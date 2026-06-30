@@ -1,4 +1,19 @@
 (function () {
+  function applyTheme(theme) {
+    var mode = theme === 'light' ? 'light' : 'dark';
+    document.body.setAttribute('data-theme', mode);
+    try { localStorage.setItem('perfushopping-theme', mode); } catch (e) {}
+    document.querySelectorAll('[data-theme-choice]').forEach(function (btn) {
+      btn.classList.toggle('active', btn.getAttribute('data-theme-choice') === mode);
+    });
+  }
+
+  try {
+    applyTheme(localStorage.getItem('perfushopping-theme') || 'dark');
+  } catch (e) {
+    applyTheme('dark');
+  }
+
   function onThumbClick(e) {
     var t = e.target;
     if (!t || !t.dataset || !t.dataset.mainTarget) return;
@@ -9,6 +24,11 @@
 
   document.addEventListener('click', function (e) {
     onThumbClick(e);
+    var themeBtn = e.target && e.target.closest ? e.target.closest('[data-theme-choice]') : null;
+    if (themeBtn) {
+      e.preventDefault();
+      applyTheme(themeBtn.getAttribute('data-theme-choice') || 'dark');
+    }
   });
 
   function humanSize(bytes) {

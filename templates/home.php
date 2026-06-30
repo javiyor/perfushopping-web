@@ -10,16 +10,16 @@ $isNovedades = ($q === '' && $codrub === 0 && $codsub === 0);
 
 <div class="hero">
   <div style="display:flex;justify-content:center;">
-    <img src="/assets/brand/logo-banner.jpg" alt="Perfushopping" loading="eager" decoding="async" style="max-width:80%;height:auto;border-radius:22px;border:1px solid rgba(216,178,90,0.18);box-shadow:0 22px 70px rgba(0,0,0,0.55);" />
+    <img src="/assets/brand/logo-banner.jpg" alt="Perfushopping" loading="eager" decoding="async" style="width:80%;max-width:900px;height:auto;border-radius:22px;border:1px solid rgba(216,178,90,0.18);box-shadow:0 22px 70px rgba(0,0,0,0.55);" />
   </div>
   <h1>Perfushopping</h1>
-  <p>Catalogo. Precios con IVA / sin IVA, paga facil y seguro en cuotas con Mercado Pago.</p>
+  <p>Carrito de compras. Compra, paga facil y seguro en cuotas con Mercado Pago.</p>
 </div>
 
 <div class="page" style="margin-top:16px">
   <?php if ($isNovedades): ?>
     <div style="margin-top:10px;color:rgba(246,244,239,0.72);line-height:1.55">
-      Tel: <strong>3482 765798</strong> &middot; Mail: <a href="mailto:clientes@perfushopping.com.ar" style="text-decoration:underline">clientes@perfushopping.com.ar</a><br />
+      Tel: <a href="https://wa.me/543482765798?text=Hola%20Perfushopping" target="_blank" rel="noopener" style="text-decoration:underline"><strong>3482 765798</strong></a> &middot; Mail: <a href="mailto:clientes@perfushopping.com.ar" style="text-decoration:underline">clientes@perfushopping.com.ar</a><br />
       Direcciones: 9 de julio 1610 - Hipolito Irigoyen 465 - Reconquista, Santa Fe - Argentina<br />
       Instagram: <a href="https://www.instagram.com/perfushopping" target="_blank" rel="noopener" style="text-decoration:underline">@perfushopping</a>
     </div>
@@ -27,7 +27,7 @@ $isNovedades = ($q === '' && $codrub === 0 && $codsub === 0);
   <?php else: ?>
     <h3 style="margin:0;color:var(--gold);font-family:Georgia, 'Times New Roman', serif;letter-spacing:0.7px">Catalogo</h3>
     <div style="margin-top:10px;color:rgba(246,244,239,0.72);line-height:1.55">
-      Tel: <strong>3482 765798</strong> &middot; Mail: <a href="mailto:clientes@perfushopping.com.ar" style="text-decoration:underline">clientes@perfushopping.com.ar</a><br />
+      Tel: <a href="https://wa.me/543482765798?text=Hola%20Perfushopping" target="_blank" rel="noopener" style="text-decoration:underline"><strong>3482 765798</strong></a> &middot; Mail: <a href="mailto:clientes@perfushopping.com.ar" style="text-decoration:underline">clientes@perfushopping.com.ar</a><br />
       Direcciones: 9 de julio 1610 - Hipolito Irigoyen 465 - Reconquista, Santa Fe - Argentina<br />
       Instagram: <a href="https://www.instagram.com/perfushopping" target="_blank" rel="noopener" style="text-decoration:underline">@perfushopping</a>
     </div>
@@ -80,7 +80,7 @@ $isNovedades = ($q === '' && $codrub === 0 && $codsub === 0);
             <?php endif; ?>
           </div>
           <div class="price">
-            <strong><?= htmlspecialchars(Format::moneyFromCents((int)round($withIva*100))) ?></strong>
+            <strong><?= htmlspecialchars(Format::moneyRoundedFromCents((int)round($withIva*100))) ?></strong>
             <small>IVA inc.</small>
           </div>
         </div>

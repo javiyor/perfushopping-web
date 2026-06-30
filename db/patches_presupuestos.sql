@@ -1,0 +1,41 @@
+CREATE TABLE IF NOT EXISTS presupuestos (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  codigo VARCHAR(20) NOT NULL UNIQUE,
+  cliente_id INT UNSIGNED DEFAULT NULL,
+  idclien INT UNSIGNED DEFAULT NULL,
+  cliente_nombre VARCHAR(200) DEFAULT NULL,
+  cliente_cuit VARCHAR(20) DEFAULT NULL,
+  cliente_direc VARCHAR(190) DEFAULT NULL,
+  cliente_tele VARCHAR(40) DEFAULT NULL,
+  cliente_mail VARCHAR(190) DEFAULT NULL,
+  fecha DATE NOT NULL,
+  valido_hasta DATE DEFAULT NULL,
+  subtotal_cents INT NOT NULL DEFAULT 0,
+  iva_cents INT NOT NULL DEFAULT 0,
+  total_cents INT NOT NULL DEFAULT 0,
+  estado ENUM('pendiente','aprobado','rechazado','vencido') NOT NULL DEFAULT 'pendiente',
+  notas TEXT,
+  created_by INT UNSIGNED DEFAULT NULL,
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME NOT NULL,
+  KEY idx_presupuestos_cliente (cliente_id),
+  KEY idx_presupuestos_estado (estado),
+  KEY idx_presupuestos_fecha (fecha),
+  CONSTRAINT fk_presupuestos_cliente FOREIGN KEY (cliente_id) REFERENCES web_users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_presupuestos_admin FOREIGN KEY (created_by) REFERENCES admin_users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS presupuesto_items (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  presupuesto_id INT UNSIGNED NOT NULL,
+  idprodu INT UNSIGNED DEFAULT NULL,
+  idcodgusto INT UNSIGNED DEFAULT NULL,
+  producto VARCHAR(220) NOT NULL,
+  variedad VARCHAR(60) DEFAULT NULL,
+  qty INT NOT NULL DEFAULT 1,
+  unit_price_cents INT NOT NULL DEFAULT 0,
+  iva_rate DECIMAL(7,2) NOT NULL DEFAULT 0,
+  total_cents INT NOT NULL DEFAULT 0,
+  KEY idx_presupuesto_items_presupuesto (presupuesto_id),
+  CONSTRAINT fk_presupuesto_items_presupuesto FOREIGN KEY (presupuesto_id) REFERENCES presupuestos(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

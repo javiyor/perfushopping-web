@@ -37,10 +37,18 @@ unset($_SESSION['flash']);
           <a class="pill secondary" href="/cart">Carrito</a>
           <a class="pill secondary" href="/eventos/demo-tecnica">Demo tecnica</a>
           <?php if ($user): ?>
+            <?php if (!empty($user['force_password_change'])): ?>
+              <a class="pill" href="/account/password">Cambiar clave</a>
+            <?php endif; ?>
             <a class="pill secondary" href="/affiliate">Mi credito</a>
             <a class="pill secondary" href="/wholesale/request">Solicitar mayorista</a>
             <?php if (($user['role'] ?? '') === 'admin'): ?>
               <a class="pill secondary" href="/admin">Admin</a>
+              <a class="pill secondary" href="/admin/prepare">Preparar</a>
+              <a class="pill secondary" href="/admin/orders">Pedidos</a>
+              <a class="pill secondary" href="/admin/users">Usuarios</a>
+              <a class="pill secondary" href="/admin/demo-tecnica/horarios">Horarios demo</a>
+              <a class="pill secondary" href="/admin/productos">Productos</a>
             <?php endif; ?>
             <form method="post" action="/logout" style="display:inline">
               <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>" />

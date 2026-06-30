@@ -41,6 +41,14 @@ final class CheckoutController
 
         $meta = new MetaRepo();
         $promoRepo = new PromoRepo();
+        $form = $_SESSION['checkout_form'] ?? [];
+        $selectedLugarId = (int)($form['cod_lugar'] ?? 0);
+        if ($selectedLugarId <= 0) {
+            $selectedProv = (int)($form['province_codprov'] ?? 0);
+            $selectedCity = trim((string)($form['city'] ?? ''));
+            $selectedLugar = $meta->findLugarByNameAndProvince($selectedCity, $selectedProv);
+            $selectedLugarId = (int)($selectedLugar['cod_lugar'] ?? 0);
+        }
 
         // For display: compute installment promo (all cards) based on current cart total (with IVA).
         $cart = new CartService();
@@ -72,15 +80,27 @@ final class CheckoutController
             }
         }
 
+        // Compute Correo Argentino cost for selected province (if any)
+        $selectedProv = (int)($form['province_codprov'] ?? 0);
+        $correoCost = null;
+        if ($selectedProv > 0) {
+            $correoCost = (new ShippingService())->correoCostForProvince($selectedProv, $totalCents);
+        }
+
         echo View::page('checkout.php', [
             'csrf' => Csrf::token(),
             'user' => $user,
             'isWholesale' => $isWholesale,
             'provincias' => $meta->provincias(),
+            'lugares' => $meta->lugares(),
             'tarjetas' => $promoRepo->tarjetas(),
             'inst' => $inst,
             'creditBalance' => $creditBalance,
-            'form' => $_SESSION['checkout_form'] ?? [],
+            'form' => $form,
+            'selectedLugarId' => $selectedLugarId,
+            'shippingOptions' => (new ShippingService())->deliveryLocalOptionsForDestination((string)(($_SESSION['checkout_form'] ?? [])['city'] ?? ''), (int)(($_SESSION['checkout_form'] ?? [])['province_codprov'] ?? 0)),
+            'correoCost' => $correoCost,
+            'cartTotalCents' => $totalCents,
             'flash' => $_SESSION['flash'] ?? null,
         ]);
         unset($_SESSION['flash']);
@@ -111,12 +131,22 @@ final class CheckoutController
         $city = trim((string)($_POST['city'] ?? ''));
         $postal = trim((string)($_POST['postal_code'] ?? ''));
         $prov = (int)($_POST['province_codprov'] ?? 0);
-        $localityKey = Format::slugKey($city);
-
+        $codLugar = (int)($_POST['cod_lugar'] ?? 0);
+        if ($codLugar > 0) {
+            $lugar = (new MetaRepo())->findLugar($codLugar);
+            if ($lugar && (int)($lugar['codprov'] ?? 0) === $prov) {
+                $city = trim((string)($lugar['lug_lugar'] ?? $city));
+                if ($postal === '') {
+                    $postal = trim((string)($lugar['codpost'] ?? ''));
+                }
+            }
+        }
         $shippingChoice = trim((string)($_POST['shipping_choice'] ?? ''));
+        $paymentMethod = trim((string)($_POST['payment_method'] ?? ''));
         $tarjetaId = (int)($_POST['tarjeta_id'] ?? 0);
         $cuotas = (int)($_POST['cuotas'] ?? 3);
         $creditUseRaw = trim((string)($_POST['credit_use'] ?? ''));
+        $shippingTime = trim((string)($_POST['shipping_time'] ?? ''));
 
         $form = [
             'name' => $name,
@@ -126,7 +156,10 @@ final class CheckoutController
             'city' => $city,
             'postal_code' => $postal,
             'province_codprov' => $prov,
+            'cod_lugar' => $codLugar,
             'shipping_choice' => $shippingChoice,
+            'shipping_time' => $shippingTime,
+            'payment_method' => $paymentMethod,
             'tarjeta_id' => $tarjetaId,
             'cuotas' => $cuotas,
             'credit_use' => $creditUseRaw,
@@ -142,7 +175,10 @@ final class CheckoutController
         if ($prov <= 0) {
             $errors[] = 'Selecciona provincia.';
         }
-        if (!$isWholesale && $tarjetaId <= 0) {
+        if ($codLugar <= 0) {
+            $errors[] = 'Selecciona localidad.';
+        }
+        if (!$isWholesale && $paymentMethod !== 'transfer' && $tarjetaId <= 0) {
             $errors[] = 'Selecciona tarjeta.';
         }
         if ($cuotas !== 3 && $cuotas !== 6) {
@@ -198,10 +234,10 @@ final class CheckoutController
             Response::redirect('/cart');
         }
 
-        // Promotions apply only to retail
+        // Promotions apply only to retail MP payments
         $discountPercent = 0.0;
         $recargoPercent = 0.0;
-        if (!$isWholesale) {
+        if (!$isWholesale && $paymentMethod !== 'transfer') {
             $weekday = (int)date('w') + 1; // 1=domingo
             $promo = (new PromoRepo())->bestPromoForTarjeta($tarjetaId, $weekday);
             if ($promo) {
@@ -235,11 +271,9 @@ final class CheckoutController
 
         // Shipping
         $provName = '';
-        $idzona = null;
         foreach ((new MetaRepo())->provincias() as $pr) {
             if ((int)$pr['codprov'] === $prov) {
                 $provName = (string)$pr['provinci'];
-                $idzona = $pr['idzona'] !== null ? (int)$pr['idzona'] : null;
                 break;
             }
         }
@@ -254,20 +288,16 @@ final class CheckoutController
         $shippingDetail = null;
 
         if ($shippingChoice === 'correo') {
-            if ($idzona === null) {
-                $_SESSION['flash'] = ['type' => 'danger', 'text' => 'Zona de provincia no configurada.'];
+            $correoInfo = $shipping->correoCostForProvince($prov, $totalDisc);
+            if ($correoInfo === null) {
+                $_SESSION['flash'] = ['type' => 'danger', 'text' => 'Correo Argentino no disponible para tu provincia.'];
                 Response::redirect('/checkout');
             }
-            $cost = $shipping->correoArgentinoCostCents($idzona);
-            if ($cost === null) {
-                $_SESSION['flash'] = ['type' => 'danger', 'text' => 'Correo Argentino no tiene tarifa cargada para tu zona.'];
-                Response::redirect('/checkout');
-            }
-            $shippingCost = $cost;
+            $shippingCost = $correoInfo['final_cents'];
             $shippingMethod = 'correo_argentino';
             $shippingDetail = 'Correo Argentino';
         } elseif (str_starts_with($shippingChoice, 'local_')) {
-            $opts = $shipping->deliveryLocalOptions($localityKey, $prov);
+            $opts = $shipping->deliveryLocalOptionsForDestination($city, $prov);
             $pick = null;
             foreach ($opts as $o) {
                 if ($o['id'] === $shippingChoice) {
@@ -282,20 +312,17 @@ final class CheckoutController
             $shippingCost = (int)$pick['price_cents'];
             $shippingMethod = 'local_delivery';
             $shippingDetail = (string)$pick['label'];
+            if (str_ends_with($shippingChoice, '_gratis') && $shippingTime !== '') {
+                $shippingDetail .= ' - ' . $shippingTime . ' hs';
+            }
         } else {
             $_SESSION['flash'] = ['type' => 'danger', 'text' => 'Selecciona metodo de envio.'];
             Response::redirect('/checkout');
         }
 
-        // Free shipping threshold
-        $subtotalWithIvaDisc = $totalDisc;
-        if ($subtotalWithIvaDisc >= 20000000) {
-            $shippingCost = 0;
-        }
-
         // Minimum order
-        if ($subtotalWithIvaDisc < 4000000) {
-            $_SESSION['flash'] = ['type' => 'danger', 'text' => 'El minimo de compra es $40.000 (con descuento aplicado).'];
+        if ($totalDisc < 3000000) {
+            $_SESSION['flash'] = ['type' => 'danger', 'text' => 'El minimo de compra es $30.000 (con descuento aplicado).'];
             Response::redirect('/cart');
         }
 
@@ -311,12 +338,12 @@ final class CheckoutController
             if ($balance > 0 && $creditUseRaw !== '') {
                 $want = (float)str_replace([',', ' '], ['.', ''], $creditUseRaw);
                 $wantCents = (int)round($want * 100);
-                $maxByRule = (int)floor($subtotalWithIvaDisc * 0.50);
-                $creditApplied = max(0, min($wantCents, $balance, $maxByRule, $subtotalWithIvaDisc));
+                $maxByRule = (int)floor($totalDisc * 0.50);
+                $creditApplied = max(0, min($wantCents, $balance, $maxByRule, $totalDisc));
             }
         }
 
-        $productsAfterCredit = $subtotalWithIvaDisc - $creditApplied;
+        $productsAfterCredit = $totalDisc - $creditApplied;
         $totalFinal = $productsAfterCredit + (int)$shippingCost;
         $totalForMp = $totalFinal;
         if (!$isWholesale && $cuotas === 6 && $recargoPercent > 0) {
@@ -325,7 +352,7 @@ final class CheckoutController
 
         // Create order
         $code = strtoupper(bin2hex(random_bytes(8)));
-        $orderStatus = $isWholesale ? 'pending_transfer' : 'pending_payment';
+        $orderStatus = ($isWholesale || $paymentMethod === 'transfer') ? 'pending_transfer' : 'pending_payment';
         $orderId = (new OrderRepo())->create([
             'order_code' => $code,
             'user_id' => $user ? (int)$user['id'] : null,
@@ -338,6 +365,7 @@ final class CheckoutController
             'ship_city' => $city,
             'ship_postal_code' => $postal,
             'ship_province_codprov' => $prov,
+            'ship_cod_lugar' => $codLugar > 0 ? $codLugar : null,
             'ship_province_name' => $provName,
             'shipping_method' => $shippingMethod,
             'shipping_detail' => $shippingDetail,
@@ -367,7 +395,7 @@ final class CheckoutController
         $cart->clear();
         unset($_SESSION['checkout_form']);
 
-        if ($isWholesale) {
+        if ($isWholesale || $paymentMethod === 'transfer') {
             $_SESSION['flash'] = ['type' => 'ok', 'text' => 'Pedido generado. Te mostramos los datos de transferencia.'];
             Response::redirect('/pay/mp/pending?order=' . urlencode($code) . '&mode=transfer');
         }

@@ -12,7 +12,7 @@ use Perfushopping\Web\Support\Csrf;
         <div>
           <h4><?= htmlspecialchars((string)$r['razon_social']) ?></h4>
           <div class="meta">Email: <?= htmlspecialchars((string)$r['email']) ?> | Tel: <?= htmlspecialchars((string)$r['phone']) ?></div>
-          <div class="meta">CUIT: <?= htmlspecialchars((string)$r['cuit']) ?></div>
+          <div class="meta">CUIT: <?= htmlspecialchars((string)$r['cuit']) ?> | Categoria: <?= htmlspecialchars((string)(($customerCategories[($r['customer_category'] ?? $r['user_customer_category'] ?? 'none')] ?? ($r['customer_category'] ?? $r['user_customer_category'] ?? 'Sin categoria')))) ?></div>
           <div class="meta">Dir: <?= htmlspecialchars((string)$r['address']) ?>, <?= htmlspecialchars((string)$r['city']) ?> (CP <?= htmlspecialchars((string)$r['postal_code']) ?>)</div>
         </div>
         <div class="right">

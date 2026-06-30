@@ -13,6 +13,11 @@ use Perfushopping\Web\Support\Csrf;
       <input name="address" placeholder="Direccion" />
       <input name="city" placeholder="Localidad" />
       <input name="postal_code" placeholder="Codigo postal" />
+      <select name="customer_category">
+        <?php foreach (($customerCategories ?? []) as $value => $label): ?>
+          <option value="<?= htmlspecialchars((string)$value) ?>"><?= htmlspecialchars((string)$label) ?></option>
+        <?php endforeach; ?>
+      </select>
       <select name="province_codprov">
         <option value="0">Provincia</option>
         <?php foreach ($provincias as $p): ?>

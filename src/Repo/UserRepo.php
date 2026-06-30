@@ -7,6 +7,24 @@ use Perfushopping\Web\Infra\Db;
 
 final class UserRepo
 {
+    /** @return array<int, string> */
+    public static function customerCategoryOptions(): array
+    {
+        return [
+            'none' => 'Sin categoria',
+            'peluquero' => 'Peluquero/a',
+            'cosmetologa' => 'Cosmetologa',
+            'esteticista' => 'Esteticista',
+            'manicura' => 'Manicura/o',
+            'masajista' => 'Masajista',
+            'barbero' => 'Barbero/a',
+            'maquillador' => 'Maquillador/a',
+            'spa' => 'Spa / centro estetico',
+            'revendedor' => 'Revendedor/a',
+            'otro' => 'Otro profesional',
+        ];
+    }
+
     /** @return array<string,mixed>|null */
     public function findByEmail(string $email): ?array
     {
@@ -23,6 +41,64 @@ final class UserRepo
         $st->execute([':i' => $id]);
         $r = $st->fetch();
         return $r ?: null;
+    }
+
+    /** @return array<int, array<string,mixed>> */
+    public function adminList(string $q = '', int $limit = 120): array
+    {
+        $limit = max(1, min(300, $limit));
+        $q = trim($q);
+        $params = [];
+        $sql = 'SELECT id, email, name, phone, role, wholesale_status, customer_category, created_at, last_login_at, disabled_at FROM web_users';
+        if ($q !== '') {
+            $sql .= ' WHERE email LIKE :like OR name LIKE :like OR phone LIKE :like';
+            $params[':like'] = '%' . $q . '%';
+        }
+        $sql .= ' ORDER BY created_at DESC, id DESC LIMIT ' . $limit;
+        try {
+            $st = Db::pdo()->prepare($sql);
+            $st->execute($params);
+            return $st->fetchAll();
+        } catch (\PDOException $e) {
+            $fallback = 'SELECT id, email, name, phone, role, wholesale_status, created_at, last_login_at, disabled_at FROM web_users';
+            if ($q !== '') {
+                $fallback .= ' WHERE email LIKE :like OR name LIKE :like OR phone LIKE :like';
+            }
+            $fallback .= ' ORDER BY created_at DESC, id DESC LIMIT ' . $limit;
+            $st = Db::pdo()->prepare($fallback);
+            $st->execute($params);
+            return $st->fetchAll();
+        }
+    }
+
+    public function setRole(int $userId, string $role): void
+    {
+        $st = Db::pdo()->prepare('UPDATE web_users SET role=:r WHERE id=:i LIMIT 1');
+        $st->execute([':r' => $role, ':i' => $userId]);
+    }
+
+    public function adminUpdate(int $userId, string $email, string $name, string $phone, string $role, string $wholesaleStatus, string $customerCategory): void
+    {
+        $phoneKey = preg_replace('/[^0-9]/', '', $phone) ?? '';
+        try {
+            $st = Db::pdo()->prepare('UPDATE web_users SET email=:e, name=:n, phone=:p, phone_key=:pk, role=:r, wholesale_status=:w, customer_category=:cc WHERE id=:i LIMIT 1');
+            $st->execute([':e' => $email, ':n' => $name, ':p' => $phone, ':pk' => $phoneKey, ':r' => $role, ':w' => $wholesaleStatus, ':cc' => $customerCategory, ':i' => $userId]);
+        } catch (\PDOException $e) {
+            $st = Db::pdo()->prepare('UPDATE web_users SET email=:e, name=:n, phone=:p, phone_key=:pk, role=:r, wholesale_status=:w WHERE id=:i LIMIT 1');
+            $st->execute([':e' => $email, ':n' => $name, ':p' => $phone, ':pk' => $phoneKey, ':r' => $role, ':w' => $wholesaleStatus, ':i' => $userId]);
+        }
+    }
+
+    public function setDisabled(int $userId, bool $disabled): void
+    {
+        $st = Db::pdo()->prepare('UPDATE web_users SET disabled_at=' . ($disabled ? 'NOW()' : 'NULL') . ' WHERE id=:i LIMIT 1');
+        $st->execute([':i' => $userId]);
+    }
+
+    public function deleteUser(int $userId): void
+    {
+        $st = Db::pdo()->prepare('DELETE FROM web_users WHERE id=:i LIMIT 1');
+        $st->execute([':i' => $userId]);
     }
 
     public function create(string $email, string $name, string $phone, string $role, string $whStatus): int
@@ -42,8 +118,34 @@ final class UserRepo
 
     public function setPassword(int $userId, string $hash): void
     {
-        $st = Db::pdo()->prepare('UPDATE web_users SET password_hash=:h, email_verified_at=COALESCE(email_verified_at,NOW()) WHERE id=:i');
-        $st->execute([':h' => $hash, ':i' => $userId]);
+        try {
+            $st = Db::pdo()->prepare('UPDATE web_users SET password_hash=:h, email_verified_at=COALESCE(email_verified_at,NOW()), force_password_change=0 WHERE id=:i');
+            $st->execute([':h' => $hash, ':i' => $userId]);
+        } catch (\PDOException $e) {
+            $st = Db::pdo()->prepare('UPDATE web_users SET password_hash=:h, email_verified_at=COALESCE(email_verified_at,NOW()) WHERE id=:i');
+            $st->execute([':h' => $hash, ':i' => $userId]);
+        }
+    }
+
+    public function adminResetPassword(int $userId, string $hash): void
+    {
+        try {
+            $st = Db::pdo()->prepare('UPDATE web_users SET password_hash=:h, email_verified_at=COALESCE(email_verified_at,NOW()), force_password_change=1 WHERE id=:i LIMIT 1');
+            $st->execute([':h' => $hash, ':i' => $userId]);
+        } catch (\PDOException $e) {
+            $st = Db::pdo()->prepare('UPDATE web_users SET password_hash=:h, email_verified_at=COALESCE(email_verified_at,NOW()) WHERE id=:i LIMIT 1');
+            $st->execute([':h' => $hash, ':i' => $userId]);
+        }
+    }
+
+    public function forcePasswordChange(int $userId, bool $force): void
+    {
+        try {
+            $st = Db::pdo()->prepare('UPDATE web_users SET force_password_change=:f WHERE id=:i LIMIT 1');
+            $st->execute([':f' => $force ? 1 : 0, ':i' => $userId]);
+        } catch (\PDOException $e) {
+            // Column might not exist yet.
+        }
     }
 
     public function touchLogin(int $userId): void
@@ -56,6 +158,16 @@ final class UserRepo
     {
         $st = Db::pdo()->prepare('UPDATE web_users SET wholesale_status=:s, cliente_id=:c WHERE id=:i');
         $st->execute([':s' => $status, ':c' => $clienteId, ':i' => $userId]);
+    }
+
+    public function setCustomerCategory(int $userId, string $customerCategory): void
+    {
+        try {
+            $st = Db::pdo()->prepare('UPDATE web_users SET customer_category=:cc WHERE id=:i');
+            $st->execute([':cc' => $customerCategory, ':i' => $userId]);
+        } catch (\PDOException $e) {
+            // Column might not exist yet.
+        }
     }
 
     public function setAffiliateReferrerIfEmpty(int $userId, int $referrerUserId): void

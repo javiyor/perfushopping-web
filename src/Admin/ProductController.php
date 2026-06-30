@@ -1,0 +1,355 @@
+<?php
+declare(strict_types=1);
+
+namespace Perfushopping\Web\Admin;
+
+use Perfushopping\Web\Repo\AdminProductRepo;
+use Perfushopping\Web\Service\AdminAuthService;
+use Perfushopping\Web\Service\AiProductDescriptionService;
+use Perfushopping\Web\Support\Csrf;
+use Perfushopping\Web\Support\Format;
+use Perfushopping\Web\Support\Response;
+use Perfushopping\Web\Support\View;
+
+final class ProductController
+{
+    private AdminProductRepo $repo;
+    private AdminAuthService $auth;
+
+    public function __construct()
+    {
+        $this->repo = new AdminProductRepo();
+        $this->auth = new AdminAuthService();
+    }
+
+    public function index(array $params): void
+    {
+        $adminUser = $this->auth->requireSesion();
+        $q = trim((string)($_GET['q'] ?? ''));
+        $codsub = (int)($_GET['codsub'] ?? 0);
+        $codrub = (int)($_GET['codrub'] ?? 0);
+
+        $brands = $this->repo->brandOptions();
+        $categories = $this->repo->categoryOptions();
+        $products = $this->repo->search($q, $codsub, $codrub, ($q === '' && $codsub <= 0 && $codrub <= 0) ? 24 : 60);
+
+        echo View::adminPage('admin/productos/list.php', [
+            'adminUser' => $adminUser,
+            'q' => $q,
+            'codsub' => $codsub,
+            'codrub' => $codrub,
+            'brands' => $brands,
+            'categories' => $categories,
+            'products' => $products,
+            'csrf' => Csrf::token(),
+            'flash' => $_SESSION['admin_flash'] ?? null,
+            'pageTitle' => 'Productos',
+        ]);
+        unset($_SESSION['admin_flash']);
+    }
+
+    public function show(array $params): void
+    {
+        $adminUser = $this->auth->requireSesion();
+        $id = (int)($params['id'] ?? 0);
+
+        $product = $this->repo->find($id);
+        if (!$product) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Producto no encontrado.'];
+            Response::redirect('/admin/productos');
+        }
+
+        $variants = $this->repo->variants($id);
+        $imagesMap = $this->repo->variantImagesMap(array_map(static fn (array $v): int => (int)($v['idcodgusto'] ?? 0), $variants));
+        foreach ($variants as $idx => $variant) {
+            $variants[$idx]['images'] = $imagesMap[(int)($variant['idcodgusto'] ?? 0)] ?? [];
+        }
+
+        echo View::adminPage('admin/productos/edit.php', [
+            'adminUser' => $adminUser,
+            'product' => $product,
+            'variants' => $variants,
+            'csrf' => Csrf::token(),
+            'flash' => $_SESSION['admin_flash'] ?? null,
+            'pageTitle' => 'Producto: ' . htmlspecialchars(mb_substr((string)($product['produ'] ?? ''), 0, 40)),
+        ]);
+        unset($_SESSION['admin_flash']);
+    }
+
+    public function save(array $params): void
+    {
+        $this->auth->requireSesion();
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $idprodu = (int)($_POST['idprodu'] ?? 0);
+        $product = $this->repo->find($idprodu);
+        if (!$product) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Producto no encontrado.'];
+            Response::redirect('/admin/productos');
+        }
+
+        $observ = trim((string)($_POST['observ'] ?? ''));
+        $precioBruto = $this->parseMoney((string)($_POST['precio_gross'] ?? ''));
+        $precio1Bruto = $this->parseMoney((string)($_POST['precio1_gross'] ?? ''));
+        $enweb = isset($_POST['enweb']);
+        if ($precioBruto === null || $precio1Bruto === null) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Carga precios validos.'];
+            Response::redirect('/admin/productos/' . $idprodu);
+        }
+
+        $ivaRate = (float)($product['tiva'] ?? 0);
+        $this->repo->updateProduct($idprodu, $observ, $this->grossToNet($precioBruto, $ivaRate), $this->grossToNet($precio1Bruto, $ivaRate), $enweb);
+
+        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Producto actualizado.'];
+        Response::redirect('/admin/productos/' . $idprodu);
+    }
+
+    public function uploadMainImage(array $params): void
+    {
+        $this->auth->requireSesion();
+        Csrf::check($_POST['_csrf'] ?? null);
+        $idprodu = (int)($_POST['idprodu'] ?? 0);
+
+        $product = $this->repo->find($idprodu);
+        if (!$product) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Producto no encontrado.'];
+            Response::redirect('/admin/productos');
+        }
+
+        $files = $this->normalizeFilesArray($_FILES['images'] ?? null);
+        if (!$files) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Selecciona al menos una imagen.'];
+            Response::redirect('/admin/productos/' . $idprodu);
+        }
+
+        try {
+            $dir = $this->resolveUploadDir();
+            $first = $files[0];
+            $filename = $this->storeUploadedImage($first, $dir, 'p' . $idprodu . '-main');
+            $this->repo->updateMainImage($idprodu, $filename);
+            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Imagen principal actualizada.'];
+        } catch (\Throwable $e) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => $e->getMessage()];
+        }
+        Response::redirect('/admin/productos/' . $idprodu);
+    }
+
+    public function clearMainImage(array $params): void
+    {
+        $this->auth->requireSesion();
+        Csrf::check($_POST['_csrf'] ?? null);
+        $idprodu = (int)($_POST['idprodu'] ?? 0);
+
+        $product = $this->repo->find($idprodu);
+        if (!$product) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Producto no encontrado.'];
+            Response::redirect('/admin/productos');
+        }
+        $this->repo->updateMainImage($idprodu, '');
+        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Imagen principal quitada.'];
+        Response::redirect('/admin/productos/' . $idprodu);
+    }
+
+    public function saveVariantLogistics(array $params): void
+    {
+        $this->auth->requireSesion();
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $idprodu = (int)($_POST['idprodu'] ?? 0);
+        $idcodgusto = (int)($_POST['idcodgusto'] ?? 0);
+        $weightG = max(0, (int)($_POST['weight_g'] ?? 0));
+        $heightCm = max(0, (int)($_POST['height_cm'] ?? 0));
+        $widthCm = max(0, (int)($_POST['width_cm'] ?? 0));
+        $depthCm = max(0, (int)($_POST['depth_cm'] ?? 0));
+        $productCategory = trim((string)($_POST['product_category'] ?? ''));
+
+        $product = $this->repo->find($idprodu);
+        if (!$product) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Producto no encontrado.'];
+            Response::redirect('/admin/productos');
+        }
+
+        $this->repo->updateVariantLogistics($idcodgusto, $weightG, $heightCm, $widthCm, $depthCm, $productCategory);
+        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Datos logisticos actualizados.'];
+        Response::redirect('/admin/productos/' . $idprodu);
+    }
+
+    public function uploadVariantImages(array $params): void
+    {
+        $this->auth->requireSesion();
+        Csrf::check($_POST['_csrf'] ?? null);
+        $idprodu = (int)($_POST['idprodu'] ?? 0);
+        $idcodgusto = (int)($_POST['idcodgusto'] ?? 0);
+
+        $product = $this->repo->find($idprodu);
+        if (!$product) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Producto no encontrado.'];
+            Response::redirect('/admin/productos');
+        }
+
+        $files = $this->normalizeFilesArray($_FILES['images'] ?? null);
+        if (!$files) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Selecciona al menos una imagen.'];
+            Response::redirect('/admin/productos/' . $idprodu);
+        }
+
+        $saved = 0;
+        $current = $this->repo->countVariantImages($idcodgusto);
+        try {
+            $dir = $this->resolveUploadDir();
+            foreach ($files as $idx => $file) {
+                if (($current + $saved) >= 6) break;
+                $filename = $this->storeUploadedImage($file, $dir, 'p' . $idprodu . '-g' . $idcodgusto . '-' . ($idx + 1));
+                $this->repo->insertVariantImage($idprodu, $idcodgusto, $filename);
+                $saved++;
+            }
+        } catch (\Throwable $e) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => $e->getMessage()];
+            Response::redirect('/admin/productos/' . $idprodu);
+        }
+        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Imagenes cargadas: ' . $saved . '.'];
+        Response::redirect('/admin/productos/' . $idprodu);
+    }
+
+    public function deleteVariantImage(array $params): void
+    {
+        $this->auth->requireSesion();
+        Csrf::check($_POST['_csrf'] ?? null);
+        $idprodu = (int)($_POST['idprodu'] ?? 0);
+        $idcodgusto = (int)($_POST['idcodgusto'] ?? 0);
+        $idimagen = (int)($_POST['idimagen'] ?? 0);
+        if ($idprodu <= 0 || $idcodgusto <= 0 || $idimagen <= 0) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Parametros invalidos.'];
+            Response::redirect('/admin/productos/' . max(0, $idprodu));
+        }
+        $this->repo->deleteVariantImage($idimagen, $idprodu, $idcodgusto);
+        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Imagen quitada.'];
+        Response::redirect('/admin/productos/' . $idprodu);
+    }
+
+    public function describe(array $params): void
+    {
+        $this->auth->requireSesion();
+        Csrf::check($_POST['_csrf'] ?? null);
+        $idprodu = (int)($_POST['idprodu'] ?? 0);
+
+        $product = $this->repo->find($idprodu);
+        if (!$product) {
+            Response::json(['ok' => false, 'error' => 'Producto no encontrado.'], 404);
+            return;
+        }
+        $variants = $this->repo->variants($idprodu);
+        try {
+            $text = (new AiProductDescriptionService())->generate($product, $variants);
+            Response::json(['ok' => true, 'description' => $text]);
+        } catch (\Throwable $e) {
+            Response::json(['ok' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    private function grossToNet(float $gross, float $ivaRate): float
+    {
+        $factor = 1.0 + ($ivaRate / 100.0);
+        return $factor > 0 ? round($gross / $factor, 2) : round($gross, 2);
+    }
+
+    private function parseMoney(string $value): ?float
+    {
+        $value = trim(str_replace(['$', ' '], '', $value));
+        if ($value === '') return null;
+        if (str_contains($value, ',') && str_contains($value, '.')) {
+            $value = str_replace('.', '', $value);
+            $value = str_replace(',', '.', $value);
+        } else {
+            $value = str_replace(',', '.', $value);
+        }
+        if (!is_numeric($value) || (float)$value < 0) return null;
+        return round((float)$value, 2);
+    }
+
+    private function normalizeFilesArray(mixed $raw): array
+    {
+        if (!is_array($raw) || !isset($raw['name'])) return [];
+        $out = [];
+        if (is_array($raw['name'])) {
+            foreach ($raw['name'] as $i => $name) {
+                $out[] = [
+                    'name' => is_string($name) ? $name : '',
+                    'tmp_name' => is_array($raw['tmp_name'] ?? null) && isset($raw['tmp_name'][$i]) && is_string($raw['tmp_name'][$i]) ? $raw['tmp_name'][$i] : '',
+                    'size' => is_array($raw['size'] ?? null) && isset($raw['size'][$i]) ? (int)$raw['size'][$i] : 0,
+                    'error' => is_array($raw['error'] ?? null) && isset($raw['error'][$i]) ? (int)$raw['error'][$i] : UPLOAD_ERR_NO_FILE,
+                ];
+            }
+        } else {
+            $out[] = [
+                'name' => is_string($raw['name']) ? $raw['name'] : '',
+                'tmp_name' => is_string($raw['tmp_name'] ?? '') ? $raw['tmp_name'] : '',
+                'size' => (int)($raw['size'] ?? 0),
+                'error' => (int)($raw['error'] ?? UPLOAD_ERR_NO_FILE),
+            ];
+        }
+        return array_values(array_filter($out, static fn(array $f): bool => $f['error'] === UPLOAD_ERR_OK && $f['tmp_name'] !== ''));
+    }
+
+    private function resolveUploadDir(): string
+    {
+        $base = defined('APP_BASE_DIR') ? (string)APP_BASE_DIR : (string)realpath(__DIR__ . '/../..');
+        $candidates = [
+            rtrim($base, '/\\') . '/public_html/upload',
+            rtrim($base, '/\\') . '/public/upload',
+            rtrim($base, '/\\') . '/upload',
+        ];
+        foreach ($candidates as $candidate) {
+            if (is_dir($candidate) || @mkdir($candidate, 0775, true)) {
+                return $candidate;
+            }
+        }
+        throw new \RuntimeException('No se encontro directorio de uploads.');
+    }
+
+    private function storeUploadedImage(array $file, string $dir, string $prefix): string
+    {
+        if ($file['size'] > 8 * 1024 * 1024) throw new \RuntimeException('Maximo 8 MB por archivo.');
+        if (!is_uploaded_file($file['tmp_name'])) throw new \RuntimeException('Archivo subido invalido.');
+
+        $original = $this->normalizeFilename($file['name']);
+        $ext = strtolower(pathinfo($original, PATHINFO_EXTENSION));
+        if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true)) throw new \RuntimeException('Solo JPG, PNG o WEBP.');
+
+        $prefix = trim($prefix, '-');
+        $filename = $this->uniqueFilename($dir, $prefix . '-' . $original);
+        $dest = rtrim($dir, '/\\') . DIRECTORY_SEPARATOR . $filename;
+        $tmpDest = $dest . '.tmp_' . bin2hex(random_bytes(6));
+        if (!move_uploaded_file($file['tmp_name'], $tmpDest)) throw new \RuntimeException('No se pudo mover la imagen.');
+        @chmod($tmpDest, 0644);
+        if (!@rename($tmpDest, $dest)) { @unlink($tmpDest); throw new \RuntimeException('No se pudo guardar.'); }
+        return $filename;
+    }
+
+    private function normalizeFilename(string $value): string
+    {
+        $value = trim($value);
+        $value = str_replace('\\', '/', $value);
+        $value = basename($value);
+        $value = trim($value, "\"' ");
+        $value = preg_replace('/\s+/', '-', $value) ?? $value;
+        $value = mb_strtolower($value);
+        $value = str_replace(['á','é','í','ó','ú','ñ','ü'], ['a','e','i','o','u','n','u'], $value);
+        $value = preg_replace('/[^a-z0-9._-]+/', '-', $value) ?? $value;
+        $value = trim($value, '-.');
+        return $value ?: 'imagen';
+    }
+
+    private function uniqueFilename(string $dir, string $filename): string
+    {
+        $name = pathinfo($filename, PATHINFO_FILENAME);
+        $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+        $candidate = $filename;
+        $i = 1;
+        while (is_file(rtrim($dir, '/\\') . DIRECTORY_SEPARATOR . $candidate)) {
+            $candidate = $name . '-' . $i . ($ext ? '.' . $ext : '');
+            $i++;
+        }
+        return $candidate;
+    }
+}

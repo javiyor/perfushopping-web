@@ -38,7 +38,8 @@ Endpoint: `POST /api/v1/sync`
 {
   "products": [{"idprodu": 123, "produ": "...", "precio": 1000, "precio1": 900, "imagen": "foto.jpg", "enweb": 1}],
   "gustos": [{"idcodgusto": 10, "idprodu": 123, "nomgusto": "AZUL", "stockact": 5, "discont": 0}],
-  "images": [{"idimagen": 1, "rutaimg": "foto_variante.jpg", "idprodu": 123, "idcodgusto": 10}]
+  "images": [{"idimagen": 1, "rutaimg": "foto_variante.jpg", "idprodu": 123, "idcodgusto": 10}],
+  "stock_resumen": [{"idcodgusto": 10, "stock_real": 4.00}]
 }
 ```
 

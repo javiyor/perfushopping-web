@@ -12,6 +12,11 @@ $transfer = (string)($_GET['mode'] ?? '') === 'transfer';
       Pedido <?= htmlspecialchars($order) ?> generado. Pago por transferencia.
     </div>
     <div class="notice" style="white-space:pre-wrap">
+Transferencia bancaria via Mercado Pago
+Alias MP: perfushopping.mp
+    </div>
+    <div class="notice" style="white-space:pre-wrap;margin-top:10px">
+O tambien via banco:
 Banco Santa Fe
 Titular: Feresin Natalia Gabriela
 CUIT: 27-24898238-7

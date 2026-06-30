@@ -37,15 +37,16 @@ final class ApiSyncController
         $products = $json['products'] ?? [];
         $gustos = $json['gustos'] ?? [];
         $images = $json['images'] ?? [];
+        $stockResumen = $json['stock_resumen'] ?? [];
 
-        if (!is_array($products) || !is_array($gustos) || !is_array($images)) {
-            Response::json(['ok' => false, 'error' => 'Payload must contain arrays: products, gustos, images'], 400);
+        if (!is_array($products) || !is_array($gustos) || !is_array($images) || !is_array($stockResumen)) {
+            Response::json(['ok' => false, 'error' => 'Payload must contain arrays: products, gustos, images, stock_resumen'], 400);
             return;
         }
 
         $repo = new SyncRepo();
         try {
-            $result = $repo->sync($products, $gustos, $images);
+            $result = $repo->sync($products, $gustos, $images, $stockResumen);
             Response::json(['ok' => true] + $result, 200);
         } catch (\Throwable $e) {
             $repo->log('sync_error: ' . $e->getMessage());

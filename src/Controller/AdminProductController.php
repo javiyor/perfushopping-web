@@ -17,17 +17,22 @@ final class AdminProductController
         $user = (new AuthService())->requireAdmin();
         $repo = new AdminProductRepo();
         $q = trim((string)($_GET['q'] ?? ''));
+        $codsub = (int)($_GET['codsub'] ?? 0);
+        $codrub = (int)($_GET['codrub'] ?? 0);
         $selectedId = (int)($params['id'] ?? 0);
 
-        $products = $repo->search($q, $q === '' ? 24 : 60);
+        $brands = $repo->brandOptions();
+        $categories = $repo->categoryOptions();
+        $products = $repo->search($q, $codsub, $codrub, ($q === '' && $codsub <= 0 && $codrub <= 0) ? 24 : 60);
         $selected = null;
         $variants = [];
         if ($selectedId > 0) {
             $selected = $repo->find($selectedId);
             if ($selected) {
                 $variants = $repo->variants($selectedId);
+                $imagesMap = $repo->variantImagesMap(array_map(static fn (array $variant): int => (int)($variant['idcodgusto'] ?? 0), $variants));
                 foreach ($variants as $idx => $variant) {
-                    $variants[$idx]['images'] = $repo->variantImages((int)$variant['idcodgusto']);
+                    $variants[$idx]['images'] = $imagesMap[(int)($variant['idcodgusto'] ?? 0)] ?? [];
                 }
                 $alreadyListed = false;
                 foreach ($products as $p) {
@@ -45,6 +50,10 @@ final class AdminProductController
         echo View::page('admin/products.php', [
             'user' => $user,
             'q' => $q,
+            'codsub' => $codsub,
+            'codrub' => $codrub,
+            'brands' => $brands,
+            'categories' => $categories,
             'products' => $products,
             'selected' => $selected,
             'variants' => $variants,
@@ -86,6 +95,43 @@ final class AdminProductController
         );
 
         $_SESSION['flash'] = ['type' => 'ok', 'text' => 'Producto actualizado.'];
+        Response::redirect('/admin/productos/' . $idprodu);
+    }
+
+    public function saveVariantLogistics(array $params): void
+    {
+        (new AuthService())->requireAdmin();
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $idprodu = (int)($_POST['idprodu'] ?? 0);
+        $idcodgusto = (int)($_POST['idcodgusto'] ?? 0);
+        $weightG = max(0, (int)($_POST['weight_g'] ?? 0));
+        $heightCm = max(0, (int)($_POST['height_cm'] ?? 0));
+        $widthCm = max(0, (int)($_POST['width_cm'] ?? 0));
+        $depthCm = max(0, (int)($_POST['depth_cm'] ?? 0));
+        $productCategory = trim((string)($_POST['product_category'] ?? ''));
+
+        $repo = new AdminProductRepo();
+        $product = $repo->find($idprodu);
+        if (!$product) {
+            $_SESSION['flash'] = ['type' => 'danger', 'text' => 'Producto no encontrado.'];
+            Response::redirect('/admin/productos');
+        }
+
+        $variantOk = false;
+        foreach ($repo->variants($idprodu) as $variant) {
+            if ((int)($variant['idcodgusto'] ?? 0) === $idcodgusto) {
+                $variantOk = true;
+                break;
+            }
+        }
+        if (!$variantOk) {
+            $_SESSION['flash'] = ['type' => 'danger', 'text' => 'Variedad no encontrada para ese producto.'];
+            Response::redirect('/admin/productos/' . $idprodu);
+        }
+
+        $repo->updateVariantLogistics($idcodgusto, $weightG, $heightCm, $widthCm, $depthCm, $productCategory);
+        $_SESSION['flash'] = ['type' => 'ok', 'text' => 'Datos logisticos de la variedad actualizados.'];
         Response::redirect('/admin/productos/' . $idprodu);
     }
 

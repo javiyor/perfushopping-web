@@ -11,9 +11,10 @@ final class SyncRepo
      * @param array<int, array<string,mixed>> $products
      * @param array<int, array<string,mixed>> $gustos
      * @param array<int, array<string,mixed>> $images
+     * @param array<int, array<string,mixed>> $stockResumen
      * @return array<string,int>
      */
-    public function sync(array $products, array $gustos, array $images): array
+    public function sync(array $products, array $gustos, array $images, array $stockResumen = []): array
     {
         $pdo = Db::pdo();
         $pdo->beginTransaction();
@@ -21,6 +22,7 @@ final class SyncRepo
             $pCount = 0;
             $gCount = 0;
             $iCount = 0;
+            $sCount = 0;
 
             foreach ($products as $p) {
                 if (!is_array($p)) {
@@ -51,10 +53,21 @@ final class SyncRepo
                 $this->upsertImagen($im);
                 $iCount++;
             }
+            foreach ($stockResumen as $stock) {
+                if (!is_array($stock)) {
+                    continue;
+                }
+                $idcodgusto = (int)($stock['idcodgusto'] ?? 0);
+                if ($idcodgusto <= 0) {
+                    continue;
+                }
+                $this->upsertStockResumen($stock);
+                $sCount++;
+            }
 
             $pdo->commit();
-            $this->log('sync_ok products=' . $pCount . ' gustos=' . $gCount . ' images=' . $iCount);
-            return ['products' => $pCount, 'gustos' => $gCount, 'images' => $iCount];
+            $this->log('sync_ok products=' . $pCount . ' gustos=' . $gCount . ' images=' . $iCount . ' stock_resumen=' . $sCount);
+            return ['products' => $pCount, 'gustos' => $gCount, 'images' => $iCount, 'stock_resumen' => $sCount];
         } catch (\Throwable $e) {
             $pdo->rollBack();
             throw $e;
@@ -123,7 +136,7 @@ final class SyncRepo
     /** @param array<string,mixed> $g */
     private function upsertGustos(array $g): void
     {
-        $cols = ['codgusto','nomgusto','idprodu','codscan','stocmin','stocmax','cantped','stockact','stockdev','fecha','AD','codprodu','discont','rutaimg'];
+        $cols = ['codgusto','nomgusto','idprodu','codscan','stocmin','stocmax','cantped','stockact','stockdev','fecha','AD','codprodu','discont','rutaimg','weight_g','height_cm','width_cm','depth_cm','product_category'];
         $idcodgusto = (int)$g['idcodgusto'];
 
         if (array_key_exists('rutaimg', $g)) {
@@ -216,6 +229,22 @@ final class SyncRepo
 
         $sqlI = 'INSERT INTO imagen (rutaimg, idprodu, idcodgusto) VALUES (:r,:p,:g)';
         $pdo->prepare($sqlI)->execute([':r' => $rutaimg, ':p' => $idprodu, ':g' => $idcodgusto]);
+    }
+
+    /** @param array<string,mixed> $stock */
+    private function upsertStockResumen(array $stock): void
+    {
+        $idcodgusto = (int)($stock['idcodgusto'] ?? 0);
+        if ($idcodgusto <= 0) {
+            return;
+        }
+        $stockReal = (float)($stock['stock_real'] ?? 0);
+
+        $sql = 'INSERT INTO web_stock_resumen (idcodgusto, stock_real, updated_at) VALUES (:id, :stock, NOW()) ON DUPLICATE KEY UPDATE stock_real = VALUES(stock_real), updated_at = NOW()';
+        Db::pdo()->prepare($sql)->execute([
+            ':id' => $idcodgusto,
+            ':stock' => $stockReal,
+        ]);
     }
 
     public function log(string $line): void

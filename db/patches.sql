@@ -36,3 +36,47 @@ UPDATE provincias SET idzona=@patagonia_id WHERE codprov IN (18,19,20,21,22);
 -- 4) Avoid duplicate tarifas for the same pair
 ALTER TABLE envios
   ADD UNIQUE KEY uq_envios_transporte_zona (idtransporte, idzona);
+
+-- 5) Customer category on web users and wholesale requests
+ALTER TABLE web_users
+  ADD COLUMN customer_category VARCHAR(40) NOT NULL DEFAULT 'none';
+
+ALTER TABLE wholesale_requests
+  ADD COLUMN customer_category VARCHAR(40) NOT NULL DEFAULT 'none' AFTER province_codprov;
+
+ALTER TABLE web_users
+  ADD COLUMN force_password_change TINYINT(1) NOT NULL DEFAULT 0;
+
+ALTER TABLE orders
+  ADD COLUMN ship_cod_lugar INT UNSIGNED DEFAULT NULL AFTER ship_province_codprov;
+
+ALTER TABLE gustos
+  ADD COLUMN weight_g INT(10) UNSIGNED NOT NULL DEFAULT 0,
+  ADD COLUMN height_cm INT(10) UNSIGNED NOT NULL DEFAULT 0,
+  ADD COLUMN width_cm INT(10) UNSIGNED NOT NULL DEFAULT 0,
+  ADD COLUMN depth_cm INT(10) UNSIGNED NOT NULL DEFAULT 0,
+  ADD COLUMN product_category VARCHAR(80) DEFAULT NULL;
+
+ALTER TABLE orders
+  ADD COLUMN correo_operation VARCHAR(60) DEFAULT NULL AFTER ship_cod_lugar,
+  ADD COLUMN correo_tracking VARCHAR(60) DEFAULT NULL AFTER correo_operation;
+
+CREATE TABLE IF NOT EXISTS correo_agencies (
+  agency_id VARCHAR(20) NOT NULL,
+  agency_name VARCHAR(190) DEFAULT NULL,
+  state_id VARCHAR(5) DEFAULT NULL,
+  state_name VARCHAR(80) DEFAULT NULL,
+  city_name VARCHAR(120) DEFAULT NULL,
+  street_name VARCHAR(120) DEFAULT NULL,
+  street_number VARCHAR(30) DEFAULT NULL,
+  zip_code VARCHAR(20) DEFAULT NULL,
+  phone VARCHAR(60) DEFAULT NULL,
+  email VARCHAR(190) DEFAULT NULL,
+  schedule VARCHAR(190) DEFAULT NULL,
+  pickup_availability TINYINT(1) NOT NULL DEFAULT 0,
+  package_reception TINYINT(1) NOT NULL DEFAULT 0,
+  raw_json TEXT DEFAULT NULL,
+  updated_at DATETIME NOT NULL,
+  PRIMARY KEY (agency_id),
+  KEY idx_correo_agency_state (state_id, city_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

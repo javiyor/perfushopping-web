@@ -13,6 +13,14 @@ final class Format
         return $sign . '$' . $val;
     }
 
+    public static function moneyRoundedFromCents(int $cents): string
+    {
+        $sign = $cents < 0 ? '-' : '';
+        $cents = abs($cents);
+        $val = number_format((float)round($cents / 100), 0, ',', '.');
+        return $sign . '$' . $val;
+    }
+
     public static function slugKey(string $s): string
     {
         $s = trim(mb_strtolower($s));

@@ -7,7 +7,10 @@ use Perfushopping\Web\Support\Env;
 
 final class SmtpMailer
 {
-    public function send(string $to, string $subject, string $htmlBody, string $textBody = ''): void
+    /**
+     * @param array $attachments [['name'=>'file.pdf','content'=>'raw bytes','mime'=>'application/pdf'], ...]
+     */
+    public function send(string $to, string $subject, string $htmlBody, string $textBody = '', array $attachments = []): void
     {
         $host = Env::get('SMTP_HOST', 'smtp.hostinger.com');
         $port = (int)Env::get('SMTP_PORT', '465');
@@ -46,27 +49,49 @@ final class SmtpMailer
         $this->cmd($fp, 'DATA');
         $this->expect($fp, 354);
 
-        $boundary = 'b_' . bin2hex(random_bytes(12));
+        $hasAttachments = count($attachments) > 0;
+        $boundaryMixed = 'mixed_' . bin2hex(random_bytes(12));
+        $boundaryAlt = 'alt_' . bin2hex(random_bytes(12));
+
         $headers = [];
         $headers[] = 'From: ' . $this->encodeHeaderName($fromName) . ' <' . $from . '>';
         $headers[] = 'To: <' . $to . '>';
         $headers[] = 'Subject: ' . $this->encodeHeaderName($subject);
         $headers[] = 'MIME-Version: 1.0';
-        $headers[] = 'Content-Type: multipart/alternative; boundary=' . $boundary;
         $headers[] = 'Date: ' . date('r');
+
+        if ($hasAttachments) {
+            $headers[] = 'Content-Type: multipart/mixed; boundary=' . $boundaryMixed;
+            $msg = implode("\r\n", $headers) . "\r\n\r\n";
+            $msg .= '--' . $boundaryMixed . "\r\n";
+            $msg .= "Content-Type: multipart/alternative; boundary=" . $boundaryAlt . "\r\n\r\n";
+        } else {
+            $headers[] = 'Content-Type: multipart/alternative; boundary=' . $boundaryAlt;
+            $msg = implode("\r\n", $headers) . "\r\n\r\n";
+        }
 
         $text = $textBody !== '' ? $textBody : strip_tags(str_replace(['<br>', '<br/>', '<br />'], "\n", $htmlBody));
 
-        $msg = implode("\r\n", $headers) . "\r\n\r\n";
-        $msg .= '--' . $boundary . "\r\n";
+        $msg .= '--' . $boundaryAlt . "\r\n";
         $msg .= "Content-Type: text/plain; charset=UTF-8\r\n";
         $msg .= "Content-Transfer-Encoding: 8bit\r\n\r\n";
         $msg .= $this->dotStuff($text) . "\r\n";
-        $msg .= '--' . $boundary . "\r\n";
+        $msg .= '--' . $boundaryAlt . "\r\n";
         $msg .= "Content-Type: text/html; charset=UTF-8\r\n";
         $msg .= "Content-Transfer-Encoding: 8bit\r\n\r\n";
         $msg .= $this->dotStuff($htmlBody) . "\r\n";
-        $msg .= '--' . $boundary . "--\r\n";
+        $msg .= '--' . $boundaryAlt . "--\r\n";
+
+        if ($hasAttachments) {
+            foreach ($attachments as $att) {
+                $msg .= '--' . $boundaryMixed . "\r\n";
+                $msg .= "Content-Type: " . ($att['mime'] ?? 'application/octet-stream') . "; name=\"" . $att['name'] . "\"\r\n";
+                $msg .= "Content-Disposition: attachment; filename=\"" . $att['name'] . "\"\r\n";
+                $msg .= "Content-Transfer-Encoding: base64\r\n\r\n";
+                $msg .= chunk_split(base64_encode($att['content']), 76, "\r\n") . "\r\n";
+            }
+            $msg .= '--' . $boundaryMixed . "--\r\n";
+        }
 
         fwrite($fp, $msg . "\r\n.\r\n");
         $this->expect($fp, 250);

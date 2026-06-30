@@ -40,6 +40,10 @@ final class AuthController
         }
         $_SESSION['user_id'] = (int)$u['id'];
         (new UserRepo())->touchLogin((int)$u['id']);
+        if (!empty($u['force_password_change'])) {
+            $_SESSION['flash'] = ['type' => 'ok', 'text' => 'Debes cambiar la clave antes de continuar.'];
+            Response::redirect('/account/password');
+        }
         $_SESSION['flash'] = ['type' => 'ok', 'text' => 'Sesion iniciada.'];
         Response::redirect('/');
     }
@@ -104,17 +108,7 @@ final class AuthController
         $terms->accept($id, 'privacy_v1', is_string($ip) ? $ip : null, is_string($ua) ? $ua : null);
         $terms->accept($id, 'affiliate_v1', is_string($ip) ? $ip : null, is_string($ua) ? $ua : null);
 
-        // Send activation email
-        $token = bin2hex(random_bytes(24));
-        $hash = hash('sha256', $token);
-        (new TokenRepo())->create($id, 'activate', $hash, 48);
-        $url = rtrim(Env::get('APP_URL', 'https://perfushopping.ar'), '/') . '/activate?token=' . urlencode($token);
-        (new SmtpMailer())->send($email, 'Activa tu cuenta Perfushopping',
-            '<p>Hola ' . htmlspecialchars($name) . ',</p>' .
-            '<p>Para activar tu cuenta, hace click:</p>' .
-            '<p><a href="' . htmlspecialchars($url) . '">' . htmlspecialchars($url) . '</a></p>' .
-            '<p>Si no fuiste vos, ignora este email.</p>'
-        );
+        $this->sendActivationEmail($id, $email, $name);
 
         $_SESSION['flash'] = ['type' => 'ok', 'text' => 'Te enviamos un email de activacion.'];
         Response::redirect('/login');
@@ -157,6 +151,31 @@ final class AuthController
         Response::redirect('/login');
     }
 
+    public function resendActivation(array $params): void
+    {
+        Csrf::check($_POST['_csrf'] ?? null);
+        $email = trim((string)($_POST['email'] ?? ''));
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $_SESSION['flash'] = ['type' => 'danger', 'text' => 'Ingresa un email valido.'];
+            Response::redirect('/login');
+        }
+
+        $user = (new UserRepo())->findByEmail($email);
+        if (!$user) {
+            $_SESSION['flash'] = ['type' => 'ok', 'text' => 'Si el email existe y la cuenta aun no fue activada, te enviamos un nuevo link.'];
+            Response::redirect('/login');
+        }
+
+        if (!empty($user['email_verified_at']) || !empty($user['password_hash'])) {
+            $_SESSION['flash'] = ['type' => 'ok', 'text' => 'La cuenta ya esta activada. Podes ingresar con tu clave.'];
+            Response::redirect('/login');
+        }
+
+        $this->sendActivationEmail((int)$user['id'], (string)$user['email'], (string)($user['name'] ?? ''));
+        $_SESSION['flash'] = ['type' => 'ok', 'text' => 'Te enviamos un nuevo email de activacion.'];
+        Response::redirect('/login');
+    }
+
     public function wholesaleRequestForm(array $params): void
     {
         $auth = new AuthService();
@@ -166,6 +185,7 @@ final class AuthController
             'csrf' => Csrf::token(),
             'user' => $u,
             'provincias' => $meta->provincias(),
+            'customerCategories' => UserRepo::customerCategoryOptions(),
             'flash' => $_SESSION['flash'] ?? null,
         ]);
         unset($_SESSION['flash']);
@@ -183,8 +203,12 @@ final class AuthController
             'city' => trim((string)($_POST['city'] ?? '')),
             'postal_code' => trim((string)($_POST['postal_code'] ?? '')),
             'province_codprov' => (int)($_POST['province_codprov'] ?? 0),
+            'customer_category' => trim((string)($_POST['customer_category'] ?? 'none')),
             'notes' => trim((string)($_POST['notes'] ?? '')),
         ];
+        if (!array_key_exists($data['customer_category'], UserRepo::customerCategoryOptions())) {
+            $data['customer_category'] = 'none';
+        }
         foreach (['razon_social','cuit','address','city','postal_code'] as $k) {
             if ($data[$k] === '') {
                 $_SESSION['flash'] = ['type' => 'danger', 'text' => 'Completa todos los campos.'];
@@ -197,7 +221,68 @@ final class AuthController
         }
         (new WholesaleRepo())->submit((int)$u['id'], $data);
         (new UserRepo())->setWholesaleStatus((int)$u['id'], 'pending', (int)($u['cliente_id'] ?? 0) ?: null);
+        (new UserRepo())->setCustomerCategory((int)$u['id'], $data['customer_category']);
         $_SESSION['flash'] = ['type' => 'ok', 'text' => 'Solicitud enviada. La aprobacion es manual.'];
         Response::redirect('/');
+    }
+
+    public function passwordForm(array $params): void
+    {
+        $auth = new AuthService();
+        $u = $auth->requireLogin();
+        echo View::page('auth/password_change.php', ['user' => $u, 'csrf' => Csrf::token(), 'forcePasswordChange' => !empty($u['force_password_change']), 'flash' => $_SESSION['flash'] ?? null]);
+        unset($_SESSION['flash']);
+    }
+
+    public function passwordSave(array $params): void
+    {
+        $auth = new AuthService();
+        $u = $auth->requireLogin();
+        Csrf::check($_POST['_csrf'] ?? null);
+        $current = (string)($_POST['current_password'] ?? '');
+        $new = (string)($_POST['new_password'] ?? '');
+        $confirm = (string)($_POST['confirm_password'] ?? '');
+
+        if (strlen($new) < 8) {
+            $_SESSION['flash'] = ['type' => 'danger', 'text' => 'La nueva clave debe tener al menos 8 caracteres.'];
+            Response::redirect('/account/password');
+        }
+        if ($new !== $confirm) {
+            $_SESSION['flash'] = ['type' => 'danger', 'text' => 'La confirmacion de clave no coincide.'];
+            Response::redirect('/account/password');
+        }
+        if (!password_verify($current, (string)($u['password_hash'] ?? ''))) {
+            $_SESSION['flash'] = ['type' => 'danger', 'text' => 'La clave actual es incorrecta.'];
+            Response::redirect('/account/password');
+        }
+
+        (new UserRepo())->setPassword((int)$u['id'], password_hash($new, PASSWORD_DEFAULT));
+        $_SESSION['flash'] = ['type' => 'ok', 'text' => 'Clave actualizada.'];
+        Response::redirect('/');
+    }
+
+    private function baseUrl(): string
+    {
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $host = trim((string)($_SERVER['HTTP_HOST'] ?? ''));
+        if ($host !== '') {
+            return $scheme . '://' . $host;
+        }
+
+        return rtrim(Env::get('APP_URL', 'https://perfushopping.ar'), '/');
+    }
+
+    private function sendActivationEmail(int $userId, string $email, string $name): void
+    {
+        $token = bin2hex(random_bytes(24));
+        $hash = hash('sha256', $token);
+        (new TokenRepo())->create($userId, 'activate', $hash, 48);
+        $url = $this->baseUrl() . '/activate?token=' . urlencode($token);
+        (new SmtpMailer())->send($email, 'Activa tu cuenta Perfushopping',
+            '<p>Hola ' . htmlspecialchars($name !== '' ? $name : $email) . ',</p>' .
+            '<p>Para activar tu cuenta, hace click:</p>' .
+            '<p><a href="' . htmlspecialchars($url) . '">' . htmlspecialchars($url) . '</a></p>' .
+            '<p>Si no fuiste vos, ignora este email.</p>'
+        );
     }
 }

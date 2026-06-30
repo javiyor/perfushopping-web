@@ -39,12 +39,12 @@ if (!$isWholesale) {
     <div>
       <h2 style="margin:0;font-family:Georgia, 'Times New Roman', serif;letter-spacing:0.6px"><?= htmlspecialchars((string)$p['produ']) ?></h2>
       <div class="kpi">
-        <span class="chip gold"><?= htmlspecialchars(Format::moneyFromCents((int)round($withIva*100))) ?> IVA inc.</span>
-        <span class="chip"><?= htmlspecialchars(Format::moneyFromCents((int)round($base*100))) ?> sin IVA</span>
+        <span class="chip gold"><?= htmlspecialchars(Format::moneyRoundedFromCents((int)round($withIva*100))) ?> IVA inc.</span>
+        <span class="chip"><?= htmlspecialchars(Format::moneyRoundedFromCents((int)round($base*100))) ?> sin IVA</span>
         <?php if (!$isWholesale): ?>
           <span class="chip">3 cuotas sin interes</span>
           <?php if ($inst): ?>
-            <span class="chip"><?= htmlspecialchars((string)($inst['promo']['descrip'] ?? 'Cuotas')) ?>: <?= (int)$inst['cuotas'] ?>x <?= htmlspecialchars(Format::moneyFromCents((int)$inst['cuota_cents'])) ?></span>
+            <span class="chip"><?= htmlspecialchars((string)($inst['promo']['descrip'] ?? 'Cuotas')) ?>: <?= (int)$inst['cuotas'] ?>x <?= htmlspecialchars(Format::moneyRoundedFromCents((int)$inst['cuota_cents'])) ?></span>
           <?php else: ?>
             <span class="chip">Cuotas con Mercado Pago</span>
           <?php endif; ?>

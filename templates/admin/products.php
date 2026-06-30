@@ -2,6 +2,10 @@
 use Perfushopping\Web\Support\Format;
 
 $q = (string)($q ?? '');
+$codsub = (int)($codsub ?? 0);
+$codrub = (int)($codrub ?? 0);
+$brands = $brands ?? [];
+$categories = $categories ?? [];
 $products = $products ?? [];
 $selected = $selected ?? null;
 $variants = $variants ?? [];
@@ -31,7 +35,22 @@ $formatDate = static function (string $date): string {
 <div class="page" style="margin-top:14px">
   <form class="admin-products-search" method="get" action="/admin/productos">
     <input name="q" value="<?= htmlspecialchars($q) ?>" placeholder="Buscar por id, nombre, codigo, variedad o codscan" />
+    <select name="codsub">
+      <option value="0">Todas las marcas</option>
+      <?php foreach ($brands as $brand): ?>
+        <option value="<?= (int)($brand['codsub'] ?? 0) ?>" <?= $codsub === (int)($brand['codsub'] ?? 0) ? 'selected' : '' ?>><?= htmlspecialchars((string)($brand['nomsub'] ?? '')) ?></option>
+      <?php endforeach; ?>
+    </select>
+    <select name="codrub">
+      <option value="0">Todas las categorias</option>
+      <?php foreach ($categories as $category): ?>
+        <option value="<?= (int)($category['codrub'] ?? 0) ?>" <?= $codrub === (int)($category['codrub'] ?? 0) ? 'selected' : '' ?>><?= htmlspecialchars((string)($category['nomrub'] ?? '')) ?></option>
+      <?php endforeach; ?>
+    </select>
     <button class="btn" type="submit">Buscar</button>
+    <?php if ($q !== '' || $codsub > 0 || $codrub > 0): ?>
+      <a class="btn secondary" href="/admin/productos">Limpiar</a>
+    <?php endif; ?>
   </form>
 </div>
 
@@ -53,7 +72,20 @@ $formatDate = static function (string $date): string {
             $itemGross = (float)($item['precio'] ?? 0) * (1 + ($itemIva / 100));
             $itemSelected = $selected && (int)($selected['idprodu'] ?? 0) === $itemId;
           ?>
-          <a class="admin-product-card<?= $itemSelected ? ' selected' : '' ?>" href="/admin/productos/<?= $itemId ?><?= $q !== '' ? '?q=' . urlencode($q) : '' ?>">
+          <?php
+            $query = [];
+            if ($q !== '') {
+                $query['q'] = $q;
+            }
+            if ($codsub > 0) {
+                $query['codsub'] = (string)$codsub;
+            }
+            if ($codrub > 0) {
+                $query['codrub'] = (string)$codrub;
+            }
+            $href = '/admin/productos/' . $itemId . ($query ? '?' . http_build_query($query) : '');
+          ?>
+          <a class="admin-product-card<?= $itemSelected ? ' selected' : '' ?>" href="<?= htmlspecialchars($href) ?>">
             <div class="admin-product-card-top">
               <strong>#<?= $itemId ?></strong>
               <span class="chip<?= ((int)($item['enweb'] ?? 0) === 1) ? ' gold' : '' ?>"><?= ((int)($item['enweb'] ?? 0) === 1) ? 'En web' : 'Oculto' ?></span>
@@ -64,7 +96,7 @@ $formatDate = static function (string $date): string {
               <span><?= htmlspecialchars((string)($item['nomrub'] ?? '-')) ?></span>
             </div>
             <div class="admin-product-card-meta">
-              <span>Precio: <?= htmlspecialchars(Format::moneyFromCents((int)round($itemGross * 100))) ?></span>
+              <span>Precio: <?= htmlspecialchars(Format::moneyRoundedFromCents((int)round($itemGross * 100))) ?></span>
               <span>Var.: <?= (int)($item['variants_count'] ?? 0) ?></span>
             </div>
           </a>
@@ -209,8 +241,30 @@ $formatDate = static function (string $date): string {
             <div class="notice" style="margin-top:12px">Este producto no tiene variedades.</div>
           <?php else: ?>
             <div class="admin-variants-stack">
+              <?php
+                $logisticsSeed = ['weight_g' => '', 'height_cm' => '', 'width_cm' => '', 'depth_cm' => '', 'product_category' => ''];
+                foreach ($variants as $seedVariant) {
+                    if ((int)($seedVariant['weight_g'] ?? 0) > 0 || (int)($seedVariant['height_cm'] ?? 0) > 0 || (int)($seedVariant['width_cm'] ?? 0) > 0 || (int)($seedVariant['depth_cm'] ?? 0) > 0 || trim((string)($seedVariant['product_category'] ?? '')) !== '') {
+                        $logisticsSeed = [
+                            'weight_g' => (string)($seedVariant['weight_g'] ?? ''),
+                            'height_cm' => (string)($seedVariant['height_cm'] ?? ''),
+                            'width_cm' => (string)($seedVariant['width_cm'] ?? ''),
+                            'depth_cm' => (string)($seedVariant['depth_cm'] ?? ''),
+                            'product_category' => (string)($seedVariant['product_category'] ?? ''),
+                        ];
+                        break;
+                    }
+                }
+              ?>
               <?php foreach ($variants as $variant): ?>
                 <?php $variantId = (int)($variant['idcodgusto'] ?? 0); ?>
+                <?php
+                  $variantWeight = (int)($variant['weight_g'] ?? 0) > 0 ? (string)$variant['weight_g'] : $logisticsSeed['weight_g'];
+                  $variantHeight = (int)($variant['height_cm'] ?? 0) > 0 ? (string)$variant['height_cm'] : $logisticsSeed['height_cm'];
+                  $variantWidth = (int)($variant['width_cm'] ?? 0) > 0 ? (string)$variant['width_cm'] : $logisticsSeed['width_cm'];
+                  $variantDepth = (int)($variant['depth_cm'] ?? 0) > 0 ? (string)$variant['depth_cm'] : $logisticsSeed['depth_cm'];
+                  $variantCategory = trim((string)($variant['product_category'] ?? '')) !== '' ? (string)$variant['product_category'] : $logisticsSeed['product_category'];
+                ?>
                 <div class="variant admin-variant-card">
                   <div class="admin-variant-head">
                     <div>
@@ -239,6 +293,37 @@ $formatDate = static function (string $date): string {
                       <div class="admin-empty-image">Sin galeria cargada</div>
                     <?php endif; ?>
                   </div>
+
+                  <form method="post" action="/admin/productos/variant-logistics" class="admin-upload-form" style="margin-top:12px">
+                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>" />
+                    <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
+                    <input type="hidden" name="idcodgusto" value="<?= $variantId ?>" />
+                    <div class="admin-form-grid" style="margin-bottom:12px">
+                      <div>
+                        <label>Peso (gramos)</label>
+                        <input name="weight_g" value="<?= htmlspecialchars($variantWeight) ?>" inputmode="numeric" />
+                      </div>
+                      <div>
+                        <label>Alto (cm)</label>
+                        <input name="height_cm" value="<?= htmlspecialchars($variantHeight) ?>" inputmode="numeric" />
+                      </div>
+                      <div>
+                        <label>Ancho (cm)</label>
+                        <input name="width_cm" value="<?= htmlspecialchars($variantWidth) ?>" inputmode="numeric" />
+                      </div>
+                      <div>
+                        <label>Largo (cm)</label>
+                        <input name="depth_cm" value="<?= htmlspecialchars($variantDepth) ?>" inputmode="numeric" />
+                      </div>
+                      <div>
+                        <label>Categoria Correo</label>
+                        <input name="product_category" value="<?= htmlspecialchars($variantCategory) ?>" placeholder="Perfumeria y cosmetica" />
+                      </div>
+                    </div>
+                    <div class="admin-actions-row" style="margin-top:12px">
+                      <button class="btn secondary" type="submit">Guardar logistica</button>
+                    </div>
+                  </form>
 
                   <form method="post" action="/admin/productos/variant-images" enctype="multipart/form-data" class="admin-upload-form" style="margin-top:12px">
                     <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>" />

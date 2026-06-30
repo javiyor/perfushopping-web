@@ -11,7 +11,32 @@ use Perfushopping\Web\Support\View;
 
 final class DemoTechController
 {
-    public function form(array $params): void
+    public function index(array $params): void
+    {
+        $this->renderPage(null);
+    }
+
+    public function professionalsForm(array $params): void
+    {
+        $this->renderPage('pro');
+    }
+
+    public function clientsForm(array $params): void
+    {
+        $this->renderPage('client');
+    }
+
+    public function professionalsSubmit(array $params): void
+    {
+        $this->submitRegistration('pro', '/eventos/demo-tecnica/profesionales');
+    }
+
+    public function clientsSubmit(array $params): void
+    {
+        $this->submitRegistration('client', '/eventos/demo-tecnica/clientes');
+    }
+
+    private function renderPage(?string $mode): void
     {
         $auth = new AuthService();
         $u = $auth->user();
@@ -29,10 +54,11 @@ final class DemoTechController
             'isWholesale' => $isWholesale,
             'csrf' => Csrf::token(),
             'events' => $events,
+            'mode' => $mode,
         ]);
     }
 
-    public function submit(array $params): void
+    private function submitRegistration(string $kind, string $redirectPath): void
     {
         Csrf::check($_POST['_csrf'] ?? null);
 
@@ -40,13 +66,13 @@ final class DemoTechController
         $trap = trim((string)($_POST['website'] ?? ''));
         if ($trap !== '') {
             $_SESSION['flash'] = ['type' => 'ok', 'text' => 'Registro recibido.'];
-            Response::redirect('/eventos/demo-tecnica');
+            Response::redirect($redirectPath);
         }
 
-        $kind = (string)($_POST['kind'] ?? '');
-        if (!in_array($kind, ['pro', 'client'], true)) {
+        $postedKind = (string)($_POST['kind'] ?? '');
+        if ($postedKind !== $kind) {
             $_SESSION['flash'] = ['type' => 'danger', 'text' => 'Tipo de registro invalido.'];
-            Response::redirect('/eventos/demo-tecnica');
+            Response::redirect($redirectPath);
         }
 
         $name = trim((string)($_POST['name'] ?? ''));
@@ -62,15 +88,15 @@ final class DemoTechController
 
         if ($name === '') {
             $_SESSION['flash'] = ['type' => 'danger', 'text' => 'Completa tu nombre.'];
-            Response::redirect('/eventos/demo-tecnica');
+            Response::redirect($redirectPath);
         }
         if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $_SESSION['flash'] = ['type' => 'danger', 'text' => 'Email invalido.'];
-            Response::redirect('/eventos/demo-tecnica');
+            Response::redirect($redirectPath);
         }
         if ($eventId <= 0) {
             $_SESSION['flash'] = ['type' => 'danger', 'text' => 'Elegí un horario disponible.'];
-            Response::redirect('/eventos/demo-tecnica');
+            Response::redirect($redirectPath);
         }
 
         $repo = new DemoTechRepo();
@@ -80,7 +106,7 @@ final class DemoTechController
             $attN = (int)$attendees;
             if ($attN < 1 || $attN > 60) {
                 $_SESSION['flash'] = ['type' => 'danger', 'text' => 'Cantidad de asistentes invalida.'];
-                Response::redirect('/eventos/demo-tecnica');
+                Response::redirect($redirectPath);
             }
             $att = $attN;
         }
@@ -90,22 +116,22 @@ final class DemoTechController
             $ev = $repo->findEvent($eventId);
             if (!$ev) {
                 $_SESSION['flash'] = ['type' => 'danger', 'text' => 'Evento no disponible.'];
-                Response::redirect('/eventos/demo-tecnica');
+                Response::redirect($redirectPath);
             }
             $dtEv = \DateTimeImmutable::createFromFormat('Y-m-d', (string)($ev['monday_date'] ?? ''));
             $today = new \DateTimeImmutable('today');
             if (!$dtEv || $dtEv < $today) {
                 $_SESSION['flash'] = ['type' => 'danger', 'text' => 'No se permiten fechas pasadas.'];
-                Response::redirect('/eventos/demo-tecnica');
+                Response::redirect($redirectPath);
             }
         } catch (\Throwable $e) {
             $_SESSION['flash'] = ['type' => 'danger', 'text' => 'Evento no disponible.'];
-            Response::redirect('/eventos/demo-tecnica');
+            Response::redirect($redirectPath);
         }
 
         if ($kind === 'pro' && $salonName === '') {
             $_SESSION['flash'] = ['type' => 'danger', 'text' => 'Profesionales: completa el nombre del salon/peluqueria.'];
-            Response::redirect('/eventos/demo-tecnica');
+            Response::redirect($redirectPath);
         }
 
         try {
@@ -127,10 +153,10 @@ final class DemoTechController
             ]);
         } catch (\Throwable $e) {
             $_SESSION['flash'] = ['type' => 'danger', 'text' => $e->getMessage()];
-            Response::redirect('/eventos/demo-tecnica');
+            Response::redirect($redirectPath);
         }
 
         $_SESSION['flash'] = ['type' => 'ok', 'text' => 'Registro recibido. ID #' . $id . ' (te contactamos para coordinar).'];
-        Response::redirect('/eventos/demo-tecnica');
+        Response::redirect($redirectPath);
     }
 }

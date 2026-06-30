@@ -2,18 +2,49 @@
 /** @var string $csrf */
 /** @var array<int, array<string,mixed>> $events */
 $events = $events ?? [];
+$mode = $mode ?? null;
+$isProfessional = $mode === 'pro';
+$isClient = $mode === 'client';
 ?>
 
 <div class="page">
   <h2 style="margin:0 0 8px">Demostracion tecnica (lunes)</h2>
-  <p style="margin:0;color:rgba(246,244,239,0.72)">Registro para profesionales peluqueros y clientes. Elegi una fecha lunes y te contactamos para coordinar.</p>
+  <p style="margin:0;color:rgba(246,244,239,0.72)">Elegi el tipo de registro para derivar correctamente a profesionales o clientes y completar el formulario indicado.</p>
+  <?php if (($user['role'] ?? '') === 'admin'): ?>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+      <a class="btn secondary" href="/admin/demo-tecnica/horarios">Cargar horarios</a>
+      <a class="btn secondary" href="/admin/productos">Cargar productos</a>
+    </div>
+  <?php endif; ?>
 </div>
 
-<div class="page" style="margin-top:14px">
-  <div class="two" style="grid-template-columns:1fr 1fr">
-    <div>
-      <h3 style="margin:0 0 10px">Soy profesional (peluquero/a)</h3>
-      <form method="post" action="/eventos/demo-tecnica">
+<?php if (!$mode): ?>
+  <div class="page" style="margin-top:14px">
+    <div class="two" style="grid-template-columns:1fr 1fr">
+      <a href="/eventos/demo-tecnica/profesionales" style="display:block;text-decoration:none;color:inherit;border:1px solid rgba(255,255,255,0.12);border-radius:18px;padding:22px;background:rgba(255,255,255,0.03)">
+        <h3 style="margin:0 0 10px">Soy profesional (peluquero, esteticista, cosmetologa, manicura/o, etc)</h3>
+        <p style="margin:0;color:rgba(246,244,239,0.72)">Acceso al formulario pensado para profesionales, salones y equipos tecnicos.</p>
+        <span class="btn" style="margin-top:14px">Ir al registro profesional</span>
+      </a>
+      <a href="/eventos/demo-tecnica/clientes" style="display:block;text-decoration:none;color:inherit;border:1px solid rgba(255,255,255,0.12);border-radius:18px;padding:22px;background:rgba(255,255,255,0.03)">
+        <h3 style="margin:0 0 10px">Soy cliente (para trabajo tecnico)</h3>
+        <p style="margin:0;color:rgba(246,244,239,0.72)">Acceso al formulario para clientes que quieren participar en una demo tecnica.</p>
+        <span class="btn secondary" style="margin-top:14px">Ir al registro de clientes</span>
+      </a>
+    </div>
+  </div>
+<?php else: ?>
+  <div class="page" style="margin-top:14px">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div>
+        <h3 style="margin:0 0 6px"><?= $isProfessional ? 'Soy profesional (peluquero, esteticista, cosmetologa, manicura/o, etc)' : 'Soy cliente (para trabajo tecnico)' ?></h3>
+        <p style="margin:0;color:rgba(246,244,239,0.72)"><?= $isProfessional ? 'Completa tus datos profesionales y elegi el horario de lunes que mejor te quede.' : 'Completa tus datos y elegi el horario de lunes para coordinar la demo tecnica.' ?></p>
+      </div>
+      <a class="btn secondary" href="/eventos/demo-tecnica">Cambiar tipo de registro</a>
+    </div>
+
+    <?php if ($isProfessional): ?>
+      <form method="post" action="/eventos/demo-tecnica/profesionales">
         <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>" />
         <input type="hidden" name="kind" value="pro" />
         <input type="text" name="website" value="" autocomplete="off" tabindex="-1" style="position:absolute;left:-9999px;opacity:0" />
@@ -79,11 +110,8 @@ $events = $events ?? [];
 
         <button class="btn" type="submit" style="margin-top:12px">Enviar registro</button>
       </form>
-    </div>
-
-    <div>
-      <h3 style="margin:0 0 10px">Soy cliente (evento demostracion)</h3>
-      <form method="post" action="/eventos/demo-tecnica">
+    <?php else: ?>
+      <form method="post" action="/eventos/demo-tecnica/clientes">
         <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>" />
         <input type="hidden" name="kind" value="client" />
         <input type="text" name="website" value="" autocomplete="off" tabindex="-1" style="position:absolute;left:-9999px;opacity:0" />
@@ -135,9 +163,9 @@ $events = $events ?? [];
 
         <button class="btn" type="submit" style="margin-top:12px">Enviar registro</button>
       </form>
-    </div>
+    <?php endif; ?>
   </div>
-</div>
+<?php endif; ?>
 
 <?php if (!$events): ?>
   <div class="page" style="margin-top:14px">

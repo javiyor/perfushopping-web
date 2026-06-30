@@ -1,0 +1,130 @@
+<?php
+declare(strict_types=1);
+
+namespace Perfushopping\Web\Admin;
+
+use Perfushopping\Web\Repo\CtaCteRepo;
+use Perfushopping\Web\Service\AdminAuthService;
+use Perfushopping\Web\Support\Csrf;
+use Perfushopping\Web\Support\Response;
+use Perfushopping\Web\Support\View;
+
+final class CtaCteController
+{
+    public function index(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requireSesion();
+
+        $q = trim((string)($_GET['q'] ?? ''));
+        $list = (new CtaCteRepo())->listarConSaldo($q);
+
+        echo View::adminPage('admin/ctacte/list.php', [
+            'adminUser' => $adminUser,
+            'list' => $list,
+            'q' => $q,
+            'csrf' => Csrf::token(),
+            'pageTitle' => 'Cuentas corrientes',
+        ]);
+    }
+
+    public function show(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requireSesion();
+
+        $clienteId = (int)($params['id'] ?? 0);
+        if ($clienteId <= 0) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Cliente inválido.'];
+            Response::redirect('/admin/ctacte');
+        }
+
+        $repo = new CtaCteRepo();
+
+        // Get client info
+        $st = \Perfushopping\Web\Infra\Db::pdo()->prepare('SELECT id, name, email, phone FROM web_users WHERE id = :id LIMIT 1');
+        $st->execute([':id' => $clienteId]);
+        $cliente = $st->fetch();
+        if (!$cliente) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Cliente no encontrado.'];
+            Response::redirect('/admin/ctacte');
+        }
+
+        $saldo = $repo->saldoActual($clienteId);
+        $movimientos = $repo->movimientos($clienteId);
+
+        echo View::adminPage('admin/ctacte/show.php', [
+            'adminUser' => $adminUser,
+            'cliente' => $cliente,
+            'saldo' => $saldo,
+            'movimientos' => $movimientos,
+            'csrf' => Csrf::token(),
+            'pageTitle' => 'Cta. cte. — ' . ($cliente['name'] ?? ''),
+        ]);
+    }
+
+    public function ajuste(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requireSesion();
+
+        $clienteId = (int)($params['id'] ?? 0);
+        if ($clienteId <= 0) {
+            Response::redirect('/admin/ctacte');
+        }
+
+        echo View::adminPage('admin/ctacte/ajuste.php', [
+            'adminUser' => $adminUser,
+            'clienteId' => $clienteId,
+            'csrf' => Csrf::token(),
+            'pageTitle' => 'Ajuste manual',
+        ]);
+    }
+
+    public function storeAjuste(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requireSesion();
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $clienteId = (int)($_POST['cliente_id'] ?? 0);
+        $tipo = (string)($_POST['tipo'] ?? '');
+        $montoCents = (int)($_POST['monto_cents'] ?? 0);
+        $concepto = trim((string)($_POST['concepto'] ?? ''));
+
+        if ($clienteId <= 0 || !in_array($tipo, ['debito', 'credito'], true) || $montoCents <= 0 || $concepto === '') {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Completá todos los campos.'];
+            Response::redirect('/admin/ctacte/ajuste/' . $clienteId);
+        }
+
+        $repo = new CtaCteRepo();
+        $repo->agregarMovimiento(
+            $tipo,
+            'ajuste',
+            null,
+            $clienteId,
+            null,
+            $montoCents,
+            $concepto,
+            (int)$adminUser['id']
+        );
+
+        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Movimiento registrado.'];
+        Response::redirect('/admin/ctacte/' . $clienteId);
+    }
+
+    public function searchClientes(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requireSesion();
+
+        $q = trim((string)($_GET['q'] ?? ''));
+        $st = \Perfushopping\Web\Infra\Db::pdo()->prepare('
+            SELECT id, name, email, phone FROM web_users
+            WHERE name LIKE :like OR email LIKE :like OR phone LIKE :like
+            ORDER BY name ASC LIMIT 10
+        ');
+        $st->execute([':like' => '%' . $q . '%']);
+        Response::json($st->fetchAll());
+    }
+}

@@ -15,6 +15,20 @@
   --radius: 18px;
 }
 
+body[data-theme="light"] {
+  --bg0: #f8f3ea;
+  --bg1: #efe6d8;
+  --card: rgba(255,255,255,0.82);
+  --card2: rgba(255,255,255,0.92);
+  --text: #261d14;
+  --muted: rgba(38,29,20,0.72);
+  --muted2: rgba(38,29,20,0.55);
+  --gold: #b27c28;
+  --gold2: #d6a24d;
+  --line: rgba(178,124,40,0.24);
+  --shadow: 0 18px 46px rgba(97,66,28,0.15);
+}
+
 * { box-sizing: border-box; }
 html, body { height: 100%; }
 body {
@@ -89,6 +103,25 @@ a { color: inherit; text-decoration: none; }
   background: linear-gradient(135deg, rgba(216,178,90,0.12), rgba(255,255,255,0.04));
   border-radius: calc(var(--radius) + 10px);
 }
+.theme-switcher {
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+  margin-bottom:16px;
+}
+.theme-chip {
+  padding: 9px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+  color: var(--text);
+  font-weight: 700;
+  cursor: pointer;
+}
+.theme-chip.active {
+  border-color: rgba(216,178,90,0.45);
+  background: rgba(216,178,90,0.18);
+}
 .hero h1 {
   margin: 0;
   font-family: Georgia, "Times New Roman", serif;
@@ -113,6 +146,12 @@ input, select, textarea {
   background: rgba(0,0,0,0.25);
   color: var(--text);
   outline: none;
+}
+body[data-theme="light"] input,
+body[data-theme="light"] select,
+body[data-theme="light"] textarea {
+  background: rgba(255,255,255,0.88);
+  border-color: rgba(126,93,45,0.18);
 }
 input::placeholder, textarea::placeholder { color: rgba(246,244,239,0.45); }
 
@@ -204,6 +243,15 @@ input::placeholder, textarea::placeholder { color: rgba(246,244,239,0.45); }
   border-radius: calc(var(--radius) + 10px);
   padding: 18px;
   box-shadow: var(--shadow);
+}
+body[data-theme="light"] .topbar,
+body[data-theme="light"] .page,
+body[data-theme="light"] .card,
+body[data-theme="light"] .gallery,
+body[data-theme="light"] .variant,
+body[data-theme="light"] .notice {
+  background: rgba(255,255,255,0.7);
+  border-color: rgba(126,93,45,0.14);
 }
 
 .two {
@@ -501,6 +549,13 @@ input::placeholder, textarea::placeholder { color: rgba(246,244,239,0.45); }
   .admin-media-grid,
   .admin-form-grid { grid-template-columns: 1fr; }
   .admin-products-list { position: static; }
+}
+
+@media (max-width: 620px) {
+  .topbar { flex-direction: column; align-items: stretch; }
+  .brand { flex-direction: column; align-items: center; text-align: center; }
+  .brand-sub { display: none; }
+  .nav { justify-content: center; }
 }
 
 @media (max-width: 520px) {

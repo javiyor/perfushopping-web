@@ -44,4 +44,11 @@ final class View
         $body = self::render($tpl, $data);
         return self::render('layout.php', $data + ['body' => $body]);
     }
+
+    /** @param array<string,mixed> $data */
+    public static function adminPage(string $tpl, array $data = []): string
+    {
+        $body = self::render($tpl, $data);
+        return self::render('admin/layout.php', $data + ['body' => $body]);
+    }
 }
