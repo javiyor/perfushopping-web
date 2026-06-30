@@ -10,9 +10,8 @@ final class SucursalRepo
     public function listarActivas(): array
     {
         $st = Db::pdo()->query('
-            SELECT s.*, sucur.nomempre
+            SELECT s.*
             FROM admin_sucursales s
-            LEFT JOIN sucur ON sucur.idsucemp = s.idsucemp
             WHERE s.activo = 1
             ORDER BY s.nomsuc ASC
         ');
@@ -22,9 +21,8 @@ final class SucursalRepo
     public function findById(int $id): ?array
     {
         $st = Db::pdo()->prepare('
-            SELECT s.*, sucur.nomempre
+            SELECT s.*
             FROM admin_sucursales s
-            LEFT JOIN sucur ON sucur.idsucemp = s.idsucemp
             WHERE s.id = :id LIMIT 1
         ');
         $st->execute([':id' => $id]);
