@@ -7,12 +7,21 @@ use Perfushopping\Web\Infra\Db;
 
 final class AdminProductRepo
 {
+    private const SORT_MAP = [
+        'id' => 'p.idprodu', 'codprodu' => 'p.codprodu', 'produ' => 'p.produ',
+        'marca' => 's.nomsub', 'categoria' => 'r.nomrub',
+        'precio' => 'p.precio', 'precio1' => 'p.precio1', 'fecompra' => 'p.fecompra',
+    ];
+
     /** @return array<int, array<string,mixed>> */
-    public function search(string $q, int $codsub = 0, int $codrub = 0, int $limit = 40): array
+    public function search(string $q, int $codsub = 0, int $codrub = 0, int $limit = 40, string $sort = 'id', string $order = 'desc'): array
     {
         $pdo = Db::pdo();
         $limit = max(1, min(100, $limit));
         $q = trim($q);
+
+        $sortCol = self::SORT_MAP[$sort] ?? 'p.idprodu';
+        $sortDir = strtolower($order) === 'asc' ? 'ASC' : 'DESC';
 
         $params = [];
         $where = ['p.fecompra > DATE_SUB(CURDATE(), INTERVAL 6 MONTH)'];
@@ -71,7 +80,7 @@ final class AdminProductRepo
             $sql .= ' WHERE ' . implode(' AND ', $where);
         }
 
-        $sql .= ' ORDER BY p.idprodu DESC LIMIT ' . $limit;
+        $sql .= ' ORDER BY ' . $sortCol . ' ' . $sortDir . ' LIMIT ' . $limit;
         $st = $pdo->prepare($sql);
         $st->execute($params);
         return $st->fetchAll();

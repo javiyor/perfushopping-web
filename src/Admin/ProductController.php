@@ -109,16 +109,27 @@ final class ProductController
         $q = trim((string)($_GET['q'] ?? ''));
         $codsub = (int)($_GET['codsub'] ?? 0);
         $codrub = (int)($_GET['codrub'] ?? 0);
+        $sort = (string)($_GET['sort'] ?? 'id');
+        $order = (string)($_GET['order'] ?? 'desc');
+        $view = (string)($_GET['view'] ?? '');
+        if (!in_array($sort, ['id','codprodu','produ','marca','categoria','precio','precio1','fecompra'], true)) $sort = 'id';
+        if (!in_array($order, ['asc','desc'], true)) $order = 'desc';
+        $validViews = ['cards','table'];
+        $view = in_array($view, $validViews, true) ? $view : ($_SESSION['product_view'] ?? 'cards');
+        if (in_array((string)($_GET['view'] ?? ''), $validViews, true)) $_SESSION['product_view'] = $view;
 
         $brands = $this->repo->brandOptions();
         $categories = $this->repo->categoryOptions();
-        $products = $this->repo->search($q, $codsub, $codrub, ($q === '' && $codsub <= 0 && $codrub <= 0) ? 24 : 60);
+        $products = $this->repo->search($q, $codsub, $codrub, ($q === '' && $codsub <= 0 && $codrub <= 0) ? 24 : 60, $sort, $order);
 
         echo View::adminPage('admin/productos/list.php', [
             'adminUser' => $adminUser,
             'q' => $q,
             'codsub' => $codsub,
             'codrub' => $codrub,
+            'sort' => $sort,
+            'order' => $order,
+            'view' => $view,
             'brands' => $brands,
             'categories' => $categories,
             'products' => $products,

@@ -4,11 +4,23 @@ use Perfushopping\Web\Support\Format;
 $q = (string)($q ?? '');
 $codsub = (int)($codsub ?? 0);
 $codrub = (int)($codrub ?? 0);
+$sort = (string)($sort ?? 'id');
+$order = (string)($order ?? 'desc');
+$view = (string)($view ?? 'cards');
 $brands = $brands ?? [];
 $categories = $categories ?? [];
 $products = $products ?? [];
-?>
 
+$sortable = ['id'=>'ID','codprodu'=>'Código','produ'=>'Producto','marca'=>'Marca','categoria'=>'Categoría','precio'=>'Precio','fecompra'=>'F.compra'];
+$preserve = [];
+if ($q !== '') $preserve['q'] = $q;
+if ($codsub > 0) $preserve['codsub'] = (string)$codsub;
+if ($codrub > 0) $preserve['codrub'] = (string)$codrub;
+if ($view !== 'cards') $preserve['view'] = $view;
+$preserve['sort'] = $sort;
+$preserve['order'] = $order;
+$sortLink = static fn(string $col) => '/admin/productos?' . http_build_query(array_merge($preserve, ['sort' => $col, 'order' => ($sort === $col && $order === 'asc') ? 'desc' : 'asc']));
+?>
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
         <h4 class="fw-bold mb-1">Productos</h4>
@@ -42,6 +54,9 @@ $products = $products ?? [];
                     <?php endforeach; ?>
                 </select>
             </div>
+            <input type="hidden" name="sort" value="<?= htmlspecialchars($sort) ?>" />
+            <input type="hidden" name="order" value="<?= htmlspecialchars($order) ?>" />
+            <input type="hidden" name="view" value="<?= htmlspecialchars($view) ?>" />
             <div class="col-lg-1 d-flex gap-1">
                 <button class="btn btn-accent btn-sm flex-fill" type="submit"><i class="bi bi-search"></i></button>
                 <?php if ($q !== '' || $codsub > 0 || $codrub > 0): ?>
@@ -49,11 +64,71 @@ $products = $products ?? [];
                 <?php endif; ?>
             </div>
         </form>
+        <div class="d-flex gap-2 mt-2">
+            <div class="btn-group btn-group-sm">
+                <a class="btn <?= $view === 'cards' ? 'btn-accent' : 'btn-outline-secondary' ?>" href="/admin/productos?<?= http_build_query(array_merge($preserve, ['view'=>'cards'])) ?>"><i class="bi bi-grid"></i> Tarjetas</a>
+                <a class="btn <?= $view === 'table' ? 'btn-accent' : 'btn-outline-secondary' ?>" href="/admin/productos?<?= http_build_query(array_merge($preserve, ['view'=>'table'])) ?>"><i class="bi bi-list"></i> Tabla</a>
+            </div>
+        </div>
     </div>
 </div>
 
 <?php if (!$products): ?>
     <div class="alert alert-info">No se encontraron productos.</div>
+<?php elseif ($view === 'table'): ?>
+    <div class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-sm table-admin mb-0">
+                <thead>
+                    <tr>
+                        <?php foreach ($sortable as $col => $label):
+                            $active = $sort === $col;
+                        ?>
+                            <th class="<?= $active ? 'sort-active' : '' ?>">
+                                <a href="<?= htmlspecialchars($sortLink($col)) ?>" class="text-decoration-none d-flex align-items-center gap-1">
+                                    <?= htmlspecialchars($label) ?>
+                                    <?php if ($active): ?>
+                                        <i class="bi bi-chevron-<?= $order === 'asc' ? 'up' : 'down' ?>"></i>
+                                    <?php endif; ?>
+                                </a>
+                            </th>
+                        <?php endforeach; ?>
+                        <th>Var.</th>
+                        <th>Web</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($products as $item):
+                        $itemId = (int)($item['idprodu'] ?? 0);
+                        $itemIva = (float)($item['tiva'] ?? 0);
+                        $itemGross = (float)($item['precio'] ?? 0) * (1 + ($itemIva / 100));
+                        $query = [];
+                        if ($q !== '') $query['q'] = $q;
+                        if ($codsub > 0) $query['codsub'] = (string)$codsub;
+                        if ($codrub > 0) $query['codrub'] = (string)$codrub;
+                        $href = '/admin/productos/' . $itemId . ($query ? '?' . http_build_query($query) : '');
+                    ?>
+                        <tr>
+                            <td><strong>#<?= $itemId ?></strong></td>
+                            <td><code><?= htmlspecialchars((string)($item['codprodu'] ?? '-')) ?></code></td>
+                            <td><a href="<?= htmlspecialchars($href) ?>" class="text-decoration-none fw-semibold"><?= htmlspecialchars(mb_substr((string)($item['produ'] ?? ''), 0, 60)) ?></a></td>
+                            <td class="small"><?= htmlspecialchars((string)($item['nomsub'] ?? '-')) ?></td>
+                            <td class="small"><?= htmlspecialchars((string)($item['nomrub'] ?? '-')) ?></td>
+                            <td class="text-end"><?= htmlspecialchars(Format::moneyRoundedFromCents((int)round($itemGross * 100))) ?></td>
+                            <td class="text-center"><?= (int)($item['variants_count'] ?? 0) ?></td>
+                            <td class="text-center">
+                                <span class="badge <?= ((int)($item['enweb'] ?? 0) === 1) ? 'bg-success' : 'bg-secondary' ?>" style="font-size:10px"><?= ((int)($item['enweb'] ?? 0) === 1) ? 'ON' : 'OFF' ?></span>
+                            </td>
+                            <td>
+                                <a class="btn btn-sm btn-outline-secondary py-0 px-1" href="<?= htmlspecialchars($href) ?>" style="font-size:11px"><i class="bi bi-pencil"></i></a>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
 <?php else: ?>
     <div class="row g-3">
         <?php foreach ($products as $item):
