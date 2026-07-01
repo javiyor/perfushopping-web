@@ -244,6 +244,22 @@ final class AdminProductRepo
         ]);
     }
 
+    public function deleteProduct(int $idprodu): void
+    {
+        $pdo = Db::pdo();
+        $pdo->prepare('DELETE FROM imagen WHERE idprodu = :id')->execute([':id' => $idprodu]);
+        $pdo->prepare('DELETE FROM gustos WHERE idprodu = :id')->execute([':id' => $idprodu]);
+        $pdo->prepare('DELETE FROM producto_admin WHERE idprodu = :id')->execute([':id' => $idprodu]);
+        $pdo->prepare('DELETE FROM producto WHERE idprodu = :id LIMIT 1')->execute([':id' => $idprodu]);
+    }
+
+    public function deleteVariant(int $idcodgusto): void
+    {
+        $pdo = Db::pdo();
+        $pdo->prepare('DELETE FROM imagen WHERE idcodgusto = :id')->execute([':id' => $idcodgusto]);
+        $pdo->prepare('DELETE FROM gustos WHERE idcodgusto = :id LIMIT 1')->execute([':id' => $idcodgusto]);
+    }
+
     public function updateVariantLogistics(int $idcodgusto, int $weightG, int $heightCm, int $widthCm, int $depthCm, string $productCategory): void
     {
         $st = Db::pdo()->prepare('UPDATE gustos SET weight_g = :weight_g, height_cm = :height_cm, width_cm = :width_cm, depth_cm = :depth_cm, product_category = :product_category WHERE idcodgusto = :id LIMIT 1');

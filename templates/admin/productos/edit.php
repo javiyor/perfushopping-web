@@ -59,10 +59,16 @@ foreach ($proveedores as $prov) {
                         <span>IVA: <strong><?= htmlspecialchars((string)$selectedIva) ?>%</strong></span>
                     </div>
                 </div>
-                <?php if ((int)($product['enweb'] ?? 0) === 1): ?>
-                    <a class="btn btn-outline-secondary btn-sm" href="/p/<?= $selectedId ?>" target="_blank"><i class="bi bi-box-arrow-up-right"></i> Ver público</a>
-                <?php endif; ?>
-            </div>
+                <div class="d-flex gap-2">
+                    <?php if ((int)($product['enweb'] ?? 0) === 1): ?>
+                        <a class="btn btn-outline-secondary btn-sm" href="/p/<?= $selectedId ?>" target="_blank"><i class="bi bi-box-arrow-up-right"></i> Ver público</a>
+                    <?php endif; ?>
+                    <form method="post" action="/admin/productos/delete" onsubmit="return confirm('Eliminar permanentemente este producto y todas sus variedades?')">
+                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                        <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
+                        <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-trash"></i> Eliminar</button>
+                    </form>
+                </div>
         </div>
     </div>
 
@@ -239,7 +245,15 @@ foreach ($proveedores as $prov) {
                             <h6 class="fw-bold mb-0"><?= htmlspecialchars((string)($variant['nomgusto'] ?? '')) ?></h6>
                             <small class="text-muted">ID: <?= $variantId ?> · Código: <?= htmlspecialchars((string)($variant['codscan'] ?? '-')) ?> · Stock: <?= htmlspecialchars((string)($variant['stockact'] ?? '0')) ?><?= ((int)($variant['discont'] ?? 0) === 1) ? ' · <span class="text-danger">Discontinuado</span>' : '' ?></small>
                         </div>
-                        <span class="badge bg-info"><?= is_array($variant['images'] ?? null) ? count($variant['images']) : 0 ?>/6 img</span>
+                        <div class="d-flex gap-2 align-items-center">
+                            <span class="badge bg-info"><?= is_array($variant['images'] ?? null) ? count($variant['images']) : 0 ?>/6 img</span>
+                            <form method="post" action="/admin/productos/variant/delete" onsubmit="return confirm('Eliminar esta variedad?')">
+                                <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                                <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
+                                <input type="hidden" name="idcodgusto" value="<?= $variantId ?>" />
+                                <button class="btn btn-sm btn-outline-danger py-0 px-1" style="font-size:11px" type="submit"><i class="bi bi-x-lg"></i></button>
+                            </form>
+                        </div>
                     </div>
 
                     <?php if (!empty($variant['images']) && is_array($variant['images'])): ?>

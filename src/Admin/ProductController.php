@@ -346,6 +346,35 @@ final class ProductController
         }
     }
 
+    public function delete(array $params): void
+    {
+        $this->auth->requireSesion();
+        Csrf::check($_POST['_csrf'] ?? null);
+        $idprodu = (int)($_POST['idprodu'] ?? 0);
+        if ($idprodu <= 0) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'ID invalido.'];
+            Response::redirect('/admin/productos');
+        }
+        $this->repo->deleteProduct($idprodu);
+        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Producto eliminado permanentemente.'];
+        Response::redirect('/admin/productos');
+    }
+
+    public function deleteVariant(array $params): void
+    {
+        $this->auth->requireSesion();
+        Csrf::check($_POST['_csrf'] ?? null);
+        $idprodu = (int)($_POST['idprodu'] ?? 0);
+        $idcodgusto = (int)($_POST['idcodgusto'] ?? 0);
+        if ($idprodu <= 0 || $idcodgusto <= 0) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Parametros invalidos.'];
+            Response::redirect('/admin/productos/' . max(0, $idprodu));
+        }
+        $this->repo->deleteVariant($idcodgusto);
+        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Variedad eliminada.'];
+        Response::redirect('/admin/productos/' . $idprodu);
+    }
+
     private function grossToNet(float $gross, float $ivaRate): float
     {
         $factor = 1.0 + ($ivaRate / 100.0);
