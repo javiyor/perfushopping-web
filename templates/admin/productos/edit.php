@@ -135,6 +135,17 @@ foreach ($proveedores as $prov) {
                         </div>
                     </div>
 
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small">Margen minorista <span class="text-muted">(%)</span></label>
+                            <input class="form-control form-control-sm" name="ganan1" value="<?= htmlspecialchars((string)($product['ganan1'] ?? '0')) ?>" inputmode="decimal" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small">Margen mayorista <span class="text-muted">(%)</span></label>
+                            <input class="form-control form-control-sm" name="ganan2" value="<?= htmlspecialchars((string)($product['ganan2'] ?? '0')) ?>" inputmode="decimal" />
+                        </div>
+                    </div>
+
                     <div class="form-check mb-3">
                         <input class="form-check-input" type="checkbox" name="enweb" id="enweb" <?= ((int)($product['enweb'] ?? 0) === 1) ? 'checked' : '' ?> />
                         <label class="form-check-label" for="enweb">Visible en web</label>

@@ -64,6 +64,8 @@ final class ProductController
         $codepar = (int)($_POST['codepar'] ?? 0);
         $codprove = trim((string)($_POST['codprove'] ?? ''));
         $iva = (int)($_POST['iva'] ?? 0);
+        $ganan1 = (float)str_replace(',', '.', trim((string)($_POST['ganan1'] ?? '0')));
+        $ganan2 = (float)str_replace(',', '.', trim((string)($_POST['ganan2'] ?? '0')));
 
         $precioGross = $this->parseMoney((string)($_POST['precio_gross'] ?? ''));
         $precio1Gross = $this->parseMoney((string)($_POST['precio1_gross'] ?? ''));
@@ -86,7 +88,7 @@ final class ProductController
 
         $idprodu = $this->repo->createProduct($produ, $precioNeto, $precio1Neto, $iva);
 
-        $this->repo->updateProduct($idprodu, '', $precioNeto, $precio1Neto, true, $produ, $codrub, $codsub, $codepar, $codprove);
+        $this->repo->updateProduct($idprodu, '', $precioNeto, $precio1Neto, true, $produ, $codrub, $codsub, $codepar, $codprove, $ganan1, $ganan2);
 
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Producto creado correctamente.'];
         Response::redirect('/admin/productos/' . $idprodu);
@@ -181,9 +183,11 @@ final class ProductController
         $codsub = (int)($_POST['codsub'] ?? 0);
         $codepar = (int)($_POST['codepar'] ?? 0);
         $codprove = trim((string)($_POST['codprove'] ?? ''));
+        $ganan1 = (float)str_replace(',', '.', trim((string)($_POST['ganan1'] ?? '0')));
+        $ganan2 = (float)str_replace(',', '.', trim((string)($_POST['ganan2'] ?? '0')));
 
         $ivaRate = (float)($product['tiva'] ?? 0);
-        $this->repo->updateProduct($idprodu, $observ, $this->grossToNet($precioBruto, $ivaRate), $this->grossToNet($precio1Bruto, $ivaRate), $enweb, $produ, $codrub, $codsub, $codepar, $codprove);
+        $this->repo->updateProduct($idprodu, $observ, $this->grossToNet($precioBruto, $ivaRate), $this->grossToNet($precio1Bruto, $ivaRate), $enweb, $produ, $codrub, $codsub, $codepar, $codprove, $ganan1, $ganan2);
 
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Producto actualizado.'];
         Response::redirect('/admin/productos/' . $idprodu);

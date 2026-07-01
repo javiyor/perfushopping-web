@@ -39,6 +39,17 @@ $ivaOptions = $ivaOptions ?? [];
 
                     <div class="row g-2 mb-3">
                         <div class="col-md-6">
+                            <label class="form-label small">Margen minorista <span class="text-muted">(%)</span></label>
+                            <input class="form-control form-control-sm" name="ganan1" placeholder="0.00" inputmode="decimal" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small">Margen mayorista <span class="text-muted">(%)</span></label>
+                            <input class="form-control form-control-sm" name="ganan2" placeholder="0.00" inputmode="decimal" />
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
                             <label class="form-label small">Categoría</label>
                             <select class="form-select form-select-sm" name="codrub">
                                 <option value="">— Sin categoría —</option>
@@ -82,8 +93,8 @@ $ivaOptions = $ivaOptions ?? [];
                     <div class="mb-3">
                         <label class="form-label small">IVA</label>
                         <select class="form-select form-select-sm" name="iva">
-                            <?php foreach ($ivaOptions as $iva): ?>
-                                <option value="<?= (int)($iva['codivaprodu'] ?? 0) ?>"><?= htmlspecialchars((string)($iva['tiva'] ?? '')) ?>%</option>
+                            <?php foreach ($ivaOptions as $iva): $pct = (float)($iva['tiva'] ?? 0); ?>
+                                <option value="<?= (int)($iva['codivaprodu'] ?? 0) ?>"<?= $pct === 21.0 ? ' selected' : '' ?>><?= htmlspecialchars((string)($iva['tiva'] ?? '')) ?>%</option>
                             <?php endforeach; ?>
                         </select>
                     </div>

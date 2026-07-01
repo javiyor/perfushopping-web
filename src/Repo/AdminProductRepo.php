@@ -207,8 +207,8 @@ final class AdminProductRepo
         }
 
         $st = Db::pdo()->prepare('
-            INSERT INTO producto (idprodu, codprodu, produ, precio, precio1, iva, enweb, fecompra, fecalta)
-            VALUES (:id, :cp, :p, :pr, :pr1, :iva, 0, CURDATE(), NOW())
+            INSERT INTO producto (idprodu, codprodu, produ, precio, precio1, iva, ganan1, ganan2, enweb, fecompra, fecalta)
+            VALUES (:id, :cp, :p, :pr, :pr1, :iva, :g1, :g2, 0, CURDATE(), NOW())
         ');
         $st->execute([
             ':id' => $idprodu,
@@ -217,13 +217,15 @@ final class AdminProductRepo
             ':pr' => $precio,
             ':pr1' => $precio1,
             ':iva' => $iva,
+            ':g1' => 0,
+            ':g2' => 0,
         ]);
         return $idprodu;
     }
 
-    public function updateProduct(int $idprodu, string $observ, float $precioNeto, float $precio1Neto, bool $enweb, string $produ = '', int $codrub = 0, int $codsub = 0, int $codepar = 0, string $codprove = ''): void
+    public function updateProduct(int $idprodu, string $observ, float $precioNeto, float $precio1Neto, bool $enweb, string $produ = '', int $codrub = 0, int $codsub = 0, int $codepar = 0, string $codprove = '', float $ganan1 = 0, float $ganan2 = 0): void
     {
-        $st = Db::pdo()->prepare('UPDATE producto SET observ = :observ, precio = :precio, precio1 = :precio1, enweb = :enweb, produ = :produ, codrub = :codrub, codsub = :codsub, codepar = :codepar, codprove = :codprove WHERE idprodu = :id LIMIT 1');
+        $st = Db::pdo()->prepare('UPDATE producto SET observ = :observ, precio = :precio, precio1 = :precio1, enweb = :enweb, produ = :produ, codrub = :codrub, codsub = :codsub, codepar = :codepar, codprove = :codprove, ganan1 = :ganan1, ganan2 = :ganan2 WHERE idprodu = :id LIMIT 1');
         $st->execute([
             ':observ' => $observ,
             ':precio' => $precioNeto,
@@ -234,6 +236,8 @@ final class AdminProductRepo
             ':codsub' => $codsub > 0 ? $codsub : null,
             ':codepar' => $codepar > 0 ? $codepar : null,
             ':codprove' => $codprove !== '' ? $codprove : null,
+            ':ganan1' => $ganan1,
+            ':ganan2' => $ganan2,
             ':id' => $idprodu,
         ]);
     }
