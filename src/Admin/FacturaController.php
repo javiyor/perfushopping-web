@@ -5,6 +5,7 @@ namespace Perfushopping\Web\Admin;
 
 use Perfushopping\Web\Infra\SmtpMailer;
 use Perfushopping\Web\Repo\FacturaRepo;
+use Perfushopping\Web\Repo\ChequeRepo;
 use Perfushopping\Web\Service\AdminAuthService;
 use Perfushopping\Web\Support\Csrf;
 use Perfushopping\Web\Support\Format;
@@ -119,9 +120,29 @@ final class FacturaController
         foreach ($pagosRaw as $pg) {
             $monto = (int)($pg['monto_cents'] ?? 0);
             if ($monto <= 0) continue;
+            $formaPagoP = trim((string)($pg['forma_pago'] ?? 'efectivo'));
+            $chequeId = null;
+            if ($formaPagoP === 'cheque' && !empty($pg['cheque'])) {
+                $chq = $pg['cheque'];
+                $chequeRepo = new ChequeRepo();
+                $chequeId = $chequeRepo->create([
+                    'tipo' => 'tercero',
+                    'estado' => 'en_cartera',
+                    'banco_emisor' => trim((string)($chq['banco'] ?? '')),
+                    'numero_cheque' => trim((string)($chq['numero'] ?? '')),
+                    'titular' => trim((string)($chq['titular'] ?? '')),
+                    'cuit_titular' => trim((string)($chq['cuit'] ?? '')),
+                    'monto_cents' => $monto,
+                    'fecha_emision' => (string)($input['fecha'] ?? date('Y-m-d')),
+                    'fecha_vencimiento' => trim((string)($chq['vencimiento'] ?? '')) ?: null,
+                    'concepto' => 'Factura — ' . $clienteNombre,
+                ], (int)$adminUser['id']);
+                $chequeRepo->agregarMovimiento($chequeId, 'recibido', 'factura', 0, '', (int)$adminUser['id']);
+            }
             $pagos[] = [
-                'forma_pago' => trim((string)($pg['forma_pago'] ?? 'efectivo')),
+                'forma_pago' => $formaPagoP,
                 'monto_cents' => $monto,
+                'cheque_id' => $chequeId,
             ];
         }
 

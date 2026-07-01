@@ -53,6 +53,9 @@ use Perfushopping\Web\Admin\OrdenCompraController as AdminOrdenCompraController;
 use Perfushopping\Web\Admin\CajaController as AdminCajaController;
 use Perfushopping\Web\Admin\ArcaController as AdminArcaController;
 use Perfushopping\Web\Admin\EmpleadoController as AdminEmpleadoController;
+use Perfushopping\Web\Admin\ProveedorCtaCteController as AdminProveedorCtaCteController;
+use Perfushopping\Web\Admin\ChequeController as AdminChequeController;
+use Perfushopping\Web\Admin\OrdenPagoController as AdminOrdenPagoController;
 
 $router = new Router();
 
@@ -156,6 +159,8 @@ $router->post('/admin/clientes/nota', [AdminCustomerController::class, 'addNota'
 $router->get('/admin/proveedores', [AdminProveedorController::class, 'index']);
 $router->post('/admin/proveedores/save', [AdminProveedorController::class, 'save']);
 $router->post('/admin/proveedores/delete', [AdminProveedorController::class, 'delete']);
+$router->get('/admin/proveedores/ctacte', [AdminProveedorCtaCteController::class, 'index']);
+$router->get('/admin/proveedores/ctacte/(?P<id>\d+)', [AdminProveedorCtaCteController::class, 'movimientos']);
 $router->get('/admin/presupuestos', [AdminPresupuestoController::class, 'index']);
 $router->get('/admin/presupuestos/nuevo', [AdminPresupuestoController::class, 'create']);
 $router->post('/admin/presupuestos/guardar', [AdminPresupuestoController::class, 'store']);
@@ -217,6 +222,9 @@ $router->post('/admin/ordenes-compra/estado', [AdminOrdenCompraController::class
 $router->post('/admin/ordenes-compra/delete', [AdminOrdenCompraController::class, 'delete']);
 $router->get('/admin/ordenes-compra/buscar-productos', [AdminOrdenCompraController::class, 'searchProducts']);
 $router->get('/admin/ordenes-compra/buscar-proveedores', [AdminOrdenCompraController::class, 'searchProveedores']);
+$router->post('/admin/ordenes-compra/guardar-recepcion', [AdminOrdenCompraController::class, 'guardarRecepcion']);
+$router->get('/admin/ordenes-compra/fletes', [AdminOrdenCompraController::class, 'fletes']);
+$router->get('/admin/ordenes-compra/descargar-comprobante/(?P<id>\d+)', [AdminOrdenCompraController::class, 'descargarComprobante']);
 $router->get('/admin/caja', [AdminCajaController::class, 'index']);
 $router->get('/admin/caja/abrir', [AdminCajaController::class, 'abrirForm']);
 $router->post('/admin/caja/abrir/guardar', [AdminCajaController::class, 'abrirStore']);
@@ -226,13 +234,35 @@ $router->get('/admin/caja/arqueo', [AdminCajaController::class, 'arqueoForm']);
 $router->post('/admin/caja/arqueo/guardar', [AdminCajaController::class, 'storeArqueo']);
 $router->get('/admin/caja/cierre', [AdminCajaController::class, 'cierreForm']);
 $router->post('/admin/caja/cierre/guardar', [AdminCajaController::class, 'cierreStore']);
+$router->get('/admin/caja/general', [AdminCajaController::class, 'general']);
+$router->post('/admin/caja/general/guardar', [AdminCajaController::class, 'storeGeneralMovimiento']);
+$router->post('/admin/caja/general/controlar', [AdminCajaController::class, 'controlarMovimiento']);
 $router->get('/admin/arca', [AdminArcaController::class, 'index']);
 $router->get('/admin/arca/config', [AdminArcaController::class, 'config']);
 $router->post('/admin/arca/config/guardar', [AdminArcaController::class, 'configSave']);
 $router->post('/admin/arca/test', [AdminArcaController::class, 'testConnection']);
 $router->post('/admin/arca/reenviar', [AdminArcaController::class, 'reenviar']);
+$router->post('/admin/arca/generar-csr', [AdminArcaController::class, 'generarCsr']);
+$router->post('/admin/arca/cargar-certificado', [AdminArcaController::class, 'cargarCertificado']);
 $router->get('/admin/reportes', [AdminReporteController::class, 'index']);
 $router->get('/admin/reportes/data', [AdminReporteController::class, 'data']);
+
+// Admin - Cheques
+$router->get('/admin/cheques', [AdminChequeController::class, 'index']);
+$router->get('/admin/cheques/emitir', [AdminChequeController::class, 'emitirForm']);
+$router->post('/admin/cheques/emitir/guardar', [AdminChequeController::class, 'emitirStore']);
+$router->get('/admin/cheques/(?P<id>\d+)', [AdminChequeController::class, 'show']);
+$router->post('/admin/cheques/estado', [AdminChequeController::class, 'estado']);
+
+// Admin - Órdenes de pago a proveedores
+$router->get('/admin/ordenes-pago', [AdminOrdenPagoController::class, 'index']);
+$router->get('/admin/ordenes-pago/nueva', [AdminOrdenPagoController::class, 'create']);
+$router->post('/admin/ordenes-pago/guardar', [AdminOrdenPagoController::class, 'store']);
+$router->get('/admin/ordenes-pago/(?P<id>\d+)', [AdminOrdenPagoController::class, 'show']);
+$router->post('/admin/ordenes-pago/estado', [AdminOrdenPagoController::class, 'estado']);
+$router->post('/admin/ordenes-pago/delete', [AdminOrdenPagoController::class, 'delete']);
+$router->get('/admin/ordenes-pago/buscar-proveedores', [AdminOrdenPagoController::class, 'searchProveedores']);
+$router->get('/admin/ordenes-pago/deuda-proveedor', [AdminOrdenPagoController::class, 'deudaProveedor']);
 
 // Admin - Empleados / Sueldos
 $router->get('/admin/empleados', [AdminEmpleadoController::class, 'index']);

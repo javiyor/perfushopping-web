@@ -40,6 +40,8 @@ final class CajaController
         }
 
         $historial = $repo->historial($sucursalId, 10);
+        $ventasPorPuntoVenta = $repo->ventasPorPuntoVenta($fecha);
+        $saldoGeneral = $repo->saldoGeneral();
 
         echo View::adminPage('admin/caja/index.php', [
             'adminUser' => $adminUser,
@@ -49,6 +51,8 @@ final class CajaController
             'ventasEfectivo' => $ventasEfectivo,
             'ventasTransferencia' => $ventasTransferencia,
             'totalRecibos' => $totalRecibos,
+            'ventasPorPuntoVenta' => $ventasPorPuntoVenta,
+            'saldoGeneral' => $saldoGeneral,
             'arqueos' => $arqueos,
             'historial' => $historial,
             'csrf' => Csrf::token(),
@@ -144,6 +148,7 @@ final class CajaController
         $tipo = (string)($_POST['tipo'] ?? '');
         $concepto = trim((string)($_POST['concepto'] ?? ''));
         $monto = (int)($_POST['monto_cents'] ?? 0);
+        $cajaDestino = (string)($_POST['caja_destino'] ?? 'chica');
 
         if (!in_array($tipo, ['ingreso', 'egreso'], true) || $concepto === '' || $monto <= 0) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Completá todos los campos.'];
@@ -151,18 +156,100 @@ final class CajaController
         }
 
         $repo = new CajaRepo();
+
+        if ($cajaDestino === 'general') {
+            $repo->agregarMovimientoGeneral($tipo, 'directo', null, $concepto, $monto, (int)$adminUser['id']);
+            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Movimiento registrado en Caja General.'];
+            Response::redirect('/admin/caja/general');
+        }
+
+        // Default: caja chica
         $sucursalId = $auth->getSucursalId();
         $turno = $auth->getTurno();
         $apertura = $repo->aperturaActiva($sucursalId, $turno, date('Y-m-d'));
 
         if (!$apertura) {
-            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No hay caja abierta.'];
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No hay caja abierta. Abrí una primero o seleccioná Caja General.'];
             Response::redirect('/admin/caja/abrir');
         }
 
         $repo->agregarMovimiento((int)$apertura['id'], $tipo, $concepto, $monto, (int)$adminUser['id']);
-        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Movimiento registrado.'];
+        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Movimiento registrado en Caja Chica.'];
         Response::redirect('/admin/caja/movimientos');
+    }
+
+    public function general(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requireSesion();
+
+        $tipo = trim((string)($_GET['tipo'] ?? ''));
+        $desde = trim((string)($_GET['desde'] ?? ''));
+        $hasta = trim((string)($_GET['hasta'] ?? ''));
+        $q = trim((string)($_GET['q'] ?? ''));
+
+        $repo = new CajaRepo();
+        $movimientos = $repo->movimientosGenerales($tipo ?: null, $desde ?: null, $hasta ?: null, $q);
+        $totales = $repo->totalMovimientosGenerales($desde ?: null, $hasta ?: null);
+        $saldo = $repo->saldoGeneral();
+
+        echo View::adminPage('admin/caja/general.php', [
+            'adminUser' => $adminUser,
+            'movimientos' => $movimientos,
+            'totales' => $totales,
+            'saldo' => $saldo,
+            'tipo' => $tipo,
+            'desde' => $desde,
+            'hasta' => $hasta,
+            'q' => $q,
+            'csrf' => Csrf::token(),
+            'pageTitle' => 'Caja General',
+        ]);
+    }
+
+    public function storeGeneralMovimiento(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requireSesion();
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $tipo = (string)($_POST['tipo'] ?? '');
+        $concepto = trim((string)($_POST['concepto'] ?? ''));
+        $monto = (int)($_POST['monto_cents'] ?? 0);
+
+        if (!in_array($tipo, ['ingreso', 'egreso'], true) || $concepto === '' || $monto <= 0) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Completá todos los campos.'];
+            Response::redirect('/admin/caja/general');
+        }
+
+        $repo = new CajaRepo();
+        $repo->agregarMovimientoGeneral($tipo, 'directo', null, $concepto, $monto, (int)$adminUser['id']);
+
+        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Movimiento registrado en Caja General.'];
+        Response::redirect('/admin/caja/general');
+    }
+
+    public function controlarMovimiento(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requireSesion();
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $id = (int)($_POST['id'] ?? 0);
+        $accion = (string)($_POST['accion'] ?? 'controlar');
+
+        if ($id <= 0) {
+            Response::redirect('/admin/caja/general');
+        }
+
+        $repo = new CajaRepo();
+        if ($accion === 'descontrolar') {
+            $repo->descontrolarMovimientoGeneral($id);
+        } else {
+            $repo->controlarMovimientoGeneral($id, (int)$adminUser['id']);
+        }
+
+        Response::redirect('/admin/caja/general');
     }
 
     public function arqueoForm(array $params): void
@@ -269,7 +356,9 @@ final class CajaController
         Csrf::check($_POST['_csrf'] ?? null);
 
         $montoCierre = (int)($_POST['monto_cierre_cents'] ?? 0);
+        $montoRetirado = (int)($_POST['monto_retirado_cents'] ?? 0);
         if ($montoCierre < 0) $montoCierre = 0;
+        if ($montoRetirado < 0) $montoRetirado = 0;
 
         $repo = new CajaRepo();
         $sucursalId = $auth->getSucursalId();
@@ -281,10 +370,28 @@ final class CajaController
             Response::redirect('/admin/caja');
         }
 
-        $repo->cerrar((int)$apertura['id'], $montoCierre, (int)$adminUser['id']);
+        $repo->cerrar((int)$apertura['id'], $montoCierre, (int)$adminUser['id'], $montoRetirado);
+
+        // Register in caja general as ingreso from cierre
+        if ($montoRetirado > 0) {
+            $codigo = $apertura['codigo'] ?? ('CAJA-' . $apertura['id']);
+            $repo->agregarMovimientoGeneral(
+                'ingreso',
+                'cierre_caja',
+                (int)$apertura['id'],
+                'Retiro cierre caja ' . date('d/m/Y') . ' ' . ($turno === 'manana' ? 'Mañana' : 'Tarde'),
+                $montoRetirado,
+                (int)$adminUser['id']
+            );
+        }
+
         unset($_SESSION['admin_caja_id']);
 
-        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Caja cerrada. Monto final: $' . number_format($montoCierre / 100, 2, ',', '.')];
+        $msg = 'Caja cerrada. Monto final: $' . number_format($montoCierre / 100, 2, ',', '.');
+        if ($montoRetirado > 0) {
+            $msg .= ' | Retirado a Caja General: $' . number_format($montoRetirado / 100, 2, ',', '.');
+        }
+        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => $msg];
         Response::redirect('/admin/caja');
     }
 }

@@ -56,9 +56,11 @@ final class ReciboRepo
     public function pagos(int $reciboId): array
     {
         $st = Db::pdo()->prepare('
-            SELECT rp.*, f.codigo AS factura_codigo, f.total_cents AS factura_total
+            SELECT rp.*, f.codigo AS factura_codigo, f.total_cents AS factura_total,
+                   c.banco_emisor AS cheque_banco, c.numero_cheque, c.titular AS cheque_titular, c.fecha_vencimiento AS cheque_vto
             FROM recibo_pagos rp
             LEFT JOIN facturas f ON f.id = rp.factura_id
+            LEFT JOIN cheques c ON c.id = rp.cheque_id
             WHERE rp.recibo_id = :r
             ORDER BY rp.id ASC
         ');
@@ -101,11 +103,13 @@ final class ReciboRepo
             ]);
             $id = (int)$pdo->lastInsertId();
 
-            $stp = $pdo->prepare('INSERT INTO recibo_pagos (recibo_id, factura_id, monto_cents) VALUES (:rid, :fid, :monto)');
+            $stp = $pdo->prepare('INSERT INTO recibo_pagos (recibo_id, factura_id, forma_pago, cheque_id, monto_cents) VALUES (:rid, :fid, :forma, :chq, :monto)');
             foreach ($pagos as $pg) {
                 $stp->execute([
                     ':rid' => $id,
                     ':fid' => $pg['factura_id'],
+                    ':forma' => $pg['forma_pago'] ?? null,
+                    ':chq' => $pg['cheque_id'] ?? null,
                     ':monto' => $pg['monto_cents'],
                 ]);
             }

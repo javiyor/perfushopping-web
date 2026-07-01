@@ -63,7 +63,12 @@ final class FacturaRepo
 
     public function pagos(int $facturaId): array
     {
-        $st = Db::pdo()->prepare('SELECT * FROM factura_pagos WHERE factura_id = :f ORDER BY id ASC');
+        $st = Db::pdo()->prepare('
+            SELECT fp.*, c.banco_emisor AS cheque_banco, c.numero_cheque, c.titular AS cheque_titular, c.fecha_vencimiento AS cheque_vto, c.estado AS cheque_estado
+            FROM factura_pagos fp
+            LEFT JOIN cheques c ON c.id = fp.cheque_id
+            WHERE fp.factura_id = :f ORDER BY fp.id ASC
+        ');
         $st->execute([':f' => $facturaId]);
         return $st->fetchAll();
     }
@@ -129,11 +134,12 @@ final class FacturaRepo
                 ]);
             }
 
-            $stp = $pdo->prepare('INSERT INTO factura_pagos (factura_id, forma_pago, monto_cents) VALUES (:fid, :forma, :monto)');
+            $stp = $pdo->prepare('INSERT INTO factura_pagos (factura_id, forma_pago, cheque_id, monto_cents) VALUES (:fid, :forma, :chq, :monto)');
             foreach ($pagos as $pg) {
                 $stp->execute([
                     ':fid' => $id,
                     ':forma' => $pg['forma_pago'],
+                    ':chq' => $pg['cheque_id'] ?? null,
                     ':monto' => $pg['monto_cents'],
                 ]);
             }

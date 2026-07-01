@@ -174,7 +174,19 @@ $csrfToken = $csrf ?? '';
                     <option value="tarjeta_debito">Tarjeta de débito</option>
                     <option value="mercadopago">Mercado Pago</option>
                     <option value="cuenta_corriente">Cuenta corriente</option>
+                    <option value="cheque">Cheque de terceros</option>
                 </select>
+                <div id="posChequeData" class="mt-2 p-2 bg-light rounded" style="display:none">
+                    <h6 class="small fw-bold mb-2"><i class="bi bi-file-text"></i> Datos del cheque</h6>
+                    <div class="row g-1">
+                        <div class="col-6 mb-1"><input class="form-control form-control-sm" id="chequeBanco" placeholder="Banco" /></div>
+                        <div class="col-6 mb-1"><input class="form-control form-control-sm" id="chequeNumero" placeholder="N° de cheque" /></div>
+                        <div class="col-6 mb-1"><input class="form-control form-control-sm" id="chequeTitular" placeholder="Titular" /></div>
+                        <div class="col-6 mb-1"><input class="form-control form-control-sm" id="chequeCuit" placeholder="CUIT" /></div>
+                        <div class="col-6 mb-1"><label class="small">Vencimiento</label><input class="form-control form-control-sm" id="chequeVencimiento" type="date" /></div>
+                        <div class="col-6 mb-1"><label class="small">Monto del cheque</label><div class="input-group input-group-sm"><span class="input-group-text">$</span><input class="form-control" id="chequeMontoCents" type="number" placeholder="En centavos" /></div></div>
+                    </div>
+                </div>
                 <hr />
                 <label class="small text-muted">Monto recibido ($)</label>
                 <input class="form-control form-control-sm mb-2" id="montoRecibido" type="number" value="0" min="0" />
@@ -494,6 +506,11 @@ if (remInput) {
     });
 }
 
+// ── Cheque fields toggle ──
+document.getElementById('formaPago').addEventListener('change', function() {
+    document.getElementById('posChequeData').style.display = this.value === 'cheque' ? 'block' : 'none';
+});
+
 // ── Submit ──
 function submitFactura() {
     if (cart.length === 0) { alert('Agregá productos al carrito.'); return; }
@@ -538,6 +555,14 @@ function submitFactura() {
         pagos: [{
             forma_pago: formaPago,
             monto_cents: cart.reduce((sum, item) => sum + item.qty * item.unit_price_cents, 0),
+            cheque: formaPago === 'cheque' ? {
+                banco: document.getElementById('chequeBanco').value,
+                numero: document.getElementById('chequeNumero').value,
+                titular: document.getElementById('chequeTitular').value,
+                cuit: document.getElementById('chequeCuit').value,
+                vencimiento: document.getElementById('chequeVencimiento').value,
+                monto_cents: parseInt(document.getElementById('chequeMontoCents').value) || 0,
+            } : null,
         }],
     };
 

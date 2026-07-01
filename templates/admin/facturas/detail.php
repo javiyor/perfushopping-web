@@ -16,6 +16,7 @@ $estadoBadges = ['pendiente'=>'warning','emitida'=>'success','anulada'=>'seconda
 $formaPagoLabels = [
     'efectivo'=>'Efectivo', 'transferencia'=>'Transferencia', 'tarjeta_credito'=>'Tarjeta crédito',
     'tarjeta_debito'=>'Tarjeta débito', 'mercadopago'=>'Mercado Pago', 'cuenta_corriente'=>'Cta. cte.',
+    'cheque'=>'Cheque',
 ];
 ?>
 
@@ -149,8 +150,18 @@ $formaPagoLabels = [
             <div class="card-header bg-white fw-semibold">Pagos</div>
             <div class="card-body">
                 <?php foreach ($pagos as $pg): ?>
-                <div class="d-flex justify-content-between small">
-                    <span><?= htmlspecialchars($formaPagoLabels[$pg['forma_pago'] ?? ''] ?? $pg['forma_pago'] ?? '') ?></span>
+                <div class="d-flex justify-content-between small mb-1">
+                    <span>
+                        <?php if (($pg['forma_pago'] ?? '') === 'cheque'): ?>
+                            <span class="badge bg-info">Cheque</span>
+                            <?php if ($pg['cheque_banco'] ?? ''): ?>
+                                <div class="text-muted" style="font-size:11px"><?= htmlspecialchars($pg['cheque_banco']) ?> N°<?= htmlspecialchars($pg['numero_cheque'] ?? '') ?></div>
+                            <?php endif; ?>
+                            <a href="/admin/cheques/<?= (int)($pg['cheque_id'] ?? 0) ?>" class="small">Ver cheque</a>
+                        <?php else: ?>
+                            <?= htmlspecialchars($formaPagoLabels[$pg['forma_pago'] ?? ''] ?? $pg['forma_pago'] ?? '') ?>
+                        <?php endif; ?>
+                    </span>
                     <span class="fw-bold"><?= htmlspecialchars(Format::moneyFromCents((int)($pg['monto_cents'] ?? 0))) ?></span>
                 </div>
                 <?php endforeach; ?>

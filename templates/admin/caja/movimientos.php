@@ -21,6 +21,14 @@ $totalesMov = $totalesMov ?? ['total_ingresos' => 0, 'total_egresos' => 0];
                     <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
 
                     <div class="mb-3">
+                        <label class="form-label small fw-semibold">Registrar en</label>
+                        <select class="form-select" name="caja_destino" required>
+                            <option value="chica">Caja chica (turno actual)</option>
+                            <option value="general">Caja general</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
                         <label class="form-label small fw-semibold">Tipo</label>
                         <select class="form-select" name="tipo" required>
                             <option value="ingreso">Ingreso</option>

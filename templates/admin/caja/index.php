@@ -9,6 +9,8 @@ $ventasTransferencia = (int)($ventasTransferencia ?? 0);
 $totalRecibos = (int)($totalRecibos ?? 0);
 $arqueos = $arqueos ?? [];
 $historial = $historial ?? [];
+$ventasPorPuntoVenta = $ventasPorPuntoVenta ?? [];
+$saldoGeneral = (int)($saldoGeneral ?? 0);
 ?>
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
@@ -170,6 +172,7 @@ $saldoEsperado = $montoInicial + $ventasEfectivo + (int)$totalesMov['total_ingre
                             <th>Turno</th>
                             <th class="text-end">Apertura</th>
                             <th class="text-end">Cierre</th>
+                            <th class="text-end">Retirado</th>
                             <th>Estado</th>
                         </tr>
                     </thead>
@@ -180,6 +183,7 @@ $saldoEsperado = $montoInicial + $ventasEfectivo + (int)$totalesMov['total_ingre
                                 <td class="small"><?= htmlspecialchars($h['turno'] ?? '') ?></td>
                                 <td class="text-end small"><?= Format::moneyFromCents((int)($h['monto_inicial_cents'] ?? 0)) ?></td>
                                 <td class="text-end small"><?= Format::moneyFromCents((int)($h['monto_cierre_cents'] ?? 0)) ?></td>
+                                <td class="text-end small"><?= Format::moneyFromCents((int)($h['monto_retirado_cents'] ?? 0)) ?></td>
                                 <td><span class="badge bg-<?= ($h['estado'] ?? '') === 'cerrada' ? 'secondary' : 'success' ?>"><?= htmlspecialchars($h['estado'] ?? '') ?></span></td>
                             </tr>
                         <?php endforeach; ?>
@@ -188,6 +192,52 @@ $saldoEsperado = $montoInicial + $ventasEfectivo + (int)$totalesMov['total_ingre
             </div>
         </div>
         <?php endif; ?>
+    </div>
+</div>
+
+<?php if ($ventasPorPuntoVenta): ?>
+<div class="row g-3 mt-1">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white fw-semibold">Ventas del día por punto de venta</div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Punto de venta</th>
+                            <th class="text-end">Efectivo</th>
+                            <th class="text-end">Transferencia/MP</th>
+                            <th class="text-end">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($ventasPorPuntoVenta as $vp): ?>
+                            <tr>
+                                <td><?= htmlspecialchars((string)($vp['sucursal_nombre'] ?? 'PV #' . ($vp['punto_venta'] ?? 0))) ?></td>
+                                <td class="text-end"><?= Format::moneyFromCents((int)($vp['total_efectivo'] ?? 0)) ?></td>
+                                <td class="text-end"><?= Format::moneyFromCents((int)($vp['total_transferencia'] ?? 0)) ?></td>
+                                <td class="text-end fw-bold"><?= Format::moneyFromCents((int)($vp['total'] ?? 0)) ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<div class="row g-3 mt-1">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+                <span>Caja General</span>
+                <span class="fw-bold">Saldo: <?= Format::moneyFromCents($saldoGeneral) ?></span>
+            </div>
+            <div class="card-body text-center">
+                <a class="btn btn-outline-primary btn-sm" href="/admin/caja/general"><i class="bi bi-cash-stack"></i> Ver movimientos</a>
+            </div>
+        </div>
     </div>
 </div>
 <?php endif; ?>

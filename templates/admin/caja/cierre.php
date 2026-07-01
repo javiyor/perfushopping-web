@@ -52,9 +52,25 @@ $esperadoEfectivo = (int)($esperadoEfectivo ?? 0);
                         <label class="form-label small fw-semibold">Monto final de cierre</label>
                         <div class="input-group">
                             <span class="input-group-text">$</span>
-                            <input class="form-control" name="monto_cierre_cents" type="number" value="<?= $esperadoEfectivo ?>" min="0" step="1" />
+                            <input class="form-control" name="monto_cierre_cents" id="montoCierre" type="number" value="<?= $esperadoEfectivo ?>" min="0" step="1" />
                         </div>
                         <div class="form-text">Efectivo físico contado al cierre. En centavos.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Efectivo retirado a Caja General</label>
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            <input class="form-control" name="monto_retirado_cents" id="montoRetirado" type="number" value="0" min="0" step="1" />
+                        </div>
+                        <div class="form-text">Monto que se transfiere a Caja General al cerrar. En centavos.</div>
+                    </div>
+
+                    <div class="mb-3 bg-light p-3 rounded small">
+                        <div class="d-flex justify-content-between">
+                            <span>Queda en caja:</span>
+                            <strong id="quedaEnCaja">$0,00</strong>
+                        </div>
                     </div>
 
                     <div class="alert alert-warning small py-2">
@@ -64,6 +80,19 @@ $esperadoEfectivo = (int)($esperadoEfectivo ?? 0);
                     </div>
 
                     <button class="btn btn-warning w-100" type="submit"><i class="bi bi-stop-fill"></i> Cerrar caja</button>
+
+<script>
+document.getElementById('montoCierre').addEventListener('input', calcQueda);
+document.getElementById('montoRetirado').addEventListener('input', calcQueda);
+function calcQueda() {
+    const cierre = parseInt(document.getElementById('montoCierre').value) || 0;
+    const retiro = parseInt(document.getElementById('montoRetirado').value) || 0;
+    const queda = cierre - retiro;
+    document.getElementById('quedaEnCaja').textContent = '$' + (queda / 100).toLocaleString('es-AR', {minimumFractionDigits:2});
+    document.getElementById('quedaEnCaja').className = queda < 0 ? 'text-danger' : queda > 0 ? 'text-success' : '';
+}
+calcQueda();
+</script>
                 </form>
             </div>
         </div>

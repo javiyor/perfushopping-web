@@ -190,7 +190,10 @@
             <a href="/admin/productos/importar" class="<?= str_starts_with($currentPath, '/admin/productos/importar') ? 'active' : '' ?>"><i class="bi bi-upload"></i>Importar</a>
             <a href="/admin/departamentos" class="<?= $currentPath === '/admin/departamentos' ? 'active' : '' ?>"><i class="bi bi-tags"></i>Departamentos</a>
             <a href="/admin/proveedores" class="<?= $currentPath === '/admin/proveedores' ? 'active' : '' ?>"><i class="bi bi-truck"></i>Proveedores</a>
+            <a href="/admin/proveedores/ctacte" class="<?= str_starts_with($currentPath, '/admin/proveedores/ctacte') ? 'active' : '' ?>"><i class="bi bi-currency-dollar"></i>Cta Cte Proveedores</a>
             <a href="/admin/ordenes-compra" class="<?= str_starts_with($currentPath, '/admin/ordenes-compra') ? 'active' : '' ?>"><i class="bi bi-cart-plus"></i>Órdenes compra</a>
+            <a href="/admin/ordenes-pago" class="<?= str_starts_with($currentPath, '/admin/ordenes-pago') ? 'active' : '' ?>"><i class="bi bi-credit-card"></i>Órdenes pago</a>
+            <a href="/admin/ordenes-compra/fletes" class="<?= $currentPath === '/admin/ordenes-compra/fletes' ? 'active' : '' ?>"><i class="bi bi-truck"></i>Fletes</a>
             <a href="/admin/stock" class="<?= str_starts_with($currentPath, '/admin/stock') ? 'active' : '' ?>"><i class="bi bi-boxes"></i>Stock</a>
             <a href="/admin/stock/ajuste" class="<?= str_starts_with($currentPath, '/admin/stock/ajuste') ? 'active' : '' ?>"><i class="bi bi-pencil-square"></i>Ajuste stock</a>
 
@@ -202,7 +205,8 @@
             <a href="/admin/facturas" class="<?= str_starts_with($currentPath, '/admin/facturas') ? 'active' : '' ?>"><i class="bi bi-receipt-cutoff"></i>Facturación</a>
             <a href="/admin/recibos" class="<?= str_starts_with($currentPath, '/admin/recibos') ? 'active' : '' ?>"><i class="bi bi-wallet2"></i>Recibos</a>
             <a href="/admin/ctacte" class="<?= str_starts_with($currentPath, '/admin/ctacte') ? 'active' : '' ?>"><i class="bi bi-currency-dollar"></i>Ctas. ctes.</a>
-            <a href="/admin/caja" class="<?= str_starts_with($currentPath, '/admin/caja') ? 'active' : '' ?>"><i class="bi bi-cash-stack"></i>Caja</a>
+            <a href="/admin/caja" class="<?= str_starts_with($currentPath, '/admin/caja') && $currentPath !== '/admin/caja/general' ? 'active' : '' ?>"><i class="bi bi-cash-stack"></i>Caja</a>
+            <a href="/admin/caja/general" class="<?= $currentPath === '/admin/caja/general' ? 'active' : '' ?>"><i class="bi bi-piggy-bank"></i>Caja General</a>
             <a href="/admin/arca" class="<?= str_starts_with($currentPath, '/admin/arca') ? 'active' : '' ?>"><i class="bi bi-cloud-check"></i>ARCA</a>
             <a href="/admin/reportes" class="<?= str_starts_with($currentPath, '/admin/reportes') ? 'active' : '' ?>"><i class="bi bi-graph-up"></i>Reportes</a>
 
@@ -217,6 +221,7 @@
             <a href="/admin/withdrawals" class="<?= str_starts_with($currentPath, '/admin/withdrawals') ? 'active' : '' ?>"><i class="bi bi-cash"></i>Retiros</a>
             <a href="/admin/correo" class="<?= str_starts_with($currentPath, '/admin/correo') ? 'active' : '' ?>"><i class="bi bi-truck"></i>Correo Argentino</a>
             <a href="/admin/demo-tecnica" class="<?= str_starts_with($currentPath, '/admin/demo-tecnica') ? 'active' : '' ?>"><i class="bi bi-calendar-event"></i>Demo técnica</a>
+            <a href="/admin/cheques" class="<?= str_starts_with($currentPath, '/admin/cheques') ? 'active' : '' ?>"><i class="bi bi-file-text"></i>Cheques</a>
         </nav>
     </aside>
 

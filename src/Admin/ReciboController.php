@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Perfushopping\Web\Admin;
 
 use Perfushopping\Web\Repo\ReciboRepo;
+use Perfushopping\Web\Repo\ChequeRepo;
 use Perfushopping\Web\Service\AdminAuthService;
 use Perfushopping\Web\Support\Csrf;
 use Perfushopping\Web\Support\Response;
@@ -60,6 +61,32 @@ final class ReciboController
             Response::redirect('/admin/recibos/nuevo');
         }
 
+        $formaPago = trim((string)($_POST['forma_pago'] ?? 'efectivo'));
+
+        // Create cheque record if forma_pago = cheque
+        $chequeId = null;
+        if ($formaPago === 'cheque') {
+            $chequeRepo = new ChequeRepo();
+            $chequeMontoCents = (int)($_POST['cheque_monto_cents'] ?? 0);
+            if ($chequeMontoCents <= 0) {
+                $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Completá los datos del cheque.'];
+                Response::redirect('/admin/recibos/nuevo');
+            }
+            $chequeId = $chequeRepo->create([
+                'tipo' => 'tercero',
+                'estado' => 'en_cartera',
+                'banco_emisor' => trim((string)($_POST['cheque_banco'] ?? '')),
+                'numero_cheque' => trim((string)($_POST['cheque_numero'] ?? '')),
+                'titular' => trim((string)($_POST['cheque_titular'] ?? '')),
+                'cuit_titular' => trim((string)($_POST['cheque_cuit'] ?? '')),
+                'monto_cents' => $chequeMontoCents,
+                'fecha_emision' => (string)($_POST['fecha'] ?? date('Y-m-d')),
+                'fecha_vencimiento' => trim((string)($_POST['cheque_vencimiento'] ?? '')) ?: null,
+                'concepto' => 'Recibo — ' . trim((string)($_POST['cliente_nombre'] ?? '')),
+            ], (int)$adminUser['id']);
+            $chequeRepo->agregarMovimiento($chequeId, 'recibido', 'recibo', 0, '', (int)$adminUser['id']);
+        }
+
         $facturaIds = $_POST['factura_id'] ?? [];
         $montosPago = $_POST['pago_monto'] ?? [];
         $pagos = [];
@@ -69,7 +96,12 @@ final class ReciboController
                 if ($fid <= 0) continue;
                 $pm = (int)($montosPago[$idx] ?? 0);
                 if ($pm <= 0) continue;
-                $pagos[] = ['factura_id' => $fid, 'monto_cents' => $pm];
+                $pagoRow = ['factura_id' => $fid, 'monto_cents' => $pm];
+                if ($chequeId) {
+                    $pagoRow['forma_pago'] = 'cheque';
+                    $pagoRow['cheque_id'] = $chequeId;
+                }
+                $pagos[] = $pagoRow;
             }
         }
 
@@ -102,7 +134,7 @@ final class ReciboController
             'cliente_condicion_iva' => $clienteCondIva,
             'fecha' => (string)($_POST['fecha'] ?? date('Y-m-d')),
             'monto_cents' => $montoCents,
-            'forma_pago' => trim((string)($_POST['forma_pago'] ?? 'efectivo')),
+            'forma_pago' => $formaPago,
             'concepto' => trim((string)($_POST['concepto'] ?? '')),
             'estado' => 'emitido',
             'notas' => trim((string)($_POST['notas'] ?? '')),

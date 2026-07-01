@@ -11,6 +11,7 @@ if (!$recibo):
 $formaPagoLabels = [
     'efectivo'=>'Efectivo', 'transferencia'=>'Transferencia', 'tarjeta_credito'=>'Tarjeta crédito',
     'tarjeta_debito'=>'Tarjeta débito', 'mercadopago'=>'Mercado Pago', 'cuenta_corriente'=>'Cta. cte.',
+    'cheque'=>'Cheque',
 ];
 ?>
 <nav aria-label="breadcrumb" class="mb-3">
@@ -104,6 +105,7 @@ $formaPagoLabels = [
                 <table class="table table-sm mb-0">
                     <thead>
                         <tr>
+                            <th>Forma de pago</th>
                             <th>Factura</th>
                             <th class="text-end">Monto pagado</th>
                         </tr>
@@ -111,6 +113,16 @@ $formaPagoLabels = [
                     <tbody>
                         <?php foreach ($pagos as $pg): ?>
                             <tr>
+                                <td>
+                                    <?php if (($pg['forma_pago'] ?? '') === 'cheque'): ?>
+                                        <span class="badge bg-info">Cheque</span>
+                                        <?php if ($pg['cheque_banco'] ?? ''): ?>
+                                            <div class="small text-muted"><?= htmlspecialchars($pg['cheque_banco']) ?> N°<?= htmlspecialchars($pg['numero_cheque'] ?? '') ?></div>
+                                        <?php endif; ?>
+                                    <?php else: ?>
+                                        <?= htmlspecialchars($formaPagoLabels[$pg['forma_pago'] ?? ''] ?? $pg['forma_pago'] ?? '') ?>
+                                    <?php endif; ?>
+                                </td>
                                 <td>
                                     <?php if ($pg['factura_id']): ?>
                                         <a href="/admin/facturas/<?= (int)$pg['factura_id'] ?>">

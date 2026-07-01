@@ -3,6 +3,7 @@ $csrfToken = $csrf ?? '';
 $formaPagoLabels = [
     'efectivo'=>'Efectivo', 'transferencia'=>'Transferencia bancaria', 'tarjeta_credito'=>'Tarjeta de crédito',
     'tarjeta_debito'=>'Tarjeta de débito', 'mercadopago'=>'Mercado Pago', 'cuenta_corriente'=>'Cuenta corriente',
+    'cheque'=>'Cheque de terceros',
 ];
 ?>
 <div class="d-flex justify-content-between align-items-start mb-3">
@@ -75,6 +76,34 @@ $formaPagoLabels = [
                     <div>
                         <label class="form-label small">Concepto</label>
                         <input class="form-control form-control-sm" name="concepto" id="concepto" placeholder="Ej: Pago facturas" />
+                    </div>
+                    <div id="chequeData" class="mt-2 p-2 bg-light rounded" style="display:none">
+                        <h6 class="small fw-bold mb-2"><i class="bi bi-file-text"></i> Datos del cheque</h6>
+                        <div class="row g-1">
+                            <div class="col-6 mb-1">
+                                <input class="form-control form-control-sm" name="cheque_banco" placeholder="Banco" />
+                            </div>
+                            <div class="col-6 mb-1">
+                                <input class="form-control form-control-sm" name="cheque_numero" placeholder="N° de cheque" />
+                            </div>
+                            <div class="col-6 mb-1">
+                                <input class="form-control form-control-sm" name="cheque_titular" placeholder="Titular" />
+                            </div>
+                            <div class="col-6 mb-1">
+                                <input class="form-control form-control-sm" name="cheque_cuit" placeholder="CUIT" />
+                            </div>
+                            <div class="col-6 mb-1">
+                                <label class="small">Vencimiento</label>
+                                <input class="form-control form-control-sm" name="cheque_vencimiento" type="date" />
+                            </div>
+                            <div class="col-6 mb-1">
+                                <label class="small">Monto del cheque</label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text">$</span>
+                                    <input class="form-control" name="cheque_monto_cents" type="number" placeholder="En centavos" />
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -241,4 +270,9 @@ function recalcTotal() {
 }
 
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── Cheque fields toggle ──
+document.getElementById('formaPago').addEventListener('change', function() {
+    document.getElementById('chequeData').style.display = this.value === 'cheque' ? 'block' : 'none';
+});
 </script>
