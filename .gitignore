@@ -4,3 +4,4 @@ public/uploads/
 *.lnk
 nul
 src/sync_config.php
+sync_export.sql
