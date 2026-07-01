@@ -104,7 +104,7 @@ final class StockRepo
 
     public function departamentos(): array
     {
-        $st = Db::pdo()->query('SELECT codepar, nomdepar FROM departa WHERE activo = 1 OR activo IS NULL ORDER BY nomdepar ASC');
+        $st = Db::pdo()->query('SELECT codepar, nomdepar FROM departa ORDER BY nomdepar ASC');
         return $st->fetchAll();
     }
 
@@ -256,17 +256,17 @@ final class StockRepo
 
     public function grillaRubros(): array
     {
-        $st = Db::pdo()->query('SELECT codrub, nomrub FROM rubros WHERE activo = 1 OR activo IS NULL ORDER BY nomrub ASC');
+        $st = Db::pdo()->query('SELECT codrub, nomrub FROM rubros ORDER BY nomrub ASC');
         return $st->fetchAll();
     }
 
     public function grillaSubrubros(int $codrub = 0): array
     {
         if ($codrub > 0) {
-            $st = Db::pdo()->prepare('SELECT codsub, nomsub FROM subrubro WHERE codrub = :cr AND (activo = 1 OR activo IS NULL) ORDER BY nomsub ASC');
+            $st = Db::pdo()->prepare('SELECT codsub, nomsub FROM subrubro WHERE codrub = :cr ORDER BY nomsub ASC');
             $st->execute([':cr' => $codrub]);
         } else {
-            $st = Db::pdo()->query('SELECT codsub, nomsub FROM subrubro WHERE activo = 1 OR activo IS NULL ORDER BY nomsub ASC');
+            $st = Db::pdo()->query('SELECT codsub, nomsub FROM subrubro ORDER BY nomsub ASC');
         }
         return $st->fetchAll();
     }
