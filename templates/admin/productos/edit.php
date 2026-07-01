@@ -41,36 +41,37 @@ foreach ($proveedores as $prov) {
     </ol>
 </nav>
 
-<form method="post" action="/admin/productos/save">
-    <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
-    <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
-
-    <div class="card shadow-sm mb-3">
-        <div class="card-body">
-            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
-                <div class="flex-grow-1">
-                    <div class="mb-2">
-                        <input class="form-control form-control-lg fw-bold" name="produ" value="<?= htmlspecialchars((string)($product['produ'] ?? '')) ?>" />
-                    </div>
-                    <div class="d-flex flex-wrap gap-3 small text-muted">
-                        <span>ID: <strong><?= $selectedId ?></strong></span>
-                        <span>Código: <strong><?= htmlspecialchars((string)($product['codprodu'] ?? '-')) ?></strong></span>
-                        <span>F.compra: <strong><?= htmlspecialchars($formatDate((string)($product['fecompra'] ?? ''))) ?></strong></span>
-                        <span>IVA: <strong><?= htmlspecialchars((string)$selectedIva) ?>%</strong></span>
-                    </div>
+<div class="card shadow-sm mb-3">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+            <div class="flex-grow-1">
+                <div class="mb-2">
+                    <input class="form-control form-control-lg fw-bold" name="produ" value="<?= htmlspecialchars((string)($product['produ'] ?? '')) ?>" form="save-form" />
                 </div>
-                <div class="d-flex gap-2">
-                    <?php if ((int)($product['enweb'] ?? 0) === 1): ?>
-                        <a class="btn btn-outline-secondary btn-sm" href="/p/<?= $selectedId ?>" target="_blank"><i class="bi bi-box-arrow-up-right"></i> Ver público</a>
-                    <?php endif; ?>
-                    <form method="post" action="/admin/productos/delete" onsubmit="return confirm('Eliminar permanentemente este producto y todas sus variedades?')">
-                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
-                        <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
-                        <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-trash"></i> Eliminar</button>
-                    </form>
+                <div class="d-flex flex-wrap gap-3 small text-muted">
+                    <span>ID: <strong><?= $selectedId ?></strong></span>
+                    <span>Código: <strong><?= htmlspecialchars((string)($product['codprodu'] ?? '-')) ?></strong></span>
+                    <span>F.compra: <strong><?= htmlspecialchars($formatDate((string)($product['fecompra'] ?? ''))) ?></strong></span>
+                    <span>IVA: <strong><?= htmlspecialchars((string)$selectedIva) ?>%</strong></span>
                 </div>
+            </div>
+            <div class="d-flex gap-2">
+                <?php if ((int)($product['enweb'] ?? 0) === 1): ?>
+                    <a class="btn btn-outline-secondary btn-sm" href="/p/<?= $selectedId ?>" target="_blank"><i class="bi bi-box-arrow-up-right"></i> Ver público</a>
+                <?php endif; ?>
+                <form method="post" action="/admin/productos/delete" onsubmit="return confirm('Eliminar permanentemente este producto y todas sus variedades?')">
+                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                    <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
+                    <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-trash"></i> Eliminar</button>
+                </form>
+            </div>
         </div>
     </div>
+</div>
+
+<form method="post" action="/admin/productos/save" id="save-form">
+    <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+    <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
 
     <div class="row g-3">
         <div class="col-lg-6">
