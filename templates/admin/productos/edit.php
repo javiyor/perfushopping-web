@@ -3,6 +3,10 @@ use Perfushopping\Web\Support\Format;
 
 $product = $product ?? null;
 $variants = $variants ?? [];
+$rubros = $rubros ?? [];
+$subrubros = $subrubros ?? [];
+$departamentos = $departamentos ?? [];
+$proveedores = $proveedores ?? [];
 
 if (!$product):
 ?>
@@ -17,8 +21,19 @@ $priceGross = number_format((float)($product['precio'] ?? 0) * (1 + ($selectedIv
 $price1Gross = number_format((float)($product['precio1'] ?? 0) * (1 + ($selectedIva / 100)), 2, '.', '');
 $mainImg = Format::uploadUrl((string)($product['imagen'] ?? ''));
 $formatDate = static fn(string $d): string => (trim($d) === '' || $d === '0000-00-00') ? '-' : $d;
-?>
 
+$selectedRubro = (int)($product['codrub'] ?? 0);
+$selectedSubrubro = (int)($product['codsub'] ?? 0);
+$selectedDepartamento = (int)($product['codepar'] ?? 0);
+$selectedProveedor = trim((string)($product['codprove'] ?? ''));
+$selectedRazon = '';
+foreach ($proveedores as $prov) {
+    if ((string)($prov['codprove'] ?? '') === $selectedProveedor) {
+        $selectedRazon = htmlspecialchars((string)($prov['razon'] ?? ''));
+        break;
+    }
+}
+?>
 <nav aria-label="breadcrumb" class="mb-3">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="/admin/productos">Productos</a></li>
@@ -26,36 +41,82 @@ $formatDate = static fn(string $d): string => (trim($d) === '' || $d === '0000-0
     </ol>
 </nav>
 
-<div class="card shadow-sm mb-3">
-    <div class="card-body">
-        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
-            <div>
-                <h5 class="fw-bold mb-1"><?= htmlspecialchars((string)($product['produ'] ?? '')) ?></h5>
-                <div class="d-flex flex-wrap gap-3 small text-muted">
-                    <span>ID: <strong><?= $selectedId ?></strong></span>
-                    <span>Código: <strong><?= htmlspecialchars((string)($product['codprodu'] ?? '-')) ?></strong></span>
-                    <span>Marca: <strong><?= htmlspecialchars((string)($product['nomsub'] ?? '-')) ?></strong></span>
-                    <span>Categoría: <strong><?= htmlspecialchars((string)($product['nomrub'] ?? '-')) ?></strong></span>
-                    <span>F.compra: <strong><?= htmlspecialchars($formatDate((string)($product['fecompra'] ?? ''))) ?></strong></span>
-                    <span>IVA: <strong><?= htmlspecialchars((string)$selectedIva) ?>%</strong></span>
+<form method="post" action="/admin/productos/save">
+    <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+    <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
+
+    <div class="card shadow-sm mb-3">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                <div class="flex-grow-1">
+                    <div class="mb-2">
+                        <input class="form-control form-control-lg fw-bold" name="produ" value="<?= htmlspecialchars((string)($product['produ'] ?? '')) ?>" />
+                    </div>
+                    <div class="d-flex flex-wrap gap-3 small text-muted">
+                        <span>ID: <strong><?= $selectedId ?></strong></span>
+                        <span>Código: <strong><?= htmlspecialchars((string)($product['codprodu'] ?? '-')) ?></strong></span>
+                        <span>F.compra: <strong><?= htmlspecialchars($formatDate((string)($product['fecompra'] ?? ''))) ?></strong></span>
+                        <span>IVA: <strong><?= htmlspecialchars((string)$selectedIva) ?>%</strong></span>
+                    </div>
                 </div>
+                <?php if ((int)($product['enweb'] ?? 0) === 1): ?>
+                    <a class="btn btn-outline-secondary btn-sm" href="/p/<?= $selectedId ?>" target="_blank"><i class="bi bi-box-arrow-up-right"></i> Ver público</a>
+                <?php endif; ?>
             </div>
-            <?php if ((int)($product['enweb'] ?? 0) === 1): ?>
-                <a class="btn btn-outline-secondary btn-sm" href="/p/<?= $selectedId ?>" target="_blank"><i class="bi bi-box-arrow-up-right"></i> Ver público</a>
-            <?php endif; ?>
         </div>
     </div>
-</div>
 
-<div class="row g-3">
-    <div class="col-lg-6">
-        <div class="card shadow-sm">
-            <div class="card-header bg-white fw-semibold">Datos del producto</div>
-            <div class="card-body">
-                <form method="post" action="/admin/productos/save">
-                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
-                    <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
+    <div class="row g-3">
+        <div class="col-lg-6">
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-white fw-semibold">Categorización</div>
+                <div class="card-body">
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-6">
+                            <label class="form-label small">Categoría</label>
+                            <select class="form-select form-select-sm" name="codrub">
+                                <option value="">— Sin categoría —</option>
+                                <?php foreach ($rubros as $rub): ?>
+                                    <option value="<?= (int)($rub['codrub'] ?? 0) ?>"<?= ((int)($rub['codrub'] ?? 0) === $selectedRubro) ? ' selected' : '' ?>><?= htmlspecialchars((string)($rub['nomrub'] ?? '')) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small">Marca / Subrubro</label>
+                            <select class="form-select form-select-sm" name="codsub">
+                                <option value="">— Sin marca —</option>
+                                <?php foreach ($subrubros as $sub): ?>
+                                    <option value="<?= (int)($sub['codsub'] ?? 0) ?>"<?= ((int)($sub['codsub'] ?? 0) === $selectedSubrubro) ? ' selected' : '' ?>><?= htmlspecialchars((string)($sub['nomsub'] ?? '')) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <label class="form-label small">Departamento</label>
+                            <select class="form-select form-select-sm" name="codepar">
+                                <option value="">— Sin departamento —</option>
+                                <?php foreach ($departamentos as $dep): ?>
+                                    <option value="<?= (int)($dep['codepar'] ?? 0) ?>"<?= ((int)($dep['codepar'] ?? 0) === $selectedDepartamento) ? ' selected' : '' ?>><?= htmlspecialchars((string)($dep['nomdepar'] ?? '')) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small">Proveedor</label>
+                            <select class="form-select form-select-sm" name="codprove">
+                                <option value="">— Sin proveedor —</option>
+                                <?php foreach ($proveedores as $prov): ?>
+                                    <option value="<?= htmlspecialchars((string)($prov['codprove'] ?? '')) ?>"<?= ((string)($prov['codprove'] ?? '') === $selectedProveedor) ? ' selected' : '' ?>><?= htmlspecialchars((string)($prov['razon'] ?? '')) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
+            <div class="card shadow-sm">
+                <div class="card-header bg-white fw-semibold">Precios y visibilidad</div>
+                <div class="card-body">
                     <div class="row g-2 mb-3">
                         <div class="col-md-6">
                             <label class="form-label small">Precio minorista <span class="text-muted">(IVA incl.)</span></label>
@@ -70,7 +131,7 @@ $formatDate = static fn(string $d): string => (trim($d) === '' || $d === '0000-0
                     <div class="mb-3">
                         <label class="form-label small">Neto calculado</label>
                         <div class="form-control form-control-sm bg-light text-muted" style="cursor:default" readonly>
-                            Minorista <?= number_format((float)($product['precio'] ?? 0), 2, '.', '') ?> | Mayorista <?= number_format((float)($product['precio1'] ?? 0), 2, '.', '') ?>
+                            Minorista $<?= number_format((float)($product['precio'] ?? 0), 2, ',', '.') ?> | Mayorista $<?= number_format((float)($product['precio1'] ?? 0), 2, ',', '.') ?>
                         </div>
                     </div>
 
@@ -91,40 +152,40 @@ $formatDate = static fn(string $d): string => (trim($d) === '' || $d === '0000-0
                         </button>
                         <span class="small text-muted align-self-center" data-ai-status></span>
                     </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-lg-6">
-        <div class="card shadow-sm">
-            <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
-                <span>Imagen principal</span>
-                <small class="text-muted"><?= htmlspecialchars((string)($product['imagen'] ?? 'Sin imagen')) ?></small>
-            </div>
-            <div class="card-body">
-                <div class="text-center mb-3">
-                    <?php if ($mainImg !== ''): ?>
-                        <img src="<?= htmlspecialchars($mainImg) ?>" alt="<?= htmlspecialchars((string)($product['produ'] ?? '')) ?>" style="max-height:180px;max-width:100%;border-radius:8px" />
-                    <?php else: ?>
-                        <div class="bg-light rounded p-4 text-muted">Sin imagen principal</div>
-                    <?php endif; ?>
                 </div>
-                <form method="post" action="/admin/productos/main-image" enctype="multipart/form-data" class="mb-2">
-                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
-                    <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
-                    <input class="form-control form-control-sm mb-2" type="file" name="images[]" accept=".jpg,.jpeg,.png,.webp" />
-                    <button class="btn btn-outline-secondary btn-sm w-100" type="submit"><i class="bi bi-upload"></i> Subir</button>
-                </form>
-                <form method="post" action="/admin/productos/main-image/clear">
-                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
-                    <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
-                    <button class="btn btn-outline-danger btn-sm w-100" type="submit"><i class="bi bi-trash"></i> Quitar</button>
-                </form>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+                    <span>Imagen principal</span>
+                    <small class="text-muted"><?= htmlspecialchars((string)($product['imagen'] ?? 'Sin imagen')) ?></small>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-3">
+                        <?php if ($mainImg !== ''): ?>
+                            <img src="<?= htmlspecialchars($mainImg) ?>" alt="<?= htmlspecialchars((string)($product['produ'] ?? '')) ?>" style="max-height:180px;max-width:100%;border-radius:8px" />
+                        <?php else: ?>
+                            <div class="bg-light rounded p-4 text-muted">Sin imagen principal</div>
+                        <?php endif; ?>
+                    </div>
+                    <form method="post" action="/admin/productos/main-image" enctype="multipart/form-data" class="mb-2">
+                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                        <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
+                        <input class="form-control form-control-sm mb-2" type="file" name="images[]" accept=".jpg,.jpeg,.png,.webp" />
+                        <button class="btn btn-outline-secondary btn-sm w-100" type="submit"><i class="bi bi-upload"></i> Subir</button>
+                    </form>
+                    <form method="post" action="/admin/productos/main-image/clear">
+                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                        <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
+                        <button class="btn btn-outline-danger btn-sm w-100" type="submit"><i class="bi bi-trash"></i> Quitar</button>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
-</div>
+</form>
 
 <div class="card shadow-sm mt-3">
     <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">

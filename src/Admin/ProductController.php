@@ -4,6 +4,8 @@ declare(strict_types=1);
 namespace Perfushopping\Web\Admin;
 
 use Perfushopping\Web\Repo\AdminProductRepo;
+use Perfushopping\Web\Repo\DepartamentoRepo;
+use Perfushopping\Web\Repo\ProveedorRepo;
 use Perfushopping\Web\Service\AdminAuthService;
 use Perfushopping\Web\Service\AiProductDescriptionService;
 use Perfushopping\Web\Support\Csrf;
@@ -65,10 +67,19 @@ final class ProductController
             $variants[$idx]['images'] = $imagesMap[(int)($variant['idcodgusto'] ?? 0)] ?? [];
         }
 
+        $rubros = $this->repo->allRubros();
+        $subrubros = $this->repo->allSubrubros();
+        $departamentos = (new DepartamentoRepo())->findAll();
+        $proveedores = (new ProveedorRepo())->findAll();
+
         echo View::adminPage('admin/productos/edit.php', [
             'adminUser' => $adminUser,
             'product' => $product,
             'variants' => $variants,
+            'rubros' => $rubros,
+            'subrubros' => $subrubros,
+            'departamentos' => $departamentos,
+            'proveedores' => $proveedores,
             'csrf' => Csrf::token(),
             'flash' => $_SESSION['admin_flash'] ?? null,
             'pageTitle' => 'Producto: ' . htmlspecialchars(mb_substr((string)($product['produ'] ?? ''), 0, 40)),
@@ -97,8 +108,14 @@ final class ProductController
             Response::redirect('/admin/productos/' . $idprodu);
         }
 
+        $produ = trim((string)($_POST['produ'] ?? ''));
+        $codrub = (int)($_POST['codrub'] ?? 0);
+        $codsub = (int)($_POST['codsub'] ?? 0);
+        $codepar = (int)($_POST['codepar'] ?? 0);
+        $codprove = trim((string)($_POST['codprove'] ?? ''));
+
         $ivaRate = (float)($product['tiva'] ?? 0);
-        $this->repo->updateProduct($idprodu, $observ, $this->grossToNet($precioBruto, $ivaRate), $this->grossToNet($precio1Bruto, $ivaRate), $enweb);
+        $this->repo->updateProduct($idprodu, $observ, $this->grossToNet($precioBruto, $ivaRate), $this->grossToNet($precio1Bruto, $ivaRate), $enweb, $produ, $codrub, $codsub, $codepar, $codprove);
 
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Producto actualizado.'];
         Response::redirect('/admin/productos/' . $idprodu);

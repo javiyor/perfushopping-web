@@ -78,6 +78,22 @@ final class AdminProductRepo
     }
 
     /** @return array<int, array<string,mixed>> */
+    public function allRubros(): array
+    {
+        $st = Db::pdo()->query('SELECT codrub, nomrub FROM rubros ORDER BY nomrub ASC');
+        $rows = $st ? $st->fetchAll() : [];
+        return is_array($rows) ? $rows : [];
+    }
+
+    /** @return array<int, array<string,mixed>> */
+    public function allSubrubros(): array
+    {
+        $st = Db::pdo()->query('SELECT codsub, nomsub FROM subrubro ORDER BY nomsub ASC');
+        $rows = $st ? $st->fetchAll() : [];
+        return is_array($rows) ? $rows : [];
+    }
+
+    /** @return array<int, array<string,mixed>> */
     public function brandOptions(): array
     {
         $st = Db::pdo()->query('
@@ -173,14 +189,19 @@ final class AdminProductRepo
         return $map;
     }
 
-    public function updateProduct(int $idprodu, string $observ, float $precioNeto, float $precio1Neto, bool $enweb): void
+    public function updateProduct(int $idprodu, string $observ, float $precioNeto, float $precio1Neto, bool $enweb, string $produ = '', int $codrub = 0, int $codsub = 0, int $codepar = 0, string $codprove = ''): void
     {
-        $st = Db::pdo()->prepare('UPDATE producto SET observ = :observ, precio = :precio, precio1 = :precio1, enweb = :enweb WHERE idprodu = :id LIMIT 1');
+        $st = Db::pdo()->prepare('UPDATE producto SET observ = :observ, precio = :precio, precio1 = :precio1, enweb = :enweb, produ = :produ, codrub = :codrub, codsub = :codsub, codepar = :codepar, codprove = :codprove WHERE idprodu = :id LIMIT 1');
         $st->execute([
             ':observ' => $observ,
             ':precio' => $precioNeto,
             ':precio1' => $precio1Neto,
             ':enweb' => $enweb ? 1 : 0,
+            ':produ' => $produ !== '' ? $produ : null,
+            ':codrub' => $codrub > 0 ? $codrub : null,
+            ':codsub' => $codsub > 0 ? $codsub : null,
+            ':codepar' => $codepar > 0 ? $codepar : null,
+            ':codprove' => $codprove !== '' ? $codprove : null,
             ':id' => $idprodu,
         ]);
     }
