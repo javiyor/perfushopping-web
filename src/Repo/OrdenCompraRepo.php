@@ -43,9 +43,10 @@ final class OrdenCompraRepo
     public function findById(int $id): ?array
     {
         $st = Db::pdo()->prepare('
-            SELECT o.*, a.nombre AS created_by_nombre
+            SELECT o.*, a.nombre AS created_by_nombre, c.nombre AS controlado_por_nombre
             FROM ordenes_compra o
             LEFT JOIN admin_users a ON a.id = o.created_by
+            LEFT JOIN admin_users c ON c.id = o.controlado_por
             WHERE o.id = :i LIMIT 1
         ');
         $st->execute([':i' => $id]);
@@ -124,6 +125,71 @@ final class OrdenCompraRepo
         $pdo = Db::pdo();
         $pdo->prepare('DELETE FROM orden_compra_items WHERE orden_id = :i')->execute([':i' => $id]);
         $pdo->prepare('DELETE FROM ordenes_compra WHERE id = :i LIMIT 1')->execute([':i' => $id]);
+    }
+
+    public function updateRecepcion(int $id, array $data): void
+    {
+        $st = Db::pdo()->prepare('
+            UPDATE ordenes_compra SET
+                fecha_recepcion = :fr,
+                bultos_recibidos = :br,
+                controlado_por = :cp,
+                valor_declarado_cents = :vd,
+                flete_cents = :fc,
+                flete_pagado = :fp,
+                estado = :estado,
+                updated_at = NOW()
+            WHERE id = :i LIMIT 1
+        ');
+        $st->execute([
+            ':fr' => $data['fecha_recepcion'],
+            ':br' => $data['bultos_recibidos'] !== null ? (int)$data['bultos_recibidos'] : null,
+            ':cp' => $data['controlado_por'] !== null ? (int)$data['controlado_por'] : null,
+            ':vd' => (int)($data['valor_declarado_cents'] ?? 0),
+            ':fc' => (int)($data['flete_cents'] ?? 0),
+            ':fp' => (int)($data['flete_pagado'] ?? 0),
+            ':estado' => $data['estado'] ?? 'recibida',
+            ':i' => $id,
+        ]);
+    }
+
+    public function updateFleteComprobante(int $id, string $filename): void
+    {
+        $st = Db::pdo()->prepare('UPDATE ordenes_compra SET flete_comprobante = :fc, updated_at = NOW() WHERE id = :i LIMIT 1');
+        $st->execute([':fc' => $filename, ':i' => $id]);
+    }
+
+    public function searchFletes(string $q = '', string $proveedor = '', int $limit = 100): array
+    {
+        $limit = max(1, min(500, $limit));
+        $params = [];
+        $where = ['o.flete_cents > 0'];
+
+        if (trim($q) !== '') {
+            $where[] = '(o.codigo LIKE :like OR o.proveedor_nombre LIKE :like)';
+            $params[':like'] = '%' . $q . '%';
+        }
+        if (trim($proveedor) !== '') {
+            $where[] = 'o.proveedor_nombre LIKE :prov';
+            $params[':prov'] = '%' . $proveedor . '%';
+        }
+
+        $sql = '
+            SELECT o.id, o.codigo, o.proveedor_nombre, o.fecha, o.flete_cents, o.flete_pagado,
+                   o.flete_comprobante, o.total_cents, o.estado
+            FROM ordenes_compra o
+            WHERE ' . implode(' AND ', $where) . '
+            ORDER BY o.fecha DESC, o.id DESC
+            LIMIT ' . $limit;
+        $st = Db::pdo()->prepare($sql);
+        $st->execute($params);
+        return $st->fetchAll();
+    }
+
+    public function listAdminUsers(): array
+    {
+        $st = Db::pdo()->query('SELECT id, nombre FROM admin_users WHERE activo = 1 ORDER BY nombre ASC');
+        return $st->fetchAll();
     }
 
     public function searchProducts(string $q, int $limit = 20): array

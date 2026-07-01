@@ -126,4 +126,100 @@ final class ArcaController
 
         Response::redirect('/admin/facturas/' . $facturaId);
     }
+
+    public function generarCsr(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requireSesion();
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $repo = new ArcaRepo();
+        $cuit = $repo->getConfig('cuit');
+        if ($cuit === '') {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Primero configurá el CUIT.'];
+            Response::redirect('/admin/arca/config');
+        }
+
+        $storageDir = APP_BASE_DIR . '/storage/arca';
+        if (!is_dir($storageDir)) {
+            mkdir($storageDir, 0755, true);
+        }
+
+        $keyRes = openssl_pkey_new([
+            'private_key_bits' => 2048,
+            'private_key_type' => OPENSSL_KEYTYPE_RSA,
+        ]);
+        if (!$keyRes) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Error generando clave privada.'];
+            Response::redirect('/admin/arca/config');
+        }
+
+        $keyPath = $storageDir . '/' . $cuit . '.key';
+        if (!openssl_pkey_export($keyRes, $keyPem)) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Error exportando clave privada.'];
+            Response::redirect('/admin/arca/config');
+        }
+        file_put_contents($keyPath, $keyPem);
+
+        $dn = [
+            'commonName' => $cuit,
+            'organizationName' => $cuit,
+            'countryName' => 'AR',
+        ];
+        $csrRes = openssl_csr_new($dn, $keyRes, ['digest_alg' => 'sha256']);
+        if (!$csrRes) {
+            unlink($keyPath);
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Error generando CSR.'];
+            Response::redirect('/admin/arca/config');
+        }
+
+        openssl_csr_export($csrRes, $csrOut);
+        $csrPath = $storageDir . '/' . $cuit . '.csr';
+        file_put_contents($csrPath, $csrOut);
+
+        $repo->setConfig('key_path', $keyPath);
+        $repo->setConfig('csr_pendiente', $csrOut);
+
+        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'CSR generado correctamente. Copiá el contenido y subilo en el portal de ARCA.'];
+        Response::redirect('/admin/arca/config');
+    }
+
+    public function cargarCertificado(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requireSesion();
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $repo = new ArcaRepo();
+        $cuit = $repo->getConfig('cuit');
+        if ($cuit === '') {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Primero configurá el CUIT.'];
+            Response::redirect('/admin/arca/config');
+        }
+
+        if (!isset($_FILES['certificado']) || $_FILES['certificado']['error'] !== UPLOAD_ERR_OK) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Error al subir el archivo.'];
+            Response::redirect('/admin/arca/config');
+        }
+
+        $content = file_get_contents($_FILES['certificado']['tmp_name']);
+        if (!str_contains($content, '-----BEGIN CERTIFICATE-----')) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'El archivo no parece un certificado X.509 válido (formato PEM).'];
+            Response::redirect('/admin/arca/config');
+        }
+
+        $storageDir = APP_BASE_DIR . '/storage/arca';
+        if (!is_dir($storageDir)) {
+            mkdir($storageDir, 0755, true);
+        }
+
+        $certPath = $storageDir . '/' . $cuit . '.crt';
+        file_put_contents($certPath, $content);
+
+        $repo->setConfig('cert_path', $certPath);
+        $repo->setConfig('csr_pendiente', '');
+
+        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Certificado subido correctamente.'];
+        Response::redirect('/admin/arca/config');
+    }
 }

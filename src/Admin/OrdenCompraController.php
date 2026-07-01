@@ -4,10 +4,12 @@ declare(strict_types=1);
 namespace Perfushopping\Web\Admin;
 
 use Perfushopping\Web\Repo\OrdenCompraRepo;
+use Perfushopping\Web\Repo\CtaCteProveedorRepo;
 use Perfushopping\Web\Service\AdminAuthService;
 use Perfushopping\Web\Support\Csrf;
 use Perfushopping\Web\Support\Response;
 use Perfushopping\Web\Support\View;
+use Perfushopping\Web\Support\Format;
 
 final class OrdenCompraController
 {
@@ -197,5 +199,145 @@ final class OrdenCompraController
         $results = (new OrdenCompraRepo())->findProveedores($q);
 
         Response::json($results);
+    }
+
+    public function guardarRecepcion(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requireSesion();
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $id = (int)($_POST['id'] ?? 0);
+        $repo = new OrdenCompraRepo();
+        $orden = $repo->findById($id);
+        if (!$orden) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Orden no encontrada.'];
+            Response::redirect('/admin/ordenes-compra');
+        }
+        if ($orden['estado'] === 'anulada' || $orden['estado'] === 'recibida') {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se puede modificar una orden ' . $orden['estado'] . '.'];
+            Response::redirect('/admin/ordenes-compra/' . $id);
+        }
+
+        $fechaRecepcion = trim((string)($_POST['fecha_recepcion'] ?? ''));
+        if ($fechaRecepcion === '') $fechaRecepcion = date('Y-m-d');
+
+        $fletePagado = (int)(($_POST['flete_pagado'] ?? '0') === '1');
+        $fleteCents = (int)($_POST['flete_cents'] ?? 0);
+
+        $repo->updateRecepcion($id, [
+            'fecha_recepcion' => $fechaRecepcion,
+            'bultos_recibidos' => $_POST['bultos_recibidos'] !== '' ? (int)$_POST['bultos_recibidos'] : null,
+            'controlado_por' => $_POST['controlado_por'] !== '' ? (int)$_POST['controlado_por'] : null,
+            'valor_declarado_cents' => (int)($_POST['valor_declarado_cents'] ?? 0),
+            'flete_cents' => $fleteCents,
+            'flete_pagado' => $fletePagado,
+            'estado' => 'recibida',
+        ]);
+
+        // Handle comprobante upload
+        $comprobanteFile = '';
+        if (isset($_FILES['flete_comprobante']) && $_FILES['flete_comprobante']['error'] === UPLOAD_ERR_OK) {
+            $uploadDir = APP_BASE_DIR . '/storage/oc/fletes';
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0755, true);
+            }
+            $ext = pathinfo($_FILES['flete_comprobante']['name'], PATHINFO_EXTENSION);
+            $comprobanteFile = $orden['codigo'] . '_' . time() . '.' . $ext;
+            move_uploaded_file($_FILES['flete_comprobante']['tmp_name'], $uploadDir . '/' . $comprobanteFile);
+            $repo->updateFleteComprobante($id, $comprobanteFile);
+        }
+
+        // Register flete payment
+        if ($fleteCents > 0) {
+            if ($fletePagado) {
+                try {
+                    $cajaRepo = new \Perfushopping\Web\Repo\CajaRepo();
+                    $sucursalId = $auth->getSucursalId();
+                    $turno = $auth->getTurno();
+                    $apertura = $cajaRepo->aperturaActiva($sucursalId, $turno, date('Y-m-d'));
+                    if ($apertura) {
+                        $cajaRepo->agregarMovimiento(
+                            (int)$apertura['id'],
+                            'egreso',
+                            'Flete OC ' . $orden['codigo'] . ' — ' . $orden['proveedor_nombre'],
+                            $fleteCents,
+                            (int)$adminUser['id']
+                        );
+                    }
+                } catch (\Throwable $e) {
+                    // Log but don't fail the reception
+                }
+            } else {
+                try {
+                    $ctacteRepo = new CtaCteProveedorRepo();
+                    $ctacteRepo->agregarMovimiento(
+                        'debito',
+                        'oc_flete',
+                        $id,
+                        (int)$orden['proveedor_id'],
+                        (string)$orden['proveedor_nombre'],
+                        $fleteCents,
+                        'Flete OC ' . $orden['codigo'],
+                        (int)$adminUser['id']
+                    );
+                } catch (\Throwable $e) {
+                    // Log but don't fail
+                }
+            }
+        }
+
+        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Recepción registrada. Orden marcada como recibida.'];
+        Response::redirect('/admin/ordenes-compra/' . $id);
+    }
+
+    public function fletes(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requireSesion();
+
+        $q = trim((string)($_GET['q'] ?? ''));
+        $proveedor = trim((string)($_GET['proveedor'] ?? ''));
+        $list = (new OrdenCompraRepo())->searchFletes($q, $proveedor);
+
+        $totalFletes = 0;
+        foreach ($list as $o) {
+            $totalFletes += (int)$o['flete_cents'];
+        }
+
+        echo View::adminPage('admin/ordenes-compra/fletes.php', [
+            'adminUser' => $adminUser,
+            'list' => $list,
+            'q' => $q,
+            'proveedor' => $proveedor,
+            'totalFletes' => $totalFletes,
+            'csrf' => Csrf::token(),
+            'pageTitle' => 'Fletes — Costos comparativos',
+        ]);
+    }
+
+    public function descargarComprobante(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requireSesion();
+
+        $id = (int)($params['id'] ?? 0);
+        $orden = (new OrdenCompraRepo())->findById($id);
+        if (!$orden || !$orden['flete_comprobante']) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Archivo no encontrado.'];
+            Response::redirect('/admin/ordenes-compra/' . $id);
+        }
+
+        $filePath = APP_BASE_DIR . '/storage/oc/fletes/' . basename((string)$orden['flete_comprobante']);
+        if (!is_file($filePath)) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'El archivo ya no existe en el servidor.'];
+            Response::redirect('/admin/ordenes-compra/' . $id);
+        }
+
+        header('Content-Type: application/octet-stream');
+        header('Content-Disposition: attachment; filename="' . basename((string)$orden['flete_comprobante']) . '"');
+        header('Content-Length: ' . filesize($filePath));
+        readfile($filePath);
+        exit;
     }
 }
