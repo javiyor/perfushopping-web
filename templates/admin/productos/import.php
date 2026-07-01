@@ -34,12 +34,14 @@ $errors = (int)($stats['errors'] ?? 0);
     <div class="card-body">
         <div class="alert alert-info small">
             <strong>Formato del CSV:</strong> La primera fila debe contener los encabezados.
-            Columnas: <code>codprodup</code>, <code>codscan</code>, <code>precio_sin_iva</code>, <code>costo_sin_iva</code>, <code>stock</code>
+            Columnas: <code>codprodup</code>, <code>codscan</code>, <code>precio_sin_iva</code>, <code>costo_sin_iva</code>, <code>stock</code>, <code>ganan1</code>, <code>ganan2</code>, <code>precio1_sin_iva</code>
             <br>
             <strong>Matching:</strong> Busca primero por <code>codprodup</code> (código de proveedor), y si no encuentra, por <code>codscan</code> (código de barra).
             <br>
             <strong>Precios:</strong> <code>precio_sin_iva</code> y <code>costo_sin_iva</code> deben ser montos <strong>sin IVA</strong> (neto).
             Usá punto (<code>.</code>) como separador decimal. Precios negativos o vacíos no se actualizan.
+            <br>
+            <strong>Márgenes:</strong> Si incluís <code>ganan1</code> y <code>ganan2</code> (porcentajes), se actualizan los márgenes del producto.
         </div>
 
         <form method="post" action="/admin/productos/importar/preview" enctype="multipart/form-data">
@@ -95,9 +97,15 @@ $errors = (int)($stats['errors'] ?? 0);
                             <th>Precio ant.</th>
                             <th>Precio nuevo</th>
                             <th>Diff</th>
+                            <th>Precio1 ant.</th>
+                            <th>Precio1 nuevo</th>
                             <th>Costo ant.</th>
                             <th>Costo nuevo</th>
                             <th>Diff</th>
+                            <th>G1 ant.</th>
+                            <th>G1 nuevo</th>
+                            <th>G2 ant.</th>
+                            <th>G2 nuevo</th>
                             <th>Stock ant.</th>
                             <th>Stock nuevo</th>
                             <th>Diff</th>
@@ -153,6 +161,14 @@ $errors = (int)($stats['errors'] ?? 0);
                                         <span class="text-muted">—</span>
                                     <?php endif; ?>
                                 </td>
+                                <td class="text-end"><?= $matched ? htmlspecialchars(Format::moneyFromCents((int)round(($item['precio1_old'] ?? 0) * 100))) : '-' ?></td>
+                                <td class="text-end">
+                                    <?php if ($matched && $item['precio1_new'] !== null): ?>
+                                        <strong><?= htmlspecialchars(Format::moneyFromCents((int)round(($item['precio1_new'] ?? 0) * 100))) ?></strong>
+                                    <?php else: ?>
+                                        <span class="text-muted">=</span>
+                                    <?php endif; ?>
+                                </td>
                                 <td class="text-end"><?= $matched ? htmlspecialchars(Format::moneyFromCents((int)round(($item['costo_old'] ?? 0) * 100))) : '-' ?></td>
                                 <td class="text-end">
                                     <?php if ($matched && $item['costo_new'] !== null): ?>
@@ -168,6 +184,22 @@ $errors = (int)($stats['errors'] ?? 0);
                                         </span>
                                     <?php else: ?>
                                         <span class="text-muted">—</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="text-end"><?= $matched ? htmlspecialchars((string)($item['ganan1_old'] ?? '0')) : '-' ?></td>
+                                <td class="text-end">
+                                    <?php if ($matched && $item['ganan1_new'] !== null): ?>
+                                        <strong><?= htmlspecialchars((string)$item['ganan1_new']) ?>%</strong>
+                                    <?php else: ?>
+                                        <span class="text-muted">=</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="text-end"><?= $matched ? htmlspecialchars((string)($item['ganan2_old'] ?? '0')) : '-' ?></td>
+                                <td class="text-end">
+                                    <?php if ($matched && $item['ganan2_new'] !== null): ?>
+                                        <strong><?= htmlspecialchars((string)$item['ganan2_new']) ?>%</strong>
+                                    <?php else: ?>
+                                        <span class="text-muted">=</span>
                                     <?php endif; ?>
                                 </td>
                                 <td class="text-end"><?= $matched ? (int)($item['stock_old'] ?? 0) : '-' ?></td>
@@ -233,12 +265,12 @@ document.querySelectorAll('.row-select').forEach(cb => cb.addEventListener('chan
 
 function downloadSampleCsv() {
     const bom = '\uFEFF';
-    const headers = 'codprodup;codscan;precio_sin_iva;costo_sin_iva;stock';
+    const headers = 'codprodup;codscan;precio_sin_iva;costo_sin_iva;stock;ganan1;ganan2;precio1_sin_iva';
     const rows = [
-        'PROV001;7791234567890;15000.00;8500.00;25',
-        'PROV002;;22000.00;12000.00;10',
-        ';7790987654321;8500.00;4200.00;50',
-        'PROV003;7791112223334;30000.00;18000.00;5',
+        'PROV001;7791234567890;15000.00;8500.00;25;40;20;12000.00',
+        'PROV002;;22000.00;12000.00;10;35;15;18000.00',
+        ';7790987654321;8500.00;4200.00;50;;;',
+        'PROV003;7791112223334;30000.00;18000.00;5;50;25;25000.00',
     ];
     const csv = bom + headers + '\n' + rows.join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });

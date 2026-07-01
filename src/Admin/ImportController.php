@@ -71,6 +71,9 @@ final class ImportController
             $precioNew = $this->parseFloat((string)($row['precio_sin_iva'] ?? ''));
             $costoNew = $this->parseFloat((string)($row['costo_sin_iva'] ?? ''));
             $stockNew = $this->parseInt((string)($row['stock'] ?? ''));
+            $ganan1New = $this->parseFloat((string)($row['ganan1'] ?? ''));
+            $ganan2New = $this->parseFloat((string)($row['ganan2'] ?? ''));
+            $precio1New = $this->parseFloat((string)($row['precio1_sin_iva'] ?? ''));
 
             $match = $this->repo->findByCodprodupOrCodscan($codprodup, $codscan);
 
@@ -81,6 +84,9 @@ final class ImportController
                 'precio_new' => $precioNew,
                 'costo_new' => $costoNew,
                 'stock_new' => $stockNew,
+                'ganan1_new' => $ganan1New,
+                'ganan2_new' => $ganan2New,
+                'precio1_new' => $precio1New,
                 'matched' => $match !== null,
             ];
 
@@ -97,24 +103,37 @@ final class ImportController
 
                 $ivaRate = (float)($match['tiva'] ?? 0);
                 $precioOld = (float)($match['precio'] ?? 0);
+                $precio1Old = (float)($match['precio1'] ?? 0);
                 $costoOld = (float)($match['precomp'] ?? 0);
                 $stockOld = (int)($match['_stockact'] ?? 0);
+                $ganan1Old = (float)($match['ganan1'] ?? 0);
+                $ganan2Old = (float)($match['ganan2'] ?? 0);
 
                 $item['precio_old'] = $precioOld;
                 $item['precio_old_gross'] = $precioOld * (1 + $ivaRate / 100);
-                $item['precio_new_gross'] = $precioNew * (1 + $ivaRate / 100);
+                $item['precio_new_gross'] = $precioNew !== null ? $precioNew * (1 + $ivaRate / 100) : null;
+                $item['precio1_old'] = $precio1Old;
+                $item['precio1_old_gross'] = $precio1Old * (1 + $ivaRate / 100);
+                $item['precio1_new_gross'] = $precio1New !== null ? $precio1New * (1 + $ivaRate / 100) : null;
                 $item['costo_old'] = $costoOld;
                 $item['stock_old'] = $stockOld;
+                $item['ganan1_old'] = $ganan1Old;
+                $item['ganan2_old'] = $ganan2Old;
                 $item['iva_rate'] = $ivaRate;
 
                 $item['precio_diff'] = $precioNew !== null ? round($precioNew - $precioOld, 2) : null;
                 $item['costo_diff'] = $costoNew !== null ? round($costoNew - $costoOld, 2) : null;
                 $item['stock_diff'] = $stockNew !== null ? $stockNew - $stockOld : null;
+                $item['ganan1_diff'] = $ganan1New !== null ? round($ganan1New - $ganan1Old, 2) : null;
+                $item['ganan2_diff'] = $ganan2New !== null ? round($ganan2New - $ganan2Old, 2) : null;
 
                 $item['has_changes'] = false;
                 if ($precioNew !== null && abs($precioNew - $precioOld) > 0.001) $item['has_changes'] = true;
                 if ($costoNew !== null && abs($costoNew - $costoOld) > 0.001) $item['has_changes'] = true;
                 if ($stockNew !== null && $stockNew !== $stockOld) $item['has_changes'] = true;
+                if ($ganan1New !== null && abs($ganan1New - $ganan1Old) > 0.001) $item['has_changes'] = true;
+                if ($ganan2New !== null && abs($ganan2New - $ganan2Old) > 0.001) $item['has_changes'] = true;
+                if ($precio1New !== null && abs($precio1New - $precio1Old) > 0.001) $item['has_changes'] = true;
             } else {
                 $notFound++;
             }
@@ -165,14 +184,19 @@ final class ImportController
                 $precioVal = $item['precio_new'];
                 $costoVal = $item['costo_new'];
                 $stockVal = $item['stock_new'];
+                $ganan1Val = $item['ganan1_new'] ?? null;
+                $ganan2Val = $item['ganan2_new'] ?? null;
+                $precio1Val = $item['precio1_new'] ?? null;
                 $idcodgusto = (int)$item['idcodgusto'];
 
                 $hasPriceChange = $item['precio_diff'] !== null && abs((float)$item['precio_diff']) > 0.001;
                 $hasCostChange = $item['costo_diff'] !== null && abs((float)$item['costo_diff']) > 0.001;
                 $hasStockChange = $item['stock_diff'] !== null && (int)$item['stock_diff'] !== 0;
+                $hasGanan1Change = $item['ganan1_diff'] !== null && abs((float)$item['ganan1_diff']) > 0.001;
+                $hasGanan2Change = $item['ganan2_diff'] !== null && abs((float)$item['ganan2_diff']) > 0.001;
 
-                if ($hasPriceChange || $hasCostChange) {
-                    $this->repo->updatePrecios($idprodu, (float)$precioVal, (float)$costoVal);
+                if ($hasPriceChange || $hasCostChange || $hasGanan1Change || $hasGanan2Change || $precio1Val !== null) {
+                    $this->repo->updatePrecios($idprodu, (float)$precioVal, (float)$costoVal, $ganan1Val, $ganan2Val, $precio1Val);
                 }
                 if ($hasStockChange && $idcodgusto > 0) {
                     $this->repo->updateStock($idcodgusto, (int)$stockVal);

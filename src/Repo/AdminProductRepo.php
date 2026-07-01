@@ -197,7 +197,7 @@ final class AdminProductRepo
         return $map;
     }
 
-    public function createProduct(string $produ, float $precio, float $precio1, int $iva, string $codprodu = ''): int
+    public function createProduct(string $produ, float $precio, float $precio1, int $iva, float $precomp = 0, float $ganan1 = 0, float $ganan2 = 0, string $codprodu = ''): int
     {
         $st = Db::pdo()->query('SELECT COALESCE(MAX(idprodu), 0) + 1 FROM producto');
         $idprodu = (int)$st->fetchColumn();
@@ -207,8 +207,8 @@ final class AdminProductRepo
         }
 
         $st = Db::pdo()->prepare('
-            INSERT INTO producto (idprodu, codprodu, produ, precio, precio1, iva, ganan1, ganan2, enweb, fecompra, fecalta)
-            VALUES (:id, :cp, :p, :pr, :pr1, :iva, :g1, :g2, 0, CURDATE(), NOW())
+            INSERT INTO producto (idprodu, codprodu, produ, precio, precio1, precomp, iva, ganan1, ganan2, enweb, fecompra, fecalta)
+            VALUES (:id, :cp, :p, :pr, :pr1, :pc, :iva, :g1, :g2, 0, CURDATE(), NOW())
         ');
         $st->execute([
             ':id' => $idprodu,
@@ -216,20 +216,22 @@ final class AdminProductRepo
             ':p' => $produ,
             ':pr' => $precio,
             ':pr1' => $precio1,
+            ':pc' => $precomp,
             ':iva' => $iva,
-            ':g1' => 0,
-            ':g2' => 0,
+            ':g1' => $ganan1,
+            ':g2' => $ganan2,
         ]);
         return $idprodu;
     }
 
-    public function updateProduct(int $idprodu, string $observ, float $precioNeto, float $precio1Neto, bool $enweb, string $produ = '', int $codrub = 0, int $codsub = 0, int $codepar = 0, string $codprove = '', float $ganan1 = 0, float $ganan2 = 0): void
+    public function updateProduct(int $idprodu, string $observ, float $precioNeto, float $precio1Neto, bool $enweb, string $produ = '', int $codrub = 0, int $codsub = 0, int $codepar = 0, string $codprove = '', float $ganan1 = 0, float $ganan2 = 0, float $precomp = 0): void
     {
-        $st = Db::pdo()->prepare('UPDATE producto SET observ = :observ, precio = :precio, precio1 = :precio1, enweb = :enweb, produ = :produ, codrub = :codrub, codsub = :codsub, codepar = :codepar, codprove = :codprove, ganan1 = :ganan1, ganan2 = :ganan2 WHERE idprodu = :id LIMIT 1');
+        $st = Db::pdo()->prepare('UPDATE producto SET observ = :observ, precio = :precio, precio1 = :precio1, precomp = :precomp, enweb = :enweb, produ = :produ, codrub = :codrub, codsub = :codsub, codepar = :codepar, codprove = :codprove, ganan1 = :ganan1, ganan2 = :ganan2 WHERE idprodu = :id LIMIT 1');
         $st->execute([
             ':observ' => $observ,
             ':precio' => $precioNeto,
             ':precio1' => $precio1Neto,
+            ':precomp' => $precomp,
             ':enweb' => $enweb ? 1 : 0,
             ':produ' => $produ !== '' ? $produ : null,
             ':codrub' => $codrub > 0 ? $codrub : null,

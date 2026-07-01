@@ -95,10 +95,15 @@ final class ImportRepo
         return null;
     }
 
-    public function updatePrecios(int $idprodu, float $precioNet, float $precompNet): void
+    public function updatePrecios(int $idprodu, float $precioNet, float $precompNet, ?float $ganan1 = null, ?float $ganan2 = null, ?float $precio1Net = null): void
     {
-        $st = Db::pdo()->prepare('UPDATE producto SET precio = :p, precomp = :pc WHERE idprodu = :id LIMIT 1');
-        $st->execute([':p' => $precioNet, ':pc' => $precompNet, ':id' => $idprodu]);
+        $set = ['precio = :p', 'precomp = :pc'];
+        $params = [':p' => $precioNet, ':pc' => $precompNet, ':id' => $idprodu];
+        if ($ganan1 !== null) { $set[] = 'ganan1 = :g1'; $params[':g1'] = $ganan1; }
+        if ($ganan2 !== null) { $set[] = 'ganan2 = :g2'; $params[':g2'] = $ganan2; }
+        if ($precio1Net !== null) { $set[] = 'precio1 = :p1'; $params[':p1'] = $precio1Net; }
+        $sql = 'UPDATE producto SET ' . implode(', ', $set) . ' WHERE idprodu = :id LIMIT 1';
+        Db::pdo()->prepare($sql)->execute($params);
     }
 
     public function updateStock(int $idcodgusto, int $stock): void

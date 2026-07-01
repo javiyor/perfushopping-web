@@ -115,6 +115,26 @@ foreach ($proveedores as $prov) {
             </div>
 
             <div class="card shadow-sm">
+                <div class="card-header bg-white fw-semibold">Costos y márgenes</div>
+                <div class="card-body">
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label small">Costo <span class="text-muted">(sin IVA)</span></label>
+                            <input class="form-control form-control-sm calc-trigger" name="precomp" value="<?= htmlspecialchars((string)($product['precomp'] ?? '0')) ?>" inputmode="decimal" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small">Margen minorista <span class="text-muted">(%)</span></label>
+                            <input class="form-control form-control-sm calc-trigger" name="ganan1" value="<?= htmlspecialchars((string)($product['ganan1'] ?? '0')) ?>" inputmode="decimal" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small">Margen mayorista <span class="text-muted">(%)</span></label>
+                            <input class="form-control form-control-sm calc-trigger" name="ganan2" value="<?= htmlspecialchars((string)($product['ganan2'] ?? '0')) ?>" inputmode="decimal" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
                 <div class="card-header bg-white fw-semibold">Precios y visibilidad</div>
                 <div class="card-body">
                     <div class="row g-2 mb-3">
@@ -132,17 +152,6 @@ foreach ($proveedores as $prov) {
                         <label class="form-label small">Neto calculado</label>
                         <div class="form-control form-control-sm bg-light text-muted" style="cursor:default" readonly>
                             Minorista $<?= number_format((float)($product['precio'] ?? 0), 2, ',', '.') ?> | Mayorista $<?= number_format((float)($product['precio1'] ?? 0), 2, ',', '.') ?>
-                        </div>
-                    </div>
-
-                    <div class="row g-2 mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label small">Margen minorista <span class="text-muted">(%)</span></label>
-                            <input class="form-control form-control-sm" name="ganan1" value="<?= htmlspecialchars((string)($product['ganan1'] ?? '0')) ?>" inputmode="decimal" />
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small">Margen mayorista <span class="text-muted">(%)</span></label>
-                            <input class="form-control form-control-sm" name="ganan2" value="<?= htmlspecialchars((string)($product['ganan2'] ?? '0')) ?>" inputmode="decimal" />
                         </div>
                     </div>
 
@@ -324,4 +333,25 @@ document.querySelectorAll('[data-ai-generate]').forEach(btn => {
         }
     });
 });
+
+document.querySelectorAll('.calc-trigger').forEach(function(el) {
+    el.addEventListener('input', autoCalcPrices);
+    el.addEventListener('change', autoCalcPrices);
+});
+function autoCalcPrices() {
+    var costo = parseFloat((document.querySelector('[name="precomp"]').value || '0').replace(',', '.')) || 0;
+    var g1 = parseFloat((document.querySelector('[name="ganan1"]').value || '0').replace(',', '.')) || 0;
+    var g2 = parseFloat((document.querySelector('[name="ganan2"]').value || '0').replace(',', '.')) || 0;
+    var ivaPct = <?= json_encode($selectedIva) ?>;
+    if (costo > 0 && g1 > 0) {
+        var neto1 = costo * (1 + g1 / 100);
+        var gross1 = neto1 * (1 + ivaPct / 100);
+        document.querySelector('[name="precio_gross"]').value = gross1.toFixed(2);
+    }
+    if (costo > 0 && g2 > 0) {
+        var neto2 = costo * (1 + g2 / 100);
+        var gross2 = neto2 * (1 + ivaPct / 100);
+        document.querySelector('[name="precio1_gross"]').value = gross2.toFixed(2);
+    }
+}
 </script>

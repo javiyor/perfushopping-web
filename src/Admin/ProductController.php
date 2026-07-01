@@ -66,13 +66,7 @@ final class ProductController
         $iva = (int)($_POST['iva'] ?? 0);
         $ganan1 = (float)str_replace(',', '.', trim((string)($_POST['ganan1'] ?? '0')));
         $ganan2 = (float)str_replace(',', '.', trim((string)($_POST['ganan2'] ?? '0')));
-
-        $precioGross = $this->parseMoney((string)($_POST['precio_gross'] ?? ''));
-        $precio1Gross = $this->parseMoney((string)($_POST['precio1_gross'] ?? ''));
-        if ($precioGross === null || $precio1Gross === null) {
-            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Carga precios validos.'];
-            Response::redirect('/admin/productos/nuevo');
-        }
+        $precomp = $this->parseMoney((string)($_POST['precomp'] ?? '')) ?? 0;
 
         $ivaRate = 0;
         $ivaOpts = $this->repo->ivaOptions();
@@ -83,12 +77,27 @@ final class ProductController
             }
         }
 
+        $precioGross = $this->parseMoney((string)($_POST['precio_gross'] ?? ''));
+        $precio1Gross = $this->parseMoney((string)($_POST['precio1_gross'] ?? ''));
+        if ($precioGross === null && $precomp > 0 && $ganan1 > 0) {
+            $precioNeto = round($precomp * (1 + $ganan1 / 100), 2);
+            $precioGross = round($precioNeto * (1 + $ivaRate / 100), 2);
+        }
+        if ($precio1Gross === null && $precomp > 0 && $ganan2 > 0) {
+            $precio1Neto = round($precomp * (1 + $ganan2 / 100), 2);
+            $precio1Gross = round($precio1Neto * (1 + $ivaRate / 100), 2);
+        }
+        if ($precioGross === null || $precio1Gross === null) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Carga precios o costo + margen.'];
+            Response::redirect('/admin/productos/nuevo');
+        }
+
         $precioNeto = $this->grossToNet((float)$precioGross, $ivaRate);
         $precio1Neto = $this->grossToNet((float)$precio1Gross, $ivaRate);
 
-        $idprodu = $this->repo->createProduct($produ, $precioNeto, $precio1Neto, $iva);
+        $idprodu = $this->repo->createProduct($produ, $precioNeto, $precio1Neto, $iva, $precomp, $ganan1, $ganan2);
 
-        $this->repo->updateProduct($idprodu, '', $precioNeto, $precio1Neto, true, $produ, $codrub, $codsub, $codepar, $codprove, $ganan1, $ganan2);
+        $this->repo->updateProduct($idprodu, '', $precioNeto, $precio1Neto, true, $produ, $codrub, $codsub, $codepar, $codprove, $ganan1, $ganan2, $precomp);
 
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Producto creado correctamente.'];
         Response::redirect('/admin/productos/' . $idprodu);
@@ -185,9 +194,10 @@ final class ProductController
         $codprove = trim((string)($_POST['codprove'] ?? ''));
         $ganan1 = (float)str_replace(',', '.', trim((string)($_POST['ganan1'] ?? '0')));
         $ganan2 = (float)str_replace(',', '.', trim((string)($_POST['ganan2'] ?? '0')));
+        $precomp = $this->parseMoney((string)($_POST['precomp'] ?? '')) ?? 0;
 
         $ivaRate = (float)($product['tiva'] ?? 0);
-        $this->repo->updateProduct($idprodu, $observ, $this->grossToNet($precioBruto, $ivaRate), $this->grossToNet($precio1Bruto, $ivaRate), $enweb, $produ, $codrub, $codsub, $codepar, $codprove, $ganan1, $ganan2);
+        $this->repo->updateProduct($idprodu, $observ, $this->grossToNet($precioBruto, $ivaRate), $this->grossToNet($precio1Bruto, $ivaRate), $enweb, $produ, $codrub, $codsub, $codepar, $codprove, $ganan1, $ganan2, $precomp);
 
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Producto actualizado.'];
         Response::redirect('/admin/productos/' . $idprodu);

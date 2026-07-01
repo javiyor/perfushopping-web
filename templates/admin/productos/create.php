@@ -27,6 +27,21 @@ $ivaOptions = $ivaOptions ?? [];
                     </div>
 
                     <div class="row g-2 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label small">Costo <span class="text-muted">(sin IVA)</span></label>
+                            <input class="form-control form-control-sm calc-trigger" name="precomp" placeholder="0.00" inputmode="decimal" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small">Margen minorista <span class="text-muted">(%)</span></label>
+                            <input class="form-control form-control-sm calc-trigger" name="ganan1" placeholder="0.00" inputmode="decimal" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small">Margen mayorista <span class="text-muted">(%)</span></label>
+                            <input class="form-control form-control-sm calc-trigger" name="ganan2" placeholder="0.00" inputmode="decimal" />
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-3">
                         <div class="col-md-6">
                             <label class="form-label small">Precio minorista <span class="text-muted">(IVA incl.)</span></label>
                             <input class="form-control form-control-sm" name="precio_gross" placeholder="0.00" inputmode="decimal" required />
@@ -34,17 +49,6 @@ $ivaOptions = $ivaOptions ?? [];
                         <div class="col-md-6">
                             <label class="form-label small">Precio mayorista <span class="text-muted">(IVA incl.)</span></label>
                             <input class="form-control form-control-sm" name="precio1_gross" placeholder="0.00" inputmode="decimal" required />
-                        </div>
-                    </div>
-
-                    <div class="row g-2 mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label small">Margen minorista <span class="text-muted">(%)</span></label>
-                            <input class="form-control form-control-sm" name="ganan1" placeholder="0.00" inputmode="decimal" />
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small">Margen mayorista <span class="text-muted">(%)</span></label>
-                            <input class="form-control form-control-sm" name="ganan2" placeholder="0.00" inputmode="decimal" />
                         </div>
                     </div>
 
@@ -92,9 +96,9 @@ $ivaOptions = $ivaOptions ?? [];
 
                     <div class="mb-3">
                         <label class="form-label small">IVA</label>
-                        <select class="form-select form-select-sm" name="iva">
+                        <select class="form-select form-select-sm calc-trigger" name="iva">
                             <?php foreach ($ivaOptions as $iva): $pct = (float)($iva['tiva'] ?? 0); ?>
-                                <option value="<?= (int)($iva['codivaprodu'] ?? 0) ?>"<?= $pct === 21.0 ? ' selected' : '' ?>><?= htmlspecialchars((string)($iva['tiva'] ?? '')) ?>%</option>
+                                <option value="<?= (int)($iva['codivaprodu'] ?? 0) ?>" data-iva-pct="<?= htmlspecialchars((string)$pct) ?>"<?= $pct === 21.0 ? ' selected' : '' ?>><?= htmlspecialchars((string)($iva['tiva'] ?? '')) ?>%</option>
                             <?php endforeach; ?>
                         </select>
                     </div>
@@ -114,3 +118,27 @@ $ivaOptions = $ivaOptions ?? [];
         </div>
     </div>
 </form>
+
+<script>
+document.querySelectorAll('.calc-trigger').forEach(el => {
+    el.addEventListener('input', autoCalcPrices);
+    el.addEventListener('change', autoCalcPrices);
+});
+function autoCalcPrices() {
+    var costo = parseFloat(document.querySelector('[name="precomp"]').value.replace(',', '.')) || 0;
+    var g1 = parseFloat(document.querySelector('[name="ganan1"]').value.replace(',', '.')) || 0;
+    var g2 = parseFloat(document.querySelector('[name="ganan2"]').value.replace(',', '.')) || 0;
+    var ivaSel = document.querySelector('[name="iva"]');
+    var ivaPct = parseFloat(ivaSel.options[ivaSel.selectedIndex].getAttribute('data-iva-pct')) || 0;
+    if (costo > 0 && g1 > 0) {
+        var neto1 = costo * (1 + g1 / 100);
+        var gross1 = neto1 * (1 + ivaPct / 100);
+        document.querySelector('[name="precio_gross"]').value = gross1.toFixed(2);
+    }
+    if (costo > 0 && g2 > 0) {
+        var neto2 = costo * (1 + g2 / 100);
+        var gross2 = neto2 * (1 + ivaPct / 100);
+        document.querySelector('[name="precio1_gross"]').value = gross2.toFixed(2);
+    }
+}
+</script>
