@@ -132,6 +132,8 @@ $router->post('/admin/correo/auth', [AdminController::class, 'correoAuth']);
 $router->post('/admin/correo/agencies', [AdminController::class, 'correoAgencies']);
 $router->get('/admin/correo/saved', [AdminController::class, 'correoSavedAgencies']);
 $router->get('/admin/productos', [AdminProductControllerNew::class, 'index']);
+$router->get('/admin/productos/nuevo', [AdminProductControllerNew::class, 'create']);
+$router->post('/admin/productos/crear', [AdminProductControllerNew::class, 'store']);
 $router->get('/admin/productos/(?P<id>\d+)', [AdminProductControllerNew::class, 'show']);
 $router->post('/admin/productos/save', [AdminProductControllerNew::class, 'save']);
 $router->post('/admin/productos/main-image', [AdminProductControllerNew::class, 'uploadMainImage']);

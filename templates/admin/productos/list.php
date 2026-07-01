@@ -14,7 +14,10 @@ $products = $products ?? [];
         <h4 class="fw-bold mb-1">Productos</h4>
         <p class="text-muted small">Busca productos, edita precios, visibilidad y más</p>
     </div>
-    <a class="btn btn-accent btn-sm" href="/admin/productos/importar"><i class="bi bi-upload"></i> Importar</a>
+    <div class="d-flex gap-2">
+        <a class="btn btn-accent btn-sm" href="/admin/productos/nuevo"><i class="bi bi-plus-lg"></i> Nuevo</a>
+        <a class="btn btn-outline-secondary btn-sm" href="/admin/productos/importar"><i class="bi bi-upload"></i> Importar</a>
+    </div>
 </div>
 
 <div class="card shadow-sm mb-3">

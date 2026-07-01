@@ -78,6 +78,14 @@ final class AdminProductRepo
     }
 
     /** @return array<int, array<string,mixed>> */
+    public function ivaOptions(): array
+    {
+        $st = Db::pdo()->query('SELECT codivaprodu, tiva FROM ivaprodu ORDER BY tiva ASC');
+        $rows = $st ? $st->fetchAll() : [];
+        return is_array($rows) ? $rows : [];
+    }
+
+    /** @return array<int, array<string,mixed>> */
     public function allRubros(): array
     {
         $st = Db::pdo()->query('SELECT codrub, nomrub FROM rubros ORDER BY nomrub ASC');
@@ -187,6 +195,30 @@ final class AdminProductRepo
             }
         }
         return $map;
+    }
+
+    public function createProduct(string $produ, float $precio, float $precio1, int $iva, string $codprodu = ''): int
+    {
+        $st = Db::pdo()->query('SELECT COALESCE(MAX(idprodu), 0) + 1 FROM producto');
+        $idprodu = (int)$st->fetchColumn();
+
+        if ($codprodu === '') {
+            $codprodu = (string)$idprodu;
+        }
+
+        $st = Db::pdo()->prepare('
+            INSERT INTO producto (idprodu, codprodu, produ, precio, precio1, iva, enweb, fecompra, fecalta)
+            VALUES (:id, :cp, :p, :pr, :pr1, :iva, 0, CURDATE(), NOW())
+        ');
+        $st->execute([
+            ':id' => $idprodu,
+            ':cp' => $codprodu,
+            ':p' => $produ,
+            ':pr' => $precio,
+            ':pr1' => $precio1,
+            ':iva' => $iva,
+        ]);
+        return $idprodu;
     }
 
     public function updateProduct(int $idprodu, string $observ, float $precioNeto, float $precio1Neto, bool $enweb, string $produ = '', int $codrub = 0, int $codsub = 0, int $codepar = 0, string $codprove = ''): void

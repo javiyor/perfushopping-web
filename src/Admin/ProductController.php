@@ -24,6 +24,74 @@ final class ProductController
         $this->auth = new AdminAuthService();
     }
 
+    public function create(array $params): void
+    {
+        $adminUser = $this->auth->requireSesion();
+
+        $rubros = $this->repo->allRubros();
+        $subrubros = $this->repo->allSubrubros();
+        $departamentos = (new DepartamentoRepo())->findAll();
+        $proveedores = (new ProveedorRepo())->findAll();
+        $ivaOptions = $this->repo->ivaOptions();
+
+        echo View::adminPage('admin/productos/create.php', [
+            'adminUser' => $adminUser,
+            'rubros' => $rubros,
+            'subrubros' => $subrubros,
+            'departamentos' => $departamentos,
+            'proveedores' => $proveedores,
+            'ivaOptions' => $ivaOptions,
+            'csrf' => Csrf::token(),
+            'flash' => $_SESSION['admin_flash'] ?? null,
+            'pageTitle' => 'Nuevo producto',
+        ]);
+        unset($_SESSION['admin_flash']);
+    }
+
+    public function store(array $params): void
+    {
+        $this->auth->requireSesion();
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $produ = trim((string)($_POST['produ'] ?? ''));
+        if ($produ === '') {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'El nombre del producto es obligatorio.'];
+            Response::redirect('/admin/productos/nuevo');
+        }
+
+        $codrub = (int)($_POST['codrub'] ?? 0);
+        $codsub = (int)($_POST['codsub'] ?? 0);
+        $codepar = (int)($_POST['codepar'] ?? 0);
+        $codprove = trim((string)($_POST['codprove'] ?? ''));
+        $iva = (int)($_POST['iva'] ?? 0);
+
+        $precioGross = $this->parseMoney((string)($_POST['precio_gross'] ?? ''));
+        $precio1Gross = $this->parseMoney((string)($_POST['precio1_gross'] ?? ''));
+        if ($precioGross === null || $precio1Gross === null) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Carga precios validos.'];
+            Response::redirect('/admin/productos/nuevo');
+        }
+
+        $ivaRate = 0;
+        $ivaOpts = $this->repo->ivaOptions();
+        foreach ($ivaOpts as $opt) {
+            if ((int)($opt['codivaprodu'] ?? 0) === $iva) {
+                $ivaRate = (float)($opt['tiva'] ?? 0);
+                break;
+            }
+        }
+
+        $precioNeto = $this->grossToNet((float)$precioGross, $ivaRate);
+        $precio1Neto = $this->grossToNet((float)$precio1Gross, $ivaRate);
+
+        $idprodu = $this->repo->createProduct($produ, $precioNeto, $precio1Neto, $iva);
+
+        $this->repo->updateProduct($idprodu, '', $precioNeto, $precio1Neto, true, $produ, $codrub, $codsub, $codepar, $codprove);
+
+        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Producto creado correctamente.'];
+        Response::redirect('/admin/productos/' . $idprodu);
+    }
+
     public function index(array $params): void
     {
         $adminUser = $this->auth->requireSesion();
