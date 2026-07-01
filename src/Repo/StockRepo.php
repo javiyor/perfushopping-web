@@ -251,4 +251,95 @@ final class StockRepo
             throw $e;
         }
     }
+
+    // ── Grilla de reposición ──
+
+    public function grillaRubros(): array
+    {
+        $st = Db::pdo()->query('SELECT codrub, nomrub FROM rubros WHERE activo = 1 OR activo IS NULL ORDER BY nomrub ASC');
+        return $st->fetchAll();
+    }
+
+    public function grillaSubrubros(int $codrub = 0): array
+    {
+        if ($codrub > 0) {
+            $st = Db::pdo()->prepare('SELECT codsub, nomsub FROM subrubro WHERE codrub = :cr AND (activo = 1 OR activo IS NULL) ORDER BY nomsub ASC');
+            $st->execute([':cr' => $codrub]);
+        } else {
+            $st = Db::pdo()->query('SELECT codsub, nomsub FROM subrubro WHERE activo = 1 OR activo IS NULL ORDER BY nomsub ASC');
+        }
+        return $st->fetchAll();
+    }
+
+    public function grillaProveedores(): array
+    {
+        $st = Db::pdo()->query("
+            SELECT DISTINCT pv.codprove, pv.nomprovee
+            FROM producto p
+            INNER JOIN proveedo pv ON pv.codprove = p.codprove
+            WHERE p.enweb = 1 AND p.codprove IS NOT NULL AND p.codprove > 0
+            ORDER BY pv.nomprovee ASC
+        ");
+        return $st->fetchAll();
+    }
+
+    public function grillaProductos(string $q = '', int $codrub = 0, int $codsub = 0, int $codprove = 0, string $desde = '', string $hasta = '', int $limit = 500): array
+    {
+        $limit = max(1, min(1000, $limit));
+        $params = [];
+        $where = ['p.enweb = 1'];
+
+        if ($codrub > 0) {
+            $where[] = 'p.codrub = :cr';
+            $params[':cr'] = $codrub;
+        }
+        if ($codsub > 0) {
+            $where[] = 'p.codsub = :cs';
+            $params[':cs'] = $codsub;
+        }
+        if ($codprove > 0) {
+            $where[] = 'p.codprove = :cp';
+            $params[':cp'] = $codprove;
+        }
+
+        $q = trim($q);
+        if ($q !== '') {
+            $where[] = '(p.produ LIKE :q1 OR p.codprodu LIKE :q2 OR p.codprodup LIKE :q3 OR EXISTS (SELECT 1 FROM gustos g2 WHERE g2.idprodu = p.idprodu AND (g2.codscan LIKE :q4 OR g2.nomgusto LIKE :q5)))';
+            $params[':q1'] = '%' . $q . '%';
+            $params[':q2'] = '%' . $q . '%';
+            $params[':q3'] = '%' . $q . '%';
+            $params[':q4'] = '%' . $q . '%';
+            $params[':q5'] = '%' . $q . '%';
+        }
+
+        $desde = trim($desde);
+        $hasta = trim($hasta);
+        $ventasJoin = '';
+        if ($desde === '' && $hasta === '') {
+            $ventasJoin = 'LEFT JOIN (SELECT fi.idprodu, SUM(fi.qty) AS vendidos FROM factura_items fi INNER JOIN facturas f ON f.id = fi.factura_id AND f.estado = \'emitida\' AND f.fecha >= DATE_SUB(CURDATE(), INTERVAL 90 DAY) GROUP BY fi.idprodu) v ON v.idprodu = p.idprodu';
+        } else {
+            if ($desde === '') $desde = '2000-01-01';
+            if ($hasta === '') $hasta = date('Y-m-d');
+            $params[':vdesde'] = $desde;
+            $params[':vhasta'] = $hasta;
+            $ventasJoin = 'LEFT JOIN (SELECT fi.idprodu, SUM(fi.qty) AS vendidos FROM factura_items fi INNER JOIN facturas f ON f.id = fi.factura_id AND f.estado = \'emitida\' AND f.fecha BETWEEN :vdesde AND :vhasta GROUP BY fi.idprodu) v ON v.idprodu = p.idprodu';
+        }
+
+        $sql = "
+            SELECT p.idprodu, p.codprodu, p.produ, p.precomp, p.stocact, p.codprove, p.codprodup, p.precio, p.imagen,
+                   pv.nomprovee,
+                   (SELECT MIN(g.codscan) FROM gustos g WHERE g.idprodu = p.idprodu AND g.codscan IS NOT NULL AND g.codscan != '' LIMIT 1) AS codscan,
+                   COALESCE(v.vendidos, 0) AS vendidos
+            FROM producto p
+            LEFT JOIN proveedo pv ON pv.codprove = p.codprove
+            {$ventasJoin}
+            WHERE " . implode(' AND ', $where) . "
+            ORDER BY v.vendidos DESC, p.produ ASC
+            LIMIT {$limit}
+        ";
+
+        $st = Db::pdo()->prepare($sql);
+        $st->execute($params);
+        return $st->fetchAll();
+    }
 }

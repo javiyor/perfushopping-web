@@ -196,6 +196,7 @@
             <a href="/admin/ordenes-compra/fletes" class="<?= $currentPath === '/admin/ordenes-compra/fletes' ? 'active' : '' ?>"><i class="bi bi-truck"></i>Fletes</a>
             <a href="/admin/stock" class="<?= str_starts_with($currentPath, '/admin/stock') ? 'active' : '' ?>"><i class="bi bi-boxes"></i>Stock</a>
             <a href="/admin/stock/ajuste" class="<?= str_starts_with($currentPath, '/admin/stock/ajuste') ? 'active' : '' ?>"><i class="bi bi-pencil-square"></i>Ajuste stock</a>
+            <a href="/admin/stock/grilla" class="<?= str_starts_with($currentPath, '/admin/stock/grilla') ? 'active' : '' ?>"><i class="bi bi-grid-3x3-gap"></i>Grilla reposición</a>
 
             <div class="nav-section">Ventas</div>
             <a href="/admin/orders" class="<?= str_starts_with($currentPath, '/admin/orders') ? 'active' : '' ?>"><i class="bi bi-cart"></i>Pedidos</a>
