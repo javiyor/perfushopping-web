@@ -11,7 +11,7 @@ final class CtaCteRepo
     {
         $q = trim($q);
         $params = [];
-        $having = 'HAVING saldo != 0';
+        $having = 'HAVING saldo_cents != 0';
 
         $where = '';
         if ($q !== '') {
