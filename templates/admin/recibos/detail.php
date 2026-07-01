@@ -38,7 +38,7 @@ $formaPagoLabels = [
             </div>
             <div class="card-body">
                 <div class="d-flex flex-wrap gap-2">
-                    <a class="btn btn-outline-primary btn-sm" href="/admin/recibos/imprimir/<?= (int)($recibo['id'] ?? 0) ?>" target="_blank">
+                    <a class="btn btn-outline-primary btn-sm" href="/admin/recibos/imprimir/<?= (int)($recibo['id'] ?? 0) ?>" target="_blank" id="printLinkRecibo">
                         <i class="bi bi-printer"></i> Imprimir
                     </a>
                     <?php if (($recibo['estado'] ?? '') !== 'anulado'): ?>
@@ -161,6 +161,17 @@ $formaPagoLabels = [
                 <p class="small mb-0"><?= nl2br(htmlspecialchars((string)$recibo['notas'])) ?></p>
             </div>
         </div>
-        <?php endif; ?>
-    </div>
-</div>
+<?php endif; ?>
+                </div>
+            </div>
+        </div>
+
+<script>
+(function() {
+    var link = document.getElementById('printLinkRecibo');
+    if (link) {
+        var fmt = localStorage.getItem('perfushopping_print_format') || '80mm';
+        link.href = link.href.split('?')[0] + '?formato=' + fmt;
+    }
+})();
+</script>

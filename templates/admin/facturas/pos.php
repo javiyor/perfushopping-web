@@ -575,7 +575,8 @@ function submitFactura() {
     .then(res => {
         if (res.ok) {
             if (res.arca && res.arca.cae) {
-                window.location.href = '/admin/facturas/imprimir/' + res.id + '?auto=1';
+                var fmt = localStorage.getItem('perfushopping_print_format') || '80mm';
+                window.location.href = '/admin/facturas/imprimir/' + res.id + '?auto=1&formato=' + fmt;
             } else {
                 window.location.href = '/admin/facturas/' + res.id;
             }

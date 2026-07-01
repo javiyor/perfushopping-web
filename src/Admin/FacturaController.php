@@ -389,6 +389,9 @@ final class FacturaController
         $adminUser = $auth->requireSesion();
 
         $id = (int)($params['id'] ?? 0);
+        $formato = (string)($_GET['formato'] ?? '80mm');
+        if (!in_array($formato, ['a4', '80mm', '58mm'], true)) $formato = '80mm';
+
         $repo = new FacturaRepo();
         $factura = $repo->findById($id);
         if (!$factura) {
@@ -398,12 +401,11 @@ final class FacturaController
         $items = $repo->items($id);
         $pagos = $repo->pagos($id);
 
-        echo View::adminPage('admin/facturas/print.php', [
-            'adminUser' => $adminUser,
+        echo View::render('admin/facturas/print.php', [
             'factura' => $factura,
             'items' => $items,
             'pagos' => $pagos,
-            'pageTitle' => 'Imprimir ' . ($factura['codigo'] ?? ''),
+            'formato' => $formato,
         ]);
     }
 

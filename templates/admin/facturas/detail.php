@@ -100,7 +100,7 @@ $formaPagoLabels = [
             </div>
             <div class="card-body">
                 <div class="d-flex flex-wrap gap-2">
-                    <a class="btn btn-outline-primary btn-sm" href="/admin/facturas/imprimir/<?= (int)($factura['id'] ?? 0) ?>" target="_blank">
+                    <a class="btn btn-outline-primary btn-sm" href="/admin/facturas/imprimir/<?= (int)($factura['id'] ?? 0) ?>" target="_blank" id="printLinkFactura">
                         <i class="bi bi-printer"></i> Imprimir
                     </a>
                     <?php if (($factura['cliente_mail'] ?? '') !== '' && ($factura['estado'] ?? '') !== 'anulada'): ?>
@@ -126,6 +126,16 @@ $formaPagoLabels = [
                 </div>
             </div>
         </div>
+
+<script>
+(function() {
+    var link = document.getElementById('printLinkFactura');
+    if (link) {
+        var fmt = localStorage.getItem('perfushopping_print_format') || '80mm';
+        link.href = link.href.split('?')[0] + '?formato=' + fmt;
+    }
+})();
+</script>
 
         <div class="card shadow-sm mb-3">
             <div class="card-header bg-white fw-semibold">Cliente</div>

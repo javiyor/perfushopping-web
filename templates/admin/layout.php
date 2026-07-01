@@ -208,6 +208,7 @@
             <a href="/admin/ctacte" class="<?= str_starts_with($currentPath, '/admin/ctacte') ? 'active' : '' ?>"><i class="bi bi-currency-dollar"></i>Ctas. ctes.</a>
             <a href="/admin/caja" class="<?= str_starts_with($currentPath, '/admin/caja') && $currentPath !== '/admin/caja/general' ? 'active' : '' ?>"><i class="bi bi-cash-stack"></i>Caja</a>
             <a href="/admin/caja/general" class="<?= $currentPath === '/admin/caja/general' ? 'active' : '' ?>"><i class="bi bi-piggy-bank"></i>Caja General</a>
+            <a href="/admin/impresion/config" class="<?= $currentPath === '/admin/impresion/config' ? 'active' : '' ?>"><i class="bi bi-printer"></i>Impresión</a>
             <a href="/admin/arca" class="<?= str_starts_with($currentPath, '/admin/arca') ? 'active' : '' ?>"><i class="bi bi-cloud-check"></i>ARCA</a>
             <a href="/admin/reportes" class="<?= str_starts_with($currentPath, '/admin/reportes') ? 'active' : '' ?>"><i class="bi bi-graph-up"></i>Reportes</a>
 

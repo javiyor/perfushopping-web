@@ -49,6 +49,7 @@ use Perfushopping\Web\Admin\CtaCteController as AdminCtaCteController;
 use Perfushopping\Web\Admin\SesionController as AdminSesionController;
 use Perfushopping\Web\Admin\StockController as AdminStockController;
 use Perfushopping\Web\Admin\StockGrillaController as AdminStockGrillaController;
+use Perfushopping\Web\Admin\PrintConfigController as AdminPrintConfigController;
 use Perfushopping\Web\Admin\ReporteController as AdminReporteController;
 use Perfushopping\Web\Admin\OrdenCompraController as AdminOrdenCompraController;
 use Perfushopping\Web\Admin\CajaController as AdminCajaController;
@@ -219,6 +220,9 @@ $router->get('/admin/stock/grilla', [AdminStockGrillaController::class, 'index']
 $router->post('/admin/stock/grilla/generar-oc', [AdminStockGrillaController::class, 'generarOC']);
 $router->get('/admin/stock/grilla/oc-pdf/(?P<id>\d+)', [AdminStockGrillaController::class, 'exportarPDF']);
 $router->get('/admin/stock/grilla/oc-excel/(?P<id>\d+)', [AdminStockGrillaController::class, 'exportarExcel']);
+
+// Admin - Configuración de impresión
+$router->get('/admin/impresion/config', [AdminPrintConfigController::class, 'index']);
 $router->get('/admin/ordenes-compra', [AdminOrdenCompraController::class, 'index']);
 $router->get('/admin/ordenes-compra/nueva', [AdminOrdenCompraController::class, 'create']);
 $router->post('/admin/ordenes-compra/guardar', [AdminOrdenCompraController::class, 'store']);

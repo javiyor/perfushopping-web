@@ -285,6 +285,9 @@ final class ReciboController
         $adminUser = $auth->requireSesion();
 
         $id = (int)($params['id'] ?? 0);
+        $formato = (string)($_GET['formato'] ?? '80mm');
+        if (!in_array($formato, ['a4', '80mm', '58mm'], true)) $formato = '80mm';
+
         $repo = new ReciboRepo();
         $recibo = $repo->findById($id);
         if (!$recibo) {
@@ -293,11 +296,10 @@ final class ReciboController
         }
         $pagos = $repo->pagos($id);
 
-        echo View::adminPage('admin/recibos/print.php', [
-            'adminUser' => $adminUser,
+        echo View::render('admin/recibos/print.php', [
             'recibo' => $recibo,
             'pagos' => $pagos,
-            'pageTitle' => 'Imprimir ' . ($recibo['codigo'] ?? ''),
+            'formato' => $formato,
         ]);
     }
 }
