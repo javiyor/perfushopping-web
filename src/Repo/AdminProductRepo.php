@@ -249,7 +249,7 @@ final class AdminProductRepo
         $pdo = Db::pdo();
         $pdo->prepare('DELETE FROM imagen WHERE idprodu = :id')->execute([':id' => $idprodu]);
         $pdo->prepare('DELETE FROM gustos WHERE idprodu = :id')->execute([':id' => $idprodu]);
-        $pdo->prepare('DELETE FROM producto_admin WHERE idprodu = :id')->execute([':id' => $idprodu]);
+        try { $pdo->prepare('DELETE FROM producto_admin WHERE idprodu = :id')->execute([':id' => $idprodu]); } catch (\Throwable $e) {}
         $pdo->prepare('DELETE FROM producto WHERE idprodu = :id LIMIT 1')->execute([':id' => $idprodu]);
     }
 
