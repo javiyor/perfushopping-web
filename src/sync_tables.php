@@ -1,20 +1,17 @@
 <?php
 /**
  * Sincronización diaria de producto, gustos, stockcab, stockdet
- * desde la DB local → servidor remoto (perfushopping.sytes.net)
  *
- * Preserva producto.enweb del servidor remoto.
+ * LEE desde: servidor ORIGEN (config en sync_config.php = perfushopping.sytes.net)
+ * ESCRIBE en: DB local (.env = perfushopping.ar)
  *
- * USO:
+ * Preserva producto.enweb del destino.
+ *
+ * USO (en el servidor perfushopping.ar):
  *   php src/sync_tables.php
  *
- * Para programar todos los días en Windows:
- *   - Abrir "Programador de tareas"
- *   - Crear tarea básica → disparador "Diariamente" a las 04:00
- *   - Acción: iniciar programa
- *     - Programa: php
- *     - Argumentos: "C:\perfushopping\web\src\sync_tables.php"
- *     - Iniciar en: C:\perfushopping\web
+ * CRON (Linux):
+ *   0 4 * * * cd /ruta/del/repo && /usr/bin/php src/sync_tables.php >> storage/logs/sync_cron.log 2>&1
  */
 
 declare(strict_types=1);
@@ -26,10 +23,12 @@ use Perfushopping\Web\Infra\Db;
 // ── Config ──
 $configFile = __DIR__ . '/sync_config.php';
 if (!is_file($configFile)) {
-    echo "[ERROR] Creá " . $configFile . " primero (copiá sync_config.example.php y completá la contraseña).\n";
+    echo "[ERROR] Creá " . $configFile . " primero (copiá sync_config.example.php y completá los datos del ORIGEN).\n";
+    echo "  El ORIGEN es el servidor que tiene los datos reales (perfushopping.sytes.net)\n";
+    echo "  El DESTINO es la DB local configurada en .env (perfushopping.ar)\n";
     exit(1);
 }
-$remote = require $configFile;
+$originCfg = require $configFile;
 
 $chunkSize = 500;
 $logFile = __DIR__ . '/../storage/logs/sync_' . date('Y-m-d') . '.log';
@@ -42,44 +41,40 @@ $log = function (string $msg) use ($logFile) {
     file_put_contents($logFile, $line . "\n", FILE_APPEND);
 };
 
-// ── Conectar remota ──
+// ── ORIGEN (sytes.net: de donde leemos) ──
 try {
-    $dsn = "mysql:host={$remote['host']};port={$remote['port']};dbname={$remote['db']};charset=utf8mb4";
-    $rem = new PDO($dsn, $remote['user'], $remote['pass'], [
+    $dsn = "mysql:host={$originCfg['host']};port={$originCfg['port']};dbname={$originCfg['db']};charset=utf8mb4";
+    $origin = new PDO($dsn, $originCfg['user'], $originCfg['pass'], [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
     ]);
-    $log("[OK] Conexión remota establecida");
+    $log("[OK] Conexión ORIGEN ({$originCfg['host']}) establecida");
 } catch (\Throwable $e) {
-    $log("[ERROR] No se pudo conectar a {$remote['host']}: {$e->getMessage()}");
+    $log("[ERROR] No se pudo conectar al ORIGEN {$originCfg['host']}: {$e->getMessage()}");
     exit(1);
 }
 
-$local = Db::pdo();
-
-// ── Helper para escapar ──
-function quote(string $s): string
-{
-    return "'" . str_replace(["'", "\n", "\r"], ["''", '\\n', '\\r'], $s) . "'";
-}
+// ── DESTINO (perfushopping.ar: donde escribimos) ──
+$dest = Db::pdo();
+$log("[OK] Conexión DESTINO (local) establecida");
 
 // ── Helper: sync tabla con REPLACE ──
-function syncReplace(PDO $local, PDO $rem, string $table, array $cols, int $chunkSize, callable $log): void
+function syncReplace(PDO $origin, PDO $dest, string $table, array $cols, int $chunkSize, callable $log): void
 {
-    $total = (int)$local->query("SELECT COUNT(*) FROM {$table}")->fetchColumn();
+    $total = (int)$origin->query("SELECT COUNT(*) FROM {$table}")->fetchColumn();
     $log("[{$table}] {$total} registros a sincronizar");
 
     $insertCols = implode(', ', $cols);
     $placeholders = implode(', ', array_map(fn($c) => ":{$c}", $cols));
-    $stmt = $rem->prepare("REPLACE INTO {$table} ({$insertCols}) VALUES ({$placeholders})");
+    $stmt = $dest->prepare("REPLACE INTO {$table} ({$insertCols}) VALUES ({$placeholders})");
 
     $offset = 0;
     $synced = 0;
     while ($offset < $total) {
-        $rows = $local->query("SELECT * FROM {$table} LIMIT {$chunkSize} OFFSET {$offset}")->fetchAll(PDO::FETCH_ASSOC);
+        $rows = $origin->query("SELECT * FROM {$table} LIMIT {$chunkSize} OFFSET {$offset}")->fetchAll(PDO::FETCH_ASSOC);
         if (!$rows) break;
 
-        $rem->beginTransaction();
+        $dest->beginTransaction();
         try {
             foreach ($rows as $r) {
                 foreach ($cols as $c) {
@@ -88,9 +83,9 @@ function syncReplace(PDO $local, PDO $rem, string $table, array $cols, int $chun
                 $stmt->execute();
                 $synced++;
             }
-            $rem->commit();
+            $dest->commit();
         } catch (\Throwable $e) {
-            $rem->rollBack();
+            $dest->rollBack();
             throw $e;
         }
         $offset += $chunkSize;
@@ -100,7 +95,7 @@ function syncReplace(PDO $local, PDO $rem, string $table, array $cols, int $chun
 }
 
 // ── Helper: sync producto preservando enweb ──
-function syncProducto(PDO $local, PDO $rem, int $chunkSize, callable $log): void
+function syncProducto(PDO $origin, PDO $dest, int $chunkSize, callable $log): void
 {
     $cols = [
         'idprodu', 'codprodu', 'produ', 'codprodup', 'codprove', 'codrub', 'codsub', 'codepar', 'iva',
@@ -112,10 +107,10 @@ function syncProducto(PDO $local, PDO $rem, int $chunkSize, callable $log): void
     $insertCols = implode(', ', $cols);
     $placeholders = implode(', ', array_map(fn($c) => ":{$c}", $cols));
 
-    $total = (int)$local->query("SELECT COUNT(*) FROM producto")->fetchColumn();
+    $total = (int)$origin->query("SELECT COUNT(*) FROM producto")->fetchColumn();
     $log("[producto] {$total} registros a sincronizar (enweb preservado)");
 
-    $stmt = $rem->prepare(
+    $stmt = $dest->prepare(
         "INSERT INTO producto ({$insertCols}) VALUES ({$placeholders})
          ON DUPLICATE KEY UPDATE {$setClauses}"
     );
@@ -123,10 +118,10 @@ function syncProducto(PDO $local, PDO $rem, int $chunkSize, callable $log): void
     $offset = 0;
     $synced = 0;
     while ($offset < $total) {
-        $rows = $local->query("SELECT * FROM producto LIMIT {$chunkSize} OFFSET {$offset}")->fetchAll(PDO::FETCH_ASSOC);
+        $rows = $origin->query("SELECT * FROM producto LIMIT {$chunkSize} OFFSET {$offset}")->fetchAll(PDO::FETCH_ASSOC);
         if (!$rows) break;
 
-        $rem->beginTransaction();
+        $dest->beginTransaction();
         try {
             foreach ($rows as $r) {
                 foreach ($cols as $c) {
@@ -135,9 +130,9 @@ function syncProducto(PDO $local, PDO $rem, int $chunkSize, callable $log): void
                 $stmt->execute();
                 $synced++;
             }
-            $rem->commit();
+            $dest->commit();
         } catch (\Throwable $e) {
-            $rem->rollBack();
+            $dest->rollBack();
             throw $e;
         }
         $offset += $chunkSize;
@@ -148,22 +143,22 @@ function syncProducto(PDO $local, PDO $rem, int $chunkSize, callable $log): void
 
 // ── Ejecutar ──
 $log("=== INICIO SINCRONIZACIÓN ===");
+$log("Origen: {$originCfg['host']}/{$originCfg['db']} → Destino: local");
 
 try {
-    $rem->beginTransaction();
-    // Lock tables to prevent FK issues
-    $rem->exec("SET FOREIGN_KEY_CHECKS = 0");
-    $rem->commit();
+    $dest->beginTransaction();
+    $dest->exec("SET FOREIGN_KEY_CHECKS = 0");
+    $dest->commit();
 
-    syncProducto($local, $rem, $chunkSize, $log);
-    syncReplace($local, $rem, 'gustos', ['idcodgusto', 'idprodu', 'nomgusto', 'codscan', 'precio', 'precio1', 'stockact', 'stockreal', 'discont', 'peso', 'fecbaja', 'fecha', 'codigogusto', 'descripcion'], $chunkSize, $log);
-    syncReplace($local, $rem, 'stockcab', ['idcabstock', 'iddepoh', 'iddepod', 'fecha', 'observ'], $chunkSize, $log);
-    syncReplace($local, $rem, 'stockdet', ['idstockdet', 'idstockcab', 'idprodu', 'idcodgusto', 'canti'], $chunkSize, $log);
+    syncProducto($origin, $dest, $chunkSize, $log);
+    syncReplace($origin, $dest, 'gustos', ['idcodgusto', 'idprodu', 'nomgusto', 'codscan', 'precio', 'precio1', 'stockact', 'stockreal', 'discont', 'peso', 'fecbaja', 'fecha', 'codigogusto', 'descripcion'], $chunkSize, $log);
+    syncReplace($origin, $dest, 'stockcab', ['idcabstock', 'iddepoh', 'iddepod', 'fecha', 'observ'], $chunkSize, $log);
+    syncReplace($origin, $dest, 'stockdet', ['idstockdet', 'idstockcab', 'idprodu', 'idcodgusto', 'canti'], $chunkSize, $log);
 
-    $rem->exec("SET FOREIGN_KEY_CHECKS = 1");
+    $dest->exec("SET FOREIGN_KEY_CHECKS = 1");
     $log("=== SINCRONIZACIÓN COMPLETADA ===");
 } catch (\Throwable $e) {
     $log("[ERROR] {$e->getMessage()}");
-    $rem->exec("SET FOREIGN_KEY_CHECKS = 1");
+    $dest->exec("SET FOREIGN_KEY_CHECKS = 1");
     exit(1);
 }
