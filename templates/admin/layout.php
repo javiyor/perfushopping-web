@@ -183,7 +183,7 @@
         </div>
         <nav class="sidebar-nav">
             <div class="nav-section">General</div>
-            <a href="/admin" class="<?= $currentPath === '/admin' ? 'active' : '' ?>"><i class="bi bi-speedometer2"></i>Dashboard</a>
+            <a href="/admin" class="<?= $currentPath === '/admin' ? 'active' : '' ?>"><i class="bi bi-speedometer2"></i>Panel Principal</a>
 
             <div class="nav-section">Productos</div>
             <a href="/admin/productos" class="<?= ($currentPath === '/admin/productos' || preg_match('#^/admin/productos/\d+#', $currentPath)) ? 'active' : '' ?>"><i class="bi bi-box-seam"></i>Productos</a>

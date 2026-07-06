@@ -61,7 +61,7 @@ final class DashboardController
             'paidOrders' => $paidOrders,
             'csrf' => Csrf::token(),
             'flash' => $_SESSION['admin_flash'] ?? null,
-            'pageTitle' => 'Dashboard',
+            'pageTitle' => 'Panel Principal',
         ]);
         unset($_SESSION['admin_flash']);
     }

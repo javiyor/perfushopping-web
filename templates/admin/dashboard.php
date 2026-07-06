@@ -8,7 +8,7 @@ $isSuper = $adminRol === 'superadmin';
 
 <div class="d-flex justify-content-between align-items-start mb-4">
     <div>
-        <h2 class="fw-bold mb-1">Dashboard</h2>
+        <h2 class="fw-bold mb-1">Panel Principal</h2>
         <p class="text-muted">Resumen del sistema de gestión</p>
     </div>
 </div>

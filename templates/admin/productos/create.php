@@ -102,6 +102,11 @@ $ivaOptions = $ivaOptions ?? [];
                             <?php endforeach; ?>
                         </select>
                     </div>
+
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="enweb" id="enweb" checked />
+                        <label class="form-check-label" for="enweb">Visible en web</label>
+                    </div>
                 </div>
             </div>
         </div>

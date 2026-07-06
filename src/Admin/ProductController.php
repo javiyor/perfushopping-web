@@ -97,7 +97,8 @@ final class ProductController
 
         $idprodu = $this->repo->createProduct($produ, $precioNeto, $precio1Neto, $iva, $precomp, $ganan1, $ganan2);
 
-        $this->repo->updateProduct($idprodu, '', $precioNeto, $precio1Neto, true, $produ, $codrub, $codsub, $codepar, $codprove, $ganan1, $ganan2, $precomp);
+        $enweb = isset($_POST['enweb']);
+        $this->repo->updateProduct($idprodu, '', $precioNeto, $precio1Neto, $enweb, $produ, $codrub, $codsub, $codepar, $codprove, $ganan1, $ganan2, $precomp);
 
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Producto creado correctamente.'];
         Response::redirect('/admin/productos/' . $idprodu);
