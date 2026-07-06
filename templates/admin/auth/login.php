@@ -12,7 +12,7 @@ $sucursales = $sucursales ?? [];
                 </div>
 
                 <form method="post" action="/admin/login">
-                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '')" />
+                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
                     <div class="mb-3">
                         <label class="form-label">Usuario</label>
                         <input class="form-control" name="username" placeholder="Tu usuario" required autofocus />
