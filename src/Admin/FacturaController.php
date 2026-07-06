@@ -192,6 +192,7 @@ final class FacturaController
         }
 
         $fecha = (string)($input['fecha'] ?? date('Y-m-d'));
+        $descuento = max(0, (int)($input['descuento_cents'] ?? 0));
 
         $id = $repo->create([
             'codigo' => $codigo,
@@ -210,7 +211,8 @@ final class FacturaController
             'fecha' => $fecha,
             'subtotal_cents' => $subtotal,
             'iva_cents' => $ivaTotal,
-            'total_cents' => $subtotal + $ivaTotal,
+            'descuento_cents' => $descuento,
+            'total_cents' => $subtotal + $ivaTotal - $descuento,
             'estado' => 'emitida',
             'forma_pago' => $formaPago,
             'notas' => $notas,
@@ -227,7 +229,7 @@ final class FacturaController
                 $id,
                 $clienteId,
                 $clienteErpId,
-                $subtotal + $ivaTotal,
+                $subtotal + $ivaTotal - $descuento,
                 'Factura ' . $codigo . ' — ' . $clienteNombre,
                 (int)$adminUser['id']
             );
@@ -474,6 +476,8 @@ final class FacturaController
         $attachmentHtml .= '</tbody></table>';
         $attachmentHtml .= '<div style="text-align:right"><p>Subtotal: ' . Format::moneyRoundedFromCents((int)($factura['subtotal_cents'] ?? 0)) . '</p>';
         $attachmentHtml .= '<p>IVA: ' . Format::moneyRoundedFromCents((int)($factura['iva_cents'] ?? 0)) . '</p>';
+        $desc = (int)($factura['descuento_cents'] ?? 0);
+        if ($desc > 0) $attachmentHtml .= '<p style="color:#dc3545">Descuento: -' . Format::moneyRoundedFromCents($desc) . '</p>';
         $attachmentHtml .= '<p class="total">TOTAL: ' . Format::moneyRoundedFromCents((int)($factura['total_cents'] ?? 0)) . '</p></div>';
         $attachmentHtml .= '<hr style="border:none;border-top:1px solid #ddd" />';
         $attachmentHtml .= '<div class="footer"><p>Gracias por su compra</p><p>Perfushopping — www.perfushopping.com</p></div>';

@@ -70,7 +70,7 @@ $tipoBadges = ['FACT-A' => 'primary', 'FACT-B' => 'success', 'FACT-C' => 'second
                             <td><?= htmlspecialchars((string)($f['cliente_nombre'] ?? '-')) ?></td>
                             <td class="small"><?= htmlspecialchars((string)($f['fecha'] ?? '-')) ?></td>
                             <td class="text-center"><?= (int)($f['items_count'] ?? 0) ?></td>
-                            <td class="text-end fw-bold"><?= htmlspecialchars(Format::moneyFromCents((int)($f['total_cents'] ?? 0))) ?></td>
+                            <td class="text-end fw-bold"><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($f['total_cents'] ?? 0))) ?></td>
                             <td>
                                 <?php $badge = ['pendiente' => 'warning', 'emitida' => 'success', 'anulada' => 'secondary']; ?>
                                 <span class="badge bg-<?= $badge[$f['estado'] ?? 'pendiente'] ?? 'secondary' ?>"><?= htmlspecialchars($f['estado'] ?? 'pendiente') ?></span>

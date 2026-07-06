@@ -116,6 +116,10 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
     <div class="totals">
         <div class="row"><span>Subtotal:</span><span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($factura['subtotal_cents'] ?? 0))) ?></span></div>
         <div class="row"><span>IVA:</span><span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($factura['iva_cents'] ?? 0))) ?></span></div>
+        <?php $descuento = (int)($factura['descuento_cents'] ?? 0); ?>
+        <?php if ($descuento > 0): ?>
+        <div class="row" style="color:#dc3545"><span>Descuento:</span><span>-<?= htmlspecialchars(Format::moneyRoundedFromCents($descuento)) ?></span></div>
+        <?php endif; ?>
         <div class="row total"><span>TOTAL:</span><span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($factura['total_cents'] ?? 0))) ?></span></div>
     </div>
 

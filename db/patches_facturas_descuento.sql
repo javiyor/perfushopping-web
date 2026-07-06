@@ -1,0 +1,1 @@
+ALTER TABLE facturas ADD COLUMN descuento_cents INT NOT NULL DEFAULT 0 AFTER iva_cents;

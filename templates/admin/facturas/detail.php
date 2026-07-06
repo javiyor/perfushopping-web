@@ -83,6 +83,13 @@ $formaPagoLabels = [
                             <span>IVA:</span>
                             <span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($factura['iva_cents'] ?? 0))) ?></span>
                         </div>
+                        <?php $descuento = (int)($factura['descuento_cents'] ?? 0); ?>
+                        <?php if ($descuento > 0): ?>
+                        <div class="d-flex justify-content-between small text-danger">
+                            <span>Descuento:</span>
+                            <span>-<?= htmlspecialchars(Format::moneyRoundedFromCents($descuento)) ?></span>
+                        </div>
+                        <?php endif; ?>
                         <div class="d-flex justify-content-between fw-bold" style="font-size:20px">
                             <span>Total:</span>
                             <span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($factura['total_cents'] ?? 0))) ?></span>

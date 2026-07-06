@@ -159,6 +159,10 @@ $csrfToken = $csrf ?? '';
             <div class="pos-totals">
                 <div class="pt-row"><span>Subtotal</span><span id="posSubtotal">$0</span></div>
                 <div class="pt-row"><span>IVA</span><span id="posIva">$0</span></div>
+                <div class="pt-row">
+                    <span>Dto. %</span>
+                    <span><input type="number" id="posDescuento" value="0" min="0" max="100" style="width:60px;text-align:right;font-size:14px;border:1px solid #ccc;border-radius:4px;padding:2px 4px" onchange="recalcTotals()" />%</span>
+                </div>
                 <div class="pt-row pt-total"><span>TOTAL</span><span id="posTotal">$0</span></div>
             </div>
         </div>
@@ -401,9 +405,12 @@ function recalcTotals() {
         iva += lineIva;
         total += lineTotal;
     });
+    const descPct = parseInt(document.getElementById('posDescuento').value) || 0;
+    const descuento = descPct > 0 ? Math.round(total * descPct / 100) : 0;
     document.getElementById('posSubtotal').textContent = '$' + fmtPrice(subtotal);
     document.getElementById('posIva').textContent = '$' + fmtPrice(iva);
-    document.getElementById('posTotal').textContent = '$' + fmtPrice(total);
+    document.getElementById('posDescuento').textContent = descPct;
+    document.getElementById('posTotal').textContent = '$' + fmtPrice(total - descuento);
 
     const recibido = parseInt(document.getElementById('montoRecibido').value) || 0;
     const vuelto = Math.max(0, recibido - total);
@@ -536,6 +543,10 @@ function submitFactura() {
     const notas = document.getElementById('facturaNotas').value;
     const montoRecibido = parseInt(document.getElementById('montoRecibido').value) || 0;
 
+    const descPct = parseInt(document.getElementById('posDescuento').value) || 0;
+    const totalBruto = cart.reduce((sum, item) => sum + item.qty * item.unit_price_cents, 0);
+    const descuentoCents = descPct > 0 ? Math.round(totalBruto * descPct / 100) : 0;
+
     const vendedorEl = document.getElementById('vendedorId');
     const payload = {
         _csrf: document.getElementById('csrfToken').value,
@@ -545,6 +556,7 @@ function submitFactura() {
         vendedor_id: vendedorEl ? parseInt(vendedorEl.value) || null : null,
         notas: notas,
         fecha: new Date().toISOString().slice(0,10),
+        descuento_cents: descuentoCents,
         cliente: {
             id: clienteId || null,
             idclien: clienteErpId || null,
@@ -563,7 +575,7 @@ function submitFactura() {
         })),
         pagos: [{
             forma_pago: formaPago,
-            monto_cents: cart.reduce((sum, item) => sum + item.qty * item.unit_price_cents, 0),
+            monto_cents: totalBruto - descuentoCents,
             cheque: formaPago === 'cheque' ? {
                 banco: document.getElementById('chequeBanco').value,
                 numero: document.getElementById('chequeNumero').value,
