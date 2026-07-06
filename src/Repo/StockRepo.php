@@ -274,11 +274,11 @@ final class StockRepo
     public function grillaProveedores(): array
     {
         $st = Db::pdo()->query("
-            SELECT DISTINCT pv.codprove, pv.nomprovee
+            SELECT DISTINCT pv.codprove, pv.razon AS nomprovee
             FROM producto p
             INNER JOIN proveedo pv ON pv.codprove = p.codprove
             WHERE p.enweb = 1 AND p.codprove IS NOT NULL AND p.codprove > 0
-            ORDER BY pv.nomprovee ASC
+            ORDER BY pv.razon ASC
         ");
         return $st->fetchAll();
     }
@@ -327,7 +327,7 @@ final class StockRepo
 
         $sql = "
             SELECT p.idprodu, p.codprodu, p.produ, p.precomp, p.stocact, p.codprove, p.codprodup, p.precio, p.imagen,
-                   pv.nomprovee,
+                   pv.razon AS nomprovee,
                    (SELECT MIN(g.codscan) FROM gustos g WHERE g.idprodu = p.idprodu AND g.codscan IS NOT NULL AND g.codscan != '' LIMIT 1) AS codscan,
                    COALESCE(v.vendidos, 0) AS vendidos
             FROM producto p

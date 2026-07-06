@@ -83,7 +83,7 @@ final class StockGrillaController
 
             if ($codprove > 0) {
                 // Look up supplier name
-                $pv = Db::pdo()->prepare('SELECT codprove, nomprovee FROM proveedo WHERE codprove = :cp LIMIT 1');
+                $pv = Db::pdo()->prepare('SELECT codprove, razon AS nomprovee FROM proveedo WHERE codprove = :cp LIMIT 1');
                 $pv->execute([':cp' => $codprove]);
                 $pRow = $pv->fetch();
                 if ($pRow) {
