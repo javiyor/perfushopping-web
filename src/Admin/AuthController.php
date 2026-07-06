@@ -22,11 +22,8 @@ final class AuthController
             }
         }
 
-        $sucursales = (new SucursalRepo())->listarActivas();
-
         echo View::adminPage('admin/auth/login.php', [
             'csrf' => Csrf::token(),
-            'sucursales' => $sucursales,
             'flash' => $_SESSION['admin_flash'] ?? null,
             'pageTitle' => 'Iniciar sesión',
         ]);
@@ -39,10 +36,9 @@ final class AuthController
 
         $username = trim((string)($_POST['username'] ?? ''));
         $password = (string)($_POST['password'] ?? '');
-        $sucursalId = (int)($_POST['sucursal_id'] ?? 0);
 
-        if ($username === '' || $password === '' || $sucursalId <= 0) {
-            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Completá usuario, clave y sucursal.'];
+        if ($username === '' || $password === '') {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Completá usuario y clave.'];
             Response::redirect('/admin/login');
         }
 
@@ -50,14 +46,6 @@ final class AuthController
         $u = $auth->login($username, $password);
         if (!$u) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Usuario o clave incorrectos.'];
-            Response::redirect('/admin/login');
-        }
-
-        // Save chosen sucursal in session
-        $sucursal = (new SucursalRepo())->findById($sucursalId);
-        if (!$sucursal) {
-            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Sucursal inválida.'];
-            $auth->logout();
             Response::redirect('/admin/login');
         }
 

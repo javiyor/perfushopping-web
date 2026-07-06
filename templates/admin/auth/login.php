@@ -12,16 +12,7 @@ $sucursales = $sucursales ?? [];
                 </div>
 
                 <form method="post" action="/admin/login">
-                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
-                    <div class="mb-3">
-                        <label class="form-label">Sucursal</label>
-                        <select class="form-select" name="sucursal_id" required>
-                            <option value="">— Seleccionar —</option>
-                            <?php foreach ($sucursales as $s): ?>
-                                <option value="<?= (int)$s['id'] ?>"><?= htmlspecialchars($s['nomsuc'] ?? 'Sucursal #' . $s['numsuc']) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
+                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '')" />
                     <div class="mb-3">
                         <label class="form-label">Usuario</label>
                         <input class="form-control" name="username" placeholder="Tu usuario" required autofocus />
