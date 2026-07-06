@@ -210,13 +210,17 @@ final class PresupuestoRepo
         }
 
         $st = Db::pdo()->prepare('
-            SELECT id, email, name, phone, address, city, customer_category, wholesale_status
-            FROM web_users
-            WHERE name LIKE :like OR email LIKE :like OR phone LIKE :like
-            ORDER BY name ASC
+            SELECT COALESCE(w.id, 0) AS id, c.idclien,
+                   c.razon AS name, c.cuit, c.direc, c.tele AS phone, c.mail AS email,
+                   c.Localidad AS city,
+                   COALESCE(c.condicion_iva, \'consumidor_final\') AS condicion_iva
+            FROM clientes c
+            LEFT JOIN web_users w ON w.cliente_id = c.idclien
+            WHERE c.razon LIKE :like OR c.cuit LIKE :like2
+            ORDER BY c.razon ASC
             LIMIT ' . $limit
         );
-        $st->execute([':like' => '%' . $q . '%']);
+        $st->execute([':like' => '%' . $q . '%', ':like2' => '%' . $q . '%']);
         return $st->fetchAll();
     }
 }

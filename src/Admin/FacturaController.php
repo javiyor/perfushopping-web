@@ -163,12 +163,19 @@ final class FacturaController
         $clienteMail = trim((string)($cliente['mail'] ?? ''));
         $clienteErpId = null;
 
-        if ($clienteId) {
+        $clienteErpId = (int)($cliente['idclien'] ?? 0) ?: null;
+        if (!$clienteErpId && $clienteId) {
             $erp = $repo->findClienteErpByWebId($clienteId);
             $clienteErpId = $erp ? (int)$erp['idclien'] : null;
-            if (!$clienteDirec) $clienteDirec = trim((string)($erp['direc'] ?? ''));
-            if (!$clienteTele) $clienteTele = trim((string)($erp['tele'] ?? ''));
-            if (!$clienteMail) $clienteMail = trim((string)($erp['mail'] ?? ''));
+        }
+        if ($clienteId || $clienteErpId) {
+            $erp = $clienteErpId ? $repo->findClienteByIdclien($clienteErpId) : $repo->findClienteErpByWebId($clienteId);
+            if ($erp) {
+                $clienteErpId = (int)$erp['idclien'];
+                if (!$clienteDirec) $clienteDirec = trim((string)($erp['direc'] ?? ''));
+                if (!$clienteTele) $clienteTele = trim((string)($erp['tele'] ?? ''));
+                if (!$clienteMail) $clienteMail = trim((string)($erp['mail'] ?? ''));
+            }
         }
 
         $vendedorId = (int)($input['vendedor_id'] ?? 0) ?: null;

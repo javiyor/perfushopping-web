@@ -229,13 +229,15 @@ final class FacturaRepo
         if ($q === '') return [];
 
         $st = Db::pdo()->prepare('
-            SELECT w.id, w.email, w.name, w.phone, w.address, w.city, w.customer_category, w.wholesale_status,
-                   c.idclien, c.razon, c.cuit, c.direc, c.tele, c.mail, c.Localidad, c.codprov AS provincia,
-                   c.condicion_iva, c.condicion_venta
-            FROM web_users w
-            LEFT JOIN clientes c ON c.idclien = w.cliente_id
-            WHERE w.name LIKE :like OR w.email LIKE :like OR w.phone LIKE :like OR c.razon LIKE :like2 OR c.cuit LIKE :like2
-            ORDER BY w.name ASC
+            SELECT COALESCE(w.id, 0) AS id, c.idclien,
+                   c.razon AS name, c.cuit, c.direc, c.tele AS phone, c.mail AS email,
+                   c.Localidad AS city, c.codprov AS provincia,
+                   COALESCE(c.condicion_iva, \'consumidor_final\') AS condicion_iva,
+                   COALESCE(c.condicion_venta, \'\') AS condicion_venta
+            FROM clientes c
+            LEFT JOIN web_users w ON w.cliente_id = c.idclien
+            WHERE c.razon LIKE :like OR c.cuit LIKE :like2
+            ORDER BY c.razon ASC
             LIMIT ' . $limit
         );
         $st->execute([':like' => '%' . $q . '%', ':like2' => '%' . $q . '%']);
@@ -283,6 +285,18 @@ final class FacturaRepo
             LIMIT 1
         ');
         $st->execute([':id' => $webUserId]);
+        return $st->fetch() ?: null;
+    }
+
+    public function findClienteByIdclien(int $idclien): ?array
+    {
+        $st = Db::pdo()->prepare('
+            SELECT c.*
+            FROM clientes c
+            WHERE c.idclien = :id
+            LIMIT 1
+        ');
+        $st->execute([':id' => $idclien]);
         return $st->fetch() ?: null;
     }
 }

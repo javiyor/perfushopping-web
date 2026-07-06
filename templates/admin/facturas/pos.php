@@ -106,6 +106,7 @@ $csrfToken = $csrf ?? '';
         <span class="text-muted small">Cliente:</span>
         <input class="form-control form-control-sm" id="clienteSearch" placeholder="Buscar o CF" autocomplete="off" style="width:200px" />
         <input type="hidden" id="clienteId" value="0" />
+        <input type="hidden" id="clienteErpId" value="0" />
         <span id="clienteNombre" class="fw-semibold small">Consumidor Final</span>
         <span id="clienteCuit" class="text-muted small"></span>
         <input type="hidden" id="clienteCondIva" value="consumidor_final" />
@@ -447,6 +448,7 @@ cliInput.addEventListener('blur', function() {
 
 function selectCliente(c) {
     document.getElementById('clienteId').value = c.id || 0;
+    document.getElementById('clienteErpId').value = c.idclien || 0;
     document.getElementById('clienteNombre').textContent = c.name || 'Consumidor Final';
     document.getElementById('clienteCuit').textContent = c.cuit || '';
     document.getElementById('clienteCondIva').value = c.condicion_iva || 'consumidor_final';
@@ -462,6 +464,7 @@ function selectCliente(c) {
 
 function clearCliente() {
     document.getElementById('clienteId').value = 0;
+    document.getElementById('clienteErpId').value = 0;
     document.getElementById('clienteNombre').textContent = 'Consumidor Final';
     document.getElementById('clienteCuit').textContent = '';
     document.getElementById('clienteCondIva').value = 'consumidor_final';
@@ -524,6 +527,7 @@ function submitFactura() {
     const clienteNombre = clienteId ? (document.getElementById('clienteNombre').textContent || 'Consumidor Final') : 'Consumidor Final';
     const clienteCuit = document.getElementById('clienteCuit').textContent || '';
     const clienteCondIva = document.getElementById('clienteCondIva').value || 'consumidor_final';
+    const clienteErpId = parseInt(document.getElementById('clienteErpId').value) || 0;
     const formaPago = document.getElementById('formaPago').value;
     const notas = document.getElementById('facturaNotas').value;
     const montoRecibido = parseInt(document.getElementById('montoRecibido').value) || 0;
@@ -539,6 +543,7 @@ function submitFactura() {
         fecha: new Date().toISOString().slice(0,10),
         cliente: {
             id: clienteId || null,
+            idclien: clienteErpId || null,
             nombre: clienteNombre.replace(/ -.*$/, ''), // strip CUIT from display
             cuit: clienteCuit,
             condicion_iva: clienteCondIva,

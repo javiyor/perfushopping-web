@@ -141,12 +141,14 @@ final class ReciboRepo
         if ($q === '') return [];
 
         $st = Db::pdo()->prepare('
-            SELECT w.id, w.email, w.name, w.phone, w.address, w.city, w.customer_category, w.wholesale_status,
-                   c.idclien, c.razon, c.cuit, c.direc, c.condicion_iva
-            FROM web_users w
-            LEFT JOIN clientes c ON c.idclien = w.cliente_id
-            WHERE w.name LIKE :like OR w.email LIKE :like OR w.phone LIKE :like OR c.razon LIKE :like2 OR c.cuit LIKE :like2
-            ORDER BY w.name ASC
+            SELECT COALESCE(w.id, 0) AS id, c.idclien,
+                   c.razon AS name, c.cuit, c.direc, c.tele AS phone, c.mail AS email,
+                   c.Localidad AS city,
+                   COALESCE(c.condicion_iva, \'consumidor_final\') AS condicion_iva
+            FROM clientes c
+            LEFT JOIN web_users w ON w.cliente_id = c.idclien
+            WHERE c.razon LIKE :like OR c.cuit LIKE :like2
+            ORDER BY c.razon ASC
             LIMIT ' . $limit
         );
         $st->execute([':like' => '%' . $q . '%', ':like2' => '%' . $q . '%']);
