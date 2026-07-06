@@ -5,3 +5,14 @@ public/uploads/
 nul
 src/sync_config.php
 sync_export.sql
+
+# Server junk files (Hostinger)
+*.zip
+*.crt
+*.jpg
+*.jpeg
+*.png
+*.webp
+Nuevo Documento de texto.txt
+/respaldo php app.zip
+/certiwebhomo.crt
