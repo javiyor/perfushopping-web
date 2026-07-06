@@ -136,7 +136,7 @@ $formaPagoLabels = [
                                         </a>
                                     <?php endif; ?>
                                 </td>
-                                <td class="text-end fw-bold"><?= htmlspecialchars(Format::moneyFromCents((int)($pg['monto_cents'] ?? 0))) ?></td>
+                                <td class="text-end fw-bold"><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($pg['monto_cents'] ?? 0))) ?></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -149,7 +149,7 @@ $formaPagoLabels = [
             <div class="card-footer bg-white text-end">
                 <div class="d-flex justify-content-between fw-bold" style="font-size:20px">
                     <span>Total recibido:</span>
-                    <span><?= htmlspecialchars(Format::moneyFromCents((int)($recibo['monto_cents'] ?? 0))) ?></span>
+                    <span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($recibo['monto_cents'] ?? 0))) ?></span>
                 </div>
             </div>
         </div>

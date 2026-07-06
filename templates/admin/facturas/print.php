@@ -106,24 +106,24 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
             <tr>
                 <td class="text-center"><?= (int)($it['qty'] ?? 0) ?></td>
                 <td><?= htmlspecialchars((string)($it['producto'] ?? '')) ?><?= ($it['variedad'] ?? '') ? ' (' . htmlspecialchars($it['variedad']) . ')' : '' ?></td>
-                <td class="text-right"><?= htmlspecialchars(Format::moneyFromCents((int)($it['unit_price_cents'] ?? 0))) ?></td>
-                <td class="text-right"><?= htmlspecialchars(Format::moneyFromCents((int)($it['total_cents'] ?? 0))) ?></td>
+                <td class="text-right"><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($it['unit_price_cents'] ?? 0))) ?></td>
+                <td class="text-right"><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($it['total_cents'] ?? 0))) ?></td>
             </tr>
             <?php endforeach; ?>
         </tbody>
     </table>
 
     <div class="totals">
-        <div class="row"><span>Subtotal:</span><span><?= htmlspecialchars(Format::moneyFromCents((int)($factura['subtotal_cents'] ?? 0))) ?></span></div>
-        <div class="row"><span>IVA:</span><span><?= htmlspecialchars(Format::moneyFromCents((int)($factura['iva_cents'] ?? 0))) ?></span></div>
-        <div class="row total"><span>TOTAL:</span><span><?= htmlspecialchars(Format::moneyFromCents((int)($factura['total_cents'] ?? 0))) ?></span></div>
+        <div class="row"><span>Subtotal:</span><span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($factura['subtotal_cents'] ?? 0))) ?></span></div>
+        <div class="row"><span>IVA:</span><span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($factura['iva_cents'] ?? 0))) ?></span></div>
+        <div class="row total"><span>TOTAL:</span><span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($factura['total_cents'] ?? 0))) ?></span></div>
     </div>
 
     <?php if ($pagos): ?>
     <hr />
     <div class="totals">
         <?php foreach ($pagos as $pg): ?>
-        <div class="row"><span><?= htmlspecialchars($formaPagoLabels[$pg['forma_pago'] ?? ''] ?? $pg['forma_pago'] ?? '') ?>:</span><span><?= htmlspecialchars(Format::moneyFromCents((int)($pg['monto_cents'] ?? 0))) ?></span></div>
+        <div class="row"><span><?= htmlspecialchars($formaPagoLabels[$pg['forma_pago'] ?? ''] ?? $pg['forma_pago'] ?? '') ?>:</span><span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($pg['monto_cents'] ?? 0))) ?></span></div>
         <?php endforeach; ?>
     </div>
     <?php endif; ?>

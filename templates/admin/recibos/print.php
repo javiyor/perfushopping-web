@@ -82,7 +82,7 @@ $formaPagoLabels = [
             <?php foreach ($pagos as $pg): ?>
             <tr>
                 <td><?= htmlspecialchars((string)($pg['factura_codigo'] ?? 'Pago a cuenta')) ?></td>
-                <td class="text-right"><?= htmlspecialchars(Format::moneyFromCents((int)($pg['monto_cents'] ?? 0))) ?></td>
+                <td class="text-right"><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($pg['monto_cents'] ?? 0))) ?></td>
             </tr>
             <?php endforeach; ?>
         </tbody>
@@ -91,7 +91,7 @@ $formaPagoLabels = [
     <?php endif; ?>
 
     <div class="text-right total-row">
-        <span>Total: <?= htmlspecialchars(Format::moneyFromCents((int)($recibo['monto_cents'] ?? 0))) ?></span>
+        <span>Total: <?= htmlspecialchars(Format::moneyRoundedFromCents((int)($recibo['monto_cents'] ?? 0))) ?></span>
     </div>
 
     <div class="data" style="margin-top:8px">

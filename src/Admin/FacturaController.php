@@ -472,9 +472,9 @@ final class FacturaController
         $attachmentHtml .= '<table><thead><tr><th>Producto</th><th>Cant</th><th style="text-align:right">Precio</th><th style="text-align:right">Total</th></tr></thead><tbody>';
         $attachmentHtml .= $rows;
         $attachmentHtml .= '</tbody></table>';
-        $attachmentHtml .= '<div style="text-align:right"><p>Subtotal: ' . Format::moneyFromCents((int)($factura['subtotal_cents'] ?? 0)) . '</p>';
-        $attachmentHtml .= '<p>IVA: ' . Format::moneyFromCents((int)($factura['iva_cents'] ?? 0)) . '</p>';
-        $attachmentHtml .= '<p class="total">TOTAL: ' . Format::moneyFromCents((int)($factura['total_cents'] ?? 0)) . '</p></div>';
+        $attachmentHtml .= '<div style="text-align:right"><p>Subtotal: ' . Format::moneyRoundedFromCents((int)($factura['subtotal_cents'] ?? 0)) . '</p>';
+        $attachmentHtml .= '<p>IVA: ' . Format::moneyRoundedFromCents((int)($factura['iva_cents'] ?? 0)) . '</p>';
+        $attachmentHtml .= '<p class="total">TOTAL: ' . Format::moneyRoundedFromCents((int)($factura['total_cents'] ?? 0)) . '</p></div>';
         $attachmentHtml .= '<hr style="border:none;border-top:1px solid #ddd" />';
         $attachmentHtml .= '<div class="footer"><p>Gracias por su compra</p><p>Perfushopping — www.perfushopping.com</p></div>';
         $attachmentHtml .= '<p style="text-align:center;font-size:11px;color:#999">Versión imprimible: <a href="' . $baseUrl . '/admin/facturas/imprimir/' . $id . '">' . $baseUrl . '/admin/facturas/imprimir/' . $id . '</a></p>';

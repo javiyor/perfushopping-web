@@ -1,0 +1,127 @@
+<?php
+declare(strict_types=1);
+
+header('Content-Type: application/json; charset=utf-8');
+
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+error_reporting(E_ALL);
+
+$logFile = __DIR__ . '/imagen_gusto_debug.log';
+
+function log_debug($msg) {
+    global $logFile;
+    file_put_contents($logFile, date('Y-m-d H:i:s') . ' - ' . $msg . PHP_EOL, FILE_APPEND);
+}
+
+function responder($ok, $data = [], $code = 200) {
+    http_response_code($code);
+    echo json_encode(array_merge(['ok' => $ok], $data), JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+try {
+
+    log_debug('Inicio PHP');
+
+    require_once __DIR__ . '/../config.php';
+
+    log_debug('Config cargado');
+
+    $TOKEN_VALIDO = 'Ngf75_Jry73_';
+
+    $token = $_POST['token'] ?? '';
+    $rutaimg = $_POST['rutaimg'] ?? '';
+    $idprodu = isset($_POST['idprodu']) ? (int)$_POST['idprodu'] : 0;
+    $idcodgusto = isset($_POST['idcodgusto']) ? (int)$_POST['idcodgusto'] : 0;
+    $idimagen = isset($_POST['idimagen']) ? (int)$_POST['idimagen'] : 0;
+
+    log_debug('POST recibido: ' . json_encode($_POST));
+
+    if ($token !== $TOKEN_VALIDO) {
+        responder(false, ['error' => 'Token incorrecto'], 401);
+    }
+
+    if ($rutaimg === '') {
+        responder(false, ['error' => 'Falta rutaimg'], 400);
+    }
+
+    if ($idprodu <= 0) {
+        responder(false, ['error' => 'Falta idprodu'], 400);
+    }
+
+    if ($idcodgusto <= 0) {
+        responder(false, ['error' => 'Falta idcodgusto'], 400);
+    }
+
+    log_debug('Conectando PDO');
+
+    $pdo = new PDO(
+        "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4",
+        DB_USER,
+        DB_PASS,
+        [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        ]
+    );
+
+    log_debug('PDO conectado');
+
+    if ($idimagen <= 0) {
+        $stmt = $pdo->query("SELECT COALESCE(MAX(idimagen), 0) + 1 FROM imagen");
+        $idimagen = (int)$stmt->fetchColumn();
+
+        log_debug('Nuevo idimagen: ' . $idimagen);
+
+        $stmt = $pdo->prepare("
+            INSERT INTO imagen
+            (idimagen, rutaimg, idprodu, idcodgusto)
+            VALUES (?, ?, ?, ?)
+        ");
+
+        $stmt->execute([
+            $idimagen,
+            $rutaimg,
+            $idprodu,
+            $idcodgusto
+        ]);
+
+        log_debug('Insert realizado');
+    } else {
+        $stmt = $pdo->prepare("
+            UPDATE imagen
+            SET rutaimg = ?, idprodu = ?, idcodgusto = ?
+            WHERE idimagen = ?
+        ");
+
+        $stmt->execute([
+            $rutaimg,
+            $idprodu,
+            $idcodgusto,
+            $idimagen
+        ]);
+
+        log_debug('Update realizado');
+    }
+
+    responder(true, [
+        'mensaje' => 'Imagen registrada correctamente',
+        'idimagen' => $idimagen,
+        'rutaimg' => $rutaimg,
+        'idprodu' => $idprodu,
+        'idcodgusto' => $idcodgusto
+    ]);
+
+} catch (Throwable $e) {
+
+    log_debug('ERROR: ' . $e->getMessage());
+    log_debug('LINEA: ' . $e->getLine());
+    log_debug('ARCHIVO: ' . $e->getFile());
+
+    responder(false, [
+        'error' => 'Error interno',
+        'detalle' => $e->getMessage(),
+        'linea' => $e->getLine()
+    ], 500);
+}

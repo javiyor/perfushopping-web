@@ -218,6 +218,10 @@ $csrfToken = $csrf ?? '';
 let cart = [];
 let productSearchTimer;
 
+function fmtPrice(cents) {
+    return Math.round(cents / 100).toLocaleString('es-AR');
+}
+
 // ── Load remito items if present ──
 <?php if ($remitoItems): ?>
 <?php foreach ($remitoItems as $ri): ?>
@@ -272,7 +276,7 @@ function searchProd(q) {
                         <div class="prod-name">${esc(p.produ)}</div>
                         <div class="prod-code">${esc(p.codprodu)} ${p.codprodup ? '| ' + esc(p.codprodup) : ''}</div>
                     </div>
-                    <div class="prod-price">$${priceCents.toLocaleString('es-AR')}</div>
+                    <div class="prod-price">$${fmtPrice(priceCents)}</div>
                 `;
                 div.addEventListener('mousedown', function(e) {
                     e.preventDefault();
@@ -369,8 +373,8 @@ function renderCart() {
                     <div class="ci-var">${item.variedad ? esc(item.variedad) : '—'}</div>
                 </div>
                 <div class="ci-qty"><input type="number" value="${item.qty}" min="1" onchange="updateQty(${idx}, this.value)" /></div>
-                <div class="ci-price">$${item.unit_price_cents.toLocaleString('es-AR')}</div>
-                <div class="ci-total">$${total.toLocaleString('es-AR')}</div>
+                <div class="ci-price">$${fmtPrice(item.unit_price_cents)}</div>
+                <div class="ci-total">$${fmtPrice(total)}</div>
                 <div class="ci-del" onclick="removeItem(${idx})">&times;</div>
             </div>
         `;
@@ -397,13 +401,13 @@ function recalcTotals() {
         iva += lineIva;
         total += lineTotal;
     });
-    document.getElementById('posSubtotal').textContent = '$' + subtotal.toLocaleString('es-AR');
-    document.getElementById('posIva').textContent = '$' + iva.toLocaleString('es-AR');
-    document.getElementById('posTotal').textContent = '$' + total.toLocaleString('es-AR');
+    document.getElementById('posSubtotal').textContent = '$' + fmtPrice(subtotal);
+    document.getElementById('posIva').textContent = '$' + fmtPrice(iva);
+    document.getElementById('posTotal').textContent = '$' + fmtPrice(total);
 
     const recibido = parseInt(document.getElementById('montoRecibido').value) || 0;
     const vuelto = Math.max(0, recibido - total);
-    document.getElementById('vueltoDisplay').textContent = '$' + vuelto.toLocaleString('es-AR');
+    document.getElementById('vueltoDisplay').textContent = '$' + fmtPrice(vuelto);
 }
 
 document.getElementById('montoRecibido').addEventListener('input', recalcTotals);

@@ -63,9 +63,9 @@ $formaPagoLabels = [
                                 <td><?= htmlspecialchars((string)($it['producto'] ?? '')) ?></td>
                                 <td><?= htmlspecialchars((string)($it['variedad'] ?? '')) ?: '<span class="text-muted">—</span>' ?></td>
                                 <td class="text-center"><?= (int)($it['qty'] ?? 0) ?></td>
-                                <td class="text-end"><?= htmlspecialchars(Format::moneyFromCents((int)($it['unit_price_cents'] ?? 0))) ?></td>
-                                <td class="text-end"><?= htmlspecialchars(Format::moneyFromCents((int)($it['iva_cents'] ?? 0))) ?></td>
-                                <td class="text-end fw-bold"><?= htmlspecialchars(Format::moneyFromCents((int)($it['total_cents'] ?? 0))) ?></td>
+                                <td class="text-end"><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($it['unit_price_cents'] ?? 0))) ?></td>
+                                <td class="text-end"><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($it['iva_cents'] ?? 0))) ?></td>
+                                <td class="text-end fw-bold"><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($it['total_cents'] ?? 0))) ?></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -77,15 +77,15 @@ $formaPagoLabels = [
                     <div class="col-md-5 offset-md-7">
                         <div class="d-flex justify-content-between small">
                             <span>Subtotal:</span>
-                            <span><?= htmlspecialchars(Format::moneyFromCents((int)($factura['subtotal_cents'] ?? 0))) ?></span>
+                            <span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($factura['subtotal_cents'] ?? 0))) ?></span>
                         </div>
                         <div class="d-flex justify-content-between small">
                             <span>IVA:</span>
-                            <span><?= htmlspecialchars(Format::moneyFromCents((int)($factura['iva_cents'] ?? 0))) ?></span>
+                            <span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($factura['iva_cents'] ?? 0))) ?></span>
                         </div>
                         <div class="d-flex justify-content-between fw-bold" style="font-size:20px">
                             <span>Total:</span>
-                            <span><?= htmlspecialchars(Format::moneyFromCents((int)($factura['total_cents'] ?? 0))) ?></span>
+                            <span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($factura['total_cents'] ?? 0))) ?></span>
                         </div>
                     </div>
                 </div>
@@ -172,7 +172,7 @@ $formaPagoLabels = [
                             <?= htmlspecialchars($formaPagoLabels[$pg['forma_pago'] ?? ''] ?? $pg['forma_pago'] ?? '') ?>
                         <?php endif; ?>
                     </span>
-                    <span class="fw-bold"><?= htmlspecialchars(Format::moneyFromCents((int)($pg['monto_cents'] ?? 0))) ?></span>
+                    <span class="fw-bold"><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($pg['monto_cents'] ?? 0))) ?></span>
                 </div>
                 <?php endforeach; ?>
             </div>
