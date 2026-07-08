@@ -98,11 +98,66 @@ function getColumns(PDO $origin, string $table): array
     return $cols;
 }
 
+// ── Helper: get columns + nullability defaults ──
+/** @return array<string, mixed> column_name => default_value */
+function getColumnDefaults(PDO $origin, string $table): array
+{
+    $db = $origin->query('SELECT DATABASE()')->fetchColumn();
+    $st = $origin->prepare("
+        SELECT COLUMN_NAME, IS_NULLABLE, COLUMN_DEFAULT, DATA_TYPE
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = :db AND TABLE_NAME = :t
+        ORDER BY ORDINAL_POSITION
+    ");
+    $st->execute([':db' => $db, ':t' => $table]);
+    $defaults = [];
+    while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+        $name = $row['COLUMN_NAME'];
+        if ($table === 'producto' && $name === 'enweb') {
+            continue;
+        }
+        if ($row['IS_NULLABLE'] === 'YES') {
+            $defaults[$name] = null; // null is ok
+        } else {
+            $def = $row['COLUMN_DEFAULT'];
+            if ($def !== null && $def !== '') {
+                $defaults[$name] = $def;
+            } else {
+                // Infer default by data type
+                $type = $row['DATA_TYPE'];
+                if (in_array($type, ['int','smallint','tinyint','bigint','decimal','float','double','numeric'], true)) {
+                    $defaults[$name] = 0;
+                } elseif (in_array($type, ['date','datetime','timestamp'], true)) {
+                    $defaults[$name] = $type === 'timestamp' ? '0000-00-00 00:00:00' : '0000-00-00';
+                } else {
+                    $defaults[$name] = '';
+                }
+            }
+        }
+    }
+    return $defaults;
+}
+
+// ── Clean rows: replace nulls with defaults ──
+/** @param array<string, mixed> $defaults */
+function cleanRows(array &$rows, array $defaults): void
+{
+    foreach ($rows as &$row) {
+        foreach ($defaults as $col => $def) {
+            if (array_key_exists($col, $row) && $row[$col] === null && $def !== null) {
+                $row[$col] = $def;
+            }
+        }
+    }
+    unset($row);
+}
+
 // ── Sync a table ──
 function syncTable(PDO $origin, string $url, string $token, string $table, int $chunk): void
 {
     $cols = getColumns($origin, $table);
     $selectCols = implode(', ', $cols);
+    $defaults = getColumnDefaults($origin, $table);
 
     $total = (int)$origin->query("SELECT COUNT(*) FROM {$table}")->fetchColumn();
     $label = $table === 'producto' ? "{$table} (sin enweb)" : $table;
@@ -115,6 +170,7 @@ function syncTable(PDO $origin, string $url, string $token, string $table, int $
         if (!$rows) {
             break;
         }
+        cleanRows($rows, $defaults);
         postChunk($url, $token, $table, $rows);
         $sent += count($rows);
         echo "[{$table}] {$sent}/{$total}\n";
