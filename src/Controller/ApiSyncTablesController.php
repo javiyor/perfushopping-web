@@ -56,6 +56,8 @@ final class ApiSyncTablesController
                 $count = $this->syncProducto($pdo, $rows);
             } elseif ($table === 'gustos') {
                 $count = $this->syncGustos($pdo, $rows);
+            } elseif (in_array($table, ['stockcab', 'stockdet'], true)) {
+                $count = $this->syncInsertIgnore($pdo, $table, $rows);
             } else {
                 $count = $this->syncReplace($pdo, $table, $rows);
             }
@@ -135,6 +137,27 @@ final class ApiSyncTablesController
             }
             $insertStmt->execute();
             $count++;
+        }
+        return $count;
+    }
+
+    private function syncInsertIgnore(\PDO $pdo, string $table, array $rows): int
+    {
+        $cols = array_keys($rows[0]);
+        $insertCols = implode(', ', $cols);
+        $placeholders = implode(', ', array_map(fn($c) => ":{$c}", $cols));
+
+        $stmt = $pdo->prepare(
+            "INSERT IGNORE INTO {$table} ({$insertCols}) VALUES ({$placeholders})"
+        );
+
+        $count = 0;
+        foreach ($rows as $r) {
+            foreach ($cols as $c) {
+                $stmt->bindValue(":{$c}", $r[$c] ?? null);
+            }
+            $stmt->execute();
+            $count += $stmt->rowCount();
         }
         return $count;
     }
