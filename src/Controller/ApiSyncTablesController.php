@@ -54,6 +54,8 @@ final class ApiSyncTablesController
             $count = 0;
             if ($table === 'producto') {
                 $count = $this->syncProducto($pdo, $rows);
+            } elseif ($table === 'gustos') {
+                $count = $this->syncGustos($pdo, $rows);
             } else {
                 $count = $this->syncReplace($pdo, $table, $rows);
             }
@@ -87,6 +89,50 @@ final class ApiSyncTablesController
                 $stmt->bindValue(":{$c}", $r[$c] ?? null);
             }
             $stmt->execute();
+            $count++;
+        }
+        return $count;
+    }
+
+    private function syncGustos(\PDO $pdo, array $rows): int
+    {
+        $updateCols = ['nomgusto', 'codscan', 'stockact'];
+        $setClauses = implode(', ', array_map(fn($c) => "{$c} = :{$c}", $updateCols));
+
+        $updateStmt = $pdo->prepare(
+            "UPDATE gustos SET {$setClauses} WHERE idcodgusto = :idcodgusto"
+        );
+
+        $count = 0;
+        foreach ($rows as $r) {
+            $idcodgusto = (int)($r['idcodgusto'] ?? 0);
+            if ($idcodgusto <= 0) {
+                continue;
+            }
+
+            // Try UPDATE first
+            $updateStmt->bindValue(':idcodgusto', $idcodgusto, \PDO::PARAM_INT);
+            foreach ($updateCols as $c) {
+                $updateStmt->bindValue(":{$c}", $r[$c] ?? null);
+            }
+            $updateStmt->execute();
+
+            if ($updateStmt->rowCount() > 0) {
+                $count++;
+                continue;
+            }
+
+            // INSERT full row
+            $cols = array_keys($r);
+            $insertCols = implode(', ', $cols);
+            $placeholders = implode(', ', array_map(fn($c) => ":{$c}", $cols));
+            $insertStmt = $pdo->prepare(
+                "INSERT INTO gustos ({$insertCols}) VALUES ({$placeholders})"
+            );
+            foreach ($cols as $c) {
+                $insertStmt->bindValue(":{$c}", $r[$c] ?? null);
+            }
+            $insertStmt->execute();
             $count++;
         }
         return $count;
