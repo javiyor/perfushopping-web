@@ -31,6 +31,7 @@ use Perfushopping\Web\Controller\LegalController;
 use Perfushopping\Web\Controller\AffiliateController;
 use Perfushopping\Web\Controller\ApiSyncController;
 use Perfushopping\Web\Controller\ApiUploadController;
+use Perfushopping\Web\Controller\ApiSyncTablesController;
 use Perfushopping\Web\Controller\DemoTechController;
 use Perfushopping\Web\Controller\AdminProductController;
 use Perfushopping\Web\Admin\AuthController as AdminAuthController;
@@ -122,6 +123,7 @@ $router->post('/eventos/demo-tecnica/clientes', [DemoTechController::class, 'cli
 // API (VFP sync)
 $router->post('/api/v1/sync', [ApiSyncController::class, 'sync']);
 $router->post('/api/v1/upload', [ApiUploadController::class, 'uploadBase64']);
+$router->post('/api/v1/sync-tables', [ApiSyncTablesController::class, 'push']);
 
 // Admin - Nuevo sistema
 $router->get('/admin/login', [AdminAuthController::class, 'loginForm']);
