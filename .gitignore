@@ -5,6 +5,8 @@ public/uploads/
 nul
 src/sync_config.php
 sync_export.sql
+push_daily.bat
+src/local_api.php
 
 # Server junk files (Hostinger)
 *.zip
