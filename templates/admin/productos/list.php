@@ -10,6 +10,16 @@ $view = (string)($view ?? 'cards');
 $brands = $brands ?? [];
 $categories = $categories ?? [];
 $products = $products ?? [];
+$page = (int)($page ?? 1);
+$perPage = (int)($perPage ?? 60);
+$total = (int)($total ?? 0);
+$totalPages = $perPage > 0 ? (int)ceil($total / $perPage) : 1;
+$from = $total > 0 ? (($page - 1) * $perPage + 1) : 0;
+$to = min($page * $perPage, $total);
+$preservePage = $preserve ?? [];
+$preservePage['page'] = (string)$page;
+$preservePage['per_page'] = (string)$perPage;
+$pageUrl = static fn(array $extra) => '/admin/productos?' . http_build_query(array_merge($preserve, $extra));
 
 $sortable = ['id'=>'ID','codprodu'=>'Código','produ'=>'Producto','marca'=>'Marca','categoria'=>'Categoría','precio'=>'Precio','fecompra'=>'F.compra'];
 $preserve = [];
@@ -70,6 +80,57 @@ $sortLink = static fn(string $col) => '/admin/productos?' . http_build_query(arr
                 <a class="btn <?= $view === 'table' ? 'btn-accent' : 'btn-outline-secondary' ?>" href="/admin/productos?<?= http_build_query(array_merge($preserve, ['view'=>'table'])) ?>"><i class="bi bi-list"></i> Tabla</a>
             </div>
         </div>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <div class="small text-muted">
+        <?php if ($total > 0): ?>
+            Mostrando <?= $from ?>–<?= $to ?> de <?= $total ?> productos
+        <?php endif; ?>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <select class="form-select form-select-sm" style="width:auto" onchange="window.location.href='<?= htmlspecialchars($pageUrl(['page' => '1', 'per_page' => ''])) ?>' + this.value">
+            <?php foreach ([30, 60, 100, 200] as $pp): ?>
+                <option value="<?= $pp ?>" <?= $perPage === $pp ? 'selected' : '' ?>><?= $pp ?> por página</option>
+            <?php endforeach; ?>
+        </select>
+        <?php if ($totalPages > 1): ?>
+            <nav aria-label="Paginación">
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
+                        <a class="page-link" href="<?= htmlspecialchars($pageUrl(['page' => $page - 1])) ?>">&laquo;</a>
+                    </li>
+                    <?php
+                    $startPage = max(1, $page - 2);
+                    $endPage = min($totalPages, $page + 2);
+                    if ($startPage > 1): ?>
+                        <li class="page-item">
+                            <a class="page-link" href="<?= htmlspecialchars($pageUrl(['page' => 1])) ?>">1</a>
+                        </li>
+                        <?php if ($startPage > 2): ?>
+                            <li class="page-item disabled"><span class="page-link">...</span></li>
+                        <?php endif;
+                    endif;
+                    for ($i = $startPage; $i <= $endPage; $i++): ?>
+                        <li class="page-item <?= $i === $page ? 'active' : '' ?>">
+                            <a class="page-link" href="<?= htmlspecialchars($pageUrl(['page' => $i])) ?>"><?= $i ?></a>
+                        </li>
+                    <?php endfor;
+                    if ($endPage < $totalPages):
+                        if ($endPage < $totalPages - 1): ?>
+                            <li class="page-item disabled"><span class="page-link">...</span></li>
+                        <?php endif; ?>
+                        <li class="page-item">
+                            <a class="page-link" href="<?= htmlspecialchars($pageUrl(['page' => $totalPages])) ?>"><?= $totalPages ?></a>
+                        </li>
+                    <?php endif; ?>
+                    <li class="page-item <?= $page >= $totalPages ? 'disabled' : '' ?>">
+                        <a class="page-link" href="<?= htmlspecialchars($pageUrl(['page' => $page + 1])) ?>">&raquo;</a>
+                    </li>
+                </ul>
+            </nav>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -162,5 +223,44 @@ $sortLink = static fn(string $col) => '/admin/productos?' . http_build_query(arr
                 </a>
             </div>
         <?php endforeach; ?>
+    </div>
+<?php endif; ?>
+
+<?php if ($totalPages > 1): ?>
+    <div class="d-flex justify-content-center mt-3">
+        <nav>
+            <ul class="pagination pagination-sm mb-0">
+                <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
+                    <a class="page-link" href="<?= htmlspecialchars($pageUrl(['page' => $page - 1])) ?>">&laquo;</a>
+                </li>
+                <?php
+                $startPage = max(1, $page - 2);
+                $endPage = min($totalPages, $page + 2);
+                if ($startPage > 1): ?>
+                    <li class="page-item">
+                        <a class="page-link" href="<?= htmlspecialchars($pageUrl(['page' => 1])) ?>">1</a>
+                    </li>
+                    <?php if ($startPage > 2): ?>
+                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                    <?php endif;
+                endif;
+                for ($i = $startPage; $i <= $endPage; $i++): ?>
+                    <li class="page-item <?= $i === $page ? 'active' : '' ?>">
+                        <a class="page-link" href="<?= htmlspecialchars($pageUrl(['page' => $i])) ?>"><?= $i ?></a>
+                    </li>
+                <?php endfor;
+                if ($endPage < $totalPages):
+                    if ($endPage < $totalPages - 1): ?>
+                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                    <?php endif; ?>
+                    <li class="page-item">
+                        <a class="page-link" href="<?= htmlspecialchars($pageUrl(['page' => $totalPages])) ?>"><?= $totalPages ?></a>
+                    </li>
+                <?php endif; ?>
+                <li class="page-item <?= $page >= $totalPages ? 'disabled' : '' ?>">
+                    <a class="page-link" href="<?= htmlspecialchars($pageUrl(['page' => $page + 1])) ?>">&raquo;</a>
+                </li>
+            </ul>
+        </nav>
     </div>
 <?php endif; ?>

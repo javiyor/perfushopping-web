@@ -14,10 +14,12 @@ final class AdminProductRepo
     ];
 
     /** @return array<int, array<string,mixed>> */
-    public function search(string $q, int $codsub = 0, int $codrub = 0, int $limit = 40, string $sort = 'id', string $order = 'desc'): array
+    /** @return array{items: array, total: int, page: int, perPage: int} */
+    public function search(string $q, int $codsub = 0, int $codrub = 0, int $limit = 40, string $sort = 'id', string $order = 'desc', int $page = 1, int $perPage = 0): array
     {
         $pdo = Db::pdo();
-        $limit = max(1, min(100, $limit));
+        $perPage = $perPage > 0 ? max(10, min(200, $perPage)) : max(1, min(100, $limit));
+        $page = max(1, $page);
         $q = trim($q);
 
         $sortCol = self::SORT_MAP[$sort] ?? 'p.idprodu';
@@ -55,13 +57,7 @@ final class AdminProductRepo
             $params[':codrub'] = $codrub;
         }
 
-        $sql = '
-            SELECT
-              DISTINCT p.idprodu, p.codprodu, p.produ, p.precio, p.precio1, p.imagen, p.enweb, p.fecompra,
-              r.nomrub,
-              s.nomsub,
-              i.tiva,
-              COALESCE(vc.variants_count, 0) AS variants_count
+        $from = '
             FROM producto p
             LEFT JOIN rubros r ON r.codrub = p.codrub
             LEFT JOIN subrubro s ON s.codsub = p.codsub
@@ -73,17 +69,32 @@ final class AdminProductRepo
                 GROUP BY idprodu
             ) vc ON vc.idprodu = p.idprodu
         ';
+        $from .= $searchJoin;
 
-        $sql .= $searchJoin;
-
+        $whereClause = '';
         if ($where) {
-            $sql .= ' WHERE ' . implode(' AND ', $where);
+            $whereClause = ' WHERE ' . implode(' AND ', $where);
         }
 
-        $sql .= ' ORDER BY ' . $sortCol . ' ' . $sortDir . ' LIMIT ' . $limit;
-        $st = $pdo->prepare($sql);
-        $st->execute($params);
-        return $st->fetchAll();
+        // Count
+        $stCount = $pdo->prepare('SELECT COUNT(DISTINCT p.idprodu) ' . $from . $whereClause);
+        $stCount->execute($params);
+        $total = (int)$stCount->fetchColumn();
+
+        // Data
+        $offset = ($page - 1) * $perPage;
+        $dataSql = '
+            SELECT DISTINCT p.idprodu, p.codprodu, p.produ, p.precio, p.precio1, p.imagen, p.enweb, p.fecompra,
+              r.nomrub,
+              s.nomsub,
+              i.tiva,
+              COALESCE(vc.variants_count, 0) AS variants_count
+        ' . $from . $whereClause . ' ORDER BY ' . $sortCol . ' ' . $sortDir . ' LIMIT ' . $perPage . ' OFFSET ' . $offset;
+        $stData = $pdo->prepare($dataSql);
+        $stData->execute($params);
+        $items = $stData->fetchAll();
+
+        return ['items' => $items, 'total' => $total, 'page' => $page, 'perPage' => $perPage];
     }
 
     /** @return array<int, array<string,mixed>> */

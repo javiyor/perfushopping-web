@@ -113,6 +113,9 @@ final class ProductController
         $sort = (string)($_GET['sort'] ?? 'id');
         $order = (string)($_GET['order'] ?? 'desc');
         $view = (string)($_GET['view'] ?? '');
+        $page = max(1, (int)($_GET['page'] ?? 1));
+        $perPage = max(10, min(200, (int)($_GET['per_page'] ?? 60)));
+
         if (!in_array($sort, ['id','codprodu','produ','marca','categoria','precio','precio1','fecompra'], true)) $sort = 'id';
         if (!in_array($order, ['asc','desc'], true)) $order = 'desc';
         $validViews = ['cards','table'];
@@ -121,7 +124,7 @@ final class ProductController
 
         $brands = $this->repo->brandOptions();
         $categories = $this->repo->categoryOptions();
-        $products = $this->repo->search($q, $codsub, $codrub, ($q === '' && $codsub <= 0 && $codrub <= 0) ? 24 : 60, $sort, $order);
+        $result = $this->repo->search($q, $codsub, $codrub, $perPage, $sort, $order, $page, $perPage);
 
         echo View::adminPage('admin/productos/list.php', [
             'adminUser' => $adminUser,
@@ -131,9 +134,12 @@ final class ProductController
             'sort' => $sort,
             'order' => $order,
             'view' => $view,
+            'page' => $result['page'],
+            'perPage' => $result['perPage'],
+            'total' => $result['total'],
             'brands' => $brands,
             'categories' => $categories,
-            'products' => $products,
+            'products' => $result['items'],
             'csrf' => Csrf::token(),
             'flash' => $_SESSION['admin_flash'] ?? null,
             'pageTitle' => 'Productos',
