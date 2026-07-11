@@ -16,10 +16,6 @@ $total = (int)($total ?? 0);
 $totalPages = $perPage > 0 ? (int)ceil($total / $perPage) : 1;
 $from = $total > 0 ? (($page - 1) * $perPage + 1) : 0;
 $to = min($page * $perPage, $total);
-$preservePage = $preserve ?? [];
-$preservePage['page'] = (string)$page;
-$preservePage['per_page'] = (string)$perPage;
-$pageUrl = static fn(array $extra) => '/admin/productos?' . http_build_query(array_merge($preserve, $extra));
 
 $sortable = ['id'=>'ID','codprodu'=>'Código','produ'=>'Producto','marca'=>'Marca','categoria'=>'Categoría','precio'=>'Precio','fecompra'=>'F.compra'];
 $preserve = [];
@@ -29,7 +25,8 @@ if ($codrub > 0) $preserve['codrub'] = (string)$codrub;
 if ($view !== 'cards') $preserve['view'] = $view;
 $preserve['sort'] = $sort;
 $preserve['order'] = $order;
-$sortLink = static fn(string $col) => '/admin/productos?' . http_build_query(array_merge($preserve, ['sort' => $col, 'order' => ($sort === $col && $order === 'asc') ? 'desc' : 'asc']));
+$pageUrl = fn(array $extra) => '/admin/productos?' . http_build_query(array_merge($preserve, $extra));
+$sortLink = fn(string $col) => '/admin/productos?' . http_build_query(array_merge($preserve, ['sort' => $col, 'order' => ($sort === $col && $order === 'asc') ? 'desc' : 'asc']));
 ?>
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
