@@ -25,7 +25,6 @@ use Perfushopping\Web\Controller\ProductController;
 use Perfushopping\Web\Controller\CartController;
 use Perfushopping\Web\Controller\CheckoutController;
 use Perfushopping\Web\Controller\AuthController;
-use Perfushopping\Web\Controller\AdminController;
 use Perfushopping\Web\Controller\MercadoPagoController;
 use Perfushopping\Web\Controller\LegalController;
 use Perfushopping\Web\Controller\AffiliateController;
@@ -57,6 +56,13 @@ use Perfushopping\Web\Admin\CajaController as AdminCajaController;
 use Perfushopping\Web\Admin\ArcaController as AdminArcaController;
 use Perfushopping\Web\Admin\EmpleadoController as AdminEmpleadoController;
 use Perfushopping\Web\Admin\ProveedorCtaCteController as AdminProveedorCtaCteController;
+use Perfushopping\Web\Admin\WebOrderController as AdminWebOrderController;
+use Perfushopping\Web\Admin\WebUserController as AdminWebUserController;
+use Perfushopping\Web\Admin\WholesaleController as AdminWholesaleController;
+use Perfushopping\Web\Admin\AffiliateController as AdminAffiliateController;
+use Perfushopping\Web\Admin\WithdrawalController as AdminWithdrawalController;
+use Perfushopping\Web\Admin\CapacitacionController as AdminCapacitacionController;
+use Perfushopping\Web\Admin\CorreoController as AdminCorreoController;
 use Perfushopping\Web\Admin\ChequeController as AdminChequeController;
 use Perfushopping\Web\Admin\OrdenPagoController as AdminOrdenPagoController;
 use Perfushopping\Web\Admin\EmailController as AdminEmailController;
@@ -134,11 +140,11 @@ $router->get('/admin/usuarios', [AdminUserController::class, 'index']);
 $router->post('/admin/usuarios/save', [AdminUserController::class, 'save']);
 $router->post('/admin/usuarios/delete', [AdminUserController::class, 'delete']);
 
-// Admin - Sistema original (mantener durante migración)
-$router->get('/admin/correo', [AdminController::class, 'correo']);
-$router->post('/admin/correo/auth', [AdminController::class, 'correoAuth']);
-$router->post('/admin/correo/agencies', [AdminController::class, 'correoAgencies']);
-$router->get('/admin/correo/saved', [AdminController::class, 'correoSavedAgencies']);
+// Admin - Correo Argentino
+$router->get('/admin/correo', [AdminCorreoController::class, 'index']);
+$router->post('/admin/correo/auth', [AdminCorreoController::class, 'auth']);
+$router->post('/admin/correo/agencies', [AdminCorreoController::class, 'agencies']);
+$router->get('/admin/correo/saved', [AdminCorreoController::class, 'savedAgencies']);
 $router->get('/admin/productos', [AdminProductControllerNew::class, 'index']);
 $router->get('/admin/productos/nuevo', [AdminProductControllerNew::class, 'create']);
 $router->post('/admin/productos/crear', [AdminProductControllerNew::class, 'store']);
@@ -294,31 +300,31 @@ $router->post('/admin/empleados/liquidar/guardar', [AdminEmpleadoController::cla
 $router->get('/admin/empleados/liquidaciones', [AdminEmpleadoController::class, 'liquidaciones']);
 $router->post('/admin/empleados/liquidaciones/pagar', [AdminEmpleadoController::class, 'liquidacionPagada']);
 $router->post('/admin/empleados/liquidaciones/anular', [AdminEmpleadoController::class, 'liquidacionAnular']);
-$router->get('/admin/orders', [AdminController::class, 'orders']);
-$router->get('/admin/prepare', [AdminController::class, 'prepare']);
-$router->post('/admin/order/status', [AdminController::class, 'orderStatus']);
-$router->post('/admin/orders/archive-abandoned', [AdminController::class, 'archiveAbandoned']);
-$router->post('/admin/orders/recover-abandoned', [AdminController::class, 'recoverAbandoned']);
-$router->get('/admin/users', [AdminController::class, 'users']);
-$router->post('/admin/users/save', [AdminController::class, 'userSave']);
-$router->post('/admin/users/role', [AdminController::class, 'userRoleSave']);
-$router->post('/admin/users/password', [AdminController::class, 'userPasswordReset']);
-$router->post('/admin/users/block', [AdminController::class, 'userToggleBlock']);
-$router->post('/admin/users/delete', [AdminController::class, 'userDelete']);
-$router->get('/admin/wholesale', [AdminController::class, 'wholesaleList']);
-$router->post('/admin/wholesale/approve', [AdminController::class, 'wholesaleApprove']);
-$router->post('/admin/wholesale/reject', [AdminController::class, 'wholesaleReject']);
-$router->post('/admin/affiliate/release', [AdminController::class, 'affiliateRelease']);
-$router->get('/admin/withdrawals', [AdminController::class, 'withdrawals']);
-$router->post('/admin/withdrawals/approve', [AdminController::class, 'withdrawalsApprove']);
-$router->post('/admin/withdrawals/paid', [AdminController::class, 'withdrawalsPaid']);
-$router->post('/admin/withdrawals/reject', [AdminController::class, 'withdrawalsReject']);
+$router->get('/admin/orders', [AdminWebOrderController::class, 'index']);
+$router->get('/admin/prepare', [AdminWebOrderController::class, 'prepare']);
+$router->post('/admin/order/status', [AdminWebOrderController::class, 'status']);
+$router->post('/admin/orders/archive-abandoned', [AdminWebOrderController::class, 'archiveAbandoned']);
+$router->post('/admin/orders/recover-abandoned', [AdminWebOrderController::class, 'recoverAbandoned']);
+$router->get('/admin/users', [AdminWebUserController::class, 'index']);
+$router->post('/admin/users/save', [AdminWebUserController::class, 'save']);
+$router->post('/admin/users/role', [AdminWebUserController::class, 'roleSave']);
+$router->post('/admin/users/password', [AdminWebUserController::class, 'passwordReset']);
+$router->post('/admin/users/block', [AdminWebUserController::class, 'toggleBlock']);
+$router->post('/admin/users/delete', [AdminWebUserController::class, 'delete']);
+$router->get('/admin/wholesale', [AdminWholesaleController::class, 'index']);
+$router->post('/admin/wholesale/approve', [AdminWholesaleController::class, 'approve']);
+$router->post('/admin/wholesale/reject', [AdminWholesaleController::class, 'reject']);
+$router->post('/admin/affiliate/release', [AdminAffiliateController::class, 'release']);
+$router->get('/admin/withdrawals', [AdminWithdrawalController::class, 'index']);
+$router->post('/admin/withdrawals/approve', [AdminWithdrawalController::class, 'approve']);
+$router->post('/admin/withdrawals/paid', [AdminWithdrawalController::class, 'paid']);
+$router->post('/admin/withdrawals/reject', [AdminWithdrawalController::class, 'reject']);
 
-// Admin: demo tecnica
-$router->get('/admin/demo-tecnica', [AdminController::class, 'demoTech']);
-$router->post('/admin/demo-tecnica/status', [AdminController::class, 'demoTechStatus']);
-$router->get('/admin/demo-tecnica/horarios', [AdminController::class, 'demoTechEvents']);
-$router->post('/admin/demo-tecnica/horarios/save', [AdminController::class, 'demoTechEventSave']);
+// Admin: capacitaciones
+$router->get('/admin/capacitaciones', [AdminCapacitacionController::class, 'index']);
+$router->post('/admin/capacitaciones/status', [AdminCapacitacionController::class, 'status']);
+$router->get('/admin/capacitaciones/horarios', [AdminCapacitacionController::class, 'horarios']);
+$router->post('/admin/capacitaciones/horarios/save', [AdminCapacitacionController::class, 'horariosSave']);
 
 try {
     $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';

@@ -15,6 +15,7 @@ Construir un sistema de gestión comercial completo (panel admin) para Perfushop
 - `producto.precio` y `producto.precomp` son SIN IVA (netos). IVA = multiplicar por `(1 + tiva/100)`
 - Precios en cents en tablas propias (presupuestos, facturas, etc.), decimales en ERP
 - `$auth->requireSesion()` reemplazó a `requireLogin()` — requiere auth + sucursal + turno
+- `AdminController` completamente migrado a controladores dedicados en `src/Admin/`. Pendiente de eliminar.
 - Login incluye selección de sucursal; después del login se redirige a `/admin/sesion/iniciar` para turno
 - `View::adminPage()` renderiza en `templates/admin/layout.php`
 
@@ -134,7 +135,40 @@ Construir un sistema de gestión comercial completo (panel admin) para Perfushop
 - Sin transición desde recibida o anulada
 - Tablas: `ordenes_compra`, `orden_compra_items`
 
-### 16. Caja / Arqueo
+### 16. Sync VFP → Hostinger
+- Endpoint `/api/v1/sync-tables` para push HTTP desde local a Hostinger
+- Script `src/push_tables.php` para push desde la PC local
+- Script `src/pull_tables.php` para pull desde Hostinger
+- Script `src/local_api.php` expone MySQL local vía HTTP en puerto 8080
+- `push_daily.bat` para Windows Task Scheduler
+- Dinamismo: columnas detectadas vía INFORMATION_SCHEMA
+- Tablas sincronizadas: `producto`, `gustos`, `stockcab`, `stockdet`
+
+### 17. Migración de AdminController (legacy → nuevos controladores)
+Se migraron todas las rutas del `AdminController` original a controladores dedicados en `src/Admin/`:
+
+| Controlador nuevo | Métodos | Reemplaza de AdminController |
+|---|---|---|
+| `WebOrderController` | index, prepare, status, recoverAbandoned, archiveAbandoned | orders, prepare, orderStatus, recoverAbandoned, archiveAbandoned |
+| `WebUserController` | index, save, roleSave, toggleBlock, delete, passwordReset | users, userSave, userRoleSave, userToggleBlock, userDelete, userPasswordReset |
+| `WholesaleController` | index, approve, reject (+ upsertCliente) | wholesaleList, wholesaleApprove, wholesaleReject |
+| `AffiliateController` | release | affiliateRelease |
+| `WithdrawalController` | index, approve, paid, reject | withdrawals, withdrawalsApprove, withdrawalsPaid, withdrawalsReject |
+| `CapacitacionController` | index, horarios, horariosSave, status | demoTech, demoTechEvents, demoTechEventSave, demoTechStatus |
+| `CorreoController` | index, auth, agencies, savedAgencies | correo, correoAuth, correoAgencies, correoSavedAgencies |
+
+Rutas públicas de `/eventos/demo-tecnica/*` (frontend) se mantienen en `DemoTechController` (sin cambios).
+
+### 18. Renombre: Demo Técnica → Capacitaciones
+- URLs admin: `/admin/demo-tecnica/*` → `/admin/capacitaciones/*`
+- Templates: `demo_tech.php` → `capacitaciones/registros.php`, `demo_tech_events.php` → `capacitaciones/horarios.php`
+- Sidebar y dashboard actualizados
+
+### 19. Bugfixes
+- Subrubro no se limpiaba al subir imagen (nested forms corregido en `edit.php`)
+- Paginación agregada a listado de productos
+
+### 20. Caja / Arqueo
 - Apertura de caja por turno con monto inicial
 - Movimientos extra (ingresos/egresos no facturables)
 - Arqueo con conteo físico y cálculo de diferencia vs saldo esperado
@@ -153,6 +187,12 @@ Construir un sistema de gestión comercial completo (panel admin) para Perfushop
 3. ~~Caja / Arqueo~~ ✅
 4. ~~Ajustes de stock manuales~~ ✅
 5. ~~Reportes~~ ✅
+6. ~~Migración AdminController → controladores nuevos~~ ✅
+7. **Eliminar AdminController legacy** — una vez confirmado que no hay regresiones
+8. **Evaluar archivos legacy standalone** — `stock.php`, `buscarProductoPorCodigo.php`, etc. en root
+9. **Compactar formulario de producto** — reducir padding/margins
+10. **Sistema de permisos por rol** — checkboxes en formulario de usuarios admin
+11. ~~Renombrar Demo Técnica → Capacitaciones~~ ✅
 
 ---
 
@@ -161,6 +201,13 @@ Construir un sistema de gestión comercial completo (panel admin) para Perfushop
 ```
 public/
   index.php                     ← todas las rutas del sistema
+
+sync/                             ← scripts de sincronización VFP → Hostinger
+  push_tables.php               ← push desde PC local a Hostinger vía HTTP API
+  pull_tables.php               ← pull desde Hostinger hacia local vía HTTP
+  local_api.php                 ← expone MySQL local vía HTTP en puerto 8080
+  sync_config.php               ← credenciales DB local
+push_daily.bat                  ← Windows Task Scheduler
 
 src/
   bootstrap.php                 ← autoloader
@@ -190,11 +237,18 @@ src/
     ReporteRepo.php
     OrdenCompraRepo.php
     CajaRepo.php
+    OrderRepo.php                 ← pedidos web
+    UserRepo.php                  ← usuarios web
+    WholesaleRepo.php             ← mayoristas
+    AffiliateLedgerRepo.php       ← afiliados
+    AffiliateWithdrawalRepo.php   ← retiros
+    DemoTechRepo.php              ← capacitaciones (demo tech)
+    CorreoRepo.php                ← Correo Argentino
   Admin/
     AuthController.php
     DashboardController.php
     SesionController.php
-    UserController.php
+    UserController.php            ← admins del panel
     ProductController.php
     ImportController.php
     DepartamentoController.php
@@ -209,6 +263,15 @@ src/
     ReporteController.php
     OrdenCompraController.php
     CajaController.php
+    WebOrderController.php        ← pedidos web (migrado)
+    WebUserController.php         ← usuarios web (migrado)
+    WholesaleController.php       ← mayoristas (migrado)
+    AffiliateController.php       ← afiliados (migrado)
+    WithdrawalController.php      ← retiros (migrado)
+    CapacitacionController.php    ← capacitaciones (ex demo técnica, migrado)
+    CorreoController.php          ← Correo Argentino (migrado)
+  Controller/
+    AdminController.php           ← legacy, pendiente de eliminar
 
 templates/admin/
   layout.php
@@ -229,6 +292,15 @@ templates/admin/
   reportes/index.php
   ordenes-compra/{list,form,detail}.php
   caja/{index,abrir,movimientos,arqueo,cierre}.php
+  orders.php                      ← pedidos web (migrado)
+  prepare.php                    ← preparación pedidos (migrado)
+  users.php                      ← usuarios web (migrado)
+  wholesale_list.php             ← mayoristas (migrado)
+  withdrawals.php                ← retiros (migrado)
+  correo.php                     ← Correo Argentino (migrado)
+  capacitaciones/
+    registros.php                ← capacitaciones (migrado)
+    horarios.php                 ← horarios capacitaciones (migrado)
 
 db/
   patches_admin.sql

@@ -222,7 +222,7 @@
             <a href="/admin/wholesale" class="<?= str_starts_with($currentPath, '/admin/wholesale') ? 'active' : '' ?>"><i class="bi bi-shop"></i>Mayoristas</a>
             <a href="/admin/withdrawals" class="<?= str_starts_with($currentPath, '/admin/withdrawals') ? 'active' : '' ?>"><i class="bi bi-cash"></i>Retiros</a>
             <a href="/admin/correo" class="<?= str_starts_with($currentPath, '/admin/correo') ? 'active' : '' ?>"><i class="bi bi-truck"></i>Correo Argentino</a>
-            <a href="/admin/demo-tecnica" class="<?= str_starts_with($currentPath, '/admin/demo-tecnica') ? 'active' : '' ?>"><i class="bi bi-calendar-event"></i>Demo técnica</a>
+            <a href="/admin/capacitaciones" class="<?= str_starts_with($currentPath, '/admin/capacitaciones') ? 'active' : '' ?>"><i class="bi bi-calendar-event"></i>Capacitaciones</a>
             <a href="/admin/cheques" class="<?= str_starts_with($currentPath, '/admin/cheques') ? 'active' : '' ?>"><i class="bi bi-file-text"></i>Cheques</a>
             <a href="/admin/email" class="<?= str_starts_with($currentPath, '/admin/email') ? 'active' : '' ?>"><i class="bi bi-envelope"></i>Email</a>
         </nav>

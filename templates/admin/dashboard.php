@@ -71,7 +71,7 @@ $isSuper = $adminRol === 'superadmin';
                     <a class="btn btn-outline-secondary" href="/admin/wholesale"><i class="bi bi-shop"></i> Mayoristas</a>
                     <a class="btn btn-outline-secondary" href="/admin/withdrawals"><i class="bi bi-cash"></i> Retiros</a>
                     <a class="btn btn-outline-secondary" href="/admin/correo"><i class="bi bi-truck"></i> Correo Argentino</a>
-                    <a class="btn btn-outline-secondary" href="/admin/demo-tecnica"><i class="bi bi-calendar-event"></i> Demo técnica</a>
+                    <a class="btn btn-outline-secondary" href="/admin/capacitaciones"><i class="bi bi-calendar-event"></i> Capacitaciones</a>
                 </div>
             </div>
         </div>
