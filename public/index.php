@@ -119,7 +119,13 @@ $router->post('/wholesale/request', [AuthController::class, 'wholesaleRequest'])
 $router->get('/affiliate', [AffiliateController::class, 'dashboard']);
 $router->post('/affiliate/withdraw', [AffiliateController::class, 'requestWithdraw']);
 
-// Eventos (demo tecnica)
+// Eventos (capacitaciones)
+$router->get('/eventos/capacitaciones', [DemoTechController::class, 'index']);
+$router->get('/eventos/capacitaciones/profesionales', [DemoTechController::class, 'professionalsForm']);
+$router->post('/eventos/capacitaciones/profesionales', [DemoTechController::class, 'professionalsSubmit']);
+$router->get('/eventos/capacitaciones/clientes', [DemoTechController::class, 'clientsForm']);
+$router->post('/eventos/capacitaciones/clientes', [DemoTechController::class, 'clientsSubmit']);
+// Mantener rutas viejas por compatibilidad
 $router->get('/eventos/demo-tecnica', [DemoTechController::class, 'index']);
 $router->get('/eventos/demo-tecnica/profesionales', [DemoTechController::class, 'professionalsForm']);
 $router->post('/eventos/demo-tecnica/profesionales', [DemoTechController::class, 'professionalsSubmit']);

@@ -28,12 +28,12 @@ final class DemoTechController
 
     public function professionalsSubmit(array $params): void
     {
-        $this->submitRegistration('pro', '/eventos/demo-tecnica/profesionales');
+        $this->submitRegistration('pro', '/eventos/capacitaciones/profesionales');
     }
 
     public function clientsSubmit(array $params): void
     {
-        $this->submitRegistration('client', '/eventos/demo-tecnica/clientes');
+        $this->submitRegistration('client', '/eventos/capacitaciones/clientes');
     }
 
     private function renderPage(?string $mode): void
