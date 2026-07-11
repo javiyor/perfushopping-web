@@ -197,17 +197,19 @@ foreach ($proveedores as $prov) {
                             <div class="bg-light rounded p-4 text-muted">Sin imagen principal</div>
                         <?php endif; ?>
                     </div>
-                    <form method="post" action="/admin/productos/main-image" enctype="multipart/form-data" class="mb-2">
-                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
-                        <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
-                        <input class="form-control form-control-sm mb-2" type="file" name="images[]" accept=".jpg,.jpeg,.png,.webp" />
-                        <button class="btn btn-outline-secondary btn-sm w-100" type="submit"><i class="bi bi-upload"></i> Subir</button>
-                    </form>
-                    <form method="post" action="/admin/productos/main-image/clear">
-                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
-                        <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
-                        <button class="btn btn-outline-danger btn-sm w-100" type="submit"><i class="bi bi-trash"></i> Quitar</button>
-                    </form>
+                    <div class="d-flex gap-2">
+                        <form method="post" action="/admin/productos/main-image" enctype="multipart/form-data" class="flex-grow-1">
+                            <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                            <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
+                            <input class="form-control form-control-sm mb-2" type="file" name="images[]" accept=".jpg,.jpeg,.png,.webp" />
+                            <button class="btn btn-outline-secondary btn-sm w-100" type="submit"><i class="bi bi-upload"></i> Subir</button>
+                        </form>
+                        <form method="post" action="/admin/productos/main-image/clear">
+                            <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                            <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
+                            <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-trash"></i> Quitar</button>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
