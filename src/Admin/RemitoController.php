@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Perfushopping\Web\Admin;
 
 use Perfushopping\Web\Repo\RemitoRepo;
+use Perfushopping\Web\Repo\StockRepo;
 use Perfushopping\Web\Service\AdminAuthService;
 use Perfushopping\Web\Support\Csrf;
 use Perfushopping\Web\Support\Response;
@@ -140,6 +141,21 @@ final class RemitoController
             'created_by' => (int)$adminUser['id'],
         ], $items);
 
+        // Deduct/add stock from session deposit
+        $depoId = $auth->getDepositoId();
+        if ($depoId > 0) {
+            $stockRepo = new StockRepo();
+            $sign = $tipo === 'entrada' ? 1 : -1;
+            foreach ($items as $it) {
+                $idprodu = $it['idprodu'];
+                $idcodgusto = $it['idcodgusto'];
+                $qty = $it['qty'];
+                if ($idprodu) {
+                    $stockRepo->registrarAjuste($idprodu, $idcodgusto, $depoId, $sign * $qty, 'Remito ' . $codigo, (int)$adminUser['id']);
+                }
+            }
+        }
+
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => "Remito {$codigo} creado."];
         Response::redirect('/admin/remitos/' . $id);
     }
@@ -190,7 +206,29 @@ final class RemitoController
             Response::redirect('/admin/remitos');
         }
 
+        $oldEstado = $r['estado'] ?? '';
+
         $repo->updateEstado($id, $estado);
+
+        // Restore/reverse stock if remito is anulated
+        if ($estado === 'anulado' && $oldEstado !== 'anulado') {
+            $depoId = $auth->getDepositoId();
+            if ($depoId > 0) {
+                $stockRepo = new StockRepo();
+                $remitoTipo = $r['tipo'] ?? 'salida';
+                $sign = $remitoTipo === 'entrada' ? -1 : 1;
+                $remitoItems = $repo->items($id);
+                foreach ($remitoItems as $it) {
+                    $idprodu = (int)($it['idprodu'] ?? 0);
+                    $idcodgusto = (int)($it['idcodgusto'] ?? 0) ?: null;
+                    $qty = (int)($it['qty'] ?? 0);
+                    if ($idprodu) {
+                        $stockRepo->registrarAjuste($idprodu, $idcodgusto, $depoId, $sign * $qty, 'Anulación Remito ' . ($r['codigo'] ?? ''), (int)$adminUser['id']);
+                    }
+                }
+            }
+        }
+
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Estado actualizado a: ' . $estado];
         Response::redirect('/admin/remitos/' . $id);
     }

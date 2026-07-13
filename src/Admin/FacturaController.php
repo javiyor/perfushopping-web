@@ -6,6 +6,7 @@ namespace Perfushopping\Web\Admin;
 use Perfushopping\Web\Infra\SmtpMailer;
 use Perfushopping\Web\Repo\FacturaRepo;
 use Perfushopping\Web\Repo\ChequeRepo;
+use Perfushopping\Web\Repo\StockRepo;
 use Perfushopping\Web\Service\AdminAuthService;
 use Perfushopping\Web\Support\Csrf;
 use Perfushopping\Web\Support\Format;
@@ -220,6 +221,20 @@ final class FacturaController
             'vendedor_id' => $vendedorId,
         ], $items, $pagos);
 
+        // Deduct stock from session deposit
+        $depoId = $auth->getDepositoId();
+        if ($depoId > 0) {
+            $stockRepo = new StockRepo();
+            foreach ($items as $it) {
+                $idprodu = $it['idprodu'];
+                $idcodgusto = $it['idcodgusto'];
+                $qty = $it['qty'];
+                if ($idprodu) {
+                    $stockRepo->registrarAjuste($idprodu, $idcodgusto, $depoId, -$qty, 'Factura ' . $codigo, (int)$adminUser['id']);
+                }
+            }
+        }
+
         // Auto-post to current account if forma_pago = cuenta_corriente
         if ($clienteId && $formaPago === 'cuenta_corriente') {
             $ctaCte = new \Perfushopping\Web\Repo\CtaCteRepo();
@@ -325,6 +340,23 @@ final class FacturaController
         $oldEstado = $f['estado'] ?? '';
 
         $repo->updateEstado($id, $estado);
+
+        // Restore stock if factura is anulated
+        if ($estado === 'anulada' && $oldEstado !== 'anulada') {
+            $depoId = $auth->getDepositoId();
+            if ($depoId > 0) {
+                $stockRepo = new StockRepo();
+                $facturaItems = $repo->items($id);
+                foreach ($facturaItems as $it) {
+                    $idprodu = (int)($it['idprodu'] ?? 0);
+                    $idcodgusto = (int)($it['idcodgusto'] ?? 0) ?: null;
+                    $qty = (int)($it['qty'] ?? 0);
+                    if ($idprodu) {
+                        $stockRepo->registrarAjuste($idprodu, $idcodgusto, $depoId, $qty, 'Anulación Factura ' . ($f['codigo'] ?? ''), (int)$adminUser['id']);
+                    }
+                }
+            }
+        }
 
         // Reverse ctacte movement if factura is anulated and was cta.cte.
         if ($estado === 'anulada' && $oldEstado !== 'anulada' && ($f['forma_pago'] ?? '') === 'cuenta_corriente' && $f['cliente_id']) {

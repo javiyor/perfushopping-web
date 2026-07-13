@@ -67,6 +67,7 @@ use Perfushopping\Web\Admin\ChequeController as AdminChequeController;
 use Perfushopping\Web\Admin\OrdenPagoController as AdminOrdenPagoController;
 use Perfushopping\Web\Admin\EmailController as AdminEmailController;
 use Perfushopping\Web\Admin\BadgeController as AdminBadgeController;
+use Perfushopping\Web\Admin\SucursalController as AdminSucursalController;
 
 $router = new Router();
 
@@ -279,6 +280,10 @@ $router->get('/admin/cheques/emitir', [AdminChequeController::class, 'emitirForm
 $router->post('/admin/cheques/emitir/guardar', [AdminChequeController::class, 'emitirStore']);
 $router->get('/admin/cheques/(?P<id>\d+)', [AdminChequeController::class, 'show']);
 $router->post('/admin/cheques/estado', [AdminChequeController::class, 'estado']);
+
+// Admin - Sucursales
+$router->get('/admin/sucursales', [AdminSucursalController::class, 'index']);
+$router->post('/admin/sucursales/save', [AdminSucursalController::class, 'save']);
 
 // Admin - Email (IMAP)
 $router->get('/admin/email', [AdminEmailController::class, 'inbox']);

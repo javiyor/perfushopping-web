@@ -82,9 +82,29 @@ final class WebOrderController
         Csrf::check($_POST['_csrf'] ?? null);
         $orderId = (int)($_POST['order_id'] ?? 0);
         $newStatus = trim((string)($_POST['status'] ?? ''));
-        $allowed = ['preparing', 'prepared', 'shipped', 'cancelled', 'archived'];
+
+        $order = $newStatus !== '' ? (new OrderRepo())->find($orderId) : null;
+        if (!$order) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Pedido no encontrado.'];
+            Response::redirect('/admin/orders');
+        }
+
+        $transitions = [
+            'pending_payment' => ['paid', 'cancelled'],
+            'paid' => ['preparing', 'cancelled'],
+            'pending_transfer' => ['paid', 'preparing', 'cancelled'],
+            'transfer_reported' => ['paid', 'cancelled'],
+            'preparing' => ['prepared', 'cancelled'],
+            'prepared' => ['shipped', 'cancelled'],
+            'shipped' => ['archived'],
+            'cancelled' => ['archived'],
+            'archived' => [],
+        ];
+
+        $currentStatus = (string)($order['status'] ?? '');
+        $allowed = $transitions[$currentStatus] ?? [];
         if ($orderId <= 0 || !in_array($newStatus, $allowed, true)) {
-            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Datos invalidos.'];
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Transicion invalida.'];
             Response::redirect('/admin/orders');
         }
         (new OrderRepo())->updateStatus($orderId, $newStatus);

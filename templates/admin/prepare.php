@@ -54,7 +54,16 @@ $itemsByOrder = $itemsByOrder ?? [];
             </div>
           <?php endif; ?>
 
+          <?php $currentStatus = (string)($order['status'] ?? ''); ?>
           <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+            <?php if ($currentStatus === 'pending_transfer'): ?>
+              <form method="post" action="/admin/order/status" style="display:inline">
+                <input type="hidden" name="_csrf" value="<?= htmlspecialchars((string)$csrf) ?>" />
+                <input type="hidden" name="order_id" value="<?= $orderId ?>" />
+                <input type="hidden" name="status" value="paid" />
+                <button class="btn" type="submit">Marcar pagado</button>
+              </form>
+            <?php endif; ?>
             <form method="post" action="/admin/order/status" style="display:inline">
               <input type="hidden" name="_csrf" value="<?= htmlspecialchars((string)$csrf) ?>" />
               <input type="hidden" name="order_id" value="<?= $orderId ?>" />

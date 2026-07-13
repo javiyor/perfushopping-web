@@ -231,6 +231,7 @@
             <a href="/admin/correo" class="<?= str_starts_with($currentPath, '/admin/correo') ? 'active' : '' ?>"><i class="bi bi-truck"></i>Correo Argentino</a>
             <a href="/admin/capacitaciones" class="<?= str_starts_with($currentPath, '/admin/capacitaciones') ? 'active' : '' ?>"><i class="bi bi-calendar-event"></i>Capacitaciones</a>
             <a href="/admin/cheques" class="<?= str_starts_with($currentPath, '/admin/cheques') ? 'active' : '' ?>"><i class="bi bi-file-text"></i>Cheques</a>
+            <a href="/admin/sucursales" class="<?= str_starts_with($currentPath, '/admin/sucursales') ? 'active' : '' ?>"><i class="bi bi-building"></i>Sucursales</a>
             <a href="/admin/email" class="<?= str_starts_with($currentPath, '/admin/email') ? 'active' : '' ?>"><i class="bi bi-envelope"></i>Email</a>
         </nav>
     </aside>

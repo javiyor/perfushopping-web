@@ -155,7 +155,6 @@ final class AdminAuthService
         if (isset($_SESSION['admin_punto_venta'])) {
             return (int)$_SESSION['admin_punto_venta'];
         }
-        // Load from DB if not cached
         $sid = $this->getSucursalId();
         if ($sid <= 0) return 1;
         $repo = new \Perfushopping\Web\Repo\SucursalRepo();
@@ -163,5 +162,19 @@ final class AdminAuthService
         $pv = $s ? (int)($s['punto_venta'] ?? 1) : 1;
         $_SESSION['admin_punto_venta'] = $pv;
         return $pv;
+    }
+
+    public function getDepositoId(): int
+    {
+        if (isset($_SESSION['admin_deposito_id'])) {
+            return (int)$_SESSION['admin_deposito_id'];
+        }
+        $sid = $this->getSucursalId();
+        if ($sid <= 0) return 0;
+        $repo = new \Perfushopping\Web\Repo\SucursalRepo();
+        $s = $repo->findById($sid);
+        $depo = $s ? (int)($s['iddepo'] ?? 0) : 0;
+        $_SESSION['admin_deposito_id'] = $depo;
+        return $depo;
     }
 }
