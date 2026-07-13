@@ -61,7 +61,7 @@ final class StockRepo
         $st = Db::pdo()->prepare('
             SELECT g.idcodgusto, g.nomgusto, g.codscan, g.stockact, g.discont
             FROM gustos g
-            WHERE g.idprodu = :id
+            WHERE g.idprodu = :id AND g.discont = 0
             ORDER BY g.nomgusto ASC
         ');
         $st->execute([':id' => $idprodu]);
@@ -83,7 +83,7 @@ final class StockRepo
         $sql = '
             SELECT s.*, d.nomdepo, p.produ, g.nomgusto
             FROM stock s
-            INNER JOIN deposito d ON d.iddepo = s.iddepo
+            INNER JOIN deposito d ON d.iddepo = s.iddepo AND d.marca = 2
             LEFT JOIN producto p ON p.idprodu = s.idprodu
             LEFT JOIN gustos g ON g.idcodgusto = s.idcodgusto
         ';
