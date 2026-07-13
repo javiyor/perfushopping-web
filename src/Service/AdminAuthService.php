@@ -73,8 +73,20 @@ final class AdminAuthService
             return false;
         }
         $rol = (string)($u['rol'] ?? '');
-        $permisos = self::$permisosPorRol[$rol] ?? [];
-        return in_array('*', $permisos, true) || in_array($permiso, $permisos, true);
+        $custom = (string)($u['permisos'] ?? '');
+        if ($custom !== '') {
+            $userPerms = json_decode($custom, true);
+            if (is_array($userPerms)) {
+                return in_array('*', $userPerms, true) || in_array($permiso, $userPerms, true);
+            }
+        }
+        $rolePerms = self::$permisosPorRol[$rol] ?? [];
+        return in_array('*', $rolePerms, true) || in_array($permiso, $rolePerms, true);
+    }
+
+    public function getPermisosDelRol(string $rol): array
+    {
+        return self::$permisosPorRol[$rol] ?? [];
     }
 
     public function login(string $username, string $password): ?array

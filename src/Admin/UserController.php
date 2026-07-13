@@ -24,6 +24,8 @@ final class UserController
             'csrf' => Csrf::token(),
             'flash' => $_SESSION['admin_flash'] ?? null,
             'pageTitle' => 'Usuarios admin',
+            'permOptions' => AdminUserRepo::permissionOptions(),
+            'rolPermisos' => $auth->getPermisosDelRol(''),
         ]);
         unset($_SESSION['admin_flash']);
     }
@@ -41,6 +43,15 @@ final class UserController
         $rol = trim((string)($_POST['rol'] ?? 'ventas'));
         $activo = isset($_POST['activo']) ? 1 : 0;
         $password = (string)($_POST['password'] ?? '');
+
+        $permKeys = array_keys(AdminUserRepo::permissionOptions());
+        $selectedPerms = [];
+        foreach ($permKeys as $pk) {
+            if (isset($_POST['perm_' . $pk])) {
+                $selectedPerms[] = $pk;
+            }
+        }
+        $permisos = $selectedPerms ? json_encode($selectedPerms, JSON_UNESCAPED_UNICODE) : '';
 
         $rolesValidos = array_keys(AdminUserRepo::rolOptions());
         if ($nombre === '' || $username === '' || !in_array($rol, $rolesValidos, true)) {
@@ -60,7 +71,7 @@ final class UserController
                 $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No podes desactivarte a vos mismo.'];
                 Response::redirect('/admin/usuarios');
             }
-            $repo->update($id, $nombre, $email, $rol, $activo);
+            $repo->update($id, $nombre, $email, $rol, $activo, $permisos);
             if ($password !== '' && strlen($password) >= 6) {
                 $repo->updatePassword($id, password_hash($password, PASSWORD_DEFAULT));
             }
@@ -72,7 +83,7 @@ final class UserController
                 Response::redirect('/admin/usuarios');
             }
             $hash = $password !== '' ? password_hash($password, PASSWORD_DEFAULT) : password_hash(bin2hex(random_bytes(8)), PASSWORD_DEFAULT);
-            $repo->create($username, $hash, $nombre, $email, $rol);
+            $repo->create($username, $hash, $nombre, $email, $rol, $permisos);
             $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Usuario admin creado.'];
         }
 

@@ -30,17 +30,17 @@ final class AdminUserRepo
         return $st->fetchAll();
     }
 
-    public function create(string $username, string $hash, string $nombre, string $email, string $rol): int
+    public function create(string $username, string $hash, string $nombre, string $email, string $rol, string $permisos = ''): int
     {
-        $st = Db::pdo()->prepare('INSERT INTO admin_users (username, password_hash, nombre, email, rol, activo, created_at, updated_at) VALUES (:u, :p, :n, :e, :r, 1, NOW(), NOW())');
-        $st->execute([':u' => $username, ':p' => $hash, ':n' => $nombre, ':e' => $email, ':r' => $rol]);
+        $st = Db::pdo()->prepare('INSERT INTO admin_users (username, password_hash, nombre, email, rol, permisos, activo, created_at, updated_at) VALUES (:u, :p, :n, :e, :r, :perm, 1, NOW(), NOW())');
+        $st->execute([':u' => $username, ':p' => $hash, ':n' => $nombre, ':e' => $email, ':r' => $rol, ':perm' => $permisos]);
         return (int)Db::pdo()->lastInsertId();
     }
 
-    public function update(int $id, string $nombre, string $email, string $rol, int $activo): void
+    public function update(int $id, string $nombre, string $email, string $rol, int $activo, string $permisos = ''): void
     {
-        $st = Db::pdo()->prepare('UPDATE admin_users SET nombre = :n, email = :e, rol = :r, activo = :a, updated_at = NOW() WHERE id = :i LIMIT 1');
-        $st->execute([':n' => $nombre, ':e' => $email, ':r' => $rol, ':a' => $activo, ':i' => $id]);
+        $st = Db::pdo()->prepare('UPDATE admin_users SET nombre = :n, email = :e, rol = :r, permisos = :perm, activo = :a, updated_at = NOW() WHERE id = :i LIMIT 1');
+        $st->execute([':n' => $nombre, ':e' => $email, ':r' => $rol, ':perm' => $permisos, ':a' => $activo, ':i' => $id]);
     }
 
     public function updatePassword(int $id, string $hash): void
@@ -69,6 +69,27 @@ final class AdminUserRepo
             'administracion' => 'Administración',
             'compras' => 'Compras',
             'caja' => 'Caja',
+        ];
+    }
+
+    public static function permissionOptions(): array
+    {
+        return [
+            'productos' => 'Productos',
+            'clientes' => 'Clientes',
+            'facturacion' => 'Facturación',
+            'presupuestos' => 'Presupuestos',
+            'remitos' => 'Remitos',
+            'recibos' => 'Recibos',
+            'cta_cte' => 'Cta. Cte.',
+            'arca' => 'ARCA',
+            'estadisticas' => 'Reportes',
+            'pagos' => 'Pagos',
+            'cheques' => 'Cheques',
+            'usuarios_admin' => 'Usuarios Admin',
+            'compras' => 'Compras',
+            'pagos_proveedores' => 'Pagos Proveedores',
+            'caja_movimientos' => 'Caja',
         ];
     }
 }

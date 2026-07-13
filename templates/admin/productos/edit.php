@@ -34,21 +34,22 @@ foreach ($proveedores as $prov) {
     }
 }
 ?>
-<nav aria-label="breadcrumb" class="mb-3">
+<style>.card-body{ padding:.6rem }.card-header{ padding:.4rem .6rem }.compact-form .form-label{ margin-bottom:.1rem }</style>
+<nav aria-label="breadcrumb" class="mb-2">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="/admin/productos">Productos</a></li>
         <li class="breadcrumb-item active">#<?= $selectedId ?> - <?= htmlspecialchars(mb_substr((string)($product['produ'] ?? ''), 0, 40)) ?></li>
     </ol>
 </nav>
 
-<div class="card shadow-sm mb-3">
-    <div class="card-body">
+<div class="card shadow-sm mb-2">
+    <div class="card-body py-2">
         <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
             <div class="flex-grow-1">
-                <div class="mb-2">
-                    <input class="form-control form-control-lg fw-bold" name="produ" value="<?= htmlspecialchars((string)($product['produ'] ?? '')) ?>" form="save-form" />
+                <div class="mb-1">
+                    <input class="form-control fw-bold" name="produ" value="<?= htmlspecialchars((string)($product['produ'] ?? '')) ?>" form="save-form" />
                 </div>
-                <div class="d-flex flex-wrap gap-3 small text-muted">
+                <div class="d-flex flex-wrap gap-2 small text-muted">
                     <span>ID: <strong><?= $selectedId ?></strong></span>
                     <span>Código: <strong><?= htmlspecialchars((string)($product['codprodu'] ?? '-')) ?></strong></span>
                     <span>F.compra: <strong><?= htmlspecialchars($formatDate((string)($product['fecompra'] ?? ''))) ?></strong></span>
@@ -73,12 +74,12 @@ foreach ($proveedores as $prov) {
     <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
     <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
 
-    <div class="row g-3">
+    <div class="row g-2 compact-form">
         <div class="col-lg-6">
-            <div class="card shadow-sm mb-3">
+            <div class="card shadow-sm mb-2">
                 <div class="card-header bg-white fw-semibold">Categorización</div>
                 <div class="card-body">
-                    <div class="row g-2 mb-2">
+                    <div class="row g-1 mb-1">
                         <div class="col-md-6">
                             <label class="form-label small">Categoría</label>
                             <select class="form-select form-select-sm" name="codrub">
@@ -98,7 +99,7 @@ foreach ($proveedores as $prov) {
                             </select>
                         </div>
                     </div>
-                    <div class="row g-2">
+                    <div class="row g-1">
                         <div class="col-md-6">
                             <label class="form-label small">Departamento</label>
                             <select class="form-select form-select-sm" name="codepar">
@@ -124,7 +125,7 @@ foreach ($proveedores as $prov) {
             <div class="card shadow-sm">
                 <div class="card-header bg-white fw-semibold">Costos y márgenes</div>
                 <div class="card-body">
-                    <div class="row g-2 mb-3">
+                    <div class="row g-1 mb-2">
                         <div class="col-md-4">
                             <label class="form-label small">Costo <span class="text-muted">(sin IVA)</span></label>
                             <input class="form-control form-control-sm calc-trigger" name="precomp" value="<?= htmlspecialchars((string)($product['precomp'] ?? '0')) ?>" inputmode="decimal" />
@@ -144,7 +145,7 @@ foreach ($proveedores as $prov) {
             <div class="card shadow-sm">
                 <div class="card-header bg-white fw-semibold">Precios y visibilidad</div>
                 <div class="card-body">
-                    <div class="row g-2 mb-3">
+                    <div class="row g-1 mb-1">
                         <div class="col-md-6">
                             <label class="form-label small">Precio minorista <span class="text-muted">(IVA incl.)</span></label>
                             <input class="form-control form-control-sm" name="precio_gross" value="<?= htmlspecialchars($priceGross) ?>" inputmode="decimal" required />
@@ -155,19 +156,19 @@ foreach ($proveedores as $prov) {
                         </div>
                     </div>
 
-                    <div class="mb-3">
+                    <div class="mb-1">
                         <label class="form-label small">Neto calculado</label>
                         <div class="form-control form-control-sm bg-light text-muted" style="cursor:default" readonly>
                             Minorista $<?= number_format((float)($product['precio'] ?? 0), 2, ',', '.') ?> | Mayorista $<?= number_format((float)($product['precio1'] ?? 0), 2, ',', '.') ?>
                         </div>
                     </div>
 
-                    <div class="form-check mb-3">
+                    <div class="form-check mb-1">
                         <input class="form-check-input" type="checkbox" name="enweb" id="enweb" <?= ((int)($product['enweb'] ?? 0) === 1) ? 'checked' : '' ?> />
                         <label class="form-check-label" for="enweb">Visible en web</label>
                     </div>
 
-                    <div class="mb-3">
+                    <div class="mb-1">
                         <label class="form-label small">Descripción</label>
                         <textarea class="form-control form-control-sm" id="ai-description-field" name="observ" rows="5"><?= htmlspecialchars((string)($product['observ'] ?? '')) ?></textarea>
                     </div>
@@ -216,7 +217,7 @@ foreach ($proveedores as $prov) {
     </div>
 </form>
 
-<div class="card shadow-sm mt-3">
+<div class="card shadow-sm mt-2">
     <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
         <span>Variedades</span>
         <span class="badge bg-secondary"><?= count($variants) ?></span>
@@ -242,8 +243,8 @@ foreach ($proveedores as $prov) {
                 $vd = (int)($variant['depth_cm'] ?? 0) > 0 ? (string)$variant['depth_cm'] : $logisticsSeed['depth_cm'];
                 $vc = trim((string)($variant['product_category'] ?? '')) !== '' ? (string)$variant['product_category'] : $logisticsSeed['product_category'];
             ?>
-                <div class="border rounded p-3 mb-3">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
+                <div class="border rounded p-2 mb-2">
+                    <div class="d-flex justify-content-between align-items-start mb-1">
                         <div>
                             <h6 class="fw-bold mb-0"><?= htmlspecialchars((string)($variant['nomgusto'] ?? '')) ?></h6>
                             <small class="text-muted">ID: <?= $variantId ?> · Código: <?= htmlspecialchars((string)($variant['codscan'] ?? '-')) ?> · Stock: <?= htmlspecialchars((string)($variant['stockact'] ?? '0')) ?><?= ((int)($variant['discont'] ?? 0) === 1) ? ' · <span class="text-danger">Discontinuado</span>' : '' ?></small>
@@ -260,7 +261,7 @@ foreach ($proveedores as $prov) {
                     </div>
 
                     <?php if (!empty($variant['images']) && is_array($variant['images'])): ?>
-                        <div class="d-flex flex-wrap gap-2 mb-2">
+                        <div class="d-flex flex-wrap gap-1 mb-1">
                             <?php foreach ($variant['images'] as $img): ?>
                                 <div class="text-center" style="width:80px">
                                     <img src="<?= htmlspecialchars(Format::uploadUrl((string)($img['rutaimg'] ?? ''))) ?>" alt="" style="width:70px;height:70px;object-fit:cover;border-radius:6px" />
@@ -278,29 +279,24 @@ foreach ($proveedores as $prov) {
                         <div class="small text-muted mb-2">Sin imágenes</div>
                     <?php endif; ?>
 
-                    <form method="post" action="/admin/productos/variant-logistics" class="row g-2 mb-2">
+                    <form method="post" action="/admin/productos/variant-logistics" class="row g-1 mb-1">
                         <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
                         <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
                         <input type="hidden" name="idcodgusto" value="<?= $variantId ?>" />
                         <div class="col-3">
-                            <label class="small text-muted">Peso (g)</label>
-                            <input class="form-control form-control-sm" name="weight_g" value="<?= htmlspecialchars($vw) ?>" />
+                            <input class="form-control form-control-sm" name="weight_g" value="<?= htmlspecialchars($vw) ?>" placeholder="Peso g" />
                         </div>
                         <div class="col-3">
-                            <label class="small text-muted">Alto (cm)</label>
-                            <input class="form-control form-control-sm" name="height_cm" value="<?= htmlspecialchars($vh) ?>" />
+                            <input class="form-control form-control-sm" name="height_cm" value="<?= htmlspecialchars($vh) ?>" placeholder="Alto cm" />
                         </div>
                         <div class="col-3">
-                            <label class="small text-muted">Ancho (cm)</label>
-                            <input class="form-control form-control-sm" name="width_cm" value="<?= htmlspecialchars($vwi) ?>" />
+                            <input class="form-control form-control-sm" name="width_cm" value="<?= htmlspecialchars($vwi) ?>" placeholder="Ancho cm" />
                         </div>
                         <div class="col-3">
-                            <label class="small text-muted">Largo (cm)</label>
-                            <input class="form-control form-control-sm" name="depth_cm" value="<?= htmlspecialchars($vd) ?>" />
+                            <input class="form-control form-control-sm" name="depth_cm" value="<?= htmlspecialchars($vd) ?>" placeholder="Largo cm" />
                         </div>
                         <div class="col-6">
-                            <label class="small text-muted">Categoría Correo</label>
-                            <input class="form-control form-control-sm" name="product_category" value="<?= htmlspecialchars($vc) ?>" placeholder="Perfumería y cosmética" />
+                            <input class="form-control form-control-sm" name="product_category" value="<?= htmlspecialchars($vc) ?>" placeholder="Cat. Correo" />
                         </div>
                         <div class="col-6 d-flex align-items-end">
                             <button class="btn btn-outline-secondary btn-sm w-100" type="submit"><i class="bi bi-save"></i> Logística</button>

@@ -15,7 +15,8 @@ Construir un sistema de gestión comercial completo (panel admin) para Perfushop
 - `producto.precio` y `producto.precomp` son SIN IVA (netos). IVA = multiplicar por `(1 + tiva/100)`
 - Precios en cents en tablas propias (presupuestos, facturas, etc.), decimales en ERP
 - `$auth->requireSesion()` reemplazó a `requireLogin()` — requiere auth + sucursal + turno
-- `AdminController` completamente migrado a controladores dedicados en `src/Admin/`. Pendiente de eliminar.
+- `AdminController` completamente migrado a controladores dedicados en `src/Admin/`. Eliminado.
+- Archivos legacy standalone en root y `upload/` eliminados (17 archivos). Se mantienen `public/upload/gustos_sync.php` y `public/upload/subir_imagen.php` para compatibilidad VFP.
 - Login incluye selección de sucursal; después del login se redirige a `/admin/sesion/iniciar` para turno
 - `View::adminPage()` renderiza en `templates/admin/layout.php`
 
@@ -188,10 +189,10 @@ Rutas públicas de `/eventos/demo-tecnica/*` (frontend) se mantienen en `DemoTec
 4. ~~Ajustes de stock manuales~~ ✅
 5. ~~Reportes~~ ✅
 6. ~~Migración AdminController → controladores nuevos~~ ✅
-7. **Eliminar AdminController legacy** — una vez confirmado que no hay regresiones
-8. **Evaluar archivos legacy standalone** — `stock.php`, `buscarProductoPorCodigo.php`, etc. en root
-9. **Compactar formulario de producto** — reducir padding/margins
-10. **Sistema de permisos por rol** — checkboxes en formulario de usuarios admin
+7. ~~Eliminar AdminController legacy~~ ✅
+8. ~~Evaluar y eliminar archivos legacy standalone~~ ✅ (17 archivos)
+9. ~~Compactar formulario de producto~~ ✅
+10. ~~Sistema de permisos por rol~~ ✅ — columna `permisos` (JSON) en `admin_users`, checkboxes en modal, fallback a defaults del rol
 11. ~~Renombrar Demo Técnica → Capacitaciones~~ ✅
 
 ---
@@ -271,7 +272,6 @@ src/
     CapacitacionController.php    ← capacitaciones (ex demo técnica, migrado)
     CorreoController.php          ← Correo Argentino (migrado)
   Controller/
-    AdminController.php           ← legacy, pendiente de eliminar
 
 templates/admin/
   layout.php

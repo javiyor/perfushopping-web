@@ -1,0 +1,1 @@
+ALTER TABLE admin_users ADD COLUMN permisos TEXT DEFAULT NULL AFTER rol;
