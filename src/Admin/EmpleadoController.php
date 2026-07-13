@@ -65,7 +65,10 @@ final class EmpleadoController
             Response::redirect('/admin/empleados');
         }
 
-        (new EmpleadoRepo())->saveConfig($adminUserId, $_POST);
+        $data = $_POST;
+        $data['sueldo_base_cents'] = (int)((float)($data['sueldo_base'] ?? 0) * 100);
+        $data['valor_hora_cents'] = (int)((float)($data['valor_hora'] ?? 0) * 100);
+        (new EmpleadoRepo())->saveConfig($adminUserId, $data);
 
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Configuración guardada.'];
         Response::redirect('/admin/empleados');

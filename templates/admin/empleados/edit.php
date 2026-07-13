@@ -41,11 +41,11 @@
                     <div class="row g-2 mb-3">
                         <div class="col-6">
                             <label class="form-label small fw-semibold">Sueldo base mensual ($)</label>
-                            <input class="form-control form-control-sm" name="sueldo_base_cents" type="number" value="<?= (int)($config['sueldo_base_cents'] ?? 0) ?>" min="0" />
+                            <input class="form-control form-control-sm" name="sueldo_base" type="number" value="<?= (int)(($config['sueldo_base_cents'] ?? 0) / 100) ?>" min="0" />
                         </div>
                         <div class="col-6">
                             <label class="form-label small fw-semibold">Valor hora ($)</label>
-                            <input class="form-control form-control-sm" name="valor_hora_cents" type="number" value="<?= (int)($config['valor_hora_cents'] ?? 0) ?>" min="0" />
+                            <input class="form-control form-control-sm" name="valor_hora" type="number" value="<?= (int)(($config['valor_hora_cents'] ?? 0) / 100) ?>" min="0" />
                         </div>
                     </div>
 
