@@ -275,31 +275,46 @@ final class StockRepo
 
         $cabRows = (int)$pdo->query('SELECT COUNT(*) FROM stockcab')->fetchColumn();
         $detRows = (int)$pdo->query('SELECT COUNT(*) FROM stockdet')->fetchColumn();
-        $cabConDatos = (int)$pdo->query("SELECT COUNT(*) FROM stockcab WHERE iddepoh IS NOT NULL OR iddepod IS NOT NULL")->fetchColumn();
 
         $pdo->beginTransaction();
         try {
+            // Rebuild stock table: exactamente la misma lógica que VFP
+            // Entradas = SUM(canti) WHERE stockcab.iddepoh = deposito.iddepo (mercadería que está en el depósito)
+            // Salidas  = SUM(canti) WHERE stockcab.iddepod = deposito.iddepo (mercadería que se fue del depósito)
+            // Stock por depósito = Entradas - Salidas
             $pdo->exec('DELETE FROM stock');
+
+            // Calcular stock por depósito exactamente como VFP
             $pdo->exec('
                 INSERT INTO stock (iddepo, idprodu, idcodgusto, stock)
-                SELECT mov.iddepo, mov.idprodu, mov.idcodgusto, SUM(mov.net) AS stock
-                FROM (
-                    SELECT sc.iddepoh AS iddepo, sd.idprodu, sd.idcodgusto, sd.canti AS net
+                SELECT
+                    d.iddepo,
+                    COALESCE(en.idprodu, sa.idprodu) AS idprodu,
+                    COALESCE(en.idcodgusto, sa.idcodgusto) AS idcodgusto,
+                    COALESCE(en.entradas, 0) - COALESCE(sa.salidas, 0) AS stock
+                FROM deposito d
+                LEFT JOIN (
+                    SELECT sc.iddepoh AS iddepo, sd.idprodu, sd.idcodgusto, SUM(sd.canti) AS entradas
                     FROM stockcab sc
                     INNER JOIN stockdet sd ON sd.idstockcab = sc.idcabstock
                     WHERE sc.iddepoh IS NOT NULL
-                    UNION ALL
-                    SELECT sc.iddepod AS iddepo, sd.idprodu, sd.idcodgusto, -sd.canti AS net
+                    GROUP BY sc.iddepoh, sd.idprodu, sd.idcodgusto
+                ) en ON en.iddepo = d.iddepo
+                LEFT JOIN (
+                    SELECT sc.iddepod AS iddepo, sd.idprodu, sd.idcodgusto, SUM(sd.canti) AS salidas
                     FROM stockcab sc
                     INNER JOIN stockdet sd ON sd.idstockcab = sc.idcabstock
                     WHERE sc.iddepod IS NOT NULL
-                ) mov
-                GROUP BY mov.iddepo, mov.idprodu, mov.idcodgusto
+                    GROUP BY sc.iddepod, sd.idprodu, sd.idcodgusto
+                ) sa ON sa.iddepo = d.iddepo
+                    AND COALESCE(sa.idprodu, 0) = COALESCE(en.idprodu, 0)
+                    AND COALESCE(sa.idcodgusto, 0) = COALESCE(en.idcodgusto, 0)
                 HAVING stock != 0
             ');
             $inserted = (int)$pdo->query('SELECT ROW_COUNT()')->fetchColumn();
 
-            $pdo->exec('
+            # Recalcular producto.stocact y gustos.stockact
+            $pdo->exec("
                 UPDATE producto p
                 LEFT JOIN (
                     SELECT idprodu, COALESCE(SUM(stock), 0) AS total
@@ -307,9 +322,9 @@ final class StockRepo
                     GROUP BY idprodu
                 ) s ON s.idprodu = p.idprodu
                 SET p.stocact = COALESCE(s.total, 0)
-            ');
+            ");
 
-            $pdo->exec('
+            $pdo->exec("
                 UPDATE gustos g
                 LEFT JOIN (
                     SELECT idcodgusto, COALESCE(SUM(stock), 0) AS total
@@ -318,25 +333,13 @@ final class StockRepo
                     GROUP BY idcodgusto
                 ) s ON s.idcodgusto = g.idcodgusto
                 SET g.stockact = COALESCE(s.total, 0)
-            ');
+            ");
 
             $pdo->commit();
 
             $prodConStock = (int)$pdo->query('SELECT COUNT(*) FROM producto WHERE stocact > 0')->fetchColumn();
-            $totalStock = (int)$pdo->query('SELECT COALESCE(SUM(stock), 0) FROM stock')->fetchColumn();
-            $prodEnStock = (int)$pdo->query('SELECT COUNT(DISTINCT idprodu) FROM stock')->fetchColumn();
-            $stocact8206 = (int)$pdo->query('SELECT stocact FROM producto WHERE idprodu = 8206')->fetchColumn();
-            $sumStock8206 = (int)$pdo->query('SELECT COALESCE(SUM(stock), 0) FROM stock WHERE idprodu = 8206')->fetchColumn();
-
-            // Test the UPDATE directly
-            $pdo->exec("UPDATE producto p
-                LEFT JOIN (SELECT idprodu, COALESCE(SUM(stock), 0) AS total FROM stock GROUP BY idprodu) s ON s.idprodu = p.idprodu
-                SET p.stocact = COALESCE(s.total, 0)");
-            $affected = (int)$pdo->query('SELECT ROW_COUNT()')->fetchColumn();
-            $stocact8206b = (int)$pdo->query('SELECT stocact FROM producto WHERE idprodu = 8206')->fetchColumn();
-            $prodConStockb = (int)$pdo->query('SELECT COUNT(*) FROM producto WHERE stocact > 0')->fetchColumn();
-
-            return "stock_insert={$inserted} prod_en_stock={$prodEnStock} sum_stock={$totalStock} prod_c_stock={$prodConStock} stocact8206={$stocact8206} sum8206={$sumStock8206} affected={$affected} stocact8206b={$stocact8206b} prod_c_stockb={$prodConStockb}";
+            $sumStock = (int)$pdo->query('SELECT COALESCE(SUM(stock), 0) FROM stock')->fetchColumn();
+            return "stock_insert={$inserted} sum_stock={$sumStock} prod_con_stock={$prodConStock}";
         } catch (\Throwable $e) {
             $pdo->rollBack();
             throw $e;
