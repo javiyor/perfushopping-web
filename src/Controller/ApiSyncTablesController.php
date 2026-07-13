@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Perfushopping\Web\Controller;
 
 use Perfushopping\Web\Infra\Db;
+use Perfushopping\Web\Repo\StockRepo;
 use Perfushopping\Web\Support\Env;
 use Perfushopping\Web\Support\Response;
 
@@ -51,12 +52,21 @@ final class ApiSyncTablesController
             $pdo->beginTransaction();
             $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
 
+            $recalcIds = [];
             $count = 0;
             if ($table === 'producto') {
                 $count = $this->syncProducto($pdo, $rows);
+                foreach ($rows as $r) {
+                    if (!empty($r['idprodu'])) $recalcIds[] = (int)$r['idprodu'];
+                }
             } elseif ($table === 'gustos') {
                 $count = $this->syncGustos($pdo, $rows);
-            } elseif (in_array($table, ['stockcab', 'stockdet'], true)) {
+            } elseif ($table === 'stockdet') {
+                $count = $this->syncInsertIgnore($pdo, $table, $rows);
+                foreach ($rows as $r) {
+                    if (!empty($r['idprodu'])) $recalcIds[] = (int)$r['idprodu'];
+                }
+            } elseif ($table === 'stockcab') {
                 $count = $this->syncInsertIgnore($pdo, $table, $rows);
             } else {
                 $count = $this->syncReplace($pdo, $table, $rows);
@@ -65,10 +75,22 @@ final class ApiSyncTablesController
             $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
             $pdo->commit();
 
-            Response::json(['ok' => true, 'table' => $table, 'count' => $count], 200);
+            // Recalculate stock for affected products (after commit)
+            $recalcIds = array_unique(array_filter($recalcIds));
+            if ($recalcIds) {
+                (new StockRepo())->recalcularProductos($recalcIds);
+            }
+
+            $response = ['ok' => true, 'table' => $table, 'count' => $count];
+            if ($recalcIds) {
+                $response['stock_recalc'] = count($recalcIds);
+            }
+            Response::json($response, 200);
         } catch (\Throwable $e) {
-            $pdo->rollBack();
-            $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
+            if (isset($pdo) && $pdo->inTransaction()) {
+                $pdo->rollBack();
+                $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
+            }
             Response::json(['ok' => false, 'error' => $e->getMessage()], 500);
         }
     }
@@ -179,6 +201,27 @@ final class ApiSyncTablesController
             $count++;
         }
         return $count;
+    }
+
+    public function recalcular(array $params): void
+    {
+        $token = Env::get('SYNC_TOKEN', '');
+        if ($token === '') {
+            Response::json(['ok' => false, 'error' => 'SYNC_TOKEN not configured'], 500);
+            return;
+        }
+        $provided = $this->getToken();
+        if ($provided === '' || !hash_equals($token, $provided)) {
+            Response::json(['ok' => false, 'error' => 'Unauthorized'], 401);
+            return;
+        }
+
+        try {
+            $info = (new StockRepo())->recalcular();
+            Response::json(['ok' => true, 'info' => $info], 200);
+        } catch (\Throwable $e) {
+            Response::json(['ok' => false, 'error' => $e->getMessage()], 500);
+        }
     }
 
     private function getToken(): string

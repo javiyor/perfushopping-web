@@ -138,6 +138,7 @@ $router->post('/eventos/demo-tecnica/clientes', [DemoTechController::class, 'cli
 $router->post('/api/v1/sync', [ApiSyncController::class, 'sync']);
 $router->post('/api/v1/upload', [ApiUploadController::class, 'uploadBase64']);
 $router->post('/api/v1/sync-tables', [ApiSyncTablesController::class, 'push']);
+$router->post('/api/v1/recalcular-stock', [ApiSyncTablesController::class, 'recalcular']);
 
 // Admin - Nuevo sistema
 $router->get('/admin/login', [AdminAuthController::class, 'loginForm']);

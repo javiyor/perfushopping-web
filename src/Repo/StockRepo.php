@@ -339,6 +339,52 @@ final class StockRepo
         }
     }
 
+    public function recalcularProductos(array $ids): void
+    {
+        if (empty($ids)) return;
+        $pdo = Db::pdo();
+        $ids = array_map('intval', $ids);
+        $in = implode(',', $ids);
+
+        $pdo->beginTransaction();
+        try {
+            // Delete existing stock for these products
+            $pdo->exec("DELETE FROM stock WHERE idprodu IN ({$in})");
+
+            // Distribute stocact by inflow (iddepod = destination)
+            $pdo->exec("
+                INSERT INTO stock (iddepo, idprodu, idcodgusto, stock)
+                SELECT
+                    inflow.iddepo,
+                    inflow.idprodu,
+                    NULLIF(inflow.idcodgusto, 0) AS idcodgusto,
+                    GREATEST(1, ROUND(p.stocact * inflow.qty / prod.total_qty)) AS stock
+                FROM (
+                    SELECT sc.iddepod AS iddepo, sd.idprodu, COALESCE(sd.idcodgusto, 0) AS idcodgusto, SUM(sd.canti) AS qty
+                    FROM stockcab sc
+                    INNER JOIN stockdet sd ON sd.idstockcab = sc.idcabstock
+                    WHERE sd.idprodu IN ({$in})
+                    GROUP BY sc.iddepod, sd.idprodu, sd.idcodgusto
+                ) inflow
+                INNER JOIN (
+                    SELECT sd.idprodu, COALESCE(sd.idcodgusto, 0) AS idcodgusto, SUM(sd.canti) AS total_qty
+                    FROM stockcab sc
+                    INNER JOIN stockdet sd ON sd.idstockcab = sc.idcabstock
+                    WHERE sd.idprodu IN ({$in})
+                    GROUP BY sd.idprodu, sd.idcodgusto
+                ) prod ON prod.idprodu = inflow.idprodu AND prod.idcodgusto = inflow.idcodgusto
+                INNER JOIN producto p ON p.idprodu = inflow.idprodu
+                WHERE p.stocact > 0
+                HAVING stock > 0
+            ");
+
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+    }
+
     // ── Grilla de reposición ──
 
     public function grillaRubros(): array
