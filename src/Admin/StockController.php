@@ -118,6 +118,21 @@ final class StockController
         Response::redirect('/admin/stock/' . $idprodu);
     }
 
+    public function recalcular(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requireRol('superadmin');
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        try {
+            (new StockRepo())->recalcular();
+            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Stock recalculado desde movimientos.'];
+        } catch (\Throwable $e) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Error: ' . $e->getMessage()];
+        }
+        Response::redirect('/admin/stock');
+    }
+
     public function searchAjusteProductos(array $params): void
     {
         $auth = new AdminAuthService();

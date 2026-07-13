@@ -11,7 +11,13 @@ $stockFilters = ['' => 'Todos', 'sin_stock' => 'Sin stock', 'bajo_stock' => 'Sto
         <h4 class="fw-bold mb-1">Stock</h4>
         <p class="text-muted small">Control de inventario</p>
     </div>
-    <a class="btn btn-accent btn-sm" href="/admin/stock/ajuste"><i class="bi bi-pencil-square"></i> Ajuste manual</a>
+    <div class="d-flex gap-2">
+        <form method="post" action="/admin/stock/recalcular" onsubmit="return confirm('Recalcular todo el stock desde los movimientos?')">
+            <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+            <button class="btn btn-outline-secondary btn-sm" type="submit"><i class="bi bi-arrow-repeat"></i> Recalcular</button>
+        </form>
+        <a class="btn btn-accent btn-sm" href="/admin/stock/ajuste"><i class="bi bi-pencil-square"></i> Ajuste manual</a>
+    </div>
 </div>
 
 <div class="card shadow-sm mb-3">
