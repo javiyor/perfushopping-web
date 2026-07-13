@@ -33,7 +33,11 @@ try {
                 LIMIT ? OFFSET ?";
 
         $st = Db::pdo()->prepare($sql);
-        $st->execute([$patron, $patron, $porPagina, $offset]);
+        $st->bindValue(1, $patron, \PDO::PARAM_STR);
+        $st->bindValue(2, $patron, \PDO::PARAM_STR);
+        $st->bindValue(3, $porPagina, \PDO::PARAM_INT);
+        $st->bindValue(4, $offset, \PDO::PARAM_INT);
+        $st->execute();
 
         while ($fila = $st->fetch()) {
             $fila['fecompra'] = date("d/m/y", strtotime($fila['fecompra']));
