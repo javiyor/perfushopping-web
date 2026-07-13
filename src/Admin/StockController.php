@@ -125,8 +125,8 @@ final class StockController
         Csrf::check($_POST['_csrf'] ?? null);
 
         try {
-            $rows = (new StockRepo())->recalcular();
-            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => "Stock recalculado: {$rows} filas en stock."];
+            $info = (new StockRepo())->recalcular();
+            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => "Stock recalculado: {$info}"];
         } catch (\Throwable $e) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Error: ' . $e->getMessage()];
         }

@@ -269,13 +269,16 @@ final class StockRepo
 
     // ── Recalcular stock desde movimientos ──
 
-    public function recalcular(): int
+    public function recalcular(): string
     {
         $pdo = Db::pdo();
+
+        $cabRows = (int)$pdo->query('SELECT COUNT(*) FROM stockcab')->fetchColumn();
+        $detRows = (int)$pdo->query('SELECT COUNT(*) FROM stockdet')->fetchColumn();
+        $cabConDatos = (int)$pdo->query("SELECT COUNT(*) FROM stockcab WHERE iddepoh IS NOT NULL OR iddepod IS NOT NULL")->fetchColumn();
+
         $pdo->beginTransaction();
         try {
-            // 1. Rebuild stock table from stockdet + stockcab (VFP convention)
-            // iddepoh = goods entering deposit (adds), iddepod = goods leaving deposit (subtracts)
             $pdo->exec('DELETE FROM stock');
             $pdo->exec('
                 INSERT INTO stock (iddepo, idprodu, idcodgusto, stock)
@@ -296,7 +299,6 @@ final class StockRepo
             ');
             $inserted = (int)$pdo->query('SELECT ROW_COUNT()')->fetchColumn();
 
-            // 2. Recalculate producto.stocact
             $pdo->exec('
                 UPDATE producto p
                 LEFT JOIN (
@@ -307,7 +309,6 @@ final class StockRepo
                 SET p.stocact = COALESCE(s.total, 0)
             ');
 
-            // 3. Recalculate gustos.stockact
             $pdo->exec('
                 UPDATE gustos g
                 LEFT JOIN (
@@ -320,7 +321,9 @@ final class StockRepo
             ');
 
             $pdo->commit();
-            return $inserted;
+
+            $prodConStock = (int)$pdo->query('SELECT COUNT(*) FROM producto WHERE stocact > 0')->fetchColumn();
+            return "stockcab={$cabRows} stockdet={$detRows} con_datos={$cabConDatos} stock_insert={$inserted} productos_con_stock={$prodConStock}";
         } catch (\Throwable $e) {
             $pdo->rollBack();
             throw $e;
