@@ -1,4 +1,5 @@
--- Stock recalculation from movements
+-- Stock recalculation from movements (VFP convention)
+-- iddepoh = goods ENTERING deposit (adds), iddepod = goods LEAVING deposit (subtracts)
 -- Run this if stock table gets out of sync with stockdet + stockcab
 
 -- 1. Rebuild stock table
@@ -7,15 +8,15 @@ TRUNCATE TABLE stock;
 INSERT INTO stock (iddepo, idprodu, idcodgusto, stock)
 SELECT mov.iddepo, mov.idprodu, mov.idcodgusto, SUM(mov.net) AS stock
 FROM (
-    SELECT sc.iddepod AS iddepo, sd.idprodu, sd.idcodgusto, sd.canti AS net
-    FROM stockcab sc
-    INNER JOIN stockdet sd ON sd.idstockcab = sc.idcabstock
-    WHERE sc.iddepod IS NOT NULL
-    UNION ALL
-    SELECT sc.iddepoh AS iddepo, sd.idprodu, sd.idcodgusto, -sd.canti AS net
+    SELECT sc.iddepoh AS iddepo, sd.idprodu, sd.idcodgusto, sd.canti AS net
     FROM stockcab sc
     INNER JOIN stockdet sd ON sd.idstockcab = sc.idcabstock
     WHERE sc.iddepoh IS NOT NULL
+    UNION ALL
+    SELECT sc.iddepod AS iddepo, sd.idprodu, sd.idcodgusto, -sd.canti AS net
+    FROM stockcab sc
+    INNER JOIN stockdet sd ON sd.idstockcab = sc.idcabstock
+    WHERE sc.iddepod IS NOT NULL
 ) mov
 GROUP BY mov.iddepo, mov.idprodu, mov.idcodgusto
 HAVING stock != 0;

@@ -176,12 +176,26 @@ final class StockRepo
         $pdo = Db::pdo();
         $pdo->beginTransaction();
         try {
+            // VFP convention:
+            // iddepoh = deposit receiving goods (adds to stock)
+            // iddepod = deposit sending goods (subtracts from stock)
+            // canti is always positive
+            if ($cantidad >= 0) {
+                $iddepoh = $iddepo;
+                $iddepod = null;
+                $canti = $cantidad;
+            } else {
+                $iddepoh = null;
+                $iddepod = $iddepo;
+                $canti = abs($cantidad);
+            }
+
             // 1. Insert stockcab
             $st = $pdo->prepare('
                 INSERT INTO stockcab (iddepoh, iddepod, fecha, observ)
-                VALUES (NULL, :depo, CURDATE(), :obs)
+                VALUES (:depoh, :depod, CURDATE(), :obs)
             ');
-            $st->execute([':depo' => $iddepo, ':obs' => 'Ajuste manual: ' . $motivo]);
+            $st->execute([':depoh' => $iddepoh, ':depod' => $iddepod, ':obs' => 'Ajuste manual: ' . $motivo]);
             $cabId = (int)$pdo->lastInsertId();
 
             // 2. Insert stockdet
@@ -193,7 +207,7 @@ final class StockRepo
                 ':cab' => $cabId,
                 ':prod' => $idprodu,
                 ':gusto' => $idcodgusto ?: null,
-                ':cant' => $cantidad,
+                ':cant' => $canti,
             ]);
 
             // 3. Update/insert stock table per deposit
@@ -210,12 +224,13 @@ final class StockRepo
             ]);
             $existing = $st->fetch();
 
+            $netChange = $cantidad;
             if ($existing) {
-                $newStock = (int)$existing['stock'] + $cantidad;
+                $newStock = (int)$existing['stock'] + $netChange;
                 $st = $pdo->prepare('UPDATE stock SET stock = :s WHERE idstock = :id LIMIT 1');
                 $st->execute([':s' => max(0, $newStock), ':id' => (int)$existing['idstock']]);
             } else {
-                $newStock = max(0, $cantidad);
+                $newStock = max(0, $netChange);
                 $st = $pdo->prepare('
                     INSERT INTO stock (iddepo, idprodu, idcodgusto, stock)
                     VALUES (:depo, :prod, :gusto, :s)
@@ -259,21 +274,22 @@ final class StockRepo
         $pdo = Db::pdo();
         $pdo->beginTransaction();
         try {
-            // 1. Rebuild stock table from stockdet + stockcab
+            // 1. Rebuild stock table from stockdet + stockcab (VFP convention)
+            // iddepoh = goods entering deposit (adds), iddepod = goods leaving deposit (subtracts)
             $pdo->exec('TRUNCATE TABLE stock');
             $pdo->exec('
                 INSERT INTO stock (iddepo, idprodu, idcodgusto, stock)
                 SELECT mov.iddepo, mov.idprodu, mov.idcodgusto, SUM(mov.net) AS stock
                 FROM (
-                    SELECT sc.iddepod AS iddepo, sd.idprodu, sd.idcodgusto, sd.canti AS net
-                    FROM stockcab sc
-                    INNER JOIN stockdet sd ON sd.idstockcab = sc.idcabstock
-                    WHERE sc.iddepod IS NOT NULL
-                    UNION ALL
-                    SELECT sc.iddepoh AS iddepo, sd.idprodu, sd.idcodgusto, -sd.canti AS net
+                    SELECT sc.iddepoh AS iddepo, sd.idprodu, sd.idcodgusto, sd.canti AS net
                     FROM stockcab sc
                     INNER JOIN stockdet sd ON sd.idstockcab = sc.idcabstock
                     WHERE sc.iddepoh IS NOT NULL
+                    UNION ALL
+                    SELECT sc.iddepod AS iddepo, sd.idprodu, sd.idcodgusto, -sd.canti AS net
+                    FROM stockcab sc
+                    INNER JOIN stockdet sd ON sd.idstockcab = sc.idcabstock
+                    WHERE sc.iddepod IS NOT NULL
                 ) mov
                 GROUP BY mov.iddepo, mov.idprodu, mov.idcodgusto
                 HAVING stock != 0
