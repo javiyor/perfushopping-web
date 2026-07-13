@@ -9,12 +9,12 @@ final class SucursalRepo
 {
     public function listarActivas(): array
     {
-        $st = Db::pdo()->query('
+        $st = Db::pdo()->query("
             SELECT s.*
             FROM admin_sucursales s
-            WHERE s.activo = 1
+            WHERE s.activo = 1 AND s.nomsuc NOT LIKE '%Roca%'
             ORDER BY s.nomsuc ASC
-        ');
+        ");
         return $st->fetchAll();
     }
 

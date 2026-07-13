@@ -183,39 +183,41 @@ foreach ($proveedores as $prov) {
                 </div>
             </div>
         </div>
+    </div>
+</form>
 
-        <div class="col-lg-6">
-            <div class="card shadow-sm">
-                <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
-                    <span>Imagen principal</span>
-                    <small class="text-muted"><?= htmlspecialchars((string)($product['imagen'] ?? 'Sin imagen')) ?></small>
-                </div>
-                <div class="card-body">
-                    <div class="text-center mb-3">
-                        <?php if ($mainImg !== ''): ?>
-                            <img src="<?= htmlspecialchars($mainImg) ?>" alt="<?= htmlspecialchars((string)($product['produ'] ?? '')) ?>" style="max-height:180px;max-width:100%;border-radius:8px" />
-                        <?php else: ?>
-                            <div class="bg-light rounded p-4 text-muted">Sin imagen principal</div>
-                        <?php endif; ?>
-                    </div>
-                    <div class="d-flex gap-2">
-                        <form method="post" action="/admin/productos/main-image" enctype="multipart/form-data" class="flex-grow-1">
-                            <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
-                            <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
-                            <input class="form-control form-control-sm mb-2" type="file" name="images[]" accept=".jpg,.jpeg,.png,.webp" />
-                            <button class="btn btn-outline-secondary btn-sm w-100" type="submit"><i class="bi bi-upload"></i> Subir</button>
-                        </form>
-                        <form method="post" action="/admin/productos/main-image/clear">
-                            <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
-                            <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
-                            <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-trash"></i> Quitar</button>
-                        </form>
-                    </div>
-                </div>
+<div class="row g-2 compact-form mt-2">
+<div class="col-lg-6">
+    <div class="card shadow-sm">
+        <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+            <span>Imagen principal</span>
+            <small class="text-muted"><?= htmlspecialchars((string)($product['imagen'] ?? 'Sin imagen')) ?></small>
+        </div>
+        <div class="card-body">
+            <div class="text-center mb-3">
+                <?php if ($mainImg !== ''): ?>
+                    <img src="<?= htmlspecialchars($mainImg) ?>" alt="<?= htmlspecialchars((string)($product['produ'] ?? '')) ?>" style="max-height:180px;max-width:100%;border-radius:8px" />
+                <?php else: ?>
+                    <div class="bg-light rounded p-4 text-muted">Sin imagen principal</div>
+                <?php endif; ?>
+            </div>
+            <div class="d-flex gap-2">
+                <form method="post" action="/admin/productos/main-image" enctype="multipart/form-data" class="flex-grow-1">
+                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                    <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
+                    <input class="form-control form-control-sm mb-2" type="file" name="images[]" accept=".jpg,.jpeg,.png,.webp" />
+                    <button class="btn btn-outline-secondary btn-sm w-100" type="submit"><i class="bi bi-upload"></i> Subir</button>
+                </form>
+                <form method="post" action="/admin/productos/main-image/clear">
+                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                    <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
+                    <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-trash"></i> Quitar</button>
+                </form>
             </div>
         </div>
     </div>
-</form>
+</div>
+</div>
 
 <div class="card shadow-sm mt-2">
     <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">

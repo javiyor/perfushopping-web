@@ -49,21 +49,27 @@
             gap: 10px;
         }
         .sidebar-brand img { height: 32px; }
-        .sidebar-nav { flex: 1; overflow-y: auto; padding: 10px 0; }
-        .sidebar-nav .nav-section { padding: 8px 20px 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: rgba(255,255,255,.3); }
-        .sidebar-nav a {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 10px 20px;
-            color: #c8ccd4;
-            text-decoration: none;
-            font-size: 14px;
-            transition: background .12s;
-        }
-        .sidebar-nav a:hover { background: var(--sidebar-hover); color: #f6f4ef; }
-        .sidebar-nav a.active { background: var(--sidebar-active); color: var(--accent); border-right: 3px solid var(--accent); }
-        .sidebar-nav a i { font-size: 18px; width: 22px; text-align: center; }
+.sidebar-nav { flex: 1; overflow-y: auto; padding: 6px 0; }
+.sidebar-nav .nav-section { padding: 4px 20px 2px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: rgba(255,255,255,.3); }
+.sidebar-nav a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 5px 20px;
+    color: #c8ccd4;
+    text-decoration: none;
+    font-size: 14px;
+    transition: background .12s;
+}
+.sidebar-nav a:hover { background: var(--sidebar-hover); color: #f6f4ef; }
+.sidebar-nav a.active { background: var(--sidebar-active); color: var(--accent); border-right: 3px solid var(--accent); }
+.sidebar-nav a i { font-size: 16px; width: 20px; text-align: center; }
+.sidebar-nav .badge-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: auto; flex-shrink: 0; }
+.badge-dot.green { background: #198754; }
+.badge-dot.red { background: #dc3545; }
+.badge-count { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; border-radius: 9px; font-size: 10px; font-weight: 700; padding: 0 5px; margin-left: auto; flex-shrink: 0; }
+.badge-count.green { background: #198754; color: #fff; }
+.badge-count.red { background: #dc3545; color: #fff; }
         .main-content {
             margin-left: var(--sidebar-width);
             flex: 1;
@@ -200,7 +206,7 @@
             <a href="/admin/stock/grilla" class="<?= str_starts_with($currentPath, '/admin/stock/grilla') ? 'active' : '' ?>"><i class="bi bi-grid-3x3-gap"></i>Grilla reposición</a>
 
             <div class="nav-section">Ventas</div>
-            <a href="/admin/orders" class="<?= str_starts_with($currentPath, '/admin/orders') ? 'active' : '' ?>"><i class="bi bi-cart"></i>Pedidos</a>
+            <a href="/admin/orders" class="<?= str_starts_with($currentPath, '/admin/orders') ? 'active' : '' ?>"><i class="bi bi-cart"></i>Pedidos<span class="badge-count green" id="badgePedidosNuevos" style="display:none">0</span><span class="badge-count red" id="badgePedidosAbandonados" style="display:none">0</span></a>
             <a href="/admin/prepare" class="<?= str_starts_with($currentPath, '/admin/prepare') ? 'active' : '' ?>"><i class="bi bi-box"></i>Preparar</a>
             <a href="/admin/presupuestos" class="<?= str_starts_with($currentPath, '/admin/presupuestos') ? 'active' : '' ?>"><i class="bi bi-file-text"></i>Presupuestos</a>
             <a href="/admin/remitos" class="<?= str_starts_with($currentPath, '/admin/remitos') ? 'active' : '' ?>"><i class="bi bi-receipt"></i>Remitos</a>
@@ -215,7 +221,7 @@
 
             <div class="nav-section">Clientes</div>
             <a href="/admin/clientes" class="<?= str_starts_with($currentPath, '/admin/clientes') ? 'active' : '' ?>"><i class="bi bi-people"></i>Clientes</a>
-            <a href="/admin/users" class="<?= str_starts_with($currentPath, '/admin/users') ? 'active' : '' ?>"><i class="bi bi-person-gear"></i>Usuarios web</a>
+            <a href="/admin/users" class="<?= str_starts_with($currentPath, '/admin/users') ? 'active' : '' ?>"><i class="bi bi-person-gear"></i>Usuarios web<span class="badge-count green" id="badgeUsuariosNuevos" style="display:none">0</span></a>
 
             <div class="nav-section">Administración</div>
             <a href="/admin/usuarios" class="<?= str_starts_with($currentPath, '/admin/usuarios') ? 'active' : '' ?>"><i class="bi bi-shield-lock"></i>Admins</a>
@@ -287,6 +293,28 @@
             });
         });
     });
+    </script>
+    <script>
+    async function fetchBadges() {
+        try {
+            var r = await fetch('/admin/badges');
+            if (!r.ok) return;
+            var d = await r.json();
+
+            var pn = document.getElementById('badgePedidosNuevos');
+            if (d.pedidos_nuevos > 0) { pn.textContent = d.pedidos_nuevos; pn.style.display = ''; }
+            else { pn.style.display = 'none'; }
+
+            var pa = document.getElementById('badgePedidosAbandonados');
+            if (d.pedidos_abandonados > 0) { pa.textContent = d.pedidos_abandonados; pa.style.display = ''; }
+            else { pa.style.display = 'none'; }
+
+            var un = document.getElementById('badgeUsuariosNuevos');
+            if (d.usuarios_nuevos > 0) { un.textContent = d.usuarios_nuevos; un.style.display = ''; }
+            else { un.style.display = 'none'; }
+        } catch(e) {}
+    }
+    document.addEventListener('DOMContentLoaded', function() { fetchBadges(); setInterval(fetchBadges, 30000); });
     </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>

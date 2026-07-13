@@ -175,6 +175,18 @@ final class OrderRepo
         $st->execute([':op' => $operation, ':tr' => $tracking, ':i' => $id]);
     }
 
+    public function countPendingPayment(): int
+    {
+        $st = Db::pdo()->query("SELECT COUNT(*) FROM orders WHERE status = 'pending_payment'");
+        return (int)$st->fetchColumn();
+    }
+
+    public function countAbandoned(): int
+    {
+        $st = Db::pdo()->query("SELECT COUNT(*) FROM orders WHERE status = 'pending_payment' AND created_at < DATE_SUB(NOW(), INTERVAL 6 HOUR)");
+        return (int)$st->fetchColumn();
+    }
+
     /** @return array<int, array<string,mixed>> */
     public function findAbandonedCarts(int $olderThanHours = 6, int $newerThanHours = 48): array
     {

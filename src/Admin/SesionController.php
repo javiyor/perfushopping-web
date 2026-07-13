@@ -25,10 +25,20 @@ final class SesionController
         $sucursales = (new SucursalRepo())->listarActivas();
         $vendedores = (new SucursalRepo())->vendedoresDisponibles();
 
+        $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
+        $isMobile = preg_match('/Mobile|Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i', $ua) === 1;
+
+        $lastVendedores = [];
+        if (isset($_SESSION['last_vendedores']) && is_array($_SESSION['last_vendedores'])) {
+            $lastVendedores = $_SESSION['last_vendedores'];
+        }
+
         echo View::adminPage('admin/sesion/iniciar.php', [
             'adminUser' => $adminUser,
             'sucursales' => $sucursales,
             'vendedores' => $vendedores,
+            'isMobile' => $isMobile,
+            'lastVendedores' => $lastVendedores,
             'csrf' => Csrf::token(),
             'pageTitle' => 'Iniciar turno',
         ]);
@@ -56,6 +66,8 @@ final class SesionController
         }
 
         $auth->iniciarSesion($sucursalId, $turno, $vendedores);
+
+        $_SESSION['last_vendedores'] = $vendedores;
 
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Turno iniciado — ' . htmlspecialchars($sucursal['nomsuc'] ?? '')];
         Response::redirect('/admin');

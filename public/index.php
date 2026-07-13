@@ -66,6 +66,7 @@ use Perfushopping\Web\Admin\CorreoController as AdminCorreoController;
 use Perfushopping\Web\Admin\ChequeController as AdminChequeController;
 use Perfushopping\Web\Admin\OrdenPagoController as AdminOrdenPagoController;
 use Perfushopping\Web\Admin\EmailController as AdminEmailController;
+use Perfushopping\Web\Admin\BadgeController as AdminBadgeController;
 
 $router = new Router();
 
@@ -224,6 +225,7 @@ $router->get('/admin/ctacte/buscar-clientes', [AdminCtaCteController::class, 'se
 $router->get('/admin/sesion/iniciar', [AdminSesionController::class, 'iniciar']);
 $router->post('/admin/sesion/guardar', [AdminSesionController::class, 'guardar']);
 $router->post('/admin/sesion/cerrar', [AdminSesionController::class, 'cerrar']);
+$router->get('/admin/badges', [AdminBadgeController::class, 'badges']);
 $router->get('/admin/stock', [AdminStockController::class, 'index']);
 $router->get('/admin/stock/(?P<id>\d+)', [AdminStockController::class, 'show']);
 $router->get('/admin/stock/ajuste', [AdminStockController::class, 'ajuste']);

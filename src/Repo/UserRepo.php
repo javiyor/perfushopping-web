@@ -25,6 +25,12 @@ final class UserRepo
         ];
     }
 
+    public function countNewToday(): int
+    {
+        $st = Db::pdo()->query("SELECT COUNT(*) FROM web_users WHERE DATE(created_at) = CURDATE()");
+        return (int)$st->fetchColumn();
+    }
+
     /** @return array<string,mixed>|null */
     public function findByEmail(string $email): ?array
     {
