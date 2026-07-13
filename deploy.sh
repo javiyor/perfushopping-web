@@ -5,7 +5,7 @@ echo "=== Pull desde GitHub ==="
 git pull origin master
 
 echo "=== Copiando webroot ==="
-cp public/index.php ../public_html/
+cp public/*.php ../public_html/
 cp public/.htaccess ../public_html/
 
 echo "=== Copiando assets (uno a uno, sin anidar) ==="
