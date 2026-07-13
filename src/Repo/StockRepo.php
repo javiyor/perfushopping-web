@@ -275,71 +275,65 @@ final class StockRepo
     {
         $pdo = Db::pdo();
 
-        $cabRows = (int)$pdo->query('SELECT COUNT(*) FROM stockcab')->fetchColumn();
-        $detRows = (int)$pdo->query('SELECT COUNT(*) FROM stockdet')->fetchColumn();
-
-        // Diagnostic: muestro 3 filas de stockcab + stockdet para entender el formato
-        $muestras = $pdo->query('
-            SELECT sc.idcabstock, sc.iddepoh, sc.iddepod, sd.idprodu, sd.idcodgusto, sd.canti
-            FROM stockcab sc
-            INNER JOIN stockdet sd ON sd.idstockcab = sc.idcabstock
-            LIMIT 3
-        ')->fetchAll(\PDO::FETCH_ASSOC);
-        $infoMuestra = '';
-        foreach ($muestras as $m) {
-            $infoMuestra .= "cab={$m['idcabstock']} h={$m['iddepoh']} d={$m['iddepod']} prod={$m['idprodu']} g={$m['idcodgusto']} cant={$m['canti']} | ";
-        }
-
-        // Check how many rows have both iddepoh and iddepod set (transfers)
-        $ambos = (int)$pdo->query('SELECT COUNT(*) FROM stockcab WHERE iddepoh IS NOT NULL AND iddepod IS NOT NULL')->fetchColumn();
-        $soloH = (int)$pdo->query('SELECT COUNT(*) FROM stockcab WHERE iddepoh IS NOT NULL AND iddepod IS NULL')->fetchColumn();
-        $soloD = (int)$pdo->query('SELECT COUNT(*) FROM stockcab WHERE iddepoh IS NULL AND iddepod IS NOT NULL')->fetchColumn();
-        $ninguno = (int)$pdo->query('SELECT COUNT(*) FROM stockcab WHERE iddepoh IS NULL AND iddepod IS NULL')->fetchColumn();
-
         $pdo->beginTransaction();
         try {
+            // Backup current stock for products without movements
+            $pdo->exec('CREATE TEMPORARY TABLE stock_backup (iddepo INT, idprodu INT, idcodgusto INT NULL, stock INT) ENGINE=MEMORY');
+            $pdo->exec('INSERT INTO stock_backup (iddepo, idprodu, idcodgusto, stock) SELECT iddepo, idprodu, idcodgusto, stock FROM stock');
+
             $pdo->exec('DELETE FROM stock');
 
-            // UNION ALL approach (rápida) pero con fórmula correcta
-            $pdo->exec('
+            // Distribute producto.stocact across deposits by inflow (iddepod = destination)
+            // All movements are transfers (both iddepoh and iddepod set).
+            // iddepoh = origin (sends), iddepod = destination (receives).
+            // Stock is where the goods END UP = destination = iddepod.
+            // Proportion = inflow to this deposit / total inflow to all deposits.
+            $pdo->exec("
                 INSERT INTO stock (iddepo, idprodu, idcodgusto, stock)
-                SELECT mov.iddepo, mov.idprodu, mov.idcodgusto, SUM(mov.net) AS stock
+                SELECT
+                    inflow.iddepo,
+                    inflow.idprodu,
+                    inflow.idcodgusto,
+                    GREATEST(1, ROUND(p.stocact * inflow.qty / prod.total_qty)) AS stock
                 FROM (
-                    SELECT sc.iddepoh AS iddepo, sd.idprodu, sd.idcodgusto, sd.canti AS net
+                    SELECT sc.iddepod AS iddepo, sd.idprodu, COALESCE(sd.idcodgusto, 0) AS idcodgusto, SUM(sd.canti) AS qty
                     FROM stockcab sc
                     INNER JOIN stockdet sd ON sd.idstockcab = sc.idcabstock
-                    WHERE sc.iddepoh IS NOT NULL AND sc.iddepod IS NULL
-                    UNION ALL
-                    SELECT sc.iddepod AS iddepo, sd.idprodu, sd.idcodgusto, -sd.canti AS net
+                    GROUP BY sc.iddepod, sd.idprodu, sd.idcodgusto
+                ) inflow
+                INNER JOIN (
+                    SELECT sd.idprodu, COALESCE(sd.idcodgusto, 0) AS idcodgusto, SUM(sd.canti) AS total_qty
                     FROM stockcab sc
                     INNER JOIN stockdet sd ON sd.idstockcab = sc.idcabstock
-                    WHERE sc.iddepod IS NOT NULL AND sc.iddepoh IS NULL
-                    UNION ALL
-                    SELECT sc.iddepoh AS iddepo, sd.idprodu, sd.idcodgusto, -sd.canti AS net
-                    FROM stockcab sc
-                    INNER JOIN stockdet sd ON sd.idstockcab = sc.idcabstock
-                    WHERE sc.iddepoh IS NOT NULL AND sc.iddepod IS NOT NULL
-                    UNION ALL
-                    SELECT sc.iddepod AS iddepo, sd.idprodu, sd.idcodgusto, sd.canti AS net
-                    FROM stockcab sc
-                    INNER JOIN stockdet sd ON sd.idstockcab = sc.idcabstock
-                    WHERE sc.iddepod IS NOT NULL AND sc.iddepoh IS NOT NULL
-                ) mov
-                GROUP BY mov.iddepo, mov.idprodu, mov.idcodgusto
-                HAVING stock != 0
-            ');
-            $inserted = (int)$pdo->query('SELECT ROW_COUNT()')->fetchColumn();
+                    GROUP BY sd.idprodu, sd.idcodgusto
+                ) prod ON prod.idprodu = inflow.idprodu AND prod.idcodgusto = inflow.idcodgusto
+                INNER JOIN producto p ON p.idprodu = inflow.idprodu
+                WHERE p.stocact > 0
+                HAVING stock > 0
+            ");
 
+            // Restore stock for products with zero rows after recalculation (no movement data)
+            $pdo->exec("
+                INSERT INTO stock (iddepo, idprodu, idcodgusto, stock)
+                SELECT b.iddepo, b.idprodu, b.idcodgusto, b.stock
+                FROM stock_backup b
+                WHERE NOT EXISTS (SELECT 1 FROM stock s WHERE s.idprodu = b.idprodu)
+            ");
+
+            $pdo->exec('DROP TEMPORARY TABLE IF EXISTS stock_backup');
+
+            // Update producto.stocact to match sum of stock table
             $pdo->exec("
                 UPDATE producto p
-                LEFT JOIN (
+                INNER JOIN (
                     SELECT idprodu, COALESCE(SUM(stock), 0) AS total
                     FROM stock
                     GROUP BY idprodu
                 ) s ON s.idprodu = p.idprodu
-                SET p.stocact = COALESCE(s.total, 0)
+                SET p.stocact = s.total
             ");
 
+            // Update gustos.stockact
             $pdo->exec("
                 UPDATE gustos g
                 LEFT JOIN (
@@ -353,9 +347,11 @@ final class StockRepo
 
             $pdo->commit();
 
-            $prodConStock = (int)$pdo->query('SELECT COUNT(*) FROM producto WHERE stocact > 0')->fetchColumn();
+            $inserted = (int)$pdo->query('SELECT COUNT(*) FROM stock')->fetchColumn();
             $sumStock = (int)$pdo->query('SELECT COALESCE(SUM(stock), 0) FROM stock')->fetchColumn();
-            return "muestras={$infoMuestra} ambos={$ambos} soloH={$soloH} soloD={$soloD} ninguno={$ninguno} insert={$inserted} sum={$sumStock} pcs={$prodConStock}";
+            $prodConStock = (int)$pdo->query('SELECT COUNT(*) FROM producto WHERE stocact > 0')->fetchColumn();
+            $stockConCero = (int)$pdo->query('SELECT COUNT(*) FROM stock WHERE stock = 0')->fetchColumn();
+            return "insert={$inserted} sum={$sumStock} pcs={$prodConStock} stock0={$stockConCero}";
         } catch (\Throwable $e) {
             $pdo->rollBack();
             throw $e;
