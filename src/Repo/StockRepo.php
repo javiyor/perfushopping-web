@@ -323,7 +323,17 @@ final class StockRepo
             $pdo->commit();
 
             $prodConStock = (int)$pdo->query('SELECT COUNT(*) FROM producto WHERE stocact > 0')->fetchColumn();
-            return "stockcab={$cabRows} stockdet={$detRows} con_datos={$cabConDatos} stock_insert={$inserted} productos_con_stock={$prodConStock}";
+            $prodIdEjemplo = $pdo->query('SELECT idprodu, stock FROM stock LIMIT 5')->fetchAll(\PDO::FETCH_ASSOC);
+            $existeEnProducto = 0;
+            foreach ($prodIdEjemplo as $r) {
+                $st = $pdo->prepare('SELECT COUNT(*) FROM producto WHERE idprodu = ?');
+                $st->execute([$r['idprodu']]);
+                if ((int)$st->fetchColumn() > 0) $existeEnProducto++;
+            }
+            $totalStock = (int)$pdo->query('SELECT COALESCE(SUM(stock), 0) FROM stock')->fetchColumn();
+            $idproduMuestra = $prodIdEjemplo ? $prodIdEjemplo[0]['idprodu'] : 0;
+            $stockMuestra = $prodIdEjemplo ? $prodIdEjemplo[0]['stock'] : 0;
+            return "stockcab={$cabRows} stockdet={$detRows} con_datos={$cabConDatos} stock_insert={$inserted} sum_stock={$totalStock} prod_c_stock={$prodConStock} ej_idprod={$idproduMuestra} ej_stock={$stockMuestra} match5={$existeEnProducto}/5";
         } catch (\Throwable $e) {
             $pdo->rollBack();
             throw $e;
