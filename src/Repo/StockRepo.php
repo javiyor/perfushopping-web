@@ -270,6 +270,12 @@ final class StockRepo
     }
 
     // ── Recalcular stock desde movimientos ──
+    // Todos los movimientos en stockcab son transferencias (ambos iddepoh e iddepod seteados).
+    // iddepoh = origen (envía), iddepod = destino (recibe).
+    // El stock calculado neto de transferencias siempre da 0, así que distribuimos
+    // producto.stocact (valor real del VFP) proporcionalmente según el flujo de entrada
+    // a cada depósito (iddepod). NO se modifica producto.stocact ni gustos.stockact
+    // porque esos los actualiza la sincronización VFP.
 
     public function recalcular(): string
     {
@@ -284,16 +290,12 @@ final class StockRepo
             $pdo->exec('DELETE FROM stock');
 
             // Distribute producto.stocact across deposits by inflow (iddepod = destination)
-            // All movements are transfers (both iddepoh and iddepod set).
-            // iddepoh = origin (sends), iddepod = destination (receives).
-            // Stock is where the goods END UP = destination = iddepod.
-            // Proportion = inflow to this deposit / total inflow to all deposits.
             $pdo->exec("
                 INSERT INTO stock (iddepo, idprodu, idcodgusto, stock)
                 SELECT
                     inflow.iddepo,
                     inflow.idprodu,
-                    inflow.idcodgusto,
+                    NULLIF(inflow.idcodgusto, 0) AS idcodgusto,
                     GREATEST(1, ROUND(p.stocact * inflow.qty / prod.total_qty)) AS stock
                 FROM (
                     SELECT sc.iddepod AS iddepo, sd.idprodu, COALESCE(sd.idcodgusto, 0) AS idcodgusto, SUM(sd.canti) AS qty
@@ -322,36 +324,15 @@ final class StockRepo
 
             $pdo->exec('DROP TEMPORARY TABLE IF EXISTS stock_backup');
 
-            // Update producto.stocact to match sum of stock table
-            $pdo->exec("
-                UPDATE producto p
-                INNER JOIN (
-                    SELECT idprodu, COALESCE(SUM(stock), 0) AS total
-                    FROM stock
-                    GROUP BY idprodu
-                ) s ON s.idprodu = p.idprodu
-                SET p.stocact = s.total
-            ");
-
-            // Update gustos.stockact
-            $pdo->exec("
-                UPDATE gustos g
-                LEFT JOIN (
-                    SELECT idcodgusto, COALESCE(SUM(stock), 0) AS total
-                    FROM stock
-                    WHERE idcodgusto IS NOT NULL
-                    GROUP BY idcodgusto
-                ) s ON s.idcodgusto = g.idcodgusto
-                SET g.stockact = COALESCE(s.total, 0)
-            ");
+            // NO se actualiza producto.stocact ni gustos.stockact porque esos
+            // vienen de la sincronización VFP y son la fuente de verdad.
 
             $pdo->commit();
 
             $inserted = (int)$pdo->query('SELECT COUNT(*) FROM stock')->fetchColumn();
             $sumStock = (int)$pdo->query('SELECT COALESCE(SUM(stock), 0) FROM stock')->fetchColumn();
             $prodConStock = (int)$pdo->query('SELECT COUNT(*) FROM producto WHERE stocact > 0')->fetchColumn();
-            $stockConCero = (int)$pdo->query('SELECT COUNT(*) FROM stock WHERE stock = 0')->fetchColumn();
-            return "insert={$inserted} sum={$sumStock} pcs={$prodConStock} stock0={$stockConCero}";
+            return "insert={$inserted} sum={$sumStock} pcs={$prodConStock}";
         } catch (\Throwable $e) {
             $pdo->rollBack();
             throw $e;
