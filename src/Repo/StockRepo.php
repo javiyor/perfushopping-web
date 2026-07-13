@@ -323,17 +323,20 @@ final class StockRepo
             $pdo->commit();
 
             $prodConStock = (int)$pdo->query('SELECT COUNT(*) FROM producto WHERE stocact > 0')->fetchColumn();
-            $prodIdEjemplo = $pdo->query('SELECT idprodu, stock FROM stock LIMIT 5')->fetchAll(\PDO::FETCH_ASSOC);
-            $existeEnProducto = 0;
-            foreach ($prodIdEjemplo as $r) {
-                $st = $pdo->prepare('SELECT COUNT(*) FROM producto WHERE idprodu = ?');
-                $st->execute([$r['idprodu']]);
-                if ((int)$st->fetchColumn() > 0) $existeEnProducto++;
-            }
             $totalStock = (int)$pdo->query('SELECT COALESCE(SUM(stock), 0) FROM stock')->fetchColumn();
-            $idproduMuestra = $prodIdEjemplo ? $prodIdEjemplo[0]['idprodu'] : 0;
-            $stockMuestra = $prodIdEjemplo ? $prodIdEjemplo[0]['stock'] : 0;
-            return "stockcab={$cabRows} stockdet={$detRows} con_datos={$cabConDatos} stock_insert={$inserted} sum_stock={$totalStock} prod_c_stock={$prodConStock} ej_idprod={$idproduMuestra} ej_stock={$stockMuestra} match5={$existeEnProducto}/5";
+            $prodEnStock = (int)$pdo->query('SELECT COUNT(DISTINCT idprodu) FROM stock')->fetchColumn();
+            $stocact8206 = (int)$pdo->query('SELECT stocact FROM producto WHERE idprodu = 8206')->fetchColumn();
+            $sumStock8206 = (int)$pdo->query('SELECT COALESCE(SUM(stock), 0) FROM stock WHERE idprodu = 8206')->fetchColumn();
+
+            // Test the UPDATE directly
+            $pdo->exec("UPDATE producto p
+                LEFT JOIN (SELECT idprodu, COALESCE(SUM(stock), 0) AS total FROM stock GROUP BY idprodu) s ON s.idprodu = p.idprodu
+                SET p.stocact = COALESCE(s.total, 0)");
+            $affected = (int)$pdo->query('SELECT ROW_COUNT()')->fetchColumn();
+            $stocact8206b = (int)$pdo->query('SELECT stocact FROM producto WHERE idprodu = 8206')->fetchColumn();
+            $prodConStockb = (int)$pdo->query('SELECT COUNT(*) FROM producto WHERE stocact > 0')->fetchColumn();
+
+            return "stock_insert={$inserted} prod_en_stock={$prodEnStock} sum_stock={$totalStock} prod_c_stock={$prodConStock} stocact8206={$stocact8206} sum8206={$sumStock8206} affected={$affected} stocact8206b={$stocact8206b} prod_c_stockb={$prodConStockb}";
         } catch (\Throwable $e) {
             $pdo->rollBack();
             throw $e;
