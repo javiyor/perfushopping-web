@@ -2,8 +2,8 @@
 -- iddepoh = goods ENTERING deposit (adds), iddepod = goods LEAVING deposit (subtracts)
 -- Run this if stock table gets out of sync with stockdet + stockcab
 
--- 1. Rebuild stock table
-TRUNCATE TABLE stock;
+-- 1. Rebuild stock table (DELETE instead of TRUNCATE to keep it transactional)
+DELETE FROM stock;
 
 INSERT INTO stock (iddepo, idprodu, idcodgusto, stock)
 SELECT mov.iddepo, mov.idprodu, mov.idcodgusto, SUM(mov.net) AS stock

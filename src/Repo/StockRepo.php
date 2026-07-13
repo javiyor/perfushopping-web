@@ -276,7 +276,8 @@ final class StockRepo
         try {
             // 1. Rebuild stock table from stockdet + stockcab (VFP convention)
             // iddepoh = goods entering deposit (adds), iddepod = goods leaving deposit (subtracts)
-            $pdo->exec('TRUNCATE TABLE stock');
+            // Use DELETE instead of TRUNCATE because TRUNCATE is DDL and commits the transaction
+            $pdo->exec('DELETE FROM stock');
             $pdo->exec('
                 INSERT INTO stock (iddepo, idprodu, idcodgusto, stock)
                 SELECT mov.iddepo, mov.idprodu, mov.idcodgusto, SUM(mov.net) AS stock
