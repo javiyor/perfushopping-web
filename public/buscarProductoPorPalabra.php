@@ -1,12 +1,10 @@
 <?php
-require_once __DIR__ . '/../src/bootstrap.php';
-
-use Perfushopping\Web\Infra\Db;
-
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 
 try {
+    include("../conectar.php");
+
     $palabraClave = trim($_GET['keyword'] ?? '');
     $page = max(1, (int)($_GET['page'] ?? 1));
 
@@ -32,20 +30,19 @@ try {
                 ORDER BY produ, nomgusto
                 LIMIT ? OFFSET ?";
 
-        $st = Db::pdo()->prepare($sql);
-        $st->bindValue(1, $patron, \PDO::PARAM_STR);
-        $st->bindValue(2, $patron, \PDO::PARAM_STR);
-        $st->bindValue(3, $porPagina, \PDO::PARAM_INT);
-        $st->bindValue(4, $offset, \PDO::PARAM_INT);
-        $st->execute();
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("ssii", $patron, $patron, $porPagina, $offset);
+        $stmt->execute();
+        $resultado = $stmt->get_result();
 
-        while ($fila = $st->fetch()) {
+        while ($fila = $resultado->fetch_assoc()) {
             $fila['fecompra'] = date("d/m/y", strtotime($fila['fecompra']));
             $productos[] = $fila;
         }
     }
 
     echo json_encode($productos, JSON_UNESCAPED_UNICODE);
+    $conn->close();
 } catch (\Throwable $e) {
     http_response_code(500);
     echo json_encode(['error' => $e->getMessage()]);

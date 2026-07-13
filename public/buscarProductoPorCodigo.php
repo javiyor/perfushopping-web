@@ -1,12 +1,10 @@
 <?php
-require_once __DIR__ . '/../src/bootstrap.php';
-
-use Perfushopping\Web\Infra\Db;
-
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 
 try {
+    include("../conectar.php");
+
     $codigo = $_GET['codigo'] ?? '';
 
     if ($codigo !== '') {
@@ -21,11 +19,13 @@ try {
                 WHERE TRIM(codscan) = ?
                 LIMIT 1";
 
-        $st = Db::pdo()->prepare($sql);
-        $st->execute([$codigo]);
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("s", $codigo);
+        $stmt->execute();
+        $resultado = $stmt->get_result();
         $productos = [];
 
-        if ($fila = $st->fetch()) {
+        if ($fila = $resultado->fetch_assoc()) {
             $fila['fecompra'] = date("d/m/y", strtotime($fila['fecompra']));
             $fila['precio'] = floatval($fila['precio']);
             $fila['tiva'] = floatval($fila['tiva']);
@@ -36,6 +36,8 @@ try {
     } else {
         echo json_encode([]);
     }
+
+    $conn->close();
 } catch (\Throwable $e) {
     http_response_code(500);
     echo json_encode(['error' => $e->getMessage()]);

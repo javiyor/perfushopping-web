@@ -1,66 +1,75 @@
 <?php
-require_once __DIR__ . '/../src/bootstrap.php';
-
-use Perfushopping\Web\Infra\Db;
-
 header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *');
 
-$codigo = $_GET['codigo'] ?? '';
+try {
+    include("../conectar.php");
 
-if ($codigo !== '') {
-    $sql = "SELECT produ, 
-                   nomgusto, 
-                   fecompra, 
-                   ROUND(precio,0) + ROUND(precio * tiva / 100, 0) AS precio, 
-                   tiva,
-                   idcodgusto
-            FROM gustos 
-            INNER JOIN producto ON gustos.idprodu = producto.idprodu 
-            INNER JOIN ivaprodu ON producto.iva = ivaprodu.codivaprodu 
-            WHERE TRIM(codscan) = ?
-            LIMIT 1";
+    $codigo = $_GET['codigo'] ?? '';
 
-    $st = Db::pdo()->prepare($sql);
-    $st->execute([$codigo]);
-    $fila = $st->fetch();
+    if ($codigo !== '') {
+        $sql = "SELECT produ, 
+                       nomgusto, 
+                       fecompra, 
+                       ROUND(precio,0) + ROUND(precio * tiva / 100, 0) AS precio, 
+                       tiva,
+                       idcodgusto
+                FROM gustos 
+                INNER JOIN producto ON gustos.idprodu = producto.idprodu 
+                INNER JOIN ivaprodu ON producto.iva = ivaprodu.codivaprodu 
+                WHERE TRIM(codscan) = ?
+                LIMIT 1";
 
-    if ($fila) {
-        $fila['fecompra'] = date("d/m/y", strtotime($fila['fecompra']));
-        $fila['precio'] = floatval($fila['precio']);
-        $fila['tiva'] = floatval($fila['tiva']);
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("s", $codigo);
+        $stmt->execute();
+        $resultado = $stmt->get_result();
 
-        $idcodgusto = $fila['idcodgusto'];
+        if ($fila = $resultado->fetch_assoc()) {
+            $fila['fecompra'] = date("d/m/y", strtotime($fila['fecompra']));
+            $fila['precio'] = floatval($fila['precio']);
+            $fila['tiva'] = floatval($fila['tiva']);
 
-        $stocksQuery = "
-            SELECT d.iddepo, d.nomdepo AS nombre_deposito,
-                COALESCE(SUM(CASE WHEN s.iddepoh = d.iddepo THEN sd.canti ELSE 0 END), 0) -
-                COALESCE(SUM(CASE WHEN s.iddepod = d.iddepo THEN sd.canti ELSE 0 END), 0) AS stock
-            FROM deposito d
-            LEFT JOIN stockcab s ON s.iddepoh = d.iddepo OR s.iddepod = d.iddepo
-            LEFT JOIN stockdet sd ON sd.idstockcab = s.idstockcab AND sd.idcodgusto = ?
-            WHERE d.marca = 2
-            GROUP BY d.iddepo, d.nomdepo
-            ORDER BY d.iddepo
-        ";
+            $idcodgusto = $fila['idcodgusto'];
 
-        $stStock = Db::pdo()->prepare($stocksQuery);
-        $stStock->execute([$idcodgusto]);
+            $stocksQuery = "
+                SELECT d.iddepo, d.nomdepo AS nombre_deposito,
+                    COALESCE(SUM(CASE WHEN s.iddepoh = d.iddepo THEN sd.canti ELSE 0 END), 0) -
+                    COALESCE(SUM(CASE WHEN s.iddepod = d.iddepo THEN sd.canti ELSE 0 END), 0) AS stock
+                FROM deposito d
+                LEFT JOIN stockcab s ON s.iddepoh = d.iddepo OR s.iddepod = d.iddepo
+                LEFT JOIN stockdet sd ON sd.idstockcab = s.idstockcab AND sd.idcodgusto = ?
+                WHERE d.marca = 2
+                GROUP BY d.iddepo, d.nomdepo
+                ORDER BY d.iddepo
+            ";
 
-        $stocks = [];
-        while ($s = $stStock->fetch()) {
-            $stocks[] = [
-                'iddepo' => $s['iddepo'],
-                'nombre_deposito' => $s['nombre_deposito'],
-                'stock' => (int)$s['stock'],
-            ];
+            $stmtStock = $conn->prepare($stocksQuery);
+            $stmtStock->bind_param("i", $idcodgusto);
+            $stmtStock->execute();
+            $stockResult = $stmtStock->get_result();
+
+            $stocks = [];
+            while ($s = $stockResult->fetch_assoc()) {
+                $stocks[] = [
+                    'iddepo' => $s['iddepo'],
+                    'nombre_deposito' => $s['nombre_deposito'],
+                    'stock' => (int)$s['stock'],
+                ];
+            }
+
+            $fila['stocks'] = $stocks;
+
+            echo json_encode([$fila], JSON_UNESCAPED_UNICODE);
+        } else {
+            echo json_encode([]);
         }
-
-        $fila['stocks'] = $stocks;
-
-        echo json_encode([$fila], JSON_UNESCAPED_UNICODE);
     } else {
         echo json_encode([]);
     }
-} else {
-    echo json_encode([]);
+
+    $conn->close();
+} catch (\Throwable $e) {
+    http_response_code(500);
+    echo json_encode(['error' => $e->getMessage()]);
 }
