@@ -269,14 +269,13 @@ final class StockRepo
 
     // ── Recalcular stock desde movimientos ──
 
-    public function recalcular(): void
+    public function recalcular(): int
     {
         $pdo = Db::pdo();
         $pdo->beginTransaction();
         try {
             // 1. Rebuild stock table from stockdet + stockcab (VFP convention)
             // iddepoh = goods entering deposit (adds), iddepod = goods leaving deposit (subtracts)
-            // Use DELETE instead of TRUNCATE because TRUNCATE is DDL and commits the transaction
             $pdo->exec('DELETE FROM stock');
             $pdo->exec('
                 INSERT INTO stock (iddepo, idprodu, idcodgusto, stock)
@@ -295,6 +294,7 @@ final class StockRepo
                 GROUP BY mov.iddepo, mov.idprodu, mov.idcodgusto
                 HAVING stock != 0
             ');
+            $inserted = (int)$pdo->query('SELECT ROW_COUNT()')->fetchColumn();
 
             // 2. Recalculate producto.stocact
             $pdo->exec('
@@ -320,6 +320,7 @@ final class StockRepo
             ');
 
             $pdo->commit();
+            return $inserted;
         } catch (\Throwable $e) {
             $pdo->rollBack();
             throw $e;
