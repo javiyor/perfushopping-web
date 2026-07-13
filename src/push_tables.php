@@ -202,5 +202,46 @@ foreach ($tables as $table) {
         exit(1);
     }
 }
+// Full stock recalculation as safety net
+try {
+    $ctx = stream_context_create([
+        'http' => [
+            'method'  => 'POST',
+            'header'  => "Authorization: Bearer {$token}",
+            'timeout' => 300,
+            'ignore_errors' => true,
+        ],
+    ]);
+    $resp = @file_get_contents($apiUrl . '/../recalcular-stock', false, $ctx);
+    if ($resp !== false) {
+        $j = json_decode($resp, true);
+        echo "[RECALCULAR] " . ($j['info'] ?? $resp) . "\n";
+    }
+} catch (\Throwable $e) {
+    echo "[RECALCULAR] warning: {$e->getMessage()}\n";
+}
+
+// Full stock recalculation as safety net
+$recalcUrl = str_replace('/sync-tables', '/recalcular-stock', $apiUrl);
+try {
+    $ctx = stream_context_create([
+        'http' => [
+            'method'  => 'POST',
+            'header'  => "Authorization: Bearer {$token}",
+            'timeout' => 300,
+            'ignore_errors' => true,
+        ],
+    ]);
+    $resp = @file_get_contents($recalcUrl, false, $ctx);
+    if ($resp !== false) {
+        $j = json_decode($resp, true);
+        echo "[RECALCULAR] " . ($j['info'] ?? $resp) . "\n";
+    } else {
+        echo "[RECALCULAR] warning: sin respuesta\n";
+    }
+} catch (\Throwable $e) {
+    echo "[RECALCULAR] warning: {$e->getMessage()}\n";
+}
+
 $elapsed = round(microtime(true) - $start, 1);
 echo "=== PUSH COMPLETADO en {$elapsed}s ===\n";
