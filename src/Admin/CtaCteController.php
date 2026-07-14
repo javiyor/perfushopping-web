@@ -3,8 +3,12 @@ declare(strict_types=1);
 
 namespace Perfushopping\Web\Admin;
 
+use Perfushopping\Web\Infra\Db;
+use Perfushopping\Web\Repo\ArcaRepo;
 use Perfushopping\Web\Repo\CtaCteRepo;
+use Perfushopping\Web\Repo\FacturaRepo;
 use Perfushopping\Web\Service\AdminAuthService;
+use Perfushopping\Web\Service\AfipPadronService;
 use Perfushopping\Web\Support\Csrf;
 use Perfushopping\Web\Support\Response;
 use Perfushopping\Web\Support\View;
@@ -119,7 +123,7 @@ final class CtaCteController
         $adminUser = $auth->requireSesion();
 
         $q = trim((string)($_GET['q'] ?? ''));
-        $st = \Perfushopping\Web\Infra\Db::pdo()->prepare('
+        $st = Db::pdo()->prepare('
             SELECT COALESCE(w.id, 0) AS id, c.idclien,
                    c.razon AS name, c.cuit, c.tele AS phone, c.mail AS email,
                    c.Localidad AS city,
@@ -130,6 +134,26 @@ final class CtaCteController
             ORDER BY c.razon ASC LIMIT 10
         ');
         $st->execute([':like' => '%' . $q . '%', ':like2' => '%' . $q . '%']);
-        Response::json($st->fetchAll());
+        $results = $st->fetchAll();
+
+        if (empty($results) && preg_match('/^\d{11}$/', $q)) {
+            try {
+                $arcaRepo = new ArcaRepo();
+                if ($arcaRepo->isHabilitado()) {
+                    $padron = new AfipPadronService();
+                    $persona = $padron->consultar($q);
+                    if ($persona) {
+                        $cliente = (new FacturaRepo())->upsertClienteArca($persona);
+                        if ($cliente) {
+                            $results = [$cliente];
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                error_log('ARCA padron error: ' . $e->getMessage());
+            }
+        }
+
+        Response::json($results);
     }
 }

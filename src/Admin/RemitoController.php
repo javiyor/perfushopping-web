@@ -3,9 +3,12 @@ declare(strict_types=1);
 
 namespace Perfushopping\Web\Admin;
 
+use Perfushopping\Web\Repo\ArcaRepo;
+use Perfushopping\Web\Repo\FacturaRepo;
 use Perfushopping\Web\Repo\RemitoRepo;
 use Perfushopping\Web\Repo\StockRepo;
 use Perfushopping\Web\Service\AdminAuthService;
+use Perfushopping\Web\Service\AfipPadronService;
 use Perfushopping\Web\Support\Csrf;
 use Perfushopping\Web\Support\Response;
 use Perfushopping\Web\Support\View;
@@ -266,7 +269,26 @@ final class RemitoController
         $adminUser = $auth->requireSesion();
 
         $q = trim((string)($_GET['q'] ?? ''));
-        $results = (new RemitoRepo())->findClienteWeb($q);
+        $repo = new RemitoRepo();
+        $results = $repo->findClienteWeb($q);
+
+        if (empty($results) && preg_match('/^\d{11}$/', $q)) {
+            try {
+                $arcaRepo = new ArcaRepo();
+                if ($arcaRepo->isHabilitado()) {
+                    $padron = new AfipPadronService();
+                    $persona = $padron->consultar($q);
+                    if ($persona) {
+                        $cliente = (new FacturaRepo())->upsertClienteArca($persona);
+                        if ($cliente) {
+                            $results = [$cliente];
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                error_log('ARCA padron error: ' . $e->getMessage());
+            }
+        }
 
         Response::json($results);
     }
