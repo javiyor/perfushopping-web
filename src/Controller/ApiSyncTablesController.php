@@ -98,7 +98,10 @@ final class ApiSyncTablesController
     private function syncProducto(\PDO $pdo, array $rows): int
     {
         $cols = array_keys($rows[0]);
-        $setClauses = implode(', ', array_map(fn($c) => "{$c} = VALUES({$c})", $cols));
+        // Preserve server-side columns that VFP shouldn't overwrite
+        $preserve = ['imagen', 'enweb', 'observ'];
+        $updateCols = array_diff($cols, $preserve);
+        $setClauses = implode(', ', array_map(fn($c) => "{$c} = VALUES({$c})", $updateCols));
         $insertCols = implode(', ', $cols);
         $placeholders = implode(', ', array_map(fn($c) => ":{$c}", $cols));
 
