@@ -39,24 +39,39 @@ final class ArcaRepo
 
     // ── TA ──
 
-    public function getTicketAccesoValido(): ?array
+    public function getTicketAccesoValido(string $service = 'wsfe'): ?array
     {
-        $st = Db::pdo()->query('
+        $this->ensureServiceColumn();
+        $st = Db::pdo()->prepare('
             SELECT * FROM arca_tickets_acceso
-            WHERE expiration > NOW()
+            WHERE expiration > NOW() AND service = :s
             ORDER BY id DESC LIMIT 1
         ');
+        $st->execute([':s' => $service]);
         return $st->fetch() ?: null;
     }
 
-    public function guardarTicketAcceso(string $token, string $sign, string $expiration): int
+    public function guardarTicketAcceso(string $token, string $sign, string $expiration, string $service = 'wsfe'): int
     {
+        $this->ensureServiceColumn();
         $st = Db::pdo()->prepare('
-            INSERT INTO arca_tickets_acceso (token, sign, expiration, created_at)
-            VALUES (:t, :s, :e, NOW())
+            INSERT INTO arca_tickets_acceso (token, sign, expiration, service, created_at)
+            VALUES (:t, :s, :e, :sv, NOW())
         ');
-        $st->execute([':t' => $token, ':s' => $sign, ':e' => $expiration]);
+        $st->execute([':t' => $token, ':s' => $sign, ':e' => $expiration, ':sv' => $service]);
         return (int)Db::pdo()->lastInsertId();
+    }
+
+    private function ensureServiceColumn(): void
+    {
+        static $checked = false;
+        if ($checked) return;
+        $checked = true;
+        try {
+            Db::pdo()->exec("ALTER TABLE arca_tickets_acceso ADD COLUMN service VARCHAR(32) NOT NULL DEFAULT 'wsfe' AFTER expiration");
+        } catch (\Throwable $e) {
+            // Column already exists, ignore
+        }
     }
 
     // ── Comprobantes ──

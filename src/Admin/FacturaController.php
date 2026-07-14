@@ -7,7 +7,9 @@ use Perfushopping\Web\Infra\SmtpMailer;
 use Perfushopping\Web\Repo\FacturaRepo;
 use Perfushopping\Web\Repo\ChequeRepo;
 use Perfushopping\Web\Repo\StockRepo;
+use Perfushopping\Web\Repo\ArcaRepo;
 use Perfushopping\Web\Service\AdminAuthService;
+use Perfushopping\Web\Service\AfipPadronService;
 use Perfushopping\Web\Support\Csrf;
 use Perfushopping\Web\Support\Format;
 use Perfushopping\Web\Support\Response;
@@ -408,7 +410,27 @@ final class FacturaController
         $adminUser = $auth->requireSesion();
 
         $q = trim((string)($_GET['q'] ?? ''));
-        $results = (new FacturaRepo())->findClienteWeb($q);
+        $repo = new FacturaRepo();
+        $results = $repo->findClienteWeb($q);
+
+        // If exact CUIT (11 digits) and no results, try ARCA (ex AFIP) padron
+        if (empty($results) && preg_match('/^\d{11}$/', $q)) {
+            try {
+                $arcaRepo = new ArcaRepo();
+                if ($arcaRepo->isHabilitado()) {
+                    $padron = new AfipPadronService();
+                    $persona = $padron->consultar($q);
+                    if ($persona) {
+                        $cliente = $repo->upsertClienteArca($persona);
+                        if ($cliente) {
+                            $results = [$cliente];
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                error_log('ARCA padron error: ' . $e->getMessage());
+            }
+        }
 
         Response::json($results);
     }

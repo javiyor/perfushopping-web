@@ -300,4 +300,64 @@ final class FacturaRepo
         $st->execute([':id' => $idclien]);
         return $st->fetch() ?: null;
     }
+
+    public function upsertClienteArca(array $data): ?array
+    {
+        $cuit = trim($data['cuit'] ?? '');
+        if ($cuit === '') return null;
+
+        $razon = trim($data['razon'] ?? $data['razonSocial'] ?? '');
+        $direc = trim($data['direc'] ?? '');
+        $localidad = trim($data['localidad'] ?? '');
+        $codprov = trim($data['provincia'] ?? '');
+        $condicionIva = trim($data['condicion_iva'] ?? 'consumidor_final');
+
+        // Check if exists by CUIT
+        $st = Db::pdo()->prepare('SELECT * FROM clientes WHERE cuit = :c LIMIT 1');
+        $st->execute([':c' => $cuit]);
+        $existing = $st->fetch();
+
+        if ($existing) {
+            $st = Db::pdo()->prepare('
+                UPDATE clientes SET razon = :r, direc = :d, Localidad = :l, codprov = :p, condicion_iva = :ci
+                WHERE idclien = :id LIMIT 1
+            ');
+            $st->execute([
+                ':r' => $razon,
+                ':d' => $direc,
+                ':l' => $localidad,
+                ':p' => $codprov,
+                ':ci' => $condicionIva,
+                ':id' => $existing['idclien'],
+            ]);
+            $idclien = (int)$existing['idclien'];
+        } else {
+            $st = Db::pdo()->prepare('
+                INSERT INTO clientes (razon, cuit, direc, Localidad, codprov, condicion_iva, activo, fealta)
+                VALUES (:r, :c, :d, :l, :p, :ci, 1, NOW())
+            ');
+            $st->execute([
+                ':r' => $razon,
+                ':c' => $cuit,
+                ':d' => $direc,
+                ':l' => $localidad,
+                ':p' => $codprov,
+                ':ci' => $condicionIva,
+            ]);
+            $idclien = (int)Db::pdo()->lastInsertId();
+        }
+
+        // Return in same format as findClienteWeb
+        $st = Db::pdo()->prepare('
+            SELECT 0 AS id, c.idclien,
+                   c.razon AS name, c.cuit, c.direc, c.tele AS phone, c.mail AS email,
+                   c.Localidad AS city, c.codprov AS provincia,
+                   COALESCE(c.condicion_iva, \'consumidor_final\') AS condicion_iva,
+                   COALESCE(c.condicion_venta, \'\') AS condicion_venta
+            FROM clientes c
+            WHERE c.idclien = :id LIMIT 1
+        ');
+        $st->execute([':id' => $idclien]);
+        return $st->fetch() ?: null;
+    }
 }

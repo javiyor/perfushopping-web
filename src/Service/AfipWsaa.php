@@ -12,6 +12,17 @@ final class AfipWsaa
     private string $url;
     private bool $homologacion;
 
+    private static array $serviceDestMap = [
+        'wsfe' => [
+            'homo' => 'https://wswhomo.afip.gov.ar/wsfe/service.asmx',
+            'prod' => 'https://servicios1.afip.gov.ar/wsfe/service.asmx',
+        ],
+        'ws_sr_padron_a5' => [
+            'homo' => 'https://awshomo.afip.gov.ar/sr-padron/webservices/personaServiceA5?wsdl',
+            'prod' => 'https://aws.afip.gov.ar/sr-padron/webservices/personaServiceA5?wsdl',
+        ],
+    ];
+
     public function __construct()
     {
         $repo = new ArcaRepo();
@@ -23,12 +34,12 @@ final class AfipWsaa
             : 'https://wsaa.afip.gov.ar/ws/services/LoginCms';
     }
 
-    public function login(): ?array
+    public function login(string $service = 'wsfe'): ?array
     {
         $repo = new ArcaRepo();
 
-        // Check for valid cached TA
-        $ta = $repo->getTicketAccesoValido();
+        // Check for valid cached TA for this service
+        $ta = $repo->getTicketAccesoValido($service);
         if ($ta) {
             return $ta;
         }
@@ -37,14 +48,14 @@ final class AfipWsaa
             throw new \RuntimeException('AFIP: certificado no configurado.');
         }
 
-        $ticketXml = $this->generarTicketXml();
+        $ticketXml = $this->generarTicketXml($service);
         $cms = $this->firmarTicket($ticketXml);
 
         $response = $this->callWsaa($cms);
         $taData = $this->parsearRespuesta($response);
 
         // Cache the TA
-        $repo->guardarTicketAcceso($taData['token'], $taData['sign'], $taData['expiration']);
+        $repo->guardarTicketAcceso($taData['token'], $taData['sign'], $taData['expiration'], $service);
 
         return [
             'token' => $taData['token'],
@@ -53,10 +64,9 @@ final class AfipWsaa
         ];
     }
 
-    private function generarTicketXml(): string
+    private function generarTicketXml(string $service): string
     {
         $cuit = (new ArcaRepo())->getConfig('cuit');
-        $service = $this->homologacion ? 'https://wswhomo.afip.gov.ar/wsfe/service.asmx' : 'https://servicios1.afip.gov.ar/wsfe/service.asmx';
         $genTime = gmdate('Y-m-d\TH:i:s.xxx\Z');
         $expTime = gmdate('Y-m-d\TH:i:s.xxx\Z', strtotime('+12 hours'));
 
@@ -67,7 +77,7 @@ final class AfipWsaa
         <uniqueId>{$this->uniqueId()}</uniqueId>
         <generationTime>{$genTime}</generationTime>
         <expirationTime>{$expTime}</expirationTime>
-        <service>wsfe</service>
+        <service>{$service}</service>
     </header>
 </loginTicketRequest>
 XML;

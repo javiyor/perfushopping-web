@@ -440,7 +440,7 @@ cliInput.addEventListener('input', function() {
                 data.forEach(c => {
                     const div = document.createElement('div');
                     div.className = 'suggestion-item';
-                    const condIvaLabel = c.condicion_iva === 'responsable_inscripto' ? ' (RI)' : c.condicion_iva === 'monotributista' ? ' (Mono)' : '';
+                    const condIvaLabel = c.condicion_iva === 'responsable_inscripto' ? ' (RI)' : c.condicion_iva === 'monotributista' ? ' (Mono)' : c.condicion_iva === 'exento' ? ' (EX)' : '';
                     div.innerHTML = '<strong>' + esc(c.name) + '</strong> ' + esc(c.cuit || '') + condIvaLabel + ' <span class="text-muted">' + esc(c.email || '') + '</span>';
                     div.style.cssText = 'padding:6px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid #eee;background:#fff;';
                     div.addEventListener('mousedown', function(e) {
@@ -463,14 +463,19 @@ function selectCliente(c) {
     document.getElementById('clienteNombre').textContent = c.name || 'Consumidor Final';
     document.getElementById('clienteCuit').textContent = c.cuit || '';
     document.getElementById('clienteCondIva').value = c.condicion_iva || 'consumidor_final';
-    const condIvaLabel = c.condicion_iva === 'responsable_inscripto' ? ' (Factura A)' : c.condicion_iva === 'monotributista' ? ' (Factura B)' : '';
-    document.getElementById('clienteNombre').textContent = (c.name || 'Consumidor Final') + (c.cuit ? ' - ' + c.cuit : '');
+    const displayName = (c.name || 'Consumidor Final') + (c.cuit ? ' - ' + c.cuit : '');
+    document.getElementById('clienteNombre').textContent = displayName;
     cliInput.value = c.name || '';
     cliSuggestions.innerHTML = '';
 
-    if (c.condicion_iva === 'responsable_inscripto') {
-        document.getElementById('tipoComprobante').value = 'FACT-A';
-    }
+    const iva = c.condicion_iva || 'consumidor_final';
+    const tipoMap = {
+        'responsable_inscripto': 'FACT-A',
+        'consumidor_final': 'FACT-B',
+        'monotributista': 'FACT-C',
+        'exento': 'FACT-C',
+    };
+    document.getElementById('tipoComprobante').value = tipoMap[iva] || 'FACT-B';
 }
 
 function clearCliente() {
