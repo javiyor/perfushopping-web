@@ -95,7 +95,7 @@ XML;
             CURLOPT_URL => $this->url,
             CURLOPT_POST => true,
             CURLOPT_POSTFIELDS => $xml,
-            CURLOPT_HTTPHEADER => ['Content-Type: text/xml; charset=UTF-8', 'SOAPAction: '],
+            CURLOPT_HTTPHEADER => ['Content-Type: text/xml; charset=UTF-8', 'SOAPAction: "getPersona"'],
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => 60,
             CURLOPT_SSL_VERIFYPEER => false,
@@ -111,6 +111,7 @@ XML;
             throw new \RuntimeException('ARCA Padron: ' . $error);
         }
         if ($httpCode !== 200) {
+            error_log('ARCA Padron HTTP ' . $httpCode . ' response: ' . substr($response, 0, 2000));
             throw new \RuntimeException('ARCA Padron: HTTP ' . $httpCode);
         }
 
@@ -123,13 +124,14 @@ XML;
         $dom->loadXML($response);
 
         // Check for SOAP fault
-        $fault = $dom->getElementsByTagName('faultstring')->item(0)?->textContent ?? '';
+        $fault = $dom->getElementsByTagNameNS('*', 'faultstring')->item(0)?->textContent ?? '';
         if ($fault !== '') {
             throw new \RuntimeException('ARCA Padron: ' . $fault);
         }
 
-        $returnNode = $this->getFirstChildByTagName($dom->documentElement, 'return');
+        $returnNode = $dom->getElementsByTagNameNS('*', 'return')->item(0);
         if (!$returnNode) {
+            error_log('ARCA Padron: no se encontro nodo return en respuesta. XML: ' . substr($response, 0, 2000));
             return null;
         }
 
