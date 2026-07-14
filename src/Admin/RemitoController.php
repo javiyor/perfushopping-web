@@ -272,21 +272,30 @@ final class RemitoController
         $repo = new RemitoRepo();
         $results = $repo->findClienteWeb($q);
 
-        if (empty($results) && preg_match('/^\d{11}$/', $q)) {
-            try {
-                $arcaRepo = new ArcaRepo();
-                if ($arcaRepo->isHabilitado()) {
-                    $padron = new AfipPadronService();
-                    $persona = $padron->consultar($q);
-                    if ($persona) {
-                        $cliente = (new FacturaRepo())->upsertClienteArca($persona);
-                        if ($cliente) {
-                            $results = [$cliente];
+        if (empty($results)) {
+            $cuitsToTry = [];
+            if (preg_match('/^\d{11}$/', $q)) {
+                $cuitsToTry[] = $q;
+            } elseif (preg_match('/^\d{7,8}$/', $q)) {
+                $cuitsToTry = AfipPadronService::dniToCuits($q);
+            }
+            foreach ($cuitsToTry as $cuit) {
+                try {
+                    $arcaRepo = new ArcaRepo();
+                    if ($arcaRepo->isHabilitado()) {
+                        $padron = new AfipPadronService();
+                        $persona = $padron->consultar($cuit);
+                        if ($persona) {
+                            $cliente = (new FacturaRepo())->upsertClienteArca($persona);
+                            if ($cliente) {
+                                $results = [$cliente];
+                                break;
+                            }
                         }
                     }
+                } catch (\Throwable $e) {
+                    error_log('ARCA padron error: ' . $e->getMessage());
                 }
-            } catch (\Throwable $e) {
-                error_log('ARCA padron error: ' . $e->getMessage());
             }
         }
 

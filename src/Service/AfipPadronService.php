@@ -23,6 +23,34 @@ final class AfipPadronService
             : 'https://aws.afip.gov.ar/sr-padron/webservices/personaServiceA5';
     }
 
+    /**
+     * Convert a DNI (7-8 digits) to both possible CUITs (20 and 27 prefix)
+     * using AFIP módulo 11 check digit algorithm.
+     */
+    public static function dniToCuits(string $dni): array
+    {
+        $dni = preg_replace('/\D/', '', $dni);
+        if (strlen($dni) < 7 || strlen($dni) > 8) {
+            return [];
+        }
+        $dni = str_pad($dni, 8, '0', STR_PAD_LEFT);
+        $multipliers = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
+        $cuits = [];
+        foreach (['20', '27'] as $prefix) {
+            $base = $prefix . $dni;
+            $sum = 0;
+            for ($i = 0; $i < 10; $i++) {
+                $sum += (int)$base[$i] * $multipliers[$i];
+            }
+            $rem = $sum % 11;
+            $check = 11 - $rem;
+            if ($check === 11) $check = 0;
+            if ($check === 10) $check = 9;
+            $cuits[] = $base . $check;
+        }
+        return $cuits;
+    }
+
     public function autenticar(): void
     {
         $wsaa = new AfipWsaa();
