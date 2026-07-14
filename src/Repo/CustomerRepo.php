@@ -15,7 +15,7 @@ final class CustomerRepo
 
         $select = '
             SELECT u.id, u.email, u.name, u.phone, u.role, u.wholesale_status,
-                   u.customer_category, u.disabled_at, u.created_at, u.last_login_at,
+                   u.disabled_at, u.created_at, u.last_login_at,
                    u.cliente_id,
                    COALESCE(o_sum.order_count, 0) AS order_count,
                    COALESCE(o_sum.total_spent, 0) AS total_spent_cents,
