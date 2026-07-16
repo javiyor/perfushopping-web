@@ -194,124 +194,156 @@ final class CajaRepo
 
     public function ventasPorPuntoVenta(string $fecha): array
     {
-        $st = Db::pdo()->prepare("
-            SELECT f.punto_venta, s.nomsuc AS sucursal_nombre,
-                   COALESCE(SUM(CASE WHEN fp.forma_pago = 'efectivo' THEN fp.monto_cents ELSE 0 END), 0) AS total_efectivo,
-                   COALESCE(SUM(CASE WHEN fp.forma_pago IN ('transferencia','mercadopago','debito','credito') THEN fp.monto_cents ELSE 0 END), 0) AS total_transferencia,
-                   COALESCE(SUM(fp.monto_cents), 0) AS total
-            FROM facturas f
-            INNER JOIN factura_pagos fp ON fp.factura_id = f.id
-            LEFT JOIN sucursales s ON s.id = f.punto_venta
-            WHERE f.estado = 'emitida' AND f.fecha = :fec
-            GROUP BY f.punto_venta
-            ORDER BY sucursal_nombre ASC
-        ");
-        $st->execute([':fec' => $fecha]);
-        return $st->fetchAll();
+        try {
+            $st = Db::pdo()->prepare("
+                SELECT f.punto_venta, COALESCE(s.nomsuc, CONCAT('Punto ', f.punto_venta)) AS sucursal_nombre,
+                       COALESCE(SUM(CASE WHEN fp.forma_pago = 'efectivo' THEN fp.monto_cents ELSE 0 END), 0) AS total_efectivo,
+                       COALESCE(SUM(CASE WHEN fp.forma_pago IN ('transferencia','mercadopago','debito','credito') THEN fp.monto_cents ELSE 0 END), 0) AS total_transferencia,
+                       COALESCE(SUM(fp.monto_cents), 0) AS total
+                FROM facturas f
+                INNER JOIN factura_pagos fp ON fp.factura_id = f.id
+                LEFT JOIN sucursales s ON s.id = f.punto_venta
+                WHERE f.estado = 'emitida' AND f.fecha = :fec
+                GROUP BY f.punto_venta
+            ");
+            $st->execute([':fec' => $fecha]);
+            return $st->fetchAll();
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::ventasPorPuntoVenta error: ' . $e->getMessage());
+            return [];
+        }
     }
 
     public function agregarMovimientoGeneral(string $tipo, ?string $origen, ?int $origenId, string $concepto, int $montoCents, int $createdBy): int
     {
-        $st = Db::pdo()->prepare('
-            INSERT INTO caja_general_movimientos (tipo, origen, origen_id, concepto, monto_cents, created_by, created_at)
-            VALUES (:tip, :ori, :oid, :con, :mon, :cb, NOW())
-        ');
-        $st->execute([
-            ':tip' => $tipo,
-            ':ori' => $origen,
-            ':oid' => $origenId,
-            ':con' => $concepto,
-            ':mon' => $montoCents,
-            ':cb' => $createdBy,
-        ]);
-        return (int)Db::pdo()->lastInsertId();
+        try {
+            $st = Db::pdo()->prepare('
+                INSERT INTO caja_general_movimientos (tipo, origen, origen_id, concepto, monto_cents, created_by, created_at)
+                VALUES (:tip, :ori, :oid, :con, :mon, :cb, NOW())
+            ');
+            $st->execute([
+                ':tip' => $tipo,
+                ':ori' => $origen,
+                ':oid' => $origenId,
+                ':con' => $concepto,
+                ':mon' => $montoCents,
+                ':cb' => $createdBy,
+            ]);
+            return (int)Db::pdo()->lastInsertId();
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::agregarMovimientoGeneral error: ' . $e->getMessage());
+            return 0;
+        }
     }
 
     public function movimientosGenerales(?string $tipo = null, ?string $desde = null, ?string $hasta = null, string $q = ''): array
     {
-        $sql = '
-            SELECT cg.*, a.nombre AS created_by_nombre, c.nombre AS controlado_por_nombre
-            FROM caja_general_movimientos cg
-            LEFT JOIN admin_users a ON a.id = cg.created_by
-            LEFT JOIN admin_users c ON c.id = cg.controlado_por
-            WHERE 1=1
-        ';
-        $params = [];
-        if ($tipo !== null && $tipo !== '') {
-            $sql .= ' AND cg.tipo = :tip';
-            $params[':tip'] = $tipo;
-        }
-        if ($desde !== null && $desde !== '') {
-            $sql .= ' AND DATE(cg.created_at) >= :desde';
-            $params[':desde'] = $desde;
-        }
-        if ($hasta !== null && $hasta !== '') {
-            $sql .= ' AND DATE(cg.created_at) <= :hasta';
-            $params[':hasta'] = $hasta;
-        }
-        $q = trim($q);
-        if ($q !== '') {
-            $sql .= ' AND (cg.concepto LIKE :q1 OR cg.origen LIKE :q2)';
-            $params[':q1'] = '%' . $q . '%';
-            $params[':q2'] = '%' . $q . '%';
-        }
-        $sql .= ' ORDER BY cg.created_at DESC LIMIT 200';
+        try {
+            $sql = '
+                SELECT cg.*, a.nombre AS created_by_nombre, c.nombre AS controlado_por_nombre
+                FROM caja_general_movimientos cg
+                LEFT JOIN admin_users a ON a.id = cg.created_by
+                LEFT JOIN admin_users c ON c.id = cg.controlado_por
+                WHERE 1=1
+            ';
+            $params = [];
+            if ($tipo !== null && $tipo !== '') {
+                $sql .= ' AND cg.tipo = :tip';
+                $params[':tip'] = $tipo;
+            }
+            if ($desde !== null && $desde !== '') {
+                $sql .= ' AND DATE(cg.created_at) >= :desde';
+                $params[':desde'] = $desde;
+            }
+            if ($hasta !== null && $hasta !== '') {
+                $sql .= ' AND DATE(cg.created_at) <= :hasta';
+                $params[':hasta'] = $hasta;
+            }
+            $q = trim($q);
+            if ($q !== '') {
+                $sql .= ' AND (cg.concepto LIKE :q1 OR cg.origen LIKE :q2)';
+                $params[':q1'] = '%' . $q . '%';
+                $params[':q2'] = '%' . $q . '%';
+            }
+            $sql .= ' ORDER BY cg.created_at DESC LIMIT 200';
 
-        $st = Db::pdo()->prepare($sql);
-        $st->execute($params);
-        return $st->fetchAll();
+            $st = Db::pdo()->prepare($sql);
+            $st->execute($params);
+            return $st->fetchAll();
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::movimientosGenerales error: ' . $e->getMessage());
+            return [];
+        }
     }
 
     public function totalMovimientosGenerales(?string $desde = null, ?string $hasta = null): array
     {
-        $sql = "
-            SELECT
-                COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto_cents ELSE 0 END), 0) AS total_ingresos,
-                COALESCE(SUM(CASE WHEN tipo = 'egreso' THEN monto_cents ELSE 0 END), 0) AS total_egresos
-            FROM caja_general_movimientos
-            WHERE 1=1
-        ";
-        $params = [];
-        if ($desde !== null && $desde !== '') {
-            $sql .= ' AND DATE(created_at) >= :desde';
-            $params[':desde'] = $desde;
+        try {
+            $sql = "
+                SELECT
+                    COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto_cents ELSE 0 END), 0) AS total_ingresos,
+                    COALESCE(SUM(CASE WHEN tipo = 'egreso' THEN monto_cents ELSE 0 END), 0) AS total_egresos
+                FROM caja_general_movimientos
+                WHERE 1=1
+            ";
+            $params = [];
+            if ($desde !== null && $desde !== '') {
+                $sql .= ' AND DATE(created_at) >= :desde';
+                $params[':desde'] = $desde;
+            }
+            if ($hasta !== null && $hasta !== '') {
+                $sql .= ' AND DATE(created_at) <= :hasta';
+                $params[':hasta'] = $hasta;
+            }
+            $st = Db::pdo()->prepare($sql);
+            $st->execute($params);
+            return $st->fetch() ?: ['total_ingresos' => 0, 'total_egresos' => 0];
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::totalMovimientosGenerales error: ' . $e->getMessage());
+            return ['total_ingresos' => 0, 'total_egresos' => 0];
         }
-        if ($hasta !== null && $hasta !== '') {
-            $sql .= ' AND DATE(created_at) <= :hasta';
-            $params[':hasta'] = $hasta;
-        }
-        $st = Db::pdo()->prepare($sql);
-        $st->execute($params);
-        return $st->fetch() ?: ['total_ingresos' => 0, 'total_egresos' => 0];
     }
 
     public function controlarMovimientoGeneral(int $id, int $adminUserId): void
     {
-        $st = Db::pdo()->prepare('
-            UPDATE caja_general_movimientos
-            SET controlado = 1, controlado_por = :cp, controlado_at = NOW()
-            WHERE id = :i LIMIT 1
-        ');
-        $st->execute([':cp' => $adminUserId, ':i' => $id]);
+        try {
+            $st = Db::pdo()->prepare('
+                UPDATE caja_general_movimientos
+                SET controlado = 1, controlado_por = :cp, controlado_at = NOW()
+                WHERE id = :i LIMIT 1
+            ');
+            $st->execute([':cp' => $adminUserId, ':i' => $id]);
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::controlarMovimientoGeneral error: ' . $e->getMessage());
+        }
     }
 
     public function descontrolarMovimientoGeneral(int $id): void
     {
-        $st = Db::pdo()->prepare('
-            UPDATE caja_general_movimientos
-            SET controlado = 0, controlado_por = NULL, controlado_at = NULL
-            WHERE id = :i LIMIT 1
-        ');
-        $st->execute([':i' => $id]);
+        try {
+            $st = Db::pdo()->prepare('
+                UPDATE caja_general_movimientos
+                SET controlado = 0, controlado_por = NULL, controlado_at = NULL
+                WHERE id = :i LIMIT 1
+            ');
+            $st->execute([':i' => $id]);
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::descontrolarMovimientoGeneral error: ' . $e->getMessage());
+        }
     }
 
     public function saldoGeneral(): int
     {
-        $st = Db::pdo()->query("
-            SELECT COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto_cents ELSE 0 END), 0)
-                 - COALESCE(SUM(CASE WHEN tipo = 'egreso' THEN monto_cents ELSE 0 END), 0)
-            FROM caja_general_movimientos
-        ");
-        return (int)$st->fetchColumn();
+        try {
+            $st = Db::pdo()->query("
+                SELECT COALESCE(SUM(CASE WHEN tipo = 'ingreso' THEN monto_cents ELSE 0 END), 0)
+                     - COALESCE(SUM(CASE WHEN tipo = 'egreso' THEN monto_cents ELSE 0 END), 0)
+                FROM caja_general_movimientos
+            ");
+            return (int)$st->fetchColumn();
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::saldoGeneral error: ' . $e->getMessage());
+            return 0;
+        }
     }
 }
