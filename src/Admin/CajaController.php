@@ -92,6 +92,24 @@ final class CajaController
         $montoInicial = (int)($_POST['monto_inicial_cents'] ?? 0);
         if ($montoInicial < 0) $montoInicial = 0;
         $obs = trim((string)($_POST['observaciones'] ?? ''));
+        $detalle = trim((string)($_POST['detalle_efectivo'] ?? ''));
+        if ($detalle !== '') {
+            $decoded = json_decode($detalle, true);
+            if (is_array($decoded) && count($decoded) > 0) {
+                $lines = [];
+                foreach ($decoded as $d) {
+                    $denom = (int)($d['denominacion'] ?? 0);
+                    $qty = (int)($d['cantidad'] ?? 0);
+                    if ($denom > 0 && $qty > 0) {
+                        $lines[] = '$' . number_format($denom, 0, ',', '.') . ' x ' . $qty . ' = $' . number_format($denom * $qty, 0, ',', '.');
+                    }
+                }
+                if ($lines) {
+                    $detalleStr = 'Detalle apertura: ' . implode(' | ', $lines);
+                    $obs = $obs ? $obs . "\n" . $detalleStr : $detalleStr;
+                }
+            }
+        }
 
         $sucursalId = $auth->getSucursalId();
         $turno = $auth->getTurno();
