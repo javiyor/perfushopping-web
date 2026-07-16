@@ -31,8 +31,12 @@ $isEntrada = $tipo === 'entrada';
             <div class="card shadow-sm mb-3">
                 <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
                     <span>Productos</span>
-                    <button class="btn btn-sm btn-outline-primary" type="button" onclick="addProductRow()"><i class="bi bi-plus-lg"></i> Agregar</button>
+                    <div class="d-flex gap-1">
+                        <button class="btn btn-sm btn-outline-secondary" type="button" id="btnScanRem" title="Escanear código de barras"><i class="bi bi-camera"></i></button>
+                        <button class="btn btn-sm btn-outline-primary" type="button" onclick="addProductRow()"><i class="bi bi-plus-lg"></i> Agregar</button>
+                    </div>
                 </div>
+                <div id="scanReaderRem" style="display:none;max-width:300px;margin:4px auto"></div>
                 <div class="card-body p-0">
                     <table class="table table-sm mb-0" id="itemsTable">
                         <thead>
@@ -138,6 +142,7 @@ $isEntrada = $tipo === 'entrada';
 .suggestion-item:last-child { border-radius:0 0 6px 6px; }
 </style>
 
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
 let itemCounter = 1;
 
@@ -391,6 +396,51 @@ if (presupuestoInput) {
     });
     presupuestoInput.addEventListener('blur', function() {
         setTimeout(() => presupuestoSuggestions.innerHTML = '', 300);
+    });
+}
+
+// ── Barcode scanner ──
+let scannerRem = null;
+let scanningRem = false;
+const scanBtnRem = document.getElementById('btnScanRem');
+if (scanBtnRem) {
+    scanBtnRem.addEventListener('click', function() {
+        const reader = document.getElementById('scanReaderRem');
+        if (scanningRem) {
+            if (scannerRem) { scannerRem.stop().catch(()=>{}); scannerRem.clear(); }
+            reader.style.display = 'none';
+            scanningRem = false;
+            return;
+        }
+        reader.style.display = 'block';
+        if (!scannerRem) {
+            if (typeof Html5Qrcode !== 'undefined') {
+                scannerRem = new Html5Qrcode('scanReaderRem');
+            } else {
+                alert('Cargando lector... refrescá la página');
+                reader.style.display = 'none';
+                return;
+            }
+        }
+        scannerRem.start(
+            { facingMode: 'environment' },
+            { fps: 15, qrbox: { width: 250, height: 100 } },
+            function(decodedText) {
+                scannerRem.stop().catch(()=>{});
+                reader.style.display = 'none';
+                scanningRem = false;
+                const focused = document.querySelector('.prod-input:focus');
+                const input = focused || document.querySelector('.prod-input');
+                if (input) {
+                    input.value = decodedText;
+                    input.dispatchEvent(new Event('input'));
+                }
+            },
+            function() {}
+        ).then(() => { scanningRem = true; }).catch(err => {
+            alert('Error cámara: ' + err);
+            reader.style.display = 'none';
+        });
     });
 }
 

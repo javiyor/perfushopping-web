@@ -1,6 +1,8 @@
 <?php
 $remitoId = (int)($remitoId ?? 0);
 $remitoItems = $remitoItems ?? [];
+$presupuestoId = (int)($presupuestoId ?? 0);
+$presupuestoItems = $presupuestoItems ?? [];
 $csrfToken = $csrf ?? '';
 ?>
 <style>
@@ -128,6 +130,20 @@ $csrfToken = $csrf ?? '';
         <div id="remitoSuggestions" style="position:absolute;z-index:1050;width:100%"></div>
     </div>
     <?php endif; ?>
+
+    <?php if ($presupuestoId > 0): ?>
+    <span class="badge bg-warning fs-6">Presupuesto cargado</span>
+    <input type="hidden" id="presupuestoId" value="<?= $presupuestoId ?>" />
+    <?php else: ?>
+    <input type="hidden" id="presupuestoId" value="0" />
+    <button class="btn btn-sm btn-outline-warning" type="button" onclick="document.getElementById('presupuestoSearchWrap').style.display='block'">
+        <i class="bi bi-file-text"></i> Desde presupuesto
+    </button>
+    <div id="presupuestoSearchWrap" style="display:none;position:relative">
+        <input class="form-control form-control-sm" id="presupuestoSearch" placeholder="Buscar presupuesto aprobado..." autocomplete="off" style="width:250px" />
+        <div id="presupuestoSuggestions" style="position:absolute;z-index:1050;width:100%"></div>
+    </div>
+    <?php endif; ?>
 </div>
 
 <div class="pos-cliente mb-2" id="clienteSection">
@@ -145,7 +161,11 @@ $csrfToken = $csrf ?? '';
 <div class="pos-layout">
     <div class="pos-left">
         <div class="pos-search-box">
-            <input id="productSearch" placeholder="🔍 Buscar producto por nombre, código o escanear código de barras..." autofocus />
+            <div class="d-flex gap-1">
+                <input id="productSearch" placeholder="🔍 Buscar producto por nombre o código..." autofocus class="flex-fill" style="flex:1" />
+                <button class="btn btn-sm btn-outline-secondary" type="button" id="btnScanCam" title="Escanear código de barras con la cámara"><i class="bi bi-camera"></i></button>
+            </div>
+            <div id="scanReader" style="display:none;max-width:300px;margin-top:4px"></div>
             <div class="pos-results" id="productResults" style="display:none"></div>
         </div>
 
@@ -218,10 +238,45 @@ $csrfToken = $csrf ?? '';
     </div>
 </div>
 
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
 // ── State ──
 let cart = [];
 let productSearchTimer;
+let html5Scanner = null;
+let isScanning = false;
+
+// ── Barcode scanner via camera ──
+document.getElementById('btnScanCam').addEventListener('click', function() {
+    const reader = document.getElementById('scanReader');
+    if (isScanning) {
+        if (html5Scanner) { html5Scanner.stop().catch(()=>{}); html5Scanner.clear(); }
+        reader.style.display = 'none';
+        isScanning = false;
+        return;
+    }
+    reader.style.display = 'block';
+    if (!html5Scanner) {
+        html5Scanner = new Html5Qrcode('scanReader');
+    }
+    html5Scanner.start(
+        { facingMode: 'environment' },
+        { fps: 15, qrbox: { width: 250, height: 100 } },
+        function(decodedText) {
+            html5Scanner.stop().catch(()=>{});
+            reader.style.display = 'none';
+            isScanning = false;
+            document.getElementById('productSearch').value = decodedText;
+            searchProd(decodedText);
+        },
+        function() {}
+    ).then(() => {
+        isScanning = true;
+    }).catch(err => {
+        alert('Error al acceder a la cámara: ' + err);
+        reader.style.display = 'none';
+    });
+});
 
 function fmtPrice(cents) {
     return Math.round(cents / 100).toLocaleString('es-AR');
@@ -238,6 +293,20 @@ addToCart({
     qty: <?= (int)($ri['qty'] ?? 1) ?>,
     unit_price_cents: <?= (int)($ri['precio'] ?? 0) * 100 ?>,
     iva_rate: <?= (float)($ri['tiva'] ?? 21) ?>,
+});
+<?php endforeach; ?>
+<?php endif; ?>
+
+<?php if ($presupuestoItems): ?>
+<?php foreach ($presupuestoItems as $pi): ?>
+addToCart({
+    idprodu: <?= (int)($pi['idprodu'] ?? 0) ?>,
+    idcodgusto: <?= (int)($pi['idcodgusto'] ?? 0) ?>,
+    producto: '<?= htmlspecialchars($pi['producto'] ?? '', ENT_QUOTES) ?>',
+    variedad: '<?= htmlspecialchars($pi['variedad'] ?? '', ENT_QUOTES) ?>',
+    qty: <?= (int)($pi['qty'] ?? 1) ?>,
+    unit_price_cents: <?= (int)($pi['precio'] ?? 0) * 100 ?>,
+    iva_rate: <?= (float)($pi['tiva'] ?? 21) ?>,
 });
 <?php endforeach; ?>
 <?php endif; ?>
@@ -545,6 +614,43 @@ if (remInput) {
     });
 }
 
+// ── Presupuesto search ──
+const presInput = document.getElementById('presupuestoSearch');
+const presSuggestions = document.getElementById('presupuestoSuggestions');
+if (presInput) {
+    let presTimer;
+    presInput.addEventListener('input', function() {
+        clearTimeout(presTimer);
+        const val = this.value.trim();
+        if (val.length < 2) { presSuggestions.innerHTML = ''; return; }
+        presTimer = setTimeout(() => {
+            fetch('/admin/facturas/buscar-presupuestos?q=' + encodeURIComponent(val))
+                .then(r => r.json())
+                .then(data => {
+                    presSuggestions.innerHTML = '';
+                    if (!data || data.length === 0) {
+                        presSuggestions.innerHTML = '<div class="suggestion-item text-muted">Sin resultados</div>';
+                        return;
+                    }
+                    data.forEach(p => {
+                        const div = document.createElement('div');
+                        div.className = 'suggestion-item';
+                        div.innerHTML = '<strong>' + esc(p.codigo) + '</strong> <span class="text-muted">' + esc(p.cliente_nombre || '') + '</span>';
+                        div.style.cssText = 'padding:6px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid #eee;background:#fff;';
+                        div.addEventListener('mousedown', function(e) {
+                            e.preventDefault();
+                            window.location.href = '/admin/facturas/nueva?presupuesto_id=' + p.id;
+                        });
+                        presSuggestions.appendChild(div);
+                    });
+                });
+        }, 300);
+    });
+    presInput.addEventListener('blur', function() {
+        setTimeout(() => presSuggestions.innerHTML = '', 300);
+    });
+}
+
 // ── Cheque fields toggle ──
 document.getElementById('formaPago').addEventListener('change', function() {
     document.getElementById('posChequeData').style.display = this.value === 'cheque' ? 'block' : 'none';
@@ -572,12 +678,14 @@ function submitFactura() {
     const totalBruto = cart.reduce((sum, item) => sum + item.qty * item.unit_price_cents, 0);
     const descuentoCents = descPct > 0 ? Math.round(totalBruto * descPct / 100) : 0;
 
+    const presupuestoId = parseInt(document.getElementById('presupuestoId').value) || 0;
     const vendedorEl = document.getElementById('vendedorId');
     const payload = {
         _csrf: document.getElementById('csrfToken').value,
         tipo_comprobante: tipo,
         forma_pago: formaPago,
         remito_id: remitoId,
+        presupuesto_id: presupuestoId,
         vendedor_id: vendedorEl ? parseInt(vendedorEl.value) || null : null,
         notas: notas,
         fecha: new Date().toISOString().slice(0,10),
@@ -617,23 +725,29 @@ function submitFactura() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
     })
-    .then(r => r.json())
-    .then(res => {
-        if (res.ok) {
-            if (res.arca && res.arca.cae) {
-                var fmt = localStorage.getItem('perfushopping_print_format') || '80mm';
-                window.location.href = '/admin/facturas/imprimir/' + res.id + '?auto=1&formato=' + fmt;
+    .then(r => r.text().then(text => {
+        try {
+            const res = JSON.parse(text);
+            if (res.ok) {
+                if (res.arca && res.arca.cae) {
+                    var fmt = localStorage.getItem('perfushopping_print_format') || '80mm';
+                    window.location.href = '/admin/facturas/imprimir/' + res.id + '?auto=1&formato=' + fmt;
+                } else {
+                    window.location.href = '/admin/facturas/' + res.id;
+                }
             } else {
-                window.location.href = '/admin/facturas/' + res.id;
+                alert(res.error || 'Error al facturar');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-receipt"></i> FACTURAR';
             }
-        } else {
-            alert(res.error || 'Error al facturar');
+        } catch (e) {
+            alert('Error del servidor: ' + text.substring(0, 300));
             btn.disabled = false;
             btn.innerHTML = '<i class="bi bi-receipt"></i> FACTURAR';
         }
-    })
+    }))
     .catch(err => {
-        alert('Error de conexión');
+        alert('Error de conexión: ' + err.message);
         btn.disabled = false;
         btn.innerHTML = '<i class="bi bi-receipt"></i> FACTURAR';
     });

@@ -20,8 +20,12 @@ $csrfToken = $csrf ?? '';
             <div class="card shadow-sm mb-3">
                 <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
                     <span>Productos</span>
-                    <button class="btn btn-sm btn-outline-primary" type="button" onclick="addProductRow()"><i class="bi bi-plus-lg"></i> Agregar</button>
+                    <div class="d-flex gap-1">
+                        <button class="btn btn-sm btn-outline-secondary" type="button" id="btnScanProd" title="Escanear código de barras"><i class="bi bi-camera"></i></button>
+                        <button class="btn btn-sm btn-outline-primary" type="button" onclick="addProductRow()"><i class="bi bi-plus-lg"></i> Agregar</button>
+                    </div>
                 </div>
+                <div id="scanReaderPres" style="display:none;max-width:300px;margin:4px auto"></div>
                 <div class="card-body p-0">
                     <table class="table table-sm mb-0" id="itemsTable">
                         <thead>
@@ -154,6 +158,7 @@ $csrfToken = $csrf ?? '';
 .suggestion-item:last-child { border-radius:0 0 6px 6px; }
 </style>
 
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
 let productCache = {};
 let clientesCache = {};
@@ -378,6 +383,51 @@ clienteInput.addEventListener('input', function() {
 clienteInput.addEventListener('blur', function() {
     setTimeout(() => clienteSuggestions.innerHTML = '', 300);
 });
+
+// ── Barcode scanner ──
+let scannerPres = null;
+let scanningPres = false;
+const scanBtn = document.getElementById('btnScanProd');
+if (scanBtn) {
+    scanBtn.addEventListener('click', function() {
+        const reader = document.getElementById('scanReaderPres');
+        if (scanningPres) {
+            if (scannerPres) { scannerPres.stop().catch(()=>{}); scannerPres.clear(); }
+            reader.style.display = 'none';
+            scanningPres = false;
+            return;
+        }
+        reader.style.display = 'block';
+        if (!scannerPres) {
+            if (typeof Html5Qrcode !== 'undefined') {
+                scannerPres = new Html5Qrcode('scanReaderPres');
+            } else {
+                alert('Cargando lector... refrescá la página');
+                reader.style.display = 'none';
+                return;
+            }
+        }
+        scannerPres.start(
+            { facingMode: 'environment' },
+            { fps: 15, qrbox: { width: 250, height: 100 } },
+            function(decodedText) {
+                scannerPres.stop().catch(()=>{});
+                reader.style.display = 'none';
+                scanningPres = false;
+                const focused = document.querySelector('.prod-input:focus');
+                const input = focused || document.querySelector('.prod-input');
+                if (input) {
+                    input.value = decodedText;
+                    input.dispatchEvent(new Event('input'));
+                }
+            },
+            function() {}
+        ).then(() => { scanningPres = true; }).catch(err => {
+            alert('Error cámara: ' + err);
+            reader.style.display = 'none';
+        });
+    });
+}
 
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 </script>

@@ -301,6 +301,36 @@ final class FacturaRepo
         return $st->fetchAll();
     }
 
+    public function findPresupuestosDisponibles(string $q, int $limit = 10): array
+    {
+        $limit = max(1, min(20, $limit));
+        $q = trim($q);
+        $st = Db::pdo()->prepare('
+            SELECT p.id, p.codigo, p.cliente_nombre, p.total_cents, p.fecha, p.cliente_id, p.idclien, p.cliente_cuit, p.cliente_direc, p.cliente_tele, p.cliente_mail
+            FROM presupuestos p
+            WHERE p.estado = \'aprobado\'
+              AND (p.codigo LIKE :like OR p.cliente_nombre LIKE :like)
+            ORDER BY p.created_at DESC
+            LIMIT ' . $limit
+        );
+        $st->execute([':like' => '%' . $q . '%']);
+        return $st->fetchAll();
+    }
+
+    public function itemsByPresupuesto(int $presupuestoId): array
+    {
+        $st = Db::pdo()->prepare('
+            SELECT pi.*, p.precio, i.tiva
+            FROM presupuesto_items pi
+            LEFT JOIN producto p ON p.idprodu = pi.idprodu
+            LEFT JOIN ivaprodu i ON i.codivaprodu = p.iva
+            WHERE pi.presupuesto_id = :p
+            ORDER BY pi.id ASC
+        ');
+        $st->execute([':p' => $presupuestoId]);
+        return $st->fetchAll();
+    }
+
     public function findClienteErpByWebId(int $webUserId): ?array
     {
         $st = Db::pdo()->prepare('

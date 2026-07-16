@@ -44,6 +44,8 @@ final class FacturaController
         $repo = new FacturaRepo();
         $remitoId = (int)($_GET['remito_id'] ?? 0);
         $remitoItems = [];
+        $presupuestoId = (int)($_GET['presupuesto_id'] ?? 0);
+        $presupuestoItems = [];
 
         $vendedoresSesion = $auth->getVendedores();
         $vendedores = [];
@@ -60,10 +62,19 @@ final class FacturaController
             }
         }
 
+        if ($presupuestoId > 0) {
+            $presupuesto = (new \Perfushopping\Web\Repo\PresupuestoRepo())->findById($presupuestoId);
+            if ($presupuesto && $presupuesto['estado'] === 'aprobado') {
+                $presupuestoItems = $repo->itemsByPresupuesto($presupuestoId);
+            }
+        }
+
         echo View::adminPage('admin/facturas/pos.php', [
             'adminUser' => $adminUser,
             'remitoId' => $remitoId,
             'remitoItems' => $remitoItems,
+            'presupuestoId' => $presupuestoId,
+            'presupuestoItems' => $presupuestoItems,
             'vendedores' => $vendedores,
             'csrf' => Csrf::token(),
             'pageTitle' => 'Nueva factura',
@@ -74,9 +85,9 @@ final class FacturaController
     {
         $auth = new AdminAuthService();
         $adminUser = $auth->requireSesion();
-        Csrf::check($_POST['_csrf'] ?? null);
 
         $input = json_decode(file_get_contents('php://input'), true);
+        Csrf::check($input['_csrf'] ?? null);
         if (!$input || !isset($input['items']) || !is_array($input['items'])) {
             Response::json(['ok' => false, 'error' => 'Datos inválidos.']);
             return;
@@ -193,6 +204,15 @@ final class FacturaController
                 $remitoId = null;
             }
         }
+        $presupuestoId = (int)($input['presupuesto_id'] ?? 0) ?: null;
+        if ($presupuestoId) {
+            $p = (new \Perfushopping\Web\Repo\PresupuestoRepo())->findById($presupuestoId);
+            if ($p && $p['estado'] === 'aprobado') {
+                $notas = ($notas ? $notas . "\n" : '') . 'Presupuesto: ' . $p['codigo'];
+            } else {
+                $presupuestoId = null;
+            }
+        }
 
         $fecha = (string)($input['fecha'] ?? date('Y-m-d'));
         $descuento = max(0, (int)($input['descuento_cents'] ?? 0));
@@ -201,7 +221,7 @@ final class FacturaController
             'codigo' => $codigo,
             'tipo_comprobante' => $tipo,
             'remito_id' => $remitoId,
-            'presupuesto_id' => null,
+            'presupuesto_id' => $presupuestoId,
             'cliente_id' => $clienteId,
             'idclien' => $clienteErpId,
             'cliente_nombre' => $clienteNombre,
@@ -450,6 +470,17 @@ final class FacturaController
 
         $q = trim((string)($_GET['q'] ?? ''));
         $results = (new FacturaRepo())->findRemitosDisponibles($q);
+
+        Response::json($results);
+    }
+
+    public function searchPresupuestos(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requireSesion();
+
+        $q = trim((string)($_GET['q'] ?? ''));
+        $results = (new FacturaRepo())->findPresupuestosDisponibles($q);
 
         Response::json($results);
     }

@@ -211,6 +211,7 @@ $router->post('/admin/facturas/delete', [AdminFacturaController::class, 'delete'
 $router->get('/admin/facturas/buscar-productos', [AdminFacturaController::class, 'searchProducts']);
 $router->get('/admin/facturas/buscar-clientes', [AdminFacturaController::class, 'searchClientes']);
 $router->get('/admin/facturas/buscar-remitos', [AdminFacturaController::class, 'searchRemitos']);
+$router->get('/admin/facturas/buscar-presupuestos', [AdminFacturaController::class, 'searchPresupuestos']);
 $router->get('/admin/facturas/imprimir/(?P<id>\d+)', [AdminFacturaController::class, 'print']);
 $router->post('/admin/facturas/(?P<id>\d+)/enviar-email', [AdminFacturaController::class, 'sendEmail']);
 $router->get('/admin/recibos', [AdminReciboController::class, 'create']);

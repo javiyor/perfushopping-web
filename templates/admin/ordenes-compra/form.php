@@ -19,8 +19,12 @@ $csrfToken = $csrf ?? '';
             <div class="card shadow-sm mb-3">
                 <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
                     <span>Productos</span>
-                    <button class="btn btn-sm btn-outline-primary" type="button" onclick="addRow()"><i class="bi bi-plus-lg"></i> Agregar</button>
+                    <div class="d-flex gap-1">
+                        <button class="btn btn-sm btn-outline-secondary" type="button" id="btnScanOC" title="Escanear código de barras"><i class="bi bi-camera"></i></button>
+                        <button class="btn btn-sm btn-outline-primary" type="button" onclick="addRow()"><i class="bi bi-plus-lg"></i> Agregar</button>
+                    </div>
                 </div>
+                <div id="scanReaderOC" style="display:none;max-width:300px;margin:4px auto"></div>
                 <div class="card-body p-0">
                     <table class="table table-sm mb-0" id="itemsTable">
                         <thead>
@@ -104,6 +108,7 @@ $csrfToken = $csrf ?? '';
 .suggestion-item:last-child { border-radius:0 0 6px 6px; }
 </style>
 
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
 let rowCounter = 1;
 
@@ -291,6 +296,51 @@ if (provInput) {
     });
     provInput.addEventListener('blur', function() {
         setTimeout(() => provSuggestions.innerHTML = '', 300);
+    });
+}
+
+// ── Barcode scanner ──
+let scannerOC = null;
+let scanningOC = false;
+const scanBtnOC = document.getElementById('btnScanOC');
+if (scanBtnOC) {
+    scanBtnOC.addEventListener('click', function() {
+        const reader = document.getElementById('scanReaderOC');
+        if (scanningOC) {
+            if (scannerOC) { scannerOC.stop().catch(()=>{}); scannerOC.clear(); }
+            reader.style.display = 'none';
+            scanningOC = false;
+            return;
+        }
+        reader.style.display = 'block';
+        if (!scannerOC) {
+            if (typeof Html5Qrcode !== 'undefined') {
+                scannerOC = new Html5Qrcode('scanReaderOC');
+            } else {
+                alert('Cargando lector... refrescá la página');
+                reader.style.display = 'none';
+                return;
+            }
+        }
+        scannerOC.start(
+            { facingMode: 'environment' },
+            { fps: 15, qrbox: { width: 250, height: 100 } },
+            function(decodedText) {
+                scannerOC.stop().catch(()=>{});
+                reader.style.display = 'none';
+                scanningOC = false;
+                const focused = document.querySelector('.prod-input:focus');
+                const input = focused || document.querySelector('.prod-input');
+                if (input) {
+                    input.value = decodedText;
+                    input.dispatchEvent(new Event('input'));
+                }
+            },
+            function() {}
+        ).then(() => { scanningOC = true; }).catch(err => {
+            alert('Error cámara: ' + err);
+            reader.style.display = 'none';
+        });
     });
 }
 
