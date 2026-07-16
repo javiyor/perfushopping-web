@@ -184,6 +184,7 @@ final class RemitoRepo
                 SELECT idcodgusto, nomgusto, codscan, stockact
                 FROM gustos
                 WHERE idprodu = :id AND discont = 0
+                GROUP BY nomgusto
                 ORDER BY nomgusto ASC
                 LIMIT 20
             ');

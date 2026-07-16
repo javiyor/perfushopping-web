@@ -180,6 +180,7 @@ final class FacturaRepo
             FROM producto p
             LEFT JOIN ivaprodu i ON i.codivaprodu = p.iva
             WHERE p.produ LIKE :like OR p.codprodu LIKE :like OR p.codprodup LIKE :like
+            GROUP BY p.idprodu
             ORDER BY p.produ ASC
             LIMIT ' . $limit;
         $st = $pdo->prepare($sql);
@@ -194,6 +195,7 @@ final class FacturaRepo
                 INNER JOIN producto p ON p.idprodu = g.idprodu
                 LEFT JOIN ivaprodu i ON i.codivaprodu = p.iva
                 WHERE g.codscan = :c
+                GROUP BY p.idprodu
                 LIMIT 1
             ');
             $st2->execute([':c' => $q]);
@@ -213,6 +215,7 @@ final class FacturaRepo
                 SELECT idcodgusto, nomgusto, codscan, stockact
                 FROM gustos
                 WHERE idprodu = :id AND discont = 0
+                GROUP BY nomgusto
                 ORDER BY nomgusto ASC
                 LIMIT 20
             ');
