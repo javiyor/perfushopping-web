@@ -49,16 +49,16 @@
             gap: 10px;
         }
         .sidebar-brand img { height: 32px; }
-.sidebar-nav { flex: 1; overflow-y: auto; padding: 6px 0; }
-.sidebar-nav .nav-section { padding: 4px 20px 2px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: rgba(255,255,255,.3); }
+.sidebar-nav { flex: 1; overflow-y: auto; padding: 4px 0; }
+.sidebar-nav .nav-section { padding: 3px 20px 1px; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: rgba(255,255,255,.25); }
 .sidebar-nav a {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 5px 20px;
+    gap: 8px;
+    padding: 3px 20px;
     color: #c8ccd4;
     text-decoration: none;
-    font-size: 14px;
+    font-size: 13px;
     transition: background .12s;
 }
 .sidebar-nav a:hover { background: var(--sidebar-hover); color: #f6f4ef; }
@@ -190,49 +190,51 @@
         </div>
         <nav class="sidebar-nav">
             <div class="nav-section">General</div>
-            <a href="/admin" class="<?= $currentPath === '/admin' ? 'active' : '' ?>"><i class="bi bi-speedometer2"></i>Panel Principal</a>
-
-            <div class="nav-section">Productos</div>
-            <a href="/admin/productos" class="<?= ($currentPath === '/admin/productos' || preg_match('#^/admin/productos/\d+#', $currentPath)) ? 'active' : '' ?>"><i class="bi bi-box-seam"></i>Productos</a>
-            <a href="/admin/productos/importar" class="<?= str_starts_with($currentPath, '/admin/productos/importar') ? 'active' : '' ?>"><i class="bi bi-upload"></i>Importar</a>
-            <a href="/admin/departamentos" class="<?= $currentPath === '/admin/departamentos' ? 'active' : '' ?>"><i class="bi bi-tags"></i>Departamentos</a>
-            <a href="/admin/proveedores" class="<?= $currentPath === '/admin/proveedores' ? 'active' : '' ?>"><i class="bi bi-truck"></i>Proveedores</a>
-            <a href="/admin/proveedores/ctacte" class="<?= str_starts_with($currentPath, '/admin/proveedores/ctacte') ? 'active' : '' ?>"><i class="bi bi-currency-dollar"></i>Cta Cte Proveedores</a>
-            <a href="/admin/ordenes-compra" class="<?= str_starts_with($currentPath, '/admin/ordenes-compra') ? 'active' : '' ?>"><i class="bi bi-cart-plus"></i>Órdenes compra</a>
-            <a href="/admin/ordenes-pago" class="<?= str_starts_with($currentPath, '/admin/ordenes-pago') ? 'active' : '' ?>"><i class="bi bi-credit-card"></i>Órdenes pago</a>
-            <a href="/admin/ordenes-compra/fletes" class="<?= $currentPath === '/admin/ordenes-compra/fletes' ? 'active' : '' ?>"><i class="bi bi-truck"></i>Fletes</a>
-            <a href="/admin/stock" class="<?= str_starts_with($currentPath, '/admin/stock') ? 'active' : '' ?>"><i class="bi bi-boxes"></i>Stock</a>
-            <a href="/admin/stock/ajuste" class="<?= str_starts_with($currentPath, '/admin/stock/ajuste') ? 'active' : '' ?>"><i class="bi bi-pencil-square"></i>Ajuste stock</a>
-            <a href="/admin/stock/grilla" class="<?= str_starts_with($currentPath, '/admin/stock/grilla') ? 'active' : '' ?>"><i class="bi bi-grid-3x3-gap"></i>Grilla reposición</a>
+            <a href="/admin"><i class="bi bi-speedometer2"></i>Panel Principal</a>
 
             <div class="nav-section">Ventas</div>
-            <a href="/admin/orders" class="<?= str_starts_with($currentPath, '/admin/orders') ? 'active' : '' ?>"><i class="bi bi-cart"></i>Pedidos<span class="badge-count green" id="badgePedidosNuevos" style="display:none">0</span><span class="badge-count red" id="badgePedidosAbandonados" style="display:none">0</span></a>
-            <a href="/admin/prepare" class="<?= str_starts_with($currentPath, '/admin/prepare') ? 'active' : '' ?>"><i class="bi bi-box"></i>Preparar</a>
-            <a href="/admin/presupuestos" class="<?= str_starts_with($currentPath, '/admin/presupuestos') ? 'active' : '' ?>"><i class="bi bi-file-text"></i>Presupuestos</a>
-            <a href="/admin/remitos" class="<?= str_starts_with($currentPath, '/admin/remitos') ? 'active' : '' ?>"><i class="bi bi-receipt"></i>Remitos</a>
-            <a href="/admin/facturas" class="<?= str_starts_with($currentPath, '/admin/facturas') ? 'active' : '' ?>"><i class="bi bi-receipt-cutoff"></i>Facturación</a>
-            <a href="/admin/recibos" class="<?= str_starts_with($currentPath, '/admin/recibos') ? 'active' : '' ?>"><i class="bi bi-wallet2"></i>Recibos</a>
-            <a href="/admin/ctacte" class="<?= str_starts_with($currentPath, '/admin/ctacte') ? 'active' : '' ?>"><i class="bi bi-currency-dollar"></i>Ctas. ctes.</a>
-            <a href="/admin/caja" class="<?= str_starts_with($currentPath, '/admin/caja') && $currentPath !== '/admin/caja/general' ? 'active' : '' ?>"><i class="bi bi-cash-stack"></i>Caja</a>
-            <a href="/admin/caja/general" class="<?= $currentPath === '/admin/caja/general' ? 'active' : '' ?>"><i class="bi bi-piggy-bank"></i>Caja General</a>
-            <a href="/admin/impresion/config" class="<?= $currentPath === '/admin/impresion/config' ? 'active' : '' ?>"><i class="bi bi-printer"></i>Impresión</a>
-            <a href="/admin/arca" class="<?= str_starts_with($currentPath, '/admin/arca') ? 'active' : '' ?>"><i class="bi bi-cloud-check"></i>ARCA</a>
-            <a href="/admin/reportes" class="<?= str_starts_with($currentPath, '/admin/reportes') ? 'active' : '' ?>"><i class="bi bi-graph-up"></i>Reportes</a>
+            <a href="/admin/orders"><i class="bi bi-cart"></i>Pedidos<span class="badge-count green" id="badgePedidosNuevos" style="display:none">0</span><span class="badge-count red" id="badgePedidosAbandonados" style="display:none">0</span></a>
+            <a href="/admin/prepare"><i class="bi bi-box"></i>Preparar</a>
+            <a href="/admin/presupuestos"><i class="bi bi-file-text"></i>Presupuestos</a>
+            <a href="/admin/remitos"><i class="bi bi-receipt"></i>Remitos</a>
+            <a href="/admin/facturas"><i class="bi bi-receipt-cutoff"></i>Facturación</a>
+            <a href="/admin/recibos"><i class="bi bi-wallet2"></i>Recibos</a>
+            <a href="/admin/ctacte"><i class="bi bi-currency-dollar"></i>Ctas. ctes.</a>
+            <a href="/admin/caja"><i class="bi bi-cash-stack"></i>Caja</a>
+            <a href="/admin/caja/general"><i class="bi bi-piggy-bank"></i>Caja General</a>
+            <a href="/admin/impresion/config"><i class="bi bi-printer"></i>Impresión</a>
+            <a href="/admin/arca"><i class="bi bi-cloud-check"></i>ARCA</a>
+            <a href="/admin/reportes"><i class="bi bi-graph-up"></i>Reportes</a>
+
+            <div class="nav-section">Productos</div>
+            <a href="/admin/productos"><i class="bi bi-box-seam"></i>Productos</a>
+            <a href="/admin/productos/importar"><i class="bi bi-upload"></i>Importar</a>
+            <a href="/admin/departamentos"><i class="bi bi-tags"></i>Departamentos</a>
+            <a href="/admin/stock"><i class="bi bi-boxes"></i>Stock</a>
+            <a href="/admin/stock/ajuste"><i class="bi bi-pencil-square"></i>Ajuste stock</a>
+            <a href="/admin/stock/grilla"><i class="bi bi-grid-3x3-gap"></i>Grilla reposición</a>
 
             <div class="nav-section">Clientes</div>
-            <a href="/admin/clientes" class="<?= str_starts_with($currentPath, '/admin/clientes') ? 'active' : '' ?>"><i class="bi bi-people"></i>Clientes</a>
-            <a href="/admin/users" class="<?= str_starts_with($currentPath, '/admin/users') ? 'active' : '' ?>"><i class="bi bi-person-gear"></i>Usuarios web<span class="badge-count green" id="badgeUsuariosNuevos" style="display:none">0</span></a>
+            <a href="/admin/clientes"><i class="bi bi-people"></i>Clientes</a>
+            <a href="/admin/users"><i class="bi bi-person-gear"></i>Usuarios web<span class="badge-count green" id="badgeUsuariosNuevos" style="display:none">0</span></a>
+
+            <div class="nav-section">Compras</div>
+            <a href="/admin/proveedores"><i class="bi bi-truck"></i>Proveedores</a>
+            <a href="/admin/proveedores/ctacte"><i class="bi bi-currency-dollar"></i>Cta Cte Proveedores</a>
+            <a href="/admin/ordenes-compra"><i class="bi bi-cart-plus"></i>Órdenes compra</a>
+            <a href="/admin/ordenes-pago"><i class="bi bi-credit-card"></i>Órdenes pago</a>
+            <a href="/admin/ordenes-compra/fletes"><i class="bi bi-truck"></i>Fletes</a>
 
             <div class="nav-section">Administración</div>
-            <a href="/admin/usuarios" class="<?= str_starts_with($currentPath, '/admin/usuarios') ? 'active' : '' ?>"><i class="bi bi-shield-lock"></i>Admins</a>
-            <a href="/admin/empleados" class="<?= str_starts_with($currentPath, '/admin/empleados') ? 'active' : '' ?>"><i class="bi bi-person-badge"></i>Empleados</a>
-            <a href="/admin/wholesale" class="<?= str_starts_with($currentPath, '/admin/wholesale') ? 'active' : '' ?>"><i class="bi bi-shop"></i>Mayoristas</a>
-            <a href="/admin/withdrawals" class="<?= str_starts_with($currentPath, '/admin/withdrawals') ? 'active' : '' ?>"><i class="bi bi-cash"></i>Retiros</a>
-            <a href="/admin/correo" class="<?= str_starts_with($currentPath, '/admin/correo') ? 'active' : '' ?>"><i class="bi bi-truck"></i>Correo Argentino</a>
-            <a href="/admin/capacitaciones" class="<?= str_starts_with($currentPath, '/admin/capacitaciones') ? 'active' : '' ?>"><i class="bi bi-calendar-event"></i>Capacitaciones</a>
-            <a href="/admin/cheques" class="<?= str_starts_with($currentPath, '/admin/cheques') ? 'active' : '' ?>"><i class="bi bi-file-text"></i>Cheques</a>
-            <a href="/admin/sucursales" class="<?= str_starts_with($currentPath, '/admin/sucursales') ? 'active' : '' ?>"><i class="bi bi-building"></i>Sucursales</a>
-            <a href="/admin/email" class="<?= str_starts_with($currentPath, '/admin/email') ? 'active' : '' ?>"><i class="bi bi-envelope"></i>Email</a>
+            <a href="/admin/usuarios"><i class="bi bi-shield-lock"></i>Admins</a>
+            <a href="/admin/empleados"><i class="bi bi-person-badge"></i>Empleados</a>
+            <a href="/admin/wholesale"><i class="bi bi-shop"></i>Mayoristas</a>
+            <a href="/admin/withdrawals"><i class="bi bi-cash"></i>Retiros</a>
+            <a href="/admin/correo"><i class="bi bi-truck"></i>Correo Argentino</a>
+            <a href="/admin/capacitaciones"><i class="bi bi-calendar-event"></i>Capacitaciones</a>
+            <a href="/admin/cheques"><i class="bi bi-file-text"></i>Cheques</a>
+            <a href="/admin/sucursales"><i class="bi bi-building"></i>Sucursales</a>
+            <a href="/admin/email"><i class="bi bi-envelope"></i>Email</a>
         </nav>
     </aside>
 
