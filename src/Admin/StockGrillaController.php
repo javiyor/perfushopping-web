@@ -99,8 +99,8 @@ final class StockGrillaController
                 'codscan' => $prod['codscan'] ?? '',
                 'codprodup' => $prod['codprodup'] ?? '',
                 'qty' => $qty,
-                'unit_price_cents' => (int)($prod['precomp'] ?? 0),
-                'total_cents' => $qty * (int)($prod['precomp'] ?? 0),
+                'unit_price_cents' => (int)round((float)($prod['precomp'] ?? 0) * 100),
+                'total_cents' => $qty * (int)round((float)($prod['precomp'] ?? 0) * 100),
                 'proveedor_nombre' => $proveedorNombre,
                 'proveedor_id' => $proveedorId,
             ];

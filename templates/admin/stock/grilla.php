@@ -135,7 +135,7 @@ $hasta = (string)($hasta ?? '');
                         </span>
                     </td>
                     <td class="text-end small"><?= (int)($p['vendidos'] ?? 0) ?></td>
-                    <td class="text-end small"><?= Format::moneyFromCents((int)($p['precomp'] ?? 0)) ?></td>
+                    <td class="text-end small"><?= Format::moneyFromCents((int)round((float)($p['precomp'] ?? 0) * 100)) ?></td>
                     <td>
                         <input type="number" name="cantidad[<?= (int)$p['idprodu'] ?>]" class="form-control form-control-sm text-end cant-input" value="0" min="0" step="1" style="width:90px" data-id="<?= (int)$p['idprodu'] ?>" />
                     </td>

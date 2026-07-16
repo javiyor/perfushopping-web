@@ -293,6 +293,12 @@ final class AdminProductRepo
         ]);
     }
 
+    public function updateVariantBarcode(int $idcodgusto, string $codscan): void
+    {
+        $st = Db::pdo()->prepare('UPDATE gustos SET codscan = :c WHERE idcodgusto = :id LIMIT 1');
+        $st->execute([':c' => $codscan, ':id' => $idcodgusto]);
+    }
+
     public function updateMainImage(int $idprodu, string $filename): void
     {
         $st = Db::pdo()->prepare('UPDATE producto SET imagen = :img WHERE idprodu = :id LIMIT 1');
@@ -317,5 +323,94 @@ final class AdminProductRepo
         $st = Db::pdo()->prepare('INSERT INTO imagen (rutaimg, idprodu, idcodgusto) VALUES (:r, :p, :g)');
         $st->execute([':r' => $filename, ':p' => $idprodu, ':g' => $idcodgusto]);
         return (int)Db::pdo()->lastInsertId();
+    }
+
+    /** @return array{items: array, total: int} */
+    public function searchForPriceUpdate(string $q = '', int $codsub = 0, string $codprove = '', string $fecompraDesde = '', string $fecompraHasta = '', int $page = 1, int $perPage = 50): array
+    {
+        $pdo = Db::pdo();
+        $page = max(1, $page);
+        $perPage = max(10, min(200, $perPage));
+        $q = trim($q);
+
+        $params = [];
+        $where = [];
+
+        if ($q !== '') {
+            if (ctype_digit($q)) {
+                $where[] = '(p.idprodu = :id_exact OR p.codprodu LIKE :like_prefix OR p.produ LIKE :like_any)';
+                $params[':id_exact'] = (int)$q;
+            } else {
+                $where[] = '(p.codprodu LIKE :like_prefix OR p.produ LIKE :like_any)';
+            }
+            $params[':like_prefix'] = $q . '%';
+            $params[':like_any'] = '%' . $q . '%';
+        }
+
+        if ($codsub > 0) {
+            $where[] = 'p.codsub = :codsub';
+            $params[':codsub'] = $codsub;
+        }
+
+        if ($codprove !== '') {
+            $where[] = 'p.codprove = :codprove';
+            $params[':codprove'] = $codprove;
+        }
+
+        if ($fecompraDesde !== '') {
+            $where[] = 'p.fecompra >= :fecompra_desde';
+            $params[':fecompra_desde'] = $fecompraDesde;
+        }
+
+        if ($fecompraHasta !== '') {
+            $where[] = 'p.fecompra <= :fecompra_hasta';
+            $params[':fecompra_hasta'] = $fecompraHasta;
+        }
+
+        $whereClause = $where ? ' WHERE ' . implode(' AND ', $where) : '';
+
+        $from = '
+            FROM producto p
+            LEFT JOIN subrubro s ON s.codsub = p.codsub
+            LEFT JOIN rubros r ON r.codrub = p.codrub
+            LEFT JOIN proveedo pv ON pv.codprove = p.codprove
+        ';
+
+        $stCount = $pdo->prepare('SELECT COUNT(*) ' . $from . $whereClause);
+        $stCount->execute($params);
+        $total = (int)$stCount->fetchColumn();
+
+        $offset = ($page - 1) * $perPage;
+        $stData = $pdo->prepare('
+            SELECT p.idprodu, p.codprodu, p.produ, p.precomp, p.precio, p.precio1, p.fecompra, p.codprove,
+                   s.nomsub, r.nomrub, pv.razon AS nomprove
+            ' . $from . $whereClause . '
+            ORDER BY p.idprodu DESC
+            LIMIT ' . $perPage . ' OFFSET ' . $offset
+        );
+        $stData->execute($params);
+        $items = $stData->fetchAll();
+
+        return ['items' => $items, 'total' => $total];
+    }
+
+    /** @param int[] $ids */
+    public function bulkPriceUpdate(array $ids, float $percentage): int
+    {
+        if (!$ids) return 0;
+
+        $factor = 1 + ($percentage / 100);
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+
+        $st = Db::pdo()->prepare("
+            UPDATE producto
+            SET precomp = ROUND(precomp * {$factor}, 2),
+                precio = ROUND(precio * {$factor}, 2),
+                precio1 = ROUND(precio1 * {$factor}, 2),
+                fecompra = CURDATE()
+            WHERE idprodu IN ({$placeholders})
+        ");
+        $st->execute(array_map('intval', $ids));
+        return $st->rowCount();
     }
 }

@@ -3,6 +3,7 @@ storage/
 public/uploads/
 *.lnk
 nul
+node_modules/
 src/sync_config.php
 sync_export.sql
 push_daily.bat

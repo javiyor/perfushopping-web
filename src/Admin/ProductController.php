@@ -378,6 +378,47 @@ final class ProductController
         Response::redirect('/admin/productos');
     }
 
+    public function saveBarcode(array $params): void
+    {
+        $this->auth->requireSesion();
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $idprodu = (int)($_POST['idprodu'] ?? 0);
+        $idcodgusto = (int)($_POST['idcodgusto'] ?? 0);
+        $codscan = trim((string)($_POST['codscan'] ?? ''));
+
+        if ($idprodu <= 0 || $idcodgusto <= 0 || $codscan === '') {
+            Response::json(['ok' => false, 'error' => 'Datos inválidos.']);
+            return;
+        }
+
+        $this->repo->updateVariantBarcode($idcodgusto, $codscan);
+        Response::json(['ok' => true]);
+    }
+
+    public function printLabels(array $params): void
+    {
+        $this->auth->requireSesion();
+        $id = (int)($params['id'] ?? 0);
+
+        $product = $this->repo->find($id);
+        if (!$product) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Producto no encontrado.'];
+            Response::redirect('/admin/productos');
+        }
+
+        $variants = $this->repo->variants($id);
+        if (!$variants) {
+            $_SESSION['admin_flash'] = ['type' => 'warning', 'text' => 'El producto no tiene variedades para etiquetar.'];
+            Response::redirect('/admin/productos/' . $id);
+        }
+
+        echo View::render('admin/productos/labels.php', [
+            'product' => $product,
+            'variants' => $variants,
+        ]);
+    }
+
     public function deleteVariant(array $params): void
     {
         $this->auth->requireSesion();

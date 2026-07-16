@@ -279,7 +279,7 @@ document.getElementById('btnScanCam').addEventListener('click', function() {
 });
 
 function fmtPrice(cents) {
-    return Math.round(cents / 100).toLocaleString('es-AR');
+    return (cents / 100).toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 }
 
 // ── Load remito items if present ──
@@ -291,7 +291,7 @@ addToCart({
     producto: '<?= htmlspecialchars($ri['producto'] ?? '', ENT_QUOTES) ?>',
     variedad: '<?= htmlspecialchars($ri['variedad'] ?? '', ENT_QUOTES) ?>',
     qty: <?= (int)($ri['qty'] ?? 1) ?>,
-    unit_price_cents: <?= (int)($ri['precio'] ?? 0) * 100 ?>,
+    unit_price_cents: <?= (int)round((float)($ri['precio'] ?? 0) * 100) ?>,
     iva_rate: <?= (float)($ri['tiva'] ?? 21) ?>,
 });
 <?php endforeach; ?>
@@ -305,7 +305,7 @@ addToCart({
     producto: '<?= htmlspecialchars($pi['producto'] ?? '', ENT_QUOTES) ?>',
     variedad: '<?= htmlspecialchars($pi['variedad'] ?? '', ENT_QUOTES) ?>',
     qty: <?= (int)($pi['qty'] ?? 1) ?>,
-    unit_price_cents: <?= (int)($pi['precio'] ?? 0) * 100 ?>,
+    unit_price_cents: <?= (int)round((float)($pi['precio'] ?? 0) * 100) ?>,
     iva_rate: <?= (float)($pi['tiva'] ?? 21) ?>,
 });
 <?php endforeach; ?>

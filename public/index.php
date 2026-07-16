@@ -38,6 +38,7 @@ use Perfushopping\Web\Admin\DashboardController as AdminDashboardController;
 use Perfushopping\Web\Admin\UserController as AdminUserController;
 use Perfushopping\Web\Admin\ProductController as AdminProductControllerNew;
 use Perfushopping\Web\Admin\ImportController as AdminImportController;
+use Perfushopping\Web\Admin\PriceUpdateController as AdminPriceUpdateController;
 use Perfushopping\Web\Admin\DepartamentoController as AdminDepartamentoController;
 use Perfushopping\Web\Admin\CustomerController as AdminCustomerController;
 use Perfushopping\Web\Admin\ProveedorController as AdminProveedorController;
@@ -170,6 +171,8 @@ $router->post('/admin/productos/describe', [AdminProductControllerNew::class, 'd
 $router->get('/admin/productos/importar', [AdminImportController::class, 'form']);
 $router->post('/admin/productos/importar/preview', [AdminImportController::class, 'preview']);
 $router->post('/admin/productos/importar/confirm', [AdminImportController::class, 'confirm']);
+$router->get('/admin/productos/actualizar-precios', [AdminPriceUpdateController::class, 'index']);
+$router->post('/admin/productos/actualizar-precios', [AdminPriceUpdateController::class, 'apply']);
 $router->get('/admin/departamentos', [AdminDepartamentoController::class, 'index']);
 $router->post('/admin/departamentos/save', [AdminDepartamentoController::class, 'save']);
 $router->post('/admin/departamentos/delete', [AdminDepartamentoController::class, 'delete']);

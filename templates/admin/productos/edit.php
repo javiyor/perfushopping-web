@@ -222,105 +222,149 @@ foreach ($proveedores as $prov) {
 <div class="card shadow-sm mt-2">
     <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
         <span>Variedades</span>
-        <span class="badge bg-secondary"><?= count($variants) ?></span>
+        <div class="d-flex gap-1 align-items-center">
+            <a class="btn btn-sm btn-outline-success" href="/admin/productos/etiquetas/<?= $selectedId ?>" target="_blank"><i class="bi bi-upc-scan"></i> Imprimir etiquetas</a>
+            <span class="badge bg-secondary"><?= count($variants) ?></span>
+        </div>
     </div>
     <div class="card-body">
-        <?php if (!$variants): ?>
-            <div class="text-muted small">Este producto no tiene variedades.</div>
-        <?php else: ?>
-            <?php
-            $logisticsSeed = ['weight_g' => '', 'height_cm' => '', 'width_cm' => '', 'depth_cm' => '', 'product_category' => ''];
-            foreach ($variants as $sv) {
-                if ((int)($sv['weight_g'] ?? 0) > 0 || (int)($sv['height_cm'] ?? 0) > 0 || (int)($sv['width_cm'] ?? 0) > 0 || (int)($sv['depth_cm'] ?? 0) > 0 || trim((string)($sv['product_category'] ?? '')) !== '') {
-                    $logisticsSeed = ['weight_g' => (string)$sv['weight_g'], 'height_cm' => (string)$sv['height_cm'], 'width_cm' => (string)$sv['width_cm'], 'depth_cm' => (string)$sv['depth_cm'], 'product_category' => (string)$sv['product_category']];
-                    break;
-                }
+        <?php
+        $logisticsSeed = ['weight_g' => '', 'height_cm' => '', 'width_cm' => '', 'depth_cm' => '', 'product_category' => ''];
+        foreach ($variants as $sv) {
+            if ((int)($sv['weight_g'] ?? 0) > 0 || (int)($sv['height_cm'] ?? 0) > 0 || (int)($sv['width_cm'] ?? 0) > 0 || (int)($sv['depth_cm'] ?? 0) > 0 || trim((string)($sv['product_category'] ?? '')) !== '') {
+                $logisticsSeed = ['weight_g' => (string)$sv['weight_g'], 'height_cm' => (string)$sv['height_cm'], 'width_cm' => (string)$sv['width_cm'], 'depth_cm' => (string)$sv['depth_cm'], 'product_category' => (string)$sv['product_category']];
+                break;
             }
-            ?>
-            <?php foreach ($variants as $variant):
-                $variantId = (int)($variant['idcodgusto'] ?? 0);
-                $vw = (int)($variant['weight_g'] ?? 0) > 0 ? (string)$variant['weight_g'] : $logisticsSeed['weight_g'];
-                $vh = (int)($variant['height_cm'] ?? 0) > 0 ? (string)$variant['height_cm'] : $logisticsSeed['height_cm'];
-                $vwi = (int)($variant['width_cm'] ?? 0) > 0 ? (string)$variant['width_cm'] : $logisticsSeed['width_cm'];
-                $vd = (int)($variant['depth_cm'] ?? 0) > 0 ? (string)$variant['depth_cm'] : $logisticsSeed['depth_cm'];
-                $vc = trim((string)($variant['product_category'] ?? '')) !== '' ? (string)$variant['product_category'] : $logisticsSeed['product_category'];
-            ?>
-                <div class="border rounded p-2 mb-2">
-                    <div class="d-flex justify-content-between align-items-start mb-1">
-                        <div>
-                            <h6 class="fw-bold mb-0"><?= htmlspecialchars((string)($variant['nomgusto'] ?? '')) ?></h6>
-                            <small class="text-muted">ID: <?= $variantId ?> · Código: <?= htmlspecialchars((string)($variant['codscan'] ?? '-')) ?> · Stock: <?= htmlspecialchars((string)($variant['stockact'] ?? '0')) ?><?= ((int)($variant['discont'] ?? 0) === 1) ? ' · <span class="text-danger">Discontinuado</span>' : '' ?></small>
-                        </div>
-                        <div class="d-flex gap-2 align-items-center">
-                            <span class="badge bg-info"><?= is_array($variant['images'] ?? null) ? count($variant['images']) : 0 ?>/6 img</span>
-                            <form method="post" action="/admin/productos/variant/delete" onsubmit="return confirm('Eliminar esta variedad?')">
-                                <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
-                                <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
-                                <input type="hidden" name="idcodgusto" value="<?= $variantId ?>" />
-                                <button class="btn btn-sm btn-outline-danger py-0 px-1" style="font-size:11px" type="submit"><i class="bi bi-x-lg"></i></button>
-                            </form>
+        }
+        ?>
+        <?php foreach ($variants as $variant):
+            $variantId = (int)($variant['idcodgusto'] ?? 0);
+            $vw = (int)($variant['weight_g'] ?? 0) > 0 ? (string)$variant['weight_g'] : $logisticsSeed['weight_g'];
+            $vh = (int)($variant['height_cm'] ?? 0) > 0 ? (string)$variant['height_cm'] : $logisticsSeed['height_cm'];
+            $vwi = (int)($variant['width_cm'] ?? 0) > 0 ? (string)$variant['width_cm'] : $logisticsSeed['width_cm'];
+            $vd = (int)($variant['depth_cm'] ?? 0) > 0 ? (string)$variant['depth_cm'] : $logisticsSeed['depth_cm'];
+            $vc = trim((string)($variant['product_category'] ?? '')) !== '' ? (string)$variant['product_category'] : $logisticsSeed['product_category'];
+            $ean = \Perfushopping\Web\Support\Barcode::ean13((int)$variantId);
+        ?>
+            <div class="border rounded p-2 mb-2">
+                <div class="d-flex justify-content-between align-items-start mb-1">
+                    <div>
+                        <h6 class="fw-bold mb-0"><?= htmlspecialchars((string)($variant['nomgusto'] ?? 'Sin nombre')) ?></h6>
+                        <small class="text-muted">ID: <?= $variantId ?> · Código: <span class="codscan-val"><?= htmlspecialchars((string)($variant['codscan'] ?? '-')) ?></span> · EAN: <?= $ean ?> · Stock: <?= htmlspecialchars((string)($variant['stockact'] ?? '0')) ?><?= ((int)($variant['discont'] ?? 0) === 1) ? ' · <span class="text-danger">Discontinuado</span>' : '' ?></small>
+                    </div>
+                    <div class="d-flex gap-2 align-items-center">
+                        <span class="badge bg-info"><?= is_array($variant['images'] ?? null) ? count($variant['images']) : 0 ?>/6 img</span>
+                        <form method="post" action="/admin/productos/variant/delete" onsubmit="return confirm('Eliminar esta variedad?')">
+                            <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                            <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
+                            <input type="hidden" name="idcodgusto" value="<?= $variantId ?>" />
+                            <button class="btn btn-sm btn-outline-danger py-0 px-1" style="font-size:11px" type="submit"><i class="bi bi-x-lg"></i></button>
+                        </form>
+                    </div>
+                </div>
+
+                <?php if (!empty($variant['images']) && is_array($variant['images'])): ?>
+                    <div class="d-flex flex-wrap gap-1 mb-1">
+                        <?php foreach ($variant['images'] as $img): ?>
+                            <div class="text-center" style="width:80px">
+                                <img src="<?= htmlspecialchars(Format::uploadUrl((string)($img['rutaimg'] ?? ''))) ?>" alt="" style="width:70px;height:70px;object-fit:cover;border-radius:6px" />
+                                <form method="post" action="/admin/productos/variant-images/delete" class="mt-1">
+                                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                                    <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
+                                    <input type="hidden" name="idcodgusto" value="<?= $variantId ?>" />
+                                    <input type="hidden" name="idimagen" value="<?= (int)($img['idimagen'] ?? 0) ?>" />
+                                    <button class="btn btn-sm btn-outline-danger py-0 px-1" style="font-size:11px" type="submit">Quitar</button>
+                                </form>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php else: ?>
+                    <div class="small text-muted mb-2">Sin imágenes</div>
+                <?php endif; ?>
+
+                <div class="row g-1 mb-1 align-items-end">
+                    <div class="col-4">
+                        <label class="small text-muted mb-0">Código de barras (EAN-13)</label>
+                        <div class="input-group input-group-sm">
+                            <input class="form-control form-control-sm codscan-input" data-variant="<?= $variantId ?>" value="<?= htmlspecialchars((string)($variant['codscan'] ?? '')) ?>" placeholder="EAN-13" />
+                            <button class="btn btn-outline-secondary" type="button" onclick="generarEan(this, <?= $variantId ?>)"><i class="bi bi-upc-scan"></i></button>
+                            <button class="btn btn-outline-success" type="button" onclick="guardarCodscan(this, <?= $variantId ?>, <?= $selectedId ?>)"><i class="bi bi-check"></i></button>
                         </div>
                     </div>
-
-                    <?php if (!empty($variant['images']) && is_array($variant['images'])): ?>
-                        <div class="d-flex flex-wrap gap-1 mb-1">
-                            <?php foreach ($variant['images'] as $img): ?>
-                                <div class="text-center" style="width:80px">
-                                    <img src="<?= htmlspecialchars(Format::uploadUrl((string)($img['rutaimg'] ?? ''))) ?>" alt="" style="width:70px;height:70px;object-fit:cover;border-radius:6px" />
-                                    <form method="post" action="/admin/productos/variant-images/delete" class="mt-1">
-                                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
-                                        <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
-                                        <input type="hidden" name="idcodgusto" value="<?= $variantId ?>" />
-                                        <input type="hidden" name="idimagen" value="<?= (int)($img['idimagen'] ?? 0) ?>" />
-                                        <button class="btn btn-sm btn-outline-danger py-0 px-1" style="font-size:11px" type="submit">Quitar</button>
-                                    </form>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                    <?php else: ?>
-                        <div class="small text-muted mb-2">Sin imágenes</div>
-                    <?php endif; ?>
-
-                    <form method="post" action="/admin/productos/variant-logistics" class="row g-1 mb-1">
+                    <form method="post" action="/admin/productos/variant-logistics" class="row g-1 col-8">
                         <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
                         <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
                         <input type="hidden" name="idcodgusto" value="<?= $variantId ?>" />
-                        <div class="col-3">
+                        <div class="col-2">
                             <input class="form-control form-control-sm" name="weight_g" value="<?= htmlspecialchars($vw) ?>" placeholder="Peso g" />
                         </div>
-                        <div class="col-3">
+                        <div class="col-2">
                             <input class="form-control form-control-sm" name="height_cm" value="<?= htmlspecialchars($vh) ?>" placeholder="Alto cm" />
                         </div>
-                        <div class="col-3">
+                        <div class="col-2">
                             <input class="form-control form-control-sm" name="width_cm" value="<?= htmlspecialchars($vwi) ?>" placeholder="Ancho cm" />
                         </div>
-                        <div class="col-3">
+                        <div class="col-2">
                             <input class="form-control form-control-sm" name="depth_cm" value="<?= htmlspecialchars($vd) ?>" placeholder="Largo cm" />
                         </div>
-                        <div class="col-6">
-                            <input class="form-control form-control-sm" name="product_category" value="<?= htmlspecialchars($vc) ?>" placeholder="Cat. Correo" />
+                        <div class="col-2">
+                            <input class="form-control form-control-sm" name="product_category" value="<?= htmlspecialchars($vc) ?>" placeholder="Cat." />
                         </div>
-                        <div class="col-6 d-flex align-items-end">
-                            <button class="btn btn-outline-secondary btn-sm w-100" type="submit"><i class="bi bi-save"></i> Logística</button>
-                        </div>
-                    </form>
-
-                    <form method="post" action="/admin/productos/variant-images" enctype="multipart/form-data">
-                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
-                        <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
-                        <input type="hidden" name="idcodgusto" value="<?= $variantId ?>" />
-                        <div class="input-group input-group-sm">
-                            <input class="form-control" type="file" name="images[]" multiple accept=".jpg,.jpeg,.png,.webp" />
-                            <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-images"></i> Subir</button>
+                        <div class="col-2 d-grid">
+                            <button class="btn btn-outline-secondary btn-sm" type="submit"><i class="bi bi-save"></i></button>
                         </div>
                     </form>
                 </div>
-            <?php endforeach; ?>
+
+                <div class="row g-1">
+                    <div class="col-6">
+                        <form method="post" action="/admin/productos/variant-images" enctype="multipart/form-data" class="d-flex gap-1">
+                            <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                            <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
+                            <input type="hidden" name="idcodgusto" value="<?= $variantId ?>" />
+                            <input class="form-control form-control-sm" type="file" name="images[]" multiple accept=".jpg,.jpeg,.png,.webp" />
+                            <button class="btn btn-outline-secondary btn-sm flex-shrink-0" type="submit"><i class="bi bi-images"></i></button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        <?php endforeach; ?>
+        <?php if (!$variants): ?>
+            <div class="text-muted small mb-2">Este producto no tiene variedades.</div>
         <?php endif; ?>
     </div>
 </div>
 
 <script>
+function generarEan(btn, idcodgusto) {
+    const input = btn.closest('.input-group').querySelector('.codscan-input');
+    const padded = String(idcodgusto).padStart(12, '9');
+    let sum = 0;
+    for (let i = 0; i < 12; i++) sum += (i % 2 === 0) ? parseInt(padded[i]) : parseInt(padded[i]) * 3;
+    const check = (10 - (sum % 10)) % 10;
+    input.value = padded + check;
+}
+
+function guardarCodscan(btn, idcodgusto, idprodu) {
+    const input = btn.closest('.input-group').querySelector('.codscan-input');
+    const codscan = input.value.trim();
+    if (!codscan || codscan.length < 8) { alert('Código muy corto'); return; }
+    const csrf = document.querySelector('input[name="_csrf"]').value;
+    fetch('/admin/productos/variant/barcode', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: new URLSearchParams({_csrf: csrf, idprodu: idprodu, idcodgusto: idcodgusto, codscan: codscan})
+    }).then(r => r.json()).then(res => {
+        if (res.ok) {
+            document.querySelector('.codscan-val').textContent = codscan;
+            btn.innerHTML = '<i class="bi bi-check-lg"></i>';
+            setTimeout(() => btn.innerHTML = '<i class="bi bi-check"></i>', 1500);
+        } else {
+            alert(res.error || 'Error');
+        }
+    }).catch(() => alert('Error de conexión'));
+}
+
 document.querySelectorAll('[data-ai-generate]').forEach(btn => {
     btn.addEventListener('click', async function() {
         const endpoint = this.dataset.endpoint;

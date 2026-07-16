@@ -194,10 +194,10 @@ final class StockRepo
 
             // 1. Insert stockcab
             $st = $pdo->prepare('
-                INSERT INTO stockcab (iddepoh, iddepod, fecha, observ)
-                VALUES (:depoh, :depod, CURDATE(), :obs)
+                INSERT INTO stockcab (iddepoh, iddepod, fecha)
+                VALUES (:depoh, :depod, CURDATE())
             ');
-            $st->execute([':depoh' => $iddepoh, ':depod' => $iddepod, ':obs' => 'Ajuste manual: ' . $motivo]);
+            $st->execute([':depoh' => $iddepoh, ':depod' => $iddepod]);
             $cabId = (int)$pdo->lastInsertId();
 
             // 2. Insert stockdet

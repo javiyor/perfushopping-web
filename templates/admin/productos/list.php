@@ -36,6 +36,7 @@ $sortLink = fn(string $col) => '/admin/productos?' . http_build_query(array_merg
     <div class="d-flex gap-2">
         <a class="btn btn-accent btn-sm" href="/admin/productos/nuevo"><i class="bi bi-plus-lg"></i> Nuevo</a>
         <a class="btn btn-outline-secondary btn-sm" href="/admin/productos/importar"><i class="bi bi-upload"></i> Importar</a>
+        <a class="btn btn-outline-secondary btn-sm" href="/admin/productos/actualizar-precios"><i class="bi bi-percent"></i> Precios</a>
     </div>
 </div>
 
