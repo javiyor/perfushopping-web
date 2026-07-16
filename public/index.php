@@ -176,6 +176,8 @@ $router->post('/admin/departamentos/delete', [AdminDepartamentoController::class
 $router->get('/admin/clientes', [AdminCustomerController::class, 'index']);
 $router->get('/admin/clientes/(?P<id>\d+)', [AdminCustomerController::class, 'detail']);
 $router->post('/admin/clientes/nota', [AdminCustomerController::class, 'addNota']);
+$router->get('/admin/clientes/buscar-arca', [AdminCustomerController::class, 'buscarArca']);
+$router->post('/admin/clientes/crear-desde-arca', [AdminCustomerController::class, 'crearDesdeArca']);
 $router->get('/admin/proveedores', [AdminProveedorController::class, 'index']);
 $router->post('/admin/proveedores/save', [AdminProveedorController::class, 'save']);
 $router->post('/admin/proveedores/delete', [AdminProveedorController::class, 'delete']);

@@ -16,6 +16,8 @@ $customerCategories = [
         <h4 class="fw-bold mb-1">Clientes</h4>
         <p class="text-muted small">Usuarios registrados en la web con historial de compras</p>
     </div>
+    <button class="btn btn-accent btn-sm" data-bs-toggle="modal" data-bs-target="#arcaModal"><i class="bi bi-cloud-download"></i> Nuevo desde ARCA</button>
+    <input type="hidden" id="csrfToken" value="<?= htmlspecialchars($csrf ?? '') ?>" />
 </div>
 
 <div class="card shadow-sm mb-3">
@@ -97,3 +99,112 @@ $customerCategories = [
         <div class="card-footer text-muted small text-center">Mostrando hasta 60 resultados. Refiná la búsqueda si no encontrás lo que buscás.</div>
     <?php endif; ?>
 </div>
+
+<!-- ARCA search modal -->
+<div class="modal fade" id="arcaModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-cloud-download"></i> Buscar en ARCA</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label small">CUIT (11 dígitos) o DNI (7-8 dígitos)</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="arcaInput" placeholder="Ej: 20334942813" maxlength="11" autocomplete="off" />
+                        <button class="btn btn-accent" type="button" id="arcaSearchBtn" onclick="buscarArca()"><i class="bi bi-search"></i> Buscar</button>
+                    </div>
+                </div>
+                <div id="arcaResult" style="display:none">
+                    <hr />
+                    <div class="small fw-semibold mb-2">Datos obtenidos de ARCA:</div>
+                    <dl class="row small mb-2" id="arcaData"></dl>
+                    <button class="btn btn-accent btn-sm w-100" id="arcaSaveBtn" onclick="crearDesdeArca()"><i class="bi bi-person-plus"></i> Crear cliente</button>
+                </div>
+                <div id="arcaError" class="alert alert-danger small" style="display:none"></div>
+                <div id="arcaSpinner" class="text-center py-3" style="display:none">
+                    <div class="spinner-border spinner-border-sm text-accent" role="status"></div>
+                    <span class="small ms-2">Consultando ARCA...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let ultimaPersona = null;
+
+function buscarArca() {
+    const q = document.getElementById('arcaInput').value.trim();
+    if (!q) { alert('Ingresá un CUIT o DNI.'); return; }
+    document.getElementById('arcaResult').style.display = 'none';
+    document.getElementById('arcaError').style.display = 'none';
+    document.getElementById('arcaSpinner').style.display = '';
+    document.getElementById('arcaSearchBtn').disabled = true;
+
+    fetch('/admin/clientes/buscar-arca?q=' + encodeURIComponent(q))
+        .then(r => r.json())
+        .then(res => {
+            document.getElementById('arcaSpinner').style.display = 'none';
+            document.getElementById('arcaSearchBtn').disabled = false;
+            if (!res.ok) {
+                document.getElementById('arcaError').textContent = res.error;
+                document.getElementById('arcaError').style.display = '';
+                return;
+            }
+            ultimaPersona = res.persona;
+            const p = res.persona;
+            const condIvaLabel = { 'responsable_inscripto': 'Responsable Inscripto', 'consumidor_final': 'Consumidor Final', 'monotributista': 'Monotributista', 'exento': 'Exento' };
+            document.getElementById('arcaData').innerHTML =
+                '<dt class="col-sm-4">CUIT</dt><dd class="col-sm-8">' + esc(p.cuit) + '</dd>' +
+                '<dt class="col-sm-4">Razón social</dt><dd class="col-sm-8 fw-bold">' + esc(p.razon || p.razonSocial || '') + '</dd>' +
+                '<dt class="col-sm-4">Dirección</dt><dd class="col-sm-8">' + esc(p.direc || '-') + '</dd>' +
+                '<dt class="col-sm-4">Localidad</dt><dd class="col-sm-8">' + esc(p.localidad || '-') + '</dd>' +
+                '<dt class="col-sm-4">Provincia</dt><dd class="col-sm-8">' + esc(p.provincia || '-') + '</dd>' +
+                '<dt class="col-sm-4">Cond. IVA</dt><dd class="col-sm-8">' + esc(condIvaLabel[p.condicion_iva] || p.condicion_iva) + '</dd>';
+            document.getElementById('arcaResult').style.display = '';
+        })
+        .catch(err => {
+            document.getElementById('arcaSpinner').style.display = 'none';
+            document.getElementById('arcaSearchBtn').disabled = false;
+            document.getElementById('arcaError').textContent = 'Error de conexión.';
+            document.getElementById('arcaError').style.display = '';
+        });
+}
+
+function crearDesdeArca() {
+    if (!ultimaPersona) return;
+    const btn = document.getElementById('arcaSaveBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Creando...';
+
+    const form = new FormData();
+    form.append('_csrf', document.getElementById('csrfToken').value);
+    form.append('cuit', ultimaPersona.cuit);
+    form.append('razon', ultimaPersona.razon || ultimaPersona.razonSocial || '');
+    form.append('direc', ultimaPersona.direc || '');
+    form.append('localidad', ultimaPersona.localidad || '');
+    form.append('provincia', ultimaPersona.provincia || '');
+    form.append('condicion_iva', ultimaPersona.condicion_iva || 'consumidor_final');
+
+    fetch('/admin/clientes/crear-desde-arca', { method: 'POST', body: form })
+        .then(r => r.json())
+        .then(res => {
+            if (res.ok) {
+                window.location.href = '/admin/clientes/' + res.user_id;
+            } else {
+                alert(res.error || 'Error al crear cliente');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-person-plus"></i> Crear cliente';
+            }
+        })
+        .catch(() => {
+            alert('Error de conexión');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-person-plus"></i> Crear cliente';
+        });
+}
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+</script>
