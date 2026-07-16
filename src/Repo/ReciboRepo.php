@@ -154,7 +154,7 @@ final class ReciboRepo
             SELECT COALESCE(w.id, 0) AS id, c.idclien,
                    c.razon AS name, c.cuit, c.direc, c.tele AS phone, c.mail AS email,
                    c.Localidad AS city,
-                   COALESCE(c.condicion_iva, \'consumidor_final\') AS condicion_iva
+                    \'consumidor_final\' AS condicion_iva
             FROM clientes c
             LEFT JOIN web_users w ON w.cliente_id = c.idclien
             WHERE c.razon LIKE :like OR c.cuit LIKE :like2

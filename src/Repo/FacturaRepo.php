@@ -233,7 +233,7 @@ final class FacturaRepo
             SELECT COALESCE(w.id, 0) AS id, c.idclien,
                    c.razon AS name, c.cuit, c.direc, c.tele AS phone, c.mail AS email,
                    c.Localidad AS city,
-                   COALESCE(c.condicion_iva, \'consumidor_final\') AS condicion_iva
+                    \'consumidor_final\' AS condicion_iva
             FROM clientes c
             LEFT JOIN web_users w ON w.cliente_id = c.idclien
             WHERE c.razon LIKE :like OR c.cuit LIKE :like2
@@ -308,8 +308,6 @@ final class FacturaRepo
         $razon = trim($data['razon'] ?? $data['razonSocial'] ?? '');
         $direc = trim($data['direc'] ?? '');
         $localidad = trim($data['localidad'] ?? '');
-        $condicionIva = trim($data['condicion_iva'] ?? 'consumidor_final');
-
         // Check if exists by CUIT
         $st = Db::pdo()->prepare('SELECT * FROM clientes WHERE cuit = :c LIMIT 1');
         $st->execute([':c' => $cuit]);
@@ -317,28 +315,26 @@ final class FacturaRepo
 
         if ($existing) {
             $st = Db::pdo()->prepare('
-                UPDATE clientes SET razon = :r, direc = :d, Localidad = :l, condicion_iva = :ci
+                UPDATE clientes SET razon = :r, direc = :d, Localidad = :l
                 WHERE idclien = :id LIMIT 1
             ');
             $st->execute([
                 ':r' => $razon,
                 ':d' => $direc,
                 ':l' => $localidad,
-                ':ci' => $condicionIva,
                 ':id' => $existing['idclien'],
             ]);
             $idclien = (int)$existing['idclien'];
         } else {
             $st = Db::pdo()->prepare('
-                INSERT INTO clientes (razon, cuit, direc, Localidad, condicion_iva, activo, fealta)
-                VALUES (:r, :c, :d, :l, :ci, 1, NOW())
+                INSERT INTO clientes (razon, cuit, direc, Localidad, activo, fealta)
+                VALUES (:r, :c, :d, :l, 1, NOW())
             ');
             $st->execute([
                 ':r' => $razon,
                 ':c' => $cuit,
                 ':d' => $direc,
                 ':l' => $localidad,
-                ':ci' => $condicionIva,
             ]);
             $idclien = (int)Db::pdo()->lastInsertId();
         }
@@ -348,7 +344,7 @@ final class FacturaRepo
             SELECT 0 AS id, c.idclien,
                    c.razon AS name, c.cuit, c.direc, c.tele AS phone, c.mail AS email,
                    c.Localidad AS city,
-                   COALESCE(c.condicion_iva, \'consumidor_final\') AS condicion_iva
+                   \'consumidor_final\' AS condicion_iva
             FROM clientes c
             WHERE c.idclien = :id LIMIT 1
         ');
