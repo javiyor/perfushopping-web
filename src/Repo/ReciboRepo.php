@@ -9,36 +9,41 @@ final class ReciboRepo
 {
     public function search(string $q = '', string $estado = '', int $limit = 60): array
     {
-        $limit = max(1, min(200, $limit));
-        $q = trim($q);
-        $estado = trim($estado);
-        $params = [];
-        $where = [];
+        try {
+            $limit = max(1, min(200, $limit));
+            $q = trim($q);
+            $estado = trim($estado);
+            $params = [];
+            $where = [];
 
-        if ($q !== '') {
-            $where[] = '(r.codigo LIKE :like OR r.cliente_nombre LIKE :like OR r.cliente_cuit LIKE :like)';
-            $params[':like'] = '%' . $q . '%';
-        }
-        if ($estado !== '') {
-            $where[] = 'r.estado = :estado';
-            $params[':estado'] = $estado;
-        }
+            if ($q !== '') {
+                $where[] = '(r.codigo LIKE :like OR r.cliente_nombre LIKE :like OR r.cliente_cuit LIKE :like)';
+                $params[':like'] = '%' . $q . '%';
+            }
+            if ($estado !== '') {
+                $where[] = 'r.estado = :estado';
+                $params[':estado'] = $estado;
+            }
 
-        $sql = '
-            SELECT r.*, a.nombre AS created_by_nombre,
-                   GROUP_CONCAT(CONCAT(rp.factura_id, \'|\', rp.monto_cents) SEPARATOR \';\') AS pagos_info
-            FROM recibos r
-            LEFT JOIN admin_users a ON a.id = r.created_by
-            LEFT JOIN recibo_pagos rp ON rp.recibo_id = r.id
-        ';
-        if ($where) {
-            $sql .= ' WHERE ' . implode(' AND ', $where);
-        }
-        $sql .= ' GROUP BY r.id ORDER BY r.created_at DESC, r.id DESC LIMIT ' . $limit;
+            $sql = '
+                SELECT r.*, a.nombre AS created_by_nombre,
+                       GROUP_CONCAT(CONCAT(rp.factura_id, \'|\', rp.monto_cents) SEPARATOR \';\') AS pagos_info
+                FROM recibos r
+                LEFT JOIN admin_users a ON a.id = r.created_by
+                LEFT JOIN recibo_pagos rp ON rp.recibo_id = r.id
+            ';
+            if ($where) {
+                $sql .= ' WHERE ' . implode(' AND ', $where);
+            }
+            $sql .= ' GROUP BY r.id ORDER BY r.created_at DESC, r.id DESC LIMIT ' . $limit;
 
-        $st = Db::pdo()->prepare($sql);
-        $st->execute($params);
-        return $st->fetchAll();
+            $st = Db::pdo()->prepare($sql);
+            $st->execute($params);
+            return $st->fetchAll();
+        } catch (\Throwable $e) {
+            error_log('ReciboRepo::search error: ' . $e->getMessage());
+            return [];
+        }
     }
 
     public function findById(int $id): ?array
@@ -55,17 +60,22 @@ final class ReciboRepo
 
     public function pagos(int $reciboId): array
     {
-        $st = Db::pdo()->prepare('
-            SELECT rp.*, f.codigo AS factura_codigo, f.total_cents AS factura_total,
-                   c.banco_emisor AS cheque_banco, c.numero_cheque, c.titular AS cheque_titular, c.fecha_vencimiento AS cheque_vto
-            FROM recibo_pagos rp
-            LEFT JOIN facturas f ON f.id = rp.factura_id
-            LEFT JOIN cheques c ON c.id = rp.cheque_id
-            WHERE rp.recibo_id = :r
-            ORDER BY rp.id ASC
-        ');
-        $st->execute([':r' => $reciboId]);
-        return $st->fetchAll();
+        try {
+            $st = Db::pdo()->prepare('
+                SELECT rp.*, f.codigo AS factura_codigo, f.total_cents AS factura_total,
+                       c.banco_emisor AS cheque_banco, c.numero_cheque, c.titular AS cheque_titular, c.fecha_vencimiento AS cheque_vto
+                FROM recibo_pagos rp
+                LEFT JOIN facturas f ON f.id = rp.factura_id
+                LEFT JOIN cheques c ON c.id = rp.cheque_id
+                WHERE rp.recibo_id = :r
+                ORDER BY rp.id ASC
+            ');
+            $st->execute([':r' => $reciboId]);
+            return $st->fetchAll();
+        } catch (\Throwable $e) {
+            error_log('ReciboRepo::pagos error: ' . $e->getMessage());
+            return [];
+        }
     }
 
     public function nextCodigo(string $tipo = 'REC-B'): string
@@ -157,18 +167,23 @@ final class ReciboRepo
 
     public function findFacturasPendientes(int $clienteId): array
     {
-        $st = Db::pdo()->prepare('
-            SELECT f.id, f.codigo, f.tipo_comprobante, f.total_cents, f.fecha,
-                   COALESCE(SUM(rp.monto_cents), 0) AS pagado_cents
-            FROM facturas f
-            LEFT JOIN recibo_pagos rp ON rp.factura_id = f.id AND rp.recibo_id IN (SELECT id FROM recibos WHERE estado = \'emitido\')
-            WHERE f.cliente_id = :c AND f.estado = \'emitida\'
-            GROUP BY f.id
-            HAVING (f.total_cents - COALESCE(SUM(rp.monto_cents), 0)) > 0
-            ORDER BY f.fecha ASC
-        ');
-        $st->execute([':c' => $clienteId]);
-        return $st->fetchAll();
+        try {
+            $st = Db::pdo()->prepare('
+                SELECT f.id, f.codigo, f.tipo_comprobante, f.total_cents, f.fecha,
+                       COALESCE(SUM(rp.monto_cents), 0) AS pagado_cents
+                FROM facturas f
+                LEFT JOIN recibo_pagos rp ON rp.factura_id = f.id AND rp.recibo_id IN (SELECT id FROM recibos WHERE estado = \'emitido\')
+                WHERE f.cliente_id = :c AND f.estado = \'emitida\'
+                GROUP BY f.id
+                HAVING (f.total_cents - COALESCE(SUM(rp.monto_cents), 0)) > 0
+                ORDER BY f.fecha ASC
+            ');
+            $st->execute([':c' => $clienteId]);
+            return $st->fetchAll();
+        } catch (\Throwable $e) {
+            error_log('ReciboRepo::findFacturasPendientes error: ' . $e->getMessage());
+            return [];
+        }
     }
 
     public function findClienteErpByWebId(int $webUserId): ?array
