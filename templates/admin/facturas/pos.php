@@ -90,7 +90,7 @@ $csrfToken = $csrf ?? '';
         <h4 class="fw-bold mb-1">Nueva factura</h4>
         <p class="text-muted small">POS — punto de facturación rápido</p>
     </div>
-    <a class="btn btn-outline-secondary btn-sm" href="/admin/facturas">Volver</a>
+    <a class="btn btn-outline-secondary btn-sm" href="/admin/facturas/comprobantes"><i class="bi bi-list-ul"></i> Comprobantes emitidos</a>
 </div>
 
 <div class="pos-toolbar">

@@ -201,7 +201,8 @@ $router->get('/admin/remitos/buscar-productos', [AdminRemitoController::class, '
 $router->get('/admin/remitos/buscar-clientes', [AdminRemitoController::class, 'searchClientes']);
 $router->get('/admin/remitos/buscar-presupuestos', [AdminRemitoController::class, 'searchPresupuestos']);
 $router->get('/admin/remitos/buscar-proveedores', [AdminRemitoController::class, 'searchProveedores']);
-$router->get('/admin/facturas', [AdminFacturaController::class, 'index']);
+$router->get('/admin/facturas', [AdminFacturaController::class, 'pos']);
+$router->get('/admin/facturas/comprobantes', [AdminFacturaController::class, 'index']);
 $router->get('/admin/facturas/nueva', [AdminFacturaController::class, 'pos']);
 $router->post('/admin/facturas/guardar', [AdminFacturaController::class, 'store']);
 $router->get('/admin/facturas/(?P<id>\d+)', [AdminFacturaController::class, 'show']);
@@ -212,7 +213,8 @@ $router->get('/admin/facturas/buscar-clientes', [AdminFacturaController::class, 
 $router->get('/admin/facturas/buscar-remitos', [AdminFacturaController::class, 'searchRemitos']);
 $router->get('/admin/facturas/imprimir/(?P<id>\d+)', [AdminFacturaController::class, 'print']);
 $router->post('/admin/facturas/(?P<id>\d+)/enviar-email', [AdminFacturaController::class, 'sendEmail']);
-$router->get('/admin/recibos', [AdminReciboController::class, 'index']);
+$router->get('/admin/recibos', [AdminReciboController::class, 'create']);
+$router->get('/admin/recibos/comprobantes', [AdminReciboController::class, 'index']);
 $router->get('/admin/recibos/nuevo', [AdminReciboController::class, 'create']);
 $router->post('/admin/recibos/guardar', [AdminReciboController::class, 'store']);
 $router->get('/admin/recibos/(?P<id>\d+)', [AdminReciboController::class, 'show']);

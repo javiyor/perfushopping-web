@@ -12,7 +12,7 @@ $formaPagoLabels = [
 ?>
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
-        <h4 class="fw-bold mb-1">Recibos</h4>
+        <h4 class="fw-bold mb-1">Recibos emitidos</h4>
         <p class="text-muted small">Comprobantes de pago</p>
     </div>
     <a class="btn btn-accent btn-sm" href="/admin/recibos/nuevo"><i class="bi bi-plus-lg"></i> Nuevo recibo</a>

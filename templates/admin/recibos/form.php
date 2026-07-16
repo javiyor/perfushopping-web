@@ -11,7 +11,7 @@ $formaPagoLabels = [
         <h4 class="fw-bold mb-1">Nuevo recibo</h4>
         <p class="text-muted small">Registrar pago de cliente</p>
     </div>
-    <a class="btn btn-outline-secondary btn-sm" href="/admin/recibos">Volver</a>
+    <a class="btn btn-outline-secondary btn-sm" href="/admin/recibos/comprobantes"><i class="bi bi-list-ul"></i> Comprobantes emitidos</a>
 </div>
 
 <form method="post" action="/admin/recibos/guardar" id="reciboForm">
