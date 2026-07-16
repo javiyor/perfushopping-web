@@ -276,7 +276,8 @@ function selectProduct(p, row, suggestionsContainer) {
 
     if (p.variants && p.variants.length > 0) {
         variedadSelect.disabled = false;
-        p.variants.forEach(v => {
+        let selectedIdx = -1;
+        p.variants.forEach((v, i) => {
             const opt = document.createElement('option');
             opt.value = v.nomgusto || '';
             opt.textContent = (v.nomgusto || '') + (v.codscan ? ' (' + v.codscan + ')' : '');
@@ -284,8 +285,14 @@ function selectProduct(p, row, suggestionsContainer) {
             opt.dataset.precio = precioCents;
             opt.dataset.iva = ivaRate;
             variedadSelect.appendChild(opt);
+            if (p.matched_variant && String(v.idcodgusto) === String(p.matched_variant.idcodgusto)) {
+                selectedIdx = i + 1;
+            }
         });
-        if (p.variants.length === 1) {
+        if (selectedIdx > 0) {
+            variedadSelect.selectedIndex = selectedIdx;
+            variedadSelect.dispatchEvent(new Event('change'));
+        } else if (p.variants.length === 1) {
             variedadSelect.selectedIndex = 1;
             variedadSelect.dispatchEvent(new Event('change'));
         }

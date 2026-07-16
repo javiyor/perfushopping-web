@@ -272,10 +272,29 @@ function searchProd(q) {
                 return;
             }
             data.forEach(p => {
-                const div = document.createElement('div');
-                div.className = 'pos-result-item';
                 const priceCents = p.precio ? Math.round(parseFloat(p.precio) * 100) : 0;
                 const ivaRate = p.tiva || 21;
+
+                // Barcode scan auto-add
+                if (p.matched_variant) {
+                    const mv = p.matched_variant;
+                    addToCart({
+                        idprodu: p.idprodu,
+                        idcodgusto: mv.idcodgusto,
+                        producto: p.produ,
+                        variedad: mv.nomgusto,
+                        qty: 1,
+                        unit_price_cents: priceCents,
+                        iva_rate: ivaRate,
+                    });
+                    prodResults.style.display = 'none';
+                    prodInput.value = '';
+                    prodInput.focus();
+                    return;
+                }
+
+                const div = document.createElement('div');
+                div.className = 'pos-result-item';
                 div.innerHTML = `
                     <div>
                         <div class="prod-name">${esc(p.produ)}</div>

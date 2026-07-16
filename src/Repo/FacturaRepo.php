@@ -187,10 +187,12 @@ final class FacturaRepo
         $st->execute($params);
         $products = $st->fetchAll();
 
+        $matchedVariant = null;
         if (ctype_digit($q) || preg_match('/^\d{8,13}$/', $q)) {
             $st2 = $pdo->prepare('
                 SELECT p.idprodu, p.codprodu, p.produ, p.precio, p.precomp, p.codprodup, p.enweb,
-                       i.codivaprodu, i.tiva
+                       i.codivaprodu, i.tiva,
+                       g.idcodgusto, g.nomgusto AS matched_nomgusto
                 FROM gustos g
                 INNER JOIN producto p ON p.idprodu = g.idprodu
                 LEFT JOIN ivaprodu i ON i.codivaprodu = p.iva
@@ -201,14 +203,22 @@ final class FacturaRepo
             $st2->execute([':c' => $q]);
             $byCode = $st2->fetch();
             if ($byCode) {
+                $matchedVariant = [
+                    'idcodgusto' => (int)$byCode['idcodgusto'],
+                    'nomgusto' => $byCode['matched_nomgusto'],
+                    'codscan' => $q,
+                ];
+                unset($byCode['idcodgusto'], $byCode['matched_nomgusto']);
                 $exists = false;
                 foreach ($products as $pr) {
-                    if ((int)$pr['idprodu'] === (int)$byCode['idprodu']) { $exists = true; break; }
+                    if ((int)$pr['idprodu'] === (int)$byCode['idprodu']) { $exists = true; break;
+                    }
                 }
                 if (!$exists) array_unshift($products, $byCode);
             }
         }
 
+        $matchedV = $matchedVariant;
         foreach ($products as $idx => $pr) {
             $idprodu = (int)$pr['idprodu'];
             $st3 = $pdo->prepare('
@@ -221,6 +231,19 @@ final class FacturaRepo
             ');
             $st3->execute([':id' => $idprodu]);
             $products[$idx]['variants'] = $st3->fetchAll();
+        }
+
+        if ($matchedV) {
+            foreach ($products as $idx => $pr) {
+                if ((int)$pr['idprodu'] === 0) continue;
+                foreach (($pr['variants'] ?? []) as $v) {
+                    if ((int)$v['idcodgusto'] === $matchedV['idcodgusto']) {
+                        $products[$idx]['matched_variant_id'] = $matchedV['idcodgusto'];
+                        $products[$idx]['matched_variant'] = $matchedV;
+                        break;
+                    }
+                }
+            }
         }
 
         return $products;

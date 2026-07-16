@@ -158,9 +158,11 @@ final class PresupuestoRepo
         $products = $st->fetchAll();
 
         // Also search by barcode in gustos
+        $matchedV = null;
         if (ctype_digit($q) || preg_match('/^\d{8,13}$/', $q)) {
             $st2 = $pdo->prepare('
-                SELECT p.idprodu, p.codprodu, p.produ, p.precio, p.precio1, p.codprodup, p.enweb, i.tiva
+                SELECT p.idprodu, p.codprodu, p.produ, p.precio, p.precio1, p.codprodup, p.enweb, i.tiva,
+                       g.idcodgusto, g.nomgusto AS matched_nomgusto
                 FROM gustos g
                 INNER JOIN producto p ON p.idprodu = g.idprodu
                 LEFT JOIN ivaprodu i ON i.codivaprodu = p.iva
@@ -170,6 +172,12 @@ final class PresupuestoRepo
             $st2->execute([':c' => $q]);
             $byCode = $st2->fetch();
             if ($byCode) {
+                $matchedV = [
+                    'idcodgusto' => (int)$byCode['idcodgusto'],
+                    'nomgusto' => $byCode['matched_nomgusto'],
+                    'codscan' => $q,
+                ];
+                unset($byCode['idcodgusto'], $byCode['matched_nomgusto']);
                 // Prepend to results
                 $exists = false;
                 foreach ($products as $pr) {
@@ -197,6 +205,19 @@ final class PresupuestoRepo
             ');
             $st3->execute([':id' => $idprodu]);
             $products[$idx]['variants'] = $st3->fetchAll();
+        }
+
+        if ($matchedV) {
+            foreach ($products as $idx => $pr) {
+                if ((int)$pr['idprodu'] === 0) continue;
+                foreach (($pr['variants'] ?? []) as $v) {
+                    if ((int)$v['idcodgusto'] === $matchedV['idcodgusto']) {
+                        $products[$idx]['matched_variant_id'] = $matchedV['idcodgusto'];
+                        $products[$idx]['matched_variant'] = $matchedV;
+                        break;
+                    }
+                }
+            }
         }
 
         return $products;

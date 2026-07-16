@@ -154,9 +154,11 @@ final class RemitoRepo
         $st->execute($params);
         $products = $st->fetchAll();
 
+        $matchedV = null;
         if (ctype_digit($q) || preg_match('/^\d{8,13}$/', $q)) {
             $st2 = $pdo->prepare('
-                SELECT p.idprodu, p.codprodu, p.produ, p.precio, p.codprodup, p.enweb
+                SELECT p.idprodu, p.codprodu, p.produ, p.precio, p.codprodup, p.enweb,
+                       g.idcodgusto, g.nomgusto AS matched_nomgusto
                 FROM gustos g
                 INNER JOIN producto p ON p.idprodu = g.idprodu
                 WHERE g.codscan = :c
@@ -165,6 +167,12 @@ final class RemitoRepo
             $st2->execute([':c' => $q]);
             $byCode = $st2->fetch();
             if ($byCode) {
+                $matchedV = [
+                    'idcodgusto' => (int)$byCode['idcodgusto'],
+                    'nomgusto' => $byCode['matched_nomgusto'],
+                    'codscan' => $q,
+                ];
+                unset($byCode['idcodgusto'], $byCode['matched_nomgusto']);
                 $exists = false;
                 foreach ($products as $pr) {
                     if ((int)$pr['idprodu'] === (int)$byCode['idprodu']) {
@@ -190,6 +198,19 @@ final class RemitoRepo
             ');
             $st3->execute([':id' => $idprodu]);
             $products[$idx]['variants'] = $st3->fetchAll();
+        }
+
+        if ($matchedV) {
+            foreach ($products as $idx => $pr) {
+                if ((int)$pr['idprodu'] === 0) continue;
+                foreach (($pr['variants'] ?? []) as $v) {
+                    if ((int)$v['idcodgusto'] === $matchedV['idcodgusto']) {
+                        $products[$idx]['matched_variant_id'] = $matchedV['idcodgusto'];
+                        $products[$idx]['matched_variant'] = $matchedV;
+                        break;
+                    }
+                }
+            }
         }
 
         return $products;
