@@ -10,7 +10,7 @@ $csrfToken = $csrf ?? '';
 
 .pos-search-box { position:relative; margin-bottom:16px; }
 .pos-search-box input {
-    width:100%; padding:14px 16px; font-size:18px; border:2px solid #dee2e6; border-radius:10px;
+    width:100%; padding:8px 12px; font-size:15px; border:2px solid #dee2e6; border-radius:8px;
     outline:none; transition:border-color .15s;
 }
 .pos-search-box input:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(216,178,90,.15); }
@@ -75,6 +75,8 @@ $csrfToken = $csrf ?? '';
     .pos-cliente { flex-direction:column; align-items:stretch; }
     .pos-cliente input { width:100% !important; min-width:0; }
     .pos-cliente .btn { width:100%; }
+    #clienteSection { margin-bottom:8px !important; }
+    #clienteSection input { width:100% !important; }
 }
 @media (max-width: 480px) {
     .pos-cart-item { flex-wrap:wrap; gap:4px; }
@@ -85,15 +87,14 @@ $csrfToken = $csrf ?? '';
 }
 </style>
 
-<div class="d-flex justify-content-between align-items-start mb-3">
+<div class="d-flex justify-content-between align-items-start mb-2">
     <div>
-        <h4 class="fw-bold mb-1">Nueva factura</h4>
-        <p class="text-muted small">POS — punto de facturación rápido</p>
+        <h4 class="fw-bold mb-0">Nueva factura</h4>
     </div>
     <a class="btn btn-outline-secondary btn-sm" href="/admin/facturas/comprobantes"><i class="bi bi-list-ul"></i> Comprobantes emitidos</a>
 </div>
 
-<div class="pos-toolbar">
+<div class="pos-toolbar" style="margin-bottom:8px">
     <select class="form-select form-select-sm" id="tipoComprobante" style="width:auto">
         <option value="FACT-B">Factura B</option>
         <option value="FACT-A">Factura A</option>
@@ -101,18 +102,6 @@ $csrfToken = $csrf ?? '';
         <option value="NC">Nota de Crédito</option>
         <option value="ND">Nota de Débito</option>
     </select>
-
-    <div class="pos-cliente" id="clienteSection">
-        <span class="text-muted small">Cliente:</span>
-        <input class="form-control form-control-sm" id="clienteSearch" placeholder="Buscar o CF" autocomplete="off" style="width:200px" />
-        <input type="hidden" id="clienteId" value="0" />
-        <input type="hidden" id="clienteErpId" value="0" />
-        <span id="clienteNombre" class="fw-semibold small">Consumidor Final</span>
-        <span id="clienteCuit" class="text-muted small"></span>
-        <input type="hidden" id="clienteCondIva" value="consumidor_final" />
-        <button class="btn btn-sm btn-outline-secondary" type="button" onclick="clearCliente()" title="Consumidor Final"><i class="bi bi-person-x"></i></button>
-    </div>
-    <div id="clienteSuggestions" style="position:relative"></div>
 
     <?php $vendedores = $vendedores ?? []; if ($vendedores): ?>
     <div class="pos-cliente">
@@ -140,6 +129,18 @@ $csrfToken = $csrf ?? '';
     </div>
     <?php endif; ?>
 </div>
+
+<div class="pos-cliente mb-2" id="clienteSection">
+    <span class="text-muted small">Cliente:</span>
+    <input class="form-control form-control-sm" id="clienteSearch" placeholder="Buscar o CF" autocomplete="off" style="width:200px" />
+    <input type="hidden" id="clienteId" value="0" />
+    <input type="hidden" id="clienteErpId" value="0" />
+    <span id="clienteNombre" class="fw-semibold small">Consumidor Final</span>
+    <span id="clienteCuit" class="text-muted small"></span>
+    <input type="hidden" id="clienteCondIva" value="consumidor_final" />
+    <button class="btn btn-sm btn-outline-secondary" type="button" onclick="clearCliente()" title="Consumidor Final"><i class="bi bi-person-x"></i></button>
+</div>
+<div id="clienteSuggestions" style="position:relative"></div>
 
 <div class="pos-layout">
     <div class="pos-left">
