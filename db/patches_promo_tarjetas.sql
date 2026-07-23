@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS promo_tarjetas (
   banco VARCHAR(100) NOT NULL,
   descripcion TEXT,
   detalle_promo TEXT,
+  imagen VARCHAR(255) DEFAULT NULL,
   fecha_desde DATE DEFAULT NULL,
   fecha_hasta DATE DEFAULT NULL,
   publicado TINYINT(1) DEFAULT 0,

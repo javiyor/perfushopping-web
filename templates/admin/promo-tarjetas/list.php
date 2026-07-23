@@ -18,6 +18,7 @@
                     <th>Banco</th>
                     <th>Tipo</th>
                     <th>Descripción</th>
+                    <th>Imagen</th>
                     <th>Vigencia</th>
                     <th>Público</th>
                     <th style="width:100px">Acciones</th>
@@ -25,19 +26,27 @@
             </thead>
             <tbody>
                 <?php if (!$list): ?>
-                    <tr><td colspan="7" class="text-muted text-center">Sin promociones cargadas.</td></tr>
+                    <tr><td colspan="8" class="text-muted text-center">Sin promociones cargadas.</td></tr>
                 <?php else: ?>
                     <?php foreach ($list as $item):
                         $itemId = (int)($item['id'] ?? 0);
                         $desde = (string)($item['fecha_desde'] ?? '');
                         $hasta = (string)($item['fecha_hasta'] ?? '');
                         $vigente = ($desde === '' || $desde <= date('Y-m-d')) && ($hasta === '' || $hasta >= date('Y-m-d'));
+                        $img = (string)($item['imagen'] ?? '');
                     ?>
                     <tr>
                         <td><strong>#<?= $itemId ?></strong></td>
                         <td><?= htmlspecialchars((string)($item['banco'] ?? '')) ?></td>
                         <td><span class="badge bg-<?= ((string)($item['tipo_tarjeta'] ?? '') === 'credito') ? 'warning text-dark' : 'info' ?>"><?= htmlspecialchars((string)($item['tipo_tarjeta'] ?? '')) ?></span></td>
                         <td><?= htmlspecialchars(mb_substr((string)($item['descripcion'] ?? ''), 0, 60)) ?></td>
+                        <td>
+                            <?php if ($img !== ''): ?>
+                                <img src="/upload/<?= htmlspecialchars($img) ?>" alt="" style="width:50px;height:50px;object-fit:cover;border-radius:6px" />
+                            <?php else: ?>
+                                <span class="text-muted">—</span>
+                            <?php endif; ?>
+                        </td>
                         <td class="small">
                             <?php if ($desde !== '' && $hasta !== ''): ?>
                                 <?= htmlspecialchars($desde) ?> → <?= htmlspecialchars($hasta) ?>
@@ -81,7 +90,7 @@
 
 <div class="modal fade" id="promoModal" tabindex="-1" data-bs-backdrop="static">
     <div class="modal-dialog">
-        <form method="post" action="/admin/promo-tarjetas/save" class="modal-content">
+        <form method="post" action="/admin/promo-tarjetas/save" class="modal-content" enctype="multipart/form-data">
             <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
             <input type="hidden" name="id" id="inputId" value="0" />
             <div class="modal-header">
@@ -108,6 +117,16 @@
                     <label class="form-label small">Detalle de la promo</label>
                     <textarea class="form-control form-control-sm" name="detalle_promo" id="inputDetalle" rows="3" placeholder="Ej: Hasta 12 cuotas fijas con Banco XX. Descuento del 15% en compras mayores a $50.000"></textarea>
                 </div>
+                <div class="mb-2">
+                    <label class="form-label small">Imagen promocional</label>
+                    <div id="imagenPreview" class="mb-1"></div>
+                    <input class="form-control form-control-sm" type="file" name="imagen" accept=".jpg,.jpeg,.png,.webp" />
+                    <div id="imagenActions" class="mt-1" style="display:none">
+                        <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="eliminarImagen()">
+                            <i class="bi bi-trash"></i> Quitar imagen
+                        </button>
+                    </div>
+                </div>
                 <div class="row g-2 mb-2">
                     <div class="col-6">
                         <label class="form-label small">Vigencia desde</label>
@@ -131,7 +150,14 @@
     </div>
 </div>
 
+<form method="post" action="/admin/promo-tarjetas/delete-image" id="deleteImageForm">
+    <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+    <input type="hidden" name="id" id="deleteImageId" value="0" />
+</form>
+
 <script>
+let currentImage = '';
+
 function editarPromo(data) {
     const modal = document.getElementById('promoModal');
     const title = document.getElementById('modalTitle');
@@ -143,6 +169,12 @@ function editarPromo(data) {
     const inputFechaDesde = document.getElementById('inputFechaDesde');
     const inputFechaHasta = document.getElementById('inputFechaHasta');
     const inputPublicado = document.getElementById('inputPublicado');
+    const preview = document.getElementById('imagenPreview');
+    const actions = document.getElementById('imagenActions');
+    const fileInput = document.querySelector('[name="imagen"]');
+
+    fileInput.value = '';
+    currentImage = '';
 
     if (data && data.id) {
         title.textContent = 'Editar promo';
@@ -154,6 +186,16 @@ function editarPromo(data) {
         inputFechaDesde.value = data.fecha_desde || '';
         inputFechaHasta.value = data.fecha_hasta || '';
         inputPublicado.checked = parseInt(data.publicado) === 1;
+
+        if (data.imagen) {
+            currentImage = data.imagen;
+            preview.innerHTML = '<img src="/upload/' + data.imagen + '" alt="" style="max-width:160px;max-height:80px;object-fit:cover;border-radius:6px;border:1px solid rgba(216,178,90,0.2)" />';
+            actions.style.display = 'block';
+            document.getElementById('deleteImageId').value = data.id;
+        } else {
+            preview.innerHTML = '';
+            actions.style.display = 'none';
+        }
     } else {
         title.textContent = 'Nueva promo';
         inputId.value = 0;
@@ -164,6 +206,13 @@ function editarPromo(data) {
         inputFechaDesde.value = '';
         inputFechaHasta.value = '';
         inputPublicado.checked = false;
+        preview.innerHTML = '';
+        actions.style.display = 'none';
     }
+}
+
+function eliminarImagen() {
+    if (!confirm('Quitar la imagen?')) return;
+    document.getElementById('deleteImageForm').submit();
 }
 </script>

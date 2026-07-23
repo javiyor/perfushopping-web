@@ -58,14 +58,75 @@ final class PromoTarjetaController
         ];
 
         $repo = new PromoTarjetaRepo();
+
+        // Keep existing image for update if no new one uploaded
+        if ($id > 0) {
+            $existing = $repo->findById($id);
+            $data['imagen'] = $existing['imagen'] ?? null;
+        } else {
+            $data['imagen'] = null;
+        }
+
+        // Handle image upload
+        $uploaded = $_FILES['imagen'] ?? null;
+        if ($uploaded && is_array($uploaded) && $uploaded['error'] === UPLOAD_ERR_OK) {
+            $ext = strtolower(pathinfo($uploaded['name'], PATHINFO_EXTENSION));
+            if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true)) {
+                $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Formato de imagen no válido (jpg, png, webp).'];
+                Response::redirect('/admin/promo-tarjetas');
+            }
+            $uploadDir = APP_BASE_DIR . '/public/upload/promo';
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0755, true);
+            }
+            $filename = 'promo_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+            $destPath = $uploadDir . '/' . $filename;
+            if (move_uploaded_file($uploaded['tmp_name'], $destPath)) {
+                // Delete old image if updating
+                if ($id > 0 && $data['imagen']) {
+                    $oldPath = APP_BASE_DIR . '/public/upload/' . ltrim($data['imagen'], '/');
+                    if (is_file($oldPath)) {
+                        unlink($oldPath);
+                    }
+                }
+                $data['imagen'] = 'promo/' . $filename;
+            }
+        }
+
         if ($id > 0) {
             $repo->update($id, $data);
             $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Promo actualizada.'];
         } else {
-            $repo->create($data, (int)$adminUser['id']);
+            $newId = $repo->create($data, (int)$adminUser['id']);
+            $id = $newId;
             $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Promo creada.'];
         }
 
+        Response::redirect('/admin/promo-tarjetas');
+    }
+
+    public function deleteImage(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $auth->requireSesion();
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $id = (int)($_POST['id'] ?? 0);
+        if ($id <= 0) {
+            Response::redirect('/admin/promo-tarjetas');
+        }
+
+        $repo = new PromoTarjetaRepo();
+        $promo = $repo->findById($id);
+        if ($promo && ($promo['imagen'] ?? '') !== '') {
+            $path = APP_BASE_DIR . '/public/upload/' . ltrim((string)$promo['imagen'], '/');
+            if (is_file($path)) {
+                unlink($path);
+            }
+            $repo->update($id, array_merge($promo, ['imagen' => null]));
+        }
+
+        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Imagen eliminada.'];
         Response::redirect('/admin/promo-tarjetas');
     }
 

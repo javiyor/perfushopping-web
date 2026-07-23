@@ -74,6 +74,26 @@ $promos = $promos ?? [];
     color: var(--muted);
     margin-bottom: 14px;
 }
+.promo-card .card-img-wrap {
+    width: 100%;
+    height: 160px;
+    overflow: hidden;
+    border-radius: 12px;
+    margin-bottom: 14px;
+    background: rgba(216,178,90,0.04);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.promo-card .card-img-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform .4s ease;
+}
+.promo-card:hover .card-img-wrap img {
+    transform: scale(1.04);
+}
 .promo-card .card-vigencia {
     font-size: 12px;
     color: var(--muted2);
@@ -133,9 +153,16 @@ $promos = $promos ?? [];
             $tipoLabel = $esCredito ? 'Crédito' : 'Débito';
             $desde = (string)($p['fecha_desde'] ?? '');
             $hasta = (string)($p['fecha_hasta'] ?? '');
+            $img = (string)($p['imagen'] ?? '');
         ?>
             <div class="promo-card">
-                <div class="card-icon"><?= $icono ?></div>
+                <?php if ($img !== ''): ?>
+                    <div class="card-img-wrap">
+                        <img src="/upload/<?= htmlspecialchars($img) ?>" alt="<?= htmlspecialchars((string)($p['banco'] ?? '')) ?>" loading="lazy" />
+                    </div>
+                <?php else: ?>
+                    <div class="card-icon"><?= $icono ?></div>
+                <?php endif; ?>
                 <div class="card-banco"><?= htmlspecialchars((string)($p['banco'] ?? '')) ?></div>
                 <div class="card-tipo"><?= $tipoLabel ?></div>
                 <div class="card-descripcion"><?= nl2br(htmlspecialchars((string)($p['descripcion'] ?? ''))) ?></div>

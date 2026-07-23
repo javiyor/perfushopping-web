@@ -179,6 +179,7 @@ $router->post('/admin/productos/actualizar-precios', [AdminPriceUpdateController
 $router->get('/admin/promo-tarjetas', [AdminPromoTarjetaController::class, 'index']);
 $router->post('/admin/promo-tarjetas/save', [AdminPromoTarjetaController::class, 'save']);
 $router->post('/admin/promo-tarjetas/delete', [AdminPromoTarjetaController::class, 'delete']);
+$router->post('/admin/promo-tarjetas/delete-image', [AdminPromoTarjetaController::class, 'deleteImage']);
 $router->get('/admin/departamentos', [AdminDepartamentoController::class, 'index']);
 $router->post('/admin/departamentos/save', [AdminDepartamentoController::class, 'save']);
 $router->post('/admin/departamentos/delete', [AdminDepartamentoController::class, 'delete']);

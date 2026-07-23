@@ -37,14 +37,15 @@ final class PromoTarjetaRepo
     public function create(array $data, int $createdBy): int
     {
         $st = Db::pdo()->prepare('
-            INSERT INTO promo_tarjetas (tipo_tarjeta, banco, descripcion, detalle_promo, fecha_desde, fecha_hasta, publicado, created_by, created_at, updated_at)
-            VALUES (:tt, :ban, :des, :det, :fd, :fh, :pub, :cb, NOW(), NOW())
+            INSERT INTO promo_tarjetas (tipo_tarjeta, banco, descripcion, detalle_promo, imagen, fecha_desde, fecha_hasta, publicado, created_by, created_at, updated_at)
+            VALUES (:tt, :ban, :des, :det, :img, :fd, :fh, :pub, :cb, NOW(), NOW())
         ');
         $st->execute([
             ':tt' => $data['tipo_tarjeta'],
             ':ban' => $data['banco'],
             ':des' => $data['descripcion'] ?? null,
             ':det' => $data['detalle_promo'] ?? null,
+            ':img' => $data['imagen'] ?? null,
             ':fd' => $data['fecha_desde'] ?? null,
             ':fh' => $data['fecha_hasta'] ?? null,
             ':pub' => !empty($data['publicado']) ? 1 : 0,
@@ -61,6 +62,7 @@ final class PromoTarjetaRepo
                 banco = :ban,
                 descripcion = :des,
                 detalle_promo = :det,
+                imagen = :img,
                 fecha_desde = :fd,
                 fecha_hasta = :fh,
                 publicado = :pub,
@@ -72,6 +74,7 @@ final class PromoTarjetaRepo
             ':ban' => $data['banco'],
             ':des' => $data['descripcion'] ?? null,
             ':det' => $data['detalle_promo'] ?? null,
+            ':img' => $data['imagen'] ?? null,
             ':fd' => $data['fecha_desde'] ?? null,
             ':fh' => $data['fecha_hasta'] ?? null,
             ':pub' => !empty($data['publicado']) ? 1 : 0,
@@ -81,6 +84,13 @@ final class PromoTarjetaRepo
 
     public function delete(int $id): void
     {
+        $data = $this->findById($id);
+        if ($data && ($data['imagen'] ?? '') !== '') {
+            $path = APP_BASE_DIR . '/public/upload/' . ltrim((string)$data['imagen'], '/');
+            if (is_file($path)) {
+                unlink($path);
+            }
+        }
         Db::pdo()->prepare('DELETE FROM promo_tarjetas WHERE id = :id LIMIT 1')
             ->execute([':id' => $id]);
     }
