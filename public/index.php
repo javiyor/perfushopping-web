@@ -32,6 +32,7 @@ use Perfushopping\Web\Controller\ApiSyncController;
 use Perfushopping\Web\Controller\ApiUploadController;
 use Perfushopping\Web\Controller\ApiSyncTablesController;
 use Perfushopping\Web\Controller\DemoTechController;
+use Perfushopping\Web\Controller\PromoTarjetasController as PromoTarjetasController;
 use Perfushopping\Web\Controller\AdminProductController;
 use Perfushopping\Web\Admin\AuthController as AdminAuthController;
 use Perfushopping\Web\Admin\DashboardController as AdminDashboardController;
@@ -39,6 +40,7 @@ use Perfushopping\Web\Admin\UserController as AdminUserController;
 use Perfushopping\Web\Admin\ProductController as AdminProductControllerNew;
 use Perfushopping\Web\Admin\ImportController as AdminImportController;
 use Perfushopping\Web\Admin\PriceUpdateController as AdminPriceUpdateController;
+use Perfushopping\Web\Admin\PromoTarjetaController as AdminPromoTarjetaController;
 use Perfushopping\Web\Admin\DepartamentoController as AdminDepartamentoController;
 use Perfushopping\Web\Admin\CustomerController as AdminCustomerController;
 use Perfushopping\Web\Admin\ProveedorController as AdminProveedorController;
@@ -130,6 +132,7 @@ $router->get('/eventos/capacitaciones/clientes', [DemoTechController::class, 'cl
 $router->post('/eventos/capacitaciones/clientes', [DemoTechController::class, 'clientsSubmit']);
 // Mantener rutas viejas por compatibilidad
 $router->get('/eventos/demo-tecnica', [DemoTechController::class, 'index']);
+$router->get('/promociones', [PromoTarjetasController::class, 'index']);
 $router->get('/eventos/demo-tecnica/profesionales', [DemoTechController::class, 'professionalsForm']);
 $router->post('/eventos/demo-tecnica/profesionales', [DemoTechController::class, 'professionalsSubmit']);
 $router->get('/eventos/demo-tecnica/clientes', [DemoTechController::class, 'clientsForm']);
@@ -173,6 +176,9 @@ $router->post('/admin/productos/importar/preview', [AdminImportController::class
 $router->post('/admin/productos/importar/confirm', [AdminImportController::class, 'confirm']);
 $router->get('/admin/productos/actualizar-precios', [AdminPriceUpdateController::class, 'index']);
 $router->post('/admin/productos/actualizar-precios', [AdminPriceUpdateController::class, 'apply']);
+$router->get('/admin/promo-tarjetas', [AdminPromoTarjetaController::class, 'index']);
+$router->post('/admin/promo-tarjetas/save', [AdminPromoTarjetaController::class, 'save']);
+$router->post('/admin/promo-tarjetas/delete', [AdminPromoTarjetaController::class, 'delete']);
 $router->get('/admin/departamentos', [AdminDepartamentoController::class, 'index']);
 $router->post('/admin/departamentos/save', [AdminDepartamentoController::class, 'save']);
 $router->post('/admin/departamentos/delete', [AdminDepartamentoController::class, 'delete']);

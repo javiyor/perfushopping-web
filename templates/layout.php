@@ -36,6 +36,7 @@ unset($_SESSION['flash']);
           <?php endif; ?>
           <a class="pill secondary" href="/cart">Carrito</a>
           <a class="pill secondary" href="/eventos/capacitaciones">Capacitaciones</a>
+          <a class="pill promo-link" href="/promociones">💳 Promociones</a>
           <?php if ($user): ?>
             <?php if (!empty($user['force_password_change'])): ?>
               <a class="pill" href="/account/password">Cambiar clave</a>
