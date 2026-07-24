@@ -75,16 +75,17 @@ final class PromoTarjetaController
                 $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Formato de imagen no válido (jpg, png, webp).'];
                 Response::redirect('/admin/promo-tarjetas');
             }
-            $uploadDir = APP_BASE_DIR . '/public/upload/promo';
-            if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0755, true);
+            $uploadDir = $this->resolveUploadDir();
+            if ($uploadDir === '') {
+                $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se pudo crear el directorio de uploads.'];
+                Response::redirect('/admin/promo-tarjetas');
             }
             $filename = 'promo_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
             $destPath = $uploadDir . '/' . $filename;
             if (move_uploaded_file($uploaded['tmp_name'], $destPath)) {
                 // Delete old image if updating
                 if ($id > 0 && $data['imagen']) {
-                    $oldPath = APP_BASE_DIR . '/public/upload/' . ltrim($data['imagen'], '/');
+                    $oldPath = $this->resolveUploadDir() . '/' . basename((string)$data['imagen']);
                     if (is_file($oldPath)) {
                         unlink($oldPath);
                     }
@@ -105,6 +106,23 @@ final class PromoTarjetaController
         Response::redirect('/admin/promo-tarjetas');
     }
 
+    private function resolveUploadDir(): string
+    {
+        $base = defined('APP_BASE_DIR') ? (string)APP_BASE_DIR : (string)realpath(__DIR__ . '/../..');
+        $promoDir = 'upload/promo';
+        $candidates = [
+            rtrim($base, '/\\') . '/public_html/' . $promoDir,
+            rtrim($base, '/\\') . '/public/' . $promoDir,
+            rtrim($base, '/\\') . '/' . $promoDir,
+        ];
+        foreach ($candidates as $c) {
+            if (is_dir($c) || @mkdir($c, 0775, true)) {
+                return $c;
+            }
+        }
+        return '';
+    }
+
     public function deleteImage(array $params): void
     {
         $auth = new AdminAuthService();
@@ -119,9 +137,9 @@ final class PromoTarjetaController
         $repo = new PromoTarjetaRepo();
         $promo = $repo->findById($id);
         if ($promo && ($promo['imagen'] ?? '') !== '') {
-            $path = APP_BASE_DIR . '/public/upload/' . ltrim((string)$promo['imagen'], '/');
-            if (is_file($path)) {
-                unlink($path);
+            $imgPath = $this->resolveUploadDir() . '/' . basename((string)$promo['imagen']);
+            if (is_file($imgPath)) {
+                unlink($imgPath);
             }
             $repo->update($id, array_merge($promo, ['imagen' => null]));
         }

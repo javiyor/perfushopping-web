@@ -86,9 +86,15 @@ final class PromoTarjetaRepo
     {
         $data = $this->findById($id);
         if ($data && ($data['imagen'] ?? '') !== '') {
-            $path = APP_BASE_DIR . '/public/upload/' . ltrim((string)$data['imagen'], '/');
-            if (is_file($path)) {
-                unlink($path);
+            $filename = basename((string)$data['imagen']);
+            $base = defined('APP_BASE_DIR') ? (string)APP_BASE_DIR : (string)realpath(__DIR__ . '/../..');
+            $candidates = [
+                rtrim($base, '/\\') . '/public_html/upload/promo/' . $filename,
+                rtrim($base, '/\\') . '/public/upload/promo/' . $filename,
+                rtrim($base, '/\\') . '/upload/promo/' . $filename,
+            ];
+            foreach ($candidates as $p) {
+                if (is_file($p)) { unlink($p); break; }
             }
         }
         Db::pdo()->prepare('DELETE FROM promo_tarjetas WHERE id = :id LIMIT 1')
