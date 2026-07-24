@@ -72,7 +72,7 @@
                         </td>
                         <td>
                             <div class="d-flex gap-1">
-                                <button class="btn btn-sm btn-outline-secondary py-0 px-1 btn-edit-promo" data-id="<?= $itemId ?>"><i class="bi bi-pencil"></i></button>
+                                <button class="btn btn-sm btn-outline-secondary py-0 px-1 btn-edit-promo" data-json='<?= json_encode($item, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>'><i class="bi bi-pencil"></i></button>
                                 <form method="post" action="/admin/promo-tarjetas/delete" onsubmit="return confirm('Eliminar esta promo?')">
                                     <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
                                     <input type="hidden" name="id" value="<?= $itemId ?>" />
@@ -156,31 +156,26 @@
 </form>
 
 <script>
-const promoData = <?= json_encode($list, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG) ?> || [];
-
-document.querySelector('.table-admin').addEventListener('click', function(e) {
-    const btn = e.target.closest('.btn-edit-promo');
+document.addEventListener('click', function(e) {
+    var btn = e.target.closest('.btn-edit-promo');
     if (!btn) return;
-    const id = parseInt(btn.dataset.id);
-    const data = promoData.find(function(p) { return parseInt(p.id) === id; });
+    var data = null;
+    try { data = JSON.parse(btn.getAttribute('data-json')); } catch(_) {}
     editarPromo(data || {});
 });
 
 function editarPromo(data) {
-    const title = document.getElementById('modalTitle');
-    const inputId = document.getElementById('inputId');
-    const inputBanco = document.getElementById('inputBanco');
-    const inputTipo = document.getElementById('inputTipo');
-    const inputDescripcion = document.getElementById('inputDescripcion');
-    const inputDetalle = document.getElementById('inputDetalle');
-    const inputFechaDesde = document.getElementById('inputFechaDesde');
-    const inputFechaHasta = document.getElementById('inputFechaHasta');
-    const inputPublicado = document.getElementById('inputPublicado');
-    const preview = document.getElementById('imagenPreview');
-    const actions = document.getElementById('imagenActions');
-    const fileInput = document.querySelector('[name="imagen"]');
-
-    if (fileInput) fileInput.value = '';
+    var title = document.getElementById('modalTitle');
+    var inputId = document.getElementById('inputId');
+    var inputBanco = document.getElementById('inputBanco');
+    var inputTipo = document.getElementById('inputTipo');
+    var inputDescripcion = document.getElementById('inputDescripcion');
+    var inputDetalle = document.getElementById('inputDetalle');
+    var inputFechaDesde = document.getElementById('inputFechaDesde');
+    var inputFechaHasta = document.getElementById('inputFechaHasta');
+    var inputPublicado = document.getElementById('inputPublicado');
+    var preview = document.getElementById('imagenPreview');
+    var actions = document.getElementById('imagenActions');
 
     if (data && data.id) {
         title.textContent = 'Editar promo';
