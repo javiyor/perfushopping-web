@@ -72,7 +72,7 @@
                         </td>
                         <td>
                             <div class="d-flex gap-1">
-                                <button class="btn btn-sm btn-outline-secondary py-0 px-1 btn-edit-promo" data-json='<?= json_encode($item, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>'><i class="bi bi-pencil"></i></button>
+                                <button class="btn btn-sm btn-outline-secondary py-0 px-1 btn-edit-promo" data-bs-toggle="modal" data-bs-target="#promoModal" data-json='<?= json_encode($item, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>'><i class="bi bi-pencil"></i></button>
                                 <form method="post" action="/admin/promo-tarjetas/delete" onsubmit="return confirm('Eliminar esta promo?')">
                                     <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
                                     <input type="hidden" name="id" value="<?= $itemId ?>" />
