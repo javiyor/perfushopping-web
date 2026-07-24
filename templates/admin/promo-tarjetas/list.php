@@ -72,7 +72,7 @@
                         </td>
                         <td>
                             <div class="d-flex gap-1">
-                                <button class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="editarPromo(<?= htmlspecialchars(json_encode($item)) ?>)"><i class="bi bi-pencil"></i></button>
+                                <button class="btn btn-sm btn-outline-secondary py-0 px-1 btn-edit-promo" data-id="<?= $itemId ?>"><i class="bi bi-pencil"></i></button>
                                 <form method="post" action="/admin/promo-tarjetas/delete" onsubmit="return confirm('Eliminar esta promo?')">
                                     <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
                                     <input type="hidden" name="id" value="<?= $itemId ?>" />
@@ -156,10 +156,17 @@
 </form>
 
 <script>
-let currentImage = '';
+const promoData = <?= json_encode($list, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+
+document.querySelector('.table-admin').addEventListener('click', function(e) {
+    const btn = e.target.closest('.btn-edit-promo');
+    if (!btn) return;
+    const id = parseInt(btn.dataset.id);
+    const data = promoData.find(function(p) { return parseInt(p.id) === id; });
+    editarPromo(data || {});
+});
 
 function editarPromo(data) {
-    const modal = document.getElementById('promoModal');
     const title = document.getElementById('modalTitle');
     const inputId = document.getElementById('inputId');
     const inputBanco = document.getElementById('inputBanco');
@@ -173,8 +180,7 @@ function editarPromo(data) {
     const actions = document.getElementById('imagenActions');
     const fileInput = document.querySelector('[name="imagen"]');
 
-    fileInput.value = '';
-    currentImage = '';
+    if (fileInput) fileInput.value = '';
 
     if (data && data.id) {
         title.textContent = 'Editar promo';
@@ -188,7 +194,6 @@ function editarPromo(data) {
         inputPublicado.checked = parseInt(data.publicado) === 1;
 
         if (data.imagen) {
-            currentImage = data.imagen;
             preview.innerHTML = '<img src="/upload/' + data.imagen + '" alt="" style="max-width:160px;max-height:80px;object-fit:cover;border-radius:6px;border:1px solid rgba(216,178,90,0.2)" />';
             actions.style.display = 'block';
             document.getElementById('deleteImageId').value = data.id;
