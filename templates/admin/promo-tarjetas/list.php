@@ -156,7 +156,7 @@
 </form>
 
 <script>
-const promoData = <?= json_encode($list, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+const promoData = <?= json_encode($list, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG) ?> || [];
 
 document.querySelector('.table-admin').addEventListener('click', function(e) {
     const btn = e.target.closest('.btn-edit-promo');
