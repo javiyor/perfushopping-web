@@ -169,7 +169,43 @@ Rutas públicas de `/eventos/demo-tecnica/*` (frontend) se mantienen en `DemoTec
 - Subrubro no se limpiaba al subir imagen (nested forms corregido en `edit.php`)
 - Paginación agregada a listado de productos
 
-### 20. Caja / Arqueo
+### 20. Precios: actualización por porcentaje
+- Filtros: palabra clave, marca (subrubro), proveedor, fecompra desde/hasta
+- Checkbox por producto + seleccionar todo
+- Aplica porcentaje (positivo/negativo) a precomp, precio, precio1
+- Actualiza fecompra a la fecha actual
+- Ruta: `/admin/productos/actualizar-precios`
+- Repo: `searchForPriceUpdate()`, `bulkPriceUpdate()`
+
+### 21. Promo Tarjetas
+- Admin CRUD en `/admin/promo-tarjetas` con modal de create/edit
+- Campos: banco, tipo (crédito/débito), descripción, detalle_promo, imagen, vigencia desde/hasta, publicado
+- Imagen se guarda en `upload/promo/` (resuelve `public_html/` o `public/` según servidor)
+- Landing pública en `/promociones` con diseño Perfushooking (dark + dorado)
+- Efecto hover con glow + elevación en cada card
+- Acceso dorado pulsante en topbar del sitio público
+- El botón editar usa `data-json` en el botón + `JSON.parse` para evitar escapes HTML/JS
+- Tabla: `promo_tarjetas`
+
+### 22. Código de barras (EAN-13) en productos
+- Clase `Barcode::ean13()` genera EAN-13 con dígito verificador
+- Botón generar y guardar por AJAX en cada variante
+- Vista de impresión de etiquetas 80mm (2 columnas, 35x20mm)
+- Tabla: `gustos.codscan` (columna existente en ERP)
+
+### 23. Lector de código de barras por cámara
+- Integración con librería `html5-qrcode` en POS, Presupuestos, Remitos, OC
+- Escaneo en vivo desde cámara del dispositivo
+- Auto-agrega producto con variante al detectar código
+
+### 24. Bugfixes relevantes
+- `stockcab.observ`: columna inexistente removida del INSERT (StockRepo)
+- Decimales truncados en StockGrilla, POS (remito/presupuesto → carrito)
+- `fmtPrice()` en POS: usaba `Math.round()` → perdía decimales
+- `codprove` con ceros a la izquierda: comparación como `(int)` en edit de producto
+- Upload de imágenes en promo tarjetas: resuelve directorio correcto (`public_html/` en Hostinger vs `public/` en local)
+
+### 25. Caja / Arqueo
 - Apertura de caja por turno con monto inicial
 - Movimientos extra (ingresos/egresos no facturables)
 - Arqueo con conteo físico y cálculo de diferencia vs saldo esperado
@@ -271,7 +307,10 @@ src/
     WithdrawalController.php      ← retiros (migrado)
     CapacitacionController.php    ← capacitaciones (ex demo técnica, migrado)
     CorreoController.php          ← Correo Argentino (migrado)
+    PriceUpdateController.php     ← actualización masiva de precios
+    PromoTarjetaController.php    ← CRUD promo tarjetas
   Controller/
+    PromoTarjetasController.php   ← landing pública /promociones
 
 templates/admin/
   layout.php

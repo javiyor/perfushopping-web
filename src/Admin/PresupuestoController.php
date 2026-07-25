@@ -90,8 +90,8 @@ final class PresupuestoController
             $qty = max(1, (int)($cantidades[$idx] ?? 1));
             $unitPrice = max(0, (int)($precios[$idx] ?? 0));
             $ivaRate = (float)($ivas[$idx] ?? 0);
-            $lineTotal = $qty * $unitPrice;
-            $lineIva = (int)round($lineTotal * ($ivaRate / (100 + $ivaRate)));
+            $lineNet = $qty * $unitPrice;
+            $lineIva = $ivaRate > 0 ? (int)round($lineNet * $ivaRate / 100) : 0;
             $items[] = [
                 'idprodu' => (int)($idpros[$idx] ?? 0) ?: null,
                 'idcodgusto' => (int)($idgustos[$idx] ?? 0) ?: null,
@@ -100,9 +100,9 @@ final class PresupuestoController
                 'qty' => $qty,
                 'unit_price_cents' => $unitPrice,
                 'iva_rate' => $ivaRate,
-                'total_cents' => $lineTotal,
+                'total_cents' => $lineNet + $lineIva,
             ];
-            $subtotal += $lineTotal - $lineIva;
+            $subtotal += $lineNet;
             $ivaTotal += $lineIva;
         }
 

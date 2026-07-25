@@ -113,7 +113,7 @@ final class FacturaController
             $unitPrice = max(0, (int)($it['unit_price_cents'] ?? 0));
             $ivaRate = (float)($it['iva_rate'] ?? 21);
             $lineTotal = $qty * $unitPrice;
-            $lineIva = $ivaRate > 0 ? (int)round($lineTotal - ($lineTotal / (1 + $ivaRate / 100))) : 0;
+            $lineIva = $ivaRate > 0 ? (int)round($lineTotal * $ivaRate / 100) : 0;
             $items[] = [
                 'idprodu' => (int)($it['idprodu'] ?? 0) ?: null,
                 'idcodgusto' => (int)($it['idcodgusto'] ?? 0) ?: null,
@@ -123,9 +123,9 @@ final class FacturaController
                 'unit_price_cents' => $unitPrice,
                 'iva_rate' => $ivaRate,
                 'iva_cents' => $lineIva,
-                'total_cents' => $lineTotal,
+                'total_cents' => $lineTotal + $lineIva,
             ];
-            $subtotal += $lineTotal - $lineIva;
+            $subtotal += $unitPrice * $qty;
             $ivaTotal += $lineIva;
         }
 

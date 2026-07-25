@@ -12,3 +12,6 @@ CREATE TABLE IF NOT EXISTS promo_tarjetas (
   created_at DATETIME NOT NULL,
   updated_at DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Si la tabla ya existe y falta la columna imagen, correr:
+-- ALTER TABLE promo_tarjetas ADD COLUMN imagen VARCHAR(255) DEFAULT NULL AFTER detalle_promo;

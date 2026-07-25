@@ -178,8 +178,8 @@ $csrfToken = $csrf ?? '';
                 <div class="text-muted text-center py-4 small">Buscá productos para agregar al carrito</div>
             </div>
             <div class="pos-totals">
-                <div class="pt-row"><span>Subtotal</span><span id="posSubtotal">$0</span></div>
-                <div class="pt-row"><span>IVA</span><span id="posIva">$0</span></div>
+                <div class="pt-row" id="posSubtotalRow"><span>Subtotal</span><span id="posSubtotal">$0</span></div>
+                <div class="pt-row" id="posIvaRow"><span>IVA</span><span id="posIva">$0</span></div>
                 <div class="pt-row">
                     <span>Dto. %</span>
                     <span><input type="number" id="posDescuento" value="0" min="0" max="100" style="width:60px;text-align:right;font-size:14px;border:1px solid #ccc;border-radius:4px;padding:2px 4px" onchange="recalcTotals()" />%</span>
@@ -282,6 +282,21 @@ function fmtPrice(cents) {
     return (cents / 100).toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 }
 
+function getCondIva() {
+    return document.getElementById('clienteCondIva').value || 'consumidor_final';
+}
+
+function displayPriceIsGross() {
+    return getCondIva() !== 'responsable_inscripto';
+}
+
+function getDisplayPrice(netCents, ivaRate) {
+    if (displayPriceIsGross()) {
+        return netCents + Math.round(netCents * ivaRate / 100);
+    }
+    return netCents;
+}
+
 // ── Load remito items if present ──
 <?php if ($remitoItems): ?>
 <?php foreach ($remitoItems as $ri): ?>
@@ -343,6 +358,7 @@ function searchProd(q) {
             data.forEach(p => {
                 const priceCents = p.precio ? Math.round(parseFloat(p.precio) * 100) : 0;
                 const ivaRate = p.tiva || 21;
+                const displayPrice = getDisplayPrice(priceCents, ivaRate);
 
                 // Barcode scan auto-add
                 if (p.matched_variant) {
@@ -369,7 +385,7 @@ function searchProd(q) {
                         <div class="prod-name">${esc(p.produ)}</div>
                         <div class="prod-code">${esc(p.codprodu)} ${p.codprodup ? '| ' + esc(p.codprodup) : ''}</div>
                     </div>
-                    <div class="prod-price">$${fmtPrice(priceCents)}</div>
+                    <div class="prod-price">$${fmtPrice(displayPrice)}</div>
                 `;
                 div.addEventListener('mousedown', function(e) {
                     e.preventDefault();
@@ -428,8 +444,9 @@ function showVariantPicker(p, priceCents, ivaRate) {
 
 // ── Cart ──
 function addToCart(item) {
-    const key = item.idprodu + '-' + item.idcodgusto + '-' + item.unit_price_cents;
-    const existing = cart.find(c => (c.idprodu + '-' + c.idcodgusto + '-' + c.unit_price_cents) === key);
+    const netPrice = item.unit_price_cents || 0;
+    const key = item.idprodu + '-' + item.idcodgusto;
+    const existing = cart.find(c => (c.idprodu + '-' + c.idcodgusto) === key);
     if (existing) {
         existing.qty += item.qty || 1;
     } else {
@@ -439,7 +456,7 @@ function addToCart(item) {
             producto: item.producto,
             variedad: item.variedad || '',
             qty: item.qty || 1,
-            unit_price_cents: item.unit_price_cents || 0,
+            net_price_cents: netPrice,
             iva_rate: item.iva_rate || 21,
         });
     }
@@ -458,7 +475,8 @@ function renderCart() {
 
     count.textContent = cart.length + ' item(s)';
     container.innerHTML = cart.map((item, idx) => {
-        const total = item.qty * item.unit_price_cents;
+        const displayPrice = getDisplayPrice(item.net_price_cents, item.iva_rate);
+        const total = item.qty * displayPrice;
         return `
             <div class="pos-cart-item" data-idx="${idx}">
                 <div class="ci-name">
@@ -466,7 +484,7 @@ function renderCart() {
                     <div class="ci-var">${item.variedad ? esc(item.variedad) : '—'}</div>
                 </div>
                 <div class="ci-qty"><input type="number" value="${item.qty}" min="1" onchange="updateQty(${idx}, this.value)" /></div>
-                <div class="ci-price">$${fmtPrice(item.unit_price_cents)}</div>
+                <div class="ci-price">$${fmtPrice(displayPrice)}</div>
                 <div class="ci-total">$${fmtPrice(total)}</div>
                 <div class="ci-del" onclick="removeItem(${idx})">&times;</div>
             </div>
@@ -488,17 +506,19 @@ function removeItem(idx) {
 function recalcTotals() {
     let subtotal = 0, iva = 0, total = 0;
     cart.forEach(item => {
-        const lineTotal = item.qty * item.unit_price_cents;
-        const lineIva = item.iva_rate > 0 ? Math.round(lineTotal - (lineTotal / (1 + item.iva_rate / 100))) : 0;
-        subtotal += lineTotal - lineIva;
+        const netLine = item.qty * item.net_price_cents;
+        const lineIva = item.iva_rate > 0 ? Math.round(netLine * item.iva_rate / 100) : 0;
+        subtotal += netLine;
         iva += lineIva;
-        total += lineTotal;
+        total += netLine + lineIva;
     });
     const descPct = parseInt(document.getElementById('posDescuento').value) || 0;
     const descuento = descPct > 0 ? Math.round(total * descPct / 100) : 0;
-    document.getElementById('posSubtotal').textContent = '$' + fmtPrice(subtotal);
+
+    const isRI = getCondIva() === 'responsable_inscripto';
+    document.getElementById('posIvaRow').style.display = isRI ? 'flex' : 'none';
+    document.getElementById('posSubtotal').textContent = '$' + fmtPrice(isRI ? subtotal : total);
     document.getElementById('posIva').textContent = '$' + fmtPrice(iva);
-    document.getElementById('posDescuento').textContent = descPct;
     document.getElementById('posTotal').textContent = '$' + fmtPrice(total - descuento);
 
     const recibido = parseInt(document.getElementById('montoRecibido').value) || 0;
@@ -565,6 +585,7 @@ function selectCliente(c) {
         'exento': 'FACT-C',
     };
     document.getElementById('tipoComprobante').value = tipoMap[iva] || 'FACT-B';
+    renderCart();
 }
 
 function clearCliente() {
@@ -575,6 +596,7 @@ function clearCliente() {
     document.getElementById('clienteCondIva').value = 'consumidor_final';
     cliInput.value = '';
     cliSuggestions.innerHTML = '';
+    renderCart();
 }
 
 // ── Remito search ──
@@ -675,7 +697,11 @@ function submitFactura() {
     const montoRecibido = parseInt(document.getElementById('montoRecibido').value) || 0;
 
     const descPct = parseInt(document.getElementById('posDescuento').value) || 0;
-    const totalBruto = cart.reduce((sum, item) => sum + item.qty * item.unit_price_cents, 0);
+    const totalBruto = cart.reduce((sum, item) => {
+        const netLine = item.qty * item.net_price_cents;
+        const lineIva = item.iva_rate > 0 ? Math.round(netLine * item.iva_rate / 100) : 0;
+        return sum + netLine + lineIva;
+    }, 0);
     const descuentoCents = descPct > 0 ? Math.round(totalBruto * descPct / 100) : 0;
 
     const presupuestoId = parseInt(document.getElementById('presupuestoId').value) || 0;
@@ -703,7 +729,7 @@ function submitFactura() {
             producto: item.producto,
             variedad: item.variedad,
             qty: item.qty,
-            unit_price_cents: item.unit_price_cents,
+            unit_price_cents: item.net_price_cents,
             iva_rate: item.iva_rate,
         })),
         pagos: [{

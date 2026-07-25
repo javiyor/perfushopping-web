@@ -323,11 +323,11 @@ function recalcTotals() {
         const precio = parseInt(row.querySelector('.precio-input').value) || 0;
         const qty = parseInt(row.querySelector('.qty-input').value) || 1;
         const tasa = parseFloat(row.querySelector('.iva-input').value) || 0;
-        const lineTotal = precio * qty;
-        const lineIva = Math.round(lineTotal * tasa / (100 + tasa));
-        subtotal += lineTotal - lineIva;
+        const lineNet = precio * qty;
+        const lineIva = tasa > 0 ? Math.round(lineNet * tasa / 100) : 0;
+        subtotal += lineNet;
         iva += lineIva;
-        total += lineTotal;
+        total += lineNet + lineIva;
     });
     document.getElementById('subtotalDisplay').textContent = '$' + subtotal.toLocaleString('es-AR');
     document.getElementById('ivaDisplay').textContent = '$' + iva.toLocaleString('es-AR');

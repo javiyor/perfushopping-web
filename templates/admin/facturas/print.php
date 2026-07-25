@@ -15,6 +15,7 @@ $formaPagoLabels = [
     'tarjeta_debito'=>'Tarjeta débito', 'mercadopago'=>'Mercado Pago', 'cuenta_corriente'=>'Cta. cte.',
     'cheque'=>'Cheque',
 ];
+$discriminaIva = in_array($factura['tipo_comprobante'] ?? '', ['FACT-A', 'FACT-C']);
 $isTicket = $formato !== 'a4';
 $bodyWidth = $formato === '58mm' ? '58mm' : ($formato === '80mm' ? '80mm' : '210mm');
 $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
@@ -102,20 +103,30 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
             </tr>
         </thead>
         <tbody>
-            <?php foreach ($items as $it): ?>
+            <?php foreach ($items as $it):
+                $qty = max(1, (int)($it['qty'] ?? 1));
+                $netPrice = (int)($it['unit_price_cents'] ?? 0);
+                $ivaCents = (int)($it['iva_cents'] ?? 0);
+                $unitDisplay = $discriminaIva ? $netPrice : $netPrice + (int)round($ivaCents / $qty);
+                $totalDisplay = (int)($it['total_cents'] ?? 0);
+            ?>
             <tr>
-                <td class="text-center"><?= (int)($it['qty'] ?? 0) ?></td>
+                <td class="text-center"><?= $qty ?></td>
                 <td><?= htmlspecialchars((string)($it['producto'] ?? '')) ?><?= ($it['variedad'] ?? '') ? ' (' . htmlspecialchars($it['variedad']) . ')' : '' ?></td>
-                <td class="text-right"><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($it['unit_price_cents'] ?? 0))) ?></td>
-                <td class="text-right"><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($it['total_cents'] ?? 0))) ?></td>
+                <td class="text-right"><?= htmlspecialchars(Format::moneyRoundedFromCents($unitDisplay)) ?></td>
+                <td class="text-right"><?= htmlspecialchars(Format::moneyRoundedFromCents($totalDisplay)) ?></td>
             </tr>
             <?php endforeach; ?>
         </tbody>
     </table>
 
     <div class="totals">
+        <?php if ($discriminaIva): ?>
         <div class="row"><span>Subtotal:</span><span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($factura['subtotal_cents'] ?? 0))) ?></span></div>
         <div class="row"><span>IVA:</span><span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($factura['iva_cents'] ?? 0))) ?></span></div>
+        <?php else: ?>
+        <div class="row"><span>Subtotal (con IVA):</span><span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($factura['total_cents'] ?? 0))) ?></span></div>
+        <?php endif; ?>
         <?php $descuento = (int)($factura['descuento_cents'] ?? 0); ?>
         <?php if ($descuento > 0): ?>
         <div class="row" style="color:#dc3545"><span>Descuento:</span><span>-<?= htmlspecialchars(Format::moneyRoundedFromCents($descuento)) ?></span></div>

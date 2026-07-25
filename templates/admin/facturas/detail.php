@@ -18,6 +18,9 @@ $formaPagoLabels = [
     'tarjeta_debito'=>'Tarjeta débito', 'mercadopago'=>'Mercado Pago', 'cuenta_corriente'=>'Cta. cte.',
     'cheque'=>'Cheque',
 ];
+
+// Gross price display for CF (B) and Mono (C); net for RI (A)
+$discriminaIva = in_array($factura['tipo_comprobante'] ?? '', ['FACT-A']);
 ?>
 
 <nav aria-label="breadcrumb" class="mb-3">
@@ -53,19 +56,29 @@ $formaPagoLabels = [
                             <th>Variedad</th>
                             <th class="text-center">Cant.</th>
                             <th class="text-end">P. unit.</th>
+                            <?php if ($discriminaIva): ?>
                             <th class="text-end">IVA</th>
+                            <?php endif; ?>
                             <th class="text-end">Total</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($items as $it): ?>
+                        <?php foreach ($items as $it):
+                            $qty = max(1, (int)($it['qty'] ?? 1));
+                            $netPrice = (int)($it['unit_price_cents'] ?? 0);
+                            $ivaCents = (int)($it['iva_cents'] ?? 0);
+                            $unitDisplay = $discriminaIva ? $netPrice : $netPrice + (int)round($ivaCents / $qty);
+                            $totalDisplay = (int)($it['total_cents'] ?? 0);
+                        ?>
                             <tr>
                                 <td><?= htmlspecialchars((string)($it['producto'] ?? '')) ?></td>
                                 <td><?= htmlspecialchars((string)($it['variedad'] ?? '')) ?: '<span class="text-muted">—</span>' ?></td>
-                                <td class="text-center"><?= (int)($it['qty'] ?? 0) ?></td>
-                                <td class="text-end"><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($it['unit_price_cents'] ?? 0))) ?></td>
-                                <td class="text-end"><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($it['iva_cents'] ?? 0))) ?></td>
-                                <td class="text-end fw-bold"><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($it['total_cents'] ?? 0))) ?></td>
+                                <td class="text-center"><?= $qty ?></td>
+                                <td class="text-end"><?= htmlspecialchars(Format::moneyRoundedFromCents($unitDisplay)) ?></td>
+                                <?php if ($discriminaIva): ?>
+                                <td class="text-end"><?= htmlspecialchars(Format::moneyRoundedFromCents($ivaCents)) ?></td>
+                                <?php endif; ?>
+                                <td class="text-end fw-bold"><?= htmlspecialchars(Format::moneyRoundedFromCents($totalDisplay)) ?></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -76,13 +89,15 @@ $formaPagoLabels = [
                 <div class="row">
                     <div class="col-md-5 offset-md-7">
                         <div class="d-flex justify-content-between small">
-                            <span>Subtotal:</span>
-                            <span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($factura['subtotal_cents'] ?? 0))) ?></span>
+                            <span><?= $discriminaIva ? 'Subtotal:' : 'Subtotal (con IVA):' ?></span>
+                            <span><?= htmlspecialchars(Format::moneyRoundedFromCents($discriminaIva ? (int)($factura['subtotal_cents'] ?? 0) : (int)($factura['total_cents'] ?? 0))) ?></span>
                         </div>
+                        <?php if ($discriminaIva): ?>
                         <div class="d-flex justify-content-between small">
                             <span>IVA:</span>
                             <span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($factura['iva_cents'] ?? 0))) ?></span>
                         </div>
+                        <?php endif; ?>
                         <?php $descuento = (int)($factura['descuento_cents'] ?? 0); ?>
                         <?php if ($descuento > 0): ?>
                         <div class="d-flex justify-content-between small text-danger">
