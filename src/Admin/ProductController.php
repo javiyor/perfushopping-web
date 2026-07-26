@@ -419,6 +419,31 @@ final class ProductController
         ]);
     }
 
+    public function createVariant(array $params): void
+    {
+        $this->auth->requireSesion();
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $idprodu = (int)($_POST['idprodu'] ?? 0);
+        $nomgusto = trim((string)($_POST['nomgusto'] ?? ''));
+
+        if ($idprodu <= 0 || $nomgusto === '') {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Nombre de variedad obligatorio.'];
+            Response::redirect('/admin/productos/' . $idprodu);
+        }
+
+        $product = $this->repo->find($idprodu);
+        if (!$product) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Producto no encontrado.'];
+            Response::redirect('/admin/productos');
+        }
+
+        $this->repo->createVariant($idprodu, $nomgusto);
+
+        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Variedad "' . htmlspecialchars($nomgusto) . '" creada.'];
+        Response::redirect('/admin/productos/' . $idprodu);
+    }
+
     public function deleteVariant(array $params): void
     {
         $this->auth->requireSesion();

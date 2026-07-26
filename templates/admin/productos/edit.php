@@ -223,6 +223,7 @@ foreach ($proveedores as $prov) {
     <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
         <span>Variedades</span>
         <div class="d-flex gap-1 align-items-center">
+            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addVariantModal"><i class="bi bi-plus-lg"></i> Agregar</button>
             <a class="btn btn-sm btn-outline-success" href="/admin/productos/etiquetas/<?= $selectedId ?>" target="_blank"><i class="bi bi-upc-scan"></i> Imprimir etiquetas</a>
             <span class="badge bg-secondary"><?= count($variants) ?></span>
         </div>
@@ -332,6 +333,30 @@ foreach ($proveedores as $prov) {
         <?php if (!$variants): ?>
             <div class="text-muted small mb-2">Este producto no tiene variedades.</div>
         <?php endif; ?>
+    </div>
+</div>
+
+<!-- Modal Agregar Variedad -->
+<div class="modal fade" id="addVariantModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <form method="post" action="/admin/productos/variant/create">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h6 class="modal-title">Agregar variedad</h6>
+                    <button class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                    <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
+                    <label class="form-label small">Nombre de la variedad</label>
+                    <input class="form-control" name="nomgusto" required autocomplete="off" />
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-plus-lg"></i> Crear</button>
+                </div>
+            </div>
+        </form>
     </div>
 </div>
 

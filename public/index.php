@@ -165,6 +165,7 @@ $router->get('/admin/productos/(?P<id>\d+)', [AdminProductControllerNew::class, 
 $router->post('/admin/productos/save', [AdminProductControllerNew::class, 'save']);
 $router->post('/admin/productos/main-image', [AdminProductControllerNew::class, 'uploadMainImage']);
 $router->post('/admin/productos/delete', [AdminProductControllerNew::class, 'delete']);
+$router->post('/admin/productos/variant/create', [AdminProductControllerNew::class, 'createVariant']);
 $router->post('/admin/productos/variant/delete', [AdminProductControllerNew::class, 'deleteVariant']);
 $router->post('/admin/productos/main-image/clear', [AdminProductControllerNew::class, 'clearMainImage']);
 $router->post('/admin/productos/variant-logistics', [AdminProductControllerNew::class, 'saveVariantLogistics']);
