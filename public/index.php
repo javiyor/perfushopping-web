@@ -171,6 +171,7 @@ $router->post('/admin/productos/variant-logistics', [AdminProductControllerNew::
 $router->post('/admin/productos/variant-images', [AdminProductControllerNew::class, 'uploadVariantImages']);
 $router->post('/admin/productos/variant-images/delete', [AdminProductControllerNew::class, 'deleteVariantImage']);
 $router->post('/admin/productos/describe', [AdminProductControllerNew::class, 'describe']);
+$router->get('/admin/productos/etiquetas/(?P<id>\d+)', [AdminProductControllerNew::class, 'printLabels']);
 $router->get('/admin/productos/importar', [AdminImportController::class, 'form']);
 $router->post('/admin/productos/importar/preview', [AdminImportController::class, 'preview']);
 $router->post('/admin/productos/importar/confirm', [AdminImportController::class, 'confirm']);
