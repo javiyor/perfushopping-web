@@ -273,13 +273,13 @@ final class AdminProductRepo
         $pdo->prepare('DELETE FROM producto WHERE idprodu = :id LIMIT 1')->execute([':id' => $idprodu]);
     }
 
-    public function createVariant(int $idprodu, string $nomgusto): int
+    public function createVariant(int $idprodu, string $nomgusto, string $codscan = ''): int
     {
         $st = Db::pdo()->query('SELECT COALESCE(MAX(idcodgusto), 0) + 1 FROM gustos');
         $idcodgusto = (int)$st->fetchColumn();
 
-        $st = Db::pdo()->prepare('INSERT INTO gustos (idcodgusto, idprodu, nomgusto, stockact, discont) VALUES (:id, :p, :n, 0, 0)');
-        $st->execute([':id' => $idcodgusto, ':p' => $idprodu, ':n' => $nomgusto]);
+        $st = Db::pdo()->prepare('INSERT INTO gustos (idcodgusto, idprodu, nomgusto, codscan, stockact, discont) VALUES (:id, :p, :n, :c, 0, 0)');
+        $st->execute([':id' => $idcodgusto, ':p' => $idprodu, ':n' => $nomgusto, ':c' => $codscan !== '' ? $codscan : null]);
         return $idcodgusto;
     }
 

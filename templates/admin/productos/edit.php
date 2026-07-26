@@ -339,7 +339,7 @@ foreach ($proveedores as $prov) {
 <!-- Modal Agregar Variedad -->
 <div class="modal fade" id="addVariantModal" tabindex="-1">
     <div class="modal-dialog modal-sm">
-        <form method="post" action="/admin/productos/variant/create">
+        <form method="post" action="/admin/productos/variant/create" enctype="multipart/form-data">
             <div class="modal-content">
                 <div class="modal-header">
                     <h6 class="modal-title">Agregar variedad</h6>
@@ -348,8 +348,18 @@ foreach ($proveedores as $prov) {
                 <div class="modal-body">
                     <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
                     <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
-                    <label class="form-label small">Nombre de la variedad</label>
-                    <input class="form-control" name="nomgusto" required autocomplete="off" />
+                    <div class="mb-2">
+                        <label class="form-label small">Nombre de la variedad</label>
+                        <input class="form-control" name="nomgusto" required autocomplete="off" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">Código de barras <span class="text-muted">(opcional)</span></label>
+                        <input class="form-control" name="codscan" placeholder="Ej: 999999999999" autocomplete="off" />
+                    </div>
+                    <div>
+                        <label class="form-label small">Imagen <span class="text-muted">(opcional)</span></label>
+                        <input class="form-control" type="file" name="imagen" accept=".jpg,.jpeg,.png,.webp" />
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>

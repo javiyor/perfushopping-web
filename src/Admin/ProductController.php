@@ -426,6 +426,7 @@ final class ProductController
 
         $idprodu = (int)($_POST['idprodu'] ?? 0);
         $nomgusto = trim((string)($_POST['nomgusto'] ?? ''));
+        $codscan = trim((string)($_POST['codscan'] ?? ''));
 
         if ($idprodu <= 0 || $nomgusto === '') {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Nombre de variedad obligatorio.'];
@@ -438,7 +439,19 @@ final class ProductController
             Response::redirect('/admin/productos');
         }
 
-        $this->repo->createVariant($idprodu, $nomgusto);
+        $idcodgusto = $this->repo->createVariant($idprodu, $nomgusto, $codscan);
+
+        // Upload image if provided
+        if (isset($_FILES['imagen']) && $_FILES['imagen']['error'] === UPLOAD_ERR_OK) {
+            try {
+                $dir = $this->resolveUploadDir();
+                $filename = $this->storeUploadedImage($_FILES['imagen'], $dir, 'p' . $idprodu . '-g' . $idcodgusto);
+                $this->repo->insertVariantImage($idprodu, $idcodgusto, $filename);
+            } catch (\Throwable $e) {
+                $_SESSION['admin_flash'] = ['type' => 'warning', 'text' => 'Variedad creada, pero error al subir imagen: ' . $e->getMessage()];
+                Response::redirect('/admin/productos/' . $idprodu);
+            }
+        }
 
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Variedad "' . htmlspecialchars($nomgusto) . '" creada.'];
         Response::redirect('/admin/productos/' . $idprodu);
