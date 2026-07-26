@@ -149,14 +149,15 @@ final class ApiSyncTablesController
                 continue;
             }
 
-            // INSERT new row (only synced columns, rest get defaults)
-            $insertCols = array_merge(['idcodgusto'], $updateCols);
+            // INSERT new row (must include idprodu to link to product)
+            $insertCols = array_merge(['idcodgusto', 'idprodu'], $updateCols);
             $insCols = implode(', ', $insertCols);
             $insPlaces = implode(', ', array_map(fn($c) => ":{$c}", $insertCols));
             $insertStmt = $pdo->prepare(
                 "INSERT INTO gustos ({$insCols}) VALUES ({$insPlaces})"
             );
             $insertStmt->bindValue(':idcodgusto', $idcodgusto, \PDO::PARAM_INT);
+            $insertStmt->bindValue(':idprodu', (int)($r['idprodu'] ?? 0), \PDO::PARAM_INT);
             foreach ($updateCols as $c) {
                 $insertStmt->bindValue(":{$c}", $r[$c] ?? null);
             }
