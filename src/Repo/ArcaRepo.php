@@ -79,6 +79,25 @@ final class ArcaRepo
     }
 
     private bool $hasServiceColumn = false;
+    private bool $hasCodigoEmisionColumn = false;
+
+    private function ensureCodigoEmisionColumn(): void
+    {
+        static $checked = false;
+        if ($checked) return;
+        $checked = true;
+        try {
+            Db::pdo()->exec("ALTER TABLE facturas ADD COLUMN codigo_emision_arca INT DEFAULT NULL AFTER cae_vto");
+            $this->hasCodigoEmisionColumn = true;
+        } catch (\Throwable $e) {
+            try {
+                $st = Db::pdo()->query("SHOW COLUMNS FROM facturas LIKE 'codigo_emision_arca'");
+                $this->hasCodigoEmisionColumn = (bool)$st->fetch();
+            } catch (\Throwable $e2) {
+                $this->hasCodigoEmisionColumn = false;
+            }
+        }
+    }
 
     private function ensureServiceColumn(): void
     {
@@ -128,14 +147,28 @@ final class ArcaRepo
 
         // Update factura with CAE info
         if (!empty($resultado['cae'])) {
-            $pdo->prepare('UPDATE facturas SET cae = :cae, cae_vto = :vto, resultado_arca = :res, arca_obs = :obs, updated_at = NOW() WHERE id = :fi LIMIT 1')
-                ->execute([
-                    ':cae' => $resultado['cae'],
-                    ':vto' => $resultado['cae_vto'] ?? null,
-                    ':res' => $resultado['resultado'] ?? 'A',
-                    ':obs' => $resultado['observaciones'] ?? null,
-                    ':fi' => $facturaId,
-                ]);
+            $codEmision = isset($resultado['codigo_emision']) ? (int)$resultado['codigo_emision'] : null;
+            $this->ensureCodigoEmisionColumn();
+            if ($this->hasCodigoEmisionColumn) {
+                $pdo->prepare('UPDATE facturas SET cae = :cae, cae_vto = :vto, resultado_arca = :res, arca_obs = :obs, codigo_emision_arca = :ce, updated_at = NOW() WHERE id = :fi LIMIT 1')
+                    ->execute([
+                        ':cae' => $resultado['cae'],
+                        ':vto' => $resultado['cae_vto'] ?? null,
+                        ':res' => $resultado['resultado'] ?? 'A',
+                        ':obs' => $resultado['observaciones'] ?? null,
+                        ':ce' => $codEmision,
+                        ':fi' => $facturaId,
+                    ]);
+            } else {
+                $pdo->prepare('UPDATE facturas SET cae = :cae, cae_vto = :vto, resultado_arca = :res, arca_obs = :obs, updated_at = NOW() WHERE id = :fi LIMIT 1')
+                    ->execute([
+                        ':cae' => $resultado['cae'],
+                        ':vto' => $resultado['cae_vto'] ?? null,
+                        ':res' => $resultado['resultado'] ?? 'A',
+                        ':obs' => $resultado['observaciones'] ?? null,
+                        ':fi' => $facturaId,
+                    ]);
+            }
         } else {
             $pdo->prepare('UPDATE facturas SET resultado_arca = :res, arca_obs = :obs, updated_at = NOW() WHERE id = :fi LIMIT 1')
                 ->execute([

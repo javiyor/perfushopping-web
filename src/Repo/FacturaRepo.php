@@ -7,6 +7,23 @@ use Perfushopping\Web\Infra\Db;
 
 final class FacturaRepo
 {
+    public static function normalizeCondIva(?string $value): string
+    {
+        $normalized = strtolower(trim((string)$value));
+        $map = [
+            'responsable inscripto' => 'responsable_inscripto',
+            'ri' => 'responsable_inscripto',
+            'consumidor final' => 'consumidor_final',
+            'cf' => 'consumidor_final',
+            'monotributista' => 'monotributista',
+            'monotributo' => 'monotributista',
+            'mono' => 'monotributista',
+            'exento' => 'exento',
+            'ex' => 'exento',
+        ];
+        return $map[$normalized] ?? $normalized ?: 'consumidor_final';
+    }
+
     public function search(string $q = '', string $estado = '', int $limit = 60): array
     {
         $limit = max(1, min(200, $limit));
@@ -259,7 +276,7 @@ final class FacturaRepo
             SELECT COALESCE(w.id, 0) AS id, c.idclien,
                    c.razon AS name, c.cuit, c.direc, c.tele AS phone, c.mail AS email,
                    c.Localidad AS city,
-                    \'consumidor_final\' AS condicion_iva
+                   COALESCE(c.condicion_iva, \'consumidor_final\') AS condicion_iva
             FROM clientes c
             LEFT JOIN web_users w ON w.cliente_id = c.idclien
             WHERE c.razon LIKE :like OR c.cuit LIKE :like2
@@ -267,7 +284,11 @@ final class FacturaRepo
             LIMIT ' . $limit
         );
         $st->execute([':like' => '%' . $q . '%', ':like2' => '%' . $q . '%']);
-        return $st->fetchAll();
+        $rows = $st->fetchAll();
+        foreach ($rows as &$r) {
+            $r['condicion_iva'] = self::normalizeCondIva($r['condicion_iva'] ?? null);
+        }
+        return $rows;
     }
 
     public function findRemitosDisponibles(string $q, int $limit = 10): array
@@ -400,11 +421,15 @@ final class FacturaRepo
             SELECT 0 AS id, c.idclien,
                    c.razon AS name, c.cuit, c.direc, c.tele AS phone, c.mail AS email,
                    c.Localidad AS city,
-                   \'consumidor_final\' AS condicion_iva
+                   COALESCE(c.condicion_iva, \'consumidor_final\') AS condicion_iva
             FROM clientes c
             WHERE c.idclien = :id LIMIT 1
         ');
         $st->execute([':id' => $idclien]);
-        return $st->fetch() ?: null;
+        $r = $st->fetch();
+        if ($r) {
+            $r['condicion_iva'] = self::normalizeCondIva($r['condicion_iva'] ?? null);
+        }
+        return $r ?: null;
     }
 }

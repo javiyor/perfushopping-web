@@ -222,6 +222,13 @@ $discriminaIva = in_array($factura['tipo_comprobante'] ?? '', ['FACT-A']);
                     <dd class="col-sm-12 text-muted" style="font-size:11px"><?= nl2br(htmlspecialchars((string)$arcaComprobante['observaciones'])) ?></dd>
                     <?php endif; ?>
                 </dl>
+                <?php if ($qrUrl ?? null): ?>
+                <hr />
+                <div style="text-align:center">
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=<?= urlencode($qrUrl) ?>" alt="Código QR AFIP" style="width:100px;height:100px" />
+                    <div style="font-size:9px;word-break:break-all;margin-top:2px"><?= htmlspecialchars($qrUrl) ?></div>
+                </div>
+                <?php endif; ?>
             </div>
         </div>
         <?php elseif (($factura['estado'] ?? '') !== 'anulada'): ?>

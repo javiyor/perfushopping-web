@@ -1,6 +1,7 @@
 ALTER TABLE facturas ADD COLUMN cae VARCHAR(14) DEFAULT NULL AFTER estado;
 ALTER TABLE facturas ADD COLUMN cae_vto DATE DEFAULT NULL AFTER cae;
-ALTER TABLE facturas ADD COLUMN resultado_arca VARCHAR(20) DEFAULT NULL AFTER cae_vto;
+ALTER TABLE facturas ADD COLUMN codigo_emision_arca INT DEFAULT NULL AFTER cae_vto;
+ALTER TABLE facturas ADD COLUMN resultado_arca VARCHAR(20) DEFAULT NULL AFTER codigo_emision_arca;
 ALTER TABLE facturas ADD COLUMN arca_obs TEXT DEFAULT NULL AFTER resultado_arca;
 
 CREATE TABLE IF NOT EXISTS arca_config (

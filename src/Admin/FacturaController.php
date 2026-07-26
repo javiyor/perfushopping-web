@@ -323,8 +323,17 @@ final class FacturaController
         $pagos = $repo->pagos($id);
 
         $arcaComprobante = null;
+        $qrUrl = null;
         if ($factura['cae'] ?? null) {
             $arcaComprobante = (new \Perfushopping\Web\Repo\ArcaRepo())->getComprobante($id);
+            if ($arcaComprobante && ($arcaComprobante['codigo_emision'] ?? null)) {
+                try {
+                    $wsfe = new \Perfushopping\Web\Service\AfipWsfe();
+                    $qrUrl = $wsfe->getUrlQr($factura, (int)$arcaComprobante['codigo_emision'], $factura['cae']);
+                } catch (\Throwable $e) {
+                    error_log('QR error: ' . $e->getMessage());
+                }
+            }
         }
 
         echo View::adminPage('admin/facturas/detail.php', [
@@ -333,6 +342,7 @@ final class FacturaController
             'items' => $items,
             'pagos' => $pagos,
             'arcaComprobante' => $arcaComprobante,
+            'qrUrl' => $qrUrl,
             'csrf' => Csrf::token(),
             'pageTitle' => 'Factura ' . ($factura['codigo'] ?? ''),
         ]);
@@ -503,11 +513,25 @@ final class FacturaController
         $items = $repo->items($id);
         $pagos = $repo->pagos($id);
 
+        $qrUrl = null;
+        if ($factura['cae'] ?? null) {
+            $arcaComprobante = (new \Perfushopping\Web\Repo\ArcaRepo())->getComprobante($id);
+            if ($arcaComprobante && ($arcaComprobante['codigo_emision'] ?? null)) {
+                try {
+                    $wsfe = new \Perfushopping\Web\Service\AfipWsfe();
+                    $qrUrl = $wsfe->getUrlQr($factura, (int)$arcaComprobante['codigo_emision'], $factura['cae']);
+                } catch (\Throwable $e) {
+                    error_log('QR error: ' . $e->getMessage());
+                }
+            }
+        }
+
         echo View::render('admin/facturas/print.php', [
             'factura' => $factura,
             'items' => $items,
             'pagos' => $pagos,
             'formato' => $formato,
+            'qrUrl' => $qrUrl,
         ]);
     }
 

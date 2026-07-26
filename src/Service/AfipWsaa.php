@@ -67,8 +67,8 @@ final class AfipWsaa
     private function generarTicketXml(string $service): string
     {
         $cuit = (new ArcaRepo())->getConfig('cuit');
-        $genTime = gmdate('Y-m-d\TH:i:s.xxx\Z');
-        $expTime = gmdate('Y-m-d\TH:i:s.xxx\Z', strtotime('+12 hours'));
+        $genTime = gmdate('Y-m-d\TH:i:s.') . substr(microtime(), 2, 3) . 'Z';
+        $expTime = gmdate('Y-m-d\TH:i:s.', strtotime('+12 hours')) . substr(microtime(), 2, 3) . 'Z';
 
         return <<<XML
 <?xml version="1.0" encoding="UTF-8"?>

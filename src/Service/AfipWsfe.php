@@ -18,6 +18,12 @@ final class AfipWsfe
         'FACT-B' => 6,
         'FACT-C' => 11,
         'NC' => 8,
+        'ND' => 9,
+    ];
+
+    private static array $soapActions = [
+        'FECompUltimoAutorizado' => 'http://ar.gov.afip.dif.FEV1/FECompUltimoAutorizado',
+        'FECAESolicitar' => 'http://ar.gov.afip.dif.FEV1/FECAESolicitar',
     ];
 
     private static array $condIvaMap = [
@@ -51,14 +57,22 @@ final class AfipWsfe
         $this->sign = $ta['sign'];
     }
 
+    public function autenticarSiNecesario(): void
+    {
+        if ($this->token === '' || $this->sign === '') {
+            $this->autenticar();
+        }
+    }
+
     public function getUltimoComprobanteAutorizado(int $puntoVenta, int $tipoCbte): int
     {
+        $this->autenticarSiNecesario();
         $xml = $this->buildSoapRequest('FECompUltimoAutorizado', [
             'PtoVta' => $puntoVenta,
             'CbteTipo' => $tipoCbte,
         ]);
 
-        $response = $this->call($xml);
+        $response = $this->call($xml, 'FECompUltimoAutorizado');
 
         $dom = new \DOMDocument();
         $dom->loadXML($response);
@@ -80,11 +94,16 @@ final class AfipWsfe
 
         $fecha = str_replace('-', '', $factura['fecha']);
 
-        $neto = (int)($factura['subtotal_cents'] ?? 0);
+        $descuento = (int)($factura['descuento_cents'] ?? 0);
+        $subtotalOriginal = (int)($factura['subtotal_cents'] ?? 0);
         $ivaTotal = (int)($factura['iva_cents'] ?? 0);
-        $total = (int)($factura['total_cents'] ?? 0);
 
-        // Group IVA by rate
+        // Apply descuento proportionally to neto (keeping IVA unchanged)
+        $netoDescontado = $subtotalOriginal - $descuento;
+        if ($netoDescontado < 0) $netoDescontado = 0;
+        $total = $netoDescontado + $ivaTotal;
+
+        // Group IVA by rate and distribute descuento proportionally
         $ivaGroups = [];
         foreach ($items as $it) {
             $rate = (float)($it['iva_rate'] ?? 21);
@@ -99,7 +118,15 @@ final class AfipWsfe
             $ivaGroups[$rateKey]['iva'] += $lineIva;
         }
 
-        $detalle = $this->buildDetalle($tipoCbte, $puntoVenta, $cbteNro, $fecha, $condIva, $tipoDoc, $nroDoc, $factura['cliente_nombre'] ?? '', $total, $neto, $ivaTotal, $ivaGroups, $factura['cliente_direc'] ?? '');
+        // Distribute descuento across IVA groups proportionally
+        if ($descuento > 0 && $subtotalOriginal > 0) {
+            foreach ($ivaGroups as $k => $g) {
+                $proportion = $g['neto'] / $subtotalOriginal;
+                $ivaGroups[$k]['neto'] = (int)round($g['neto'] - $descuento * $proportion);
+            }
+        }
+
+        $detalle = $this->buildDetalle($tipoCbte, $puntoVenta, $cbteNro, $fecha, $condIva, $tipoDoc, $nroDoc, $factura['cliente_nombre'] ?? '', $total, $netoDescontado, $ivaTotal, $ivaGroups, $factura['cliente_direc'] ?? '');
 
         $xml = $this->buildSoapRequest('FECAESolicitar', [
             'FeCAEReq' => [
@@ -112,9 +139,57 @@ final class AfipWsfe
             ],
         ]);
 
-        $response = $this->call($xml);
+        $response = $this->call($xml, 'FECAESolicitar');
 
         return $this->parsearRespuesta($response, $xml, $cbteNro);
+    }
+
+    public static function getTipoCbteCode(string $tipoComprobante): int
+    {
+        return self::$tipoCbteMap[$tipoComprobante] ?? 6;
+    }
+
+    public function getUrlQr(array $factura, int $codigoEmision, string $cae): string
+    {
+        $tipoCbte = self::getTipoCbteCode($factura['tipo_comprobante'] ?? 'FACT-B');
+        $puntoVenta = (int)($factura['punto_venta'] ?? 1);
+
+        $descuento = (int)($factura['descuento_cents'] ?? 0);
+        $subtotal = (int)($factura['subtotal_cents'] ?? 0);
+        $iva = (int)($factura['iva_cents'] ?? 0);
+        $importeNeto = $subtotal - $descuento;
+        if ($importeNeto < 0) $importeNeto = 0;
+        $importeTotal = $importeNeto + $iva;
+
+        $condIva = $factura['cliente_condicion_iva'] ?? 'consumidor_final';
+        $tipoDocRec = $condIva === 'consumidor_final' ? 99 : 80;
+        $nroDocRec = '0';
+        $cuit = trim((string)($factura['cliente_cuit'] ?? ''));
+        if ($cuit !== '') {
+            $tipoDocRec = 80;
+            $nroDocRec = preg_replace('/\D/', '', $cuit);
+        }
+
+        $data = [
+            'ver' => 1,
+            'fecha' => $factura['fecha'] ?? date('Y-m-d'),
+            'cuit' => (int)$this->cuit,
+            'ptoVta' => $puntoVenta,
+            'tipoCbte' => $tipoCbte,
+            'nroCbte' => $codigoEmision,
+            'importe' => $importeTotal / 100,
+            'moneda' => 'PES',
+            'ctz' => 1,
+            'tipoDocRec' => $tipoDocRec,
+            'nroDocRec' => (int)$nroDocRec,
+            'tipoCodAut' => 'E',
+            'codAut' => (int)$cae,
+        ];
+
+        $json = json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        $p = rtrim(strtr(base64_encode($json), '+/', '-_'), '=');
+
+        return 'https://www.afip.gob.ar/fe/qr/?p=' . $p;
     }
 
     private function getTipoDoc(array $factura): int
@@ -236,14 +311,15 @@ XML;
         return '';
     }
 
-    private function call(string $xml): string
+    private function call(string $xml, string $method = 'FECAESolicitar'): string
     {
+        $soapAction = self::$soapActions[$method] ?? 'http://ar.gov.afip.dif.FEV1/FECAESolicitar';
         $ch = curl_init();
         curl_setopt_array($ch, [
             CURLOPT_URL => $this->url,
             CURLOPT_POST => true,
             CURLOPT_POSTFIELDS => $xml,
-            CURLOPT_HTTPHEADER => ['Content-Type: text/xml; charset=UTF-8', 'SOAPAction: http://ar.gov.afip.dif.FEV1/FECAESolicitar'],
+            CURLOPT_HTTPHEADER => ['Content-Type: text/xml; charset=UTF-8', 'SOAPAction: ' . $soapAction],
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => 120,
             CURLOPT_SSL_VERIFYPEER => false,
