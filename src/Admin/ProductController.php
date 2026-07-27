@@ -416,6 +416,9 @@ final class ProductController
         echo View::render('admin/productos/labels.php', [
             'product' => $product,
             'variants' => $variants,
+            'showPrice' => ($_GET['precio'] ?? '1') === '1',
+            'showDesc' => ($_GET['desc'] ?? '1') === '1',
+            'showVariant' => ($_GET['variedad'] ?? '1') === '1',
         ]);
     }
 
