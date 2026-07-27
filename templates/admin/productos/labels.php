@@ -7,12 +7,13 @@ $showPrice = $showPrice ?? true;
 $showDesc = $showDesc ?? true;
 $showVariant = $showVariant ?? true;
 
-$productName = htmlspecialchars((string)($product['produ'] ?? ''));
+$productName = (string)($product['produ'] ?? '');
 $descripcion = trim((string)($product['observ'] ?? ''));
 $priceGross = number_format((float)($product['precio'] ?? 0) * (1 + ((float)($product['tiva'] ?? 0) / 100)), 0, ',', '.');
 $priceGrossWs = number_format((float)($product['precio1'] ?? 0) * (1 + ((float)($product['tiva'] ?? 0) / 100)), 0, ',', '.');
+$idprodu = (int)($product['idprodu'] ?? 0);
 ?><!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Etiquetas - <?= $productName ?></title>
+<html><head><meta charset="utf-8"><title>Etiquetas - <?= htmlspecialchars(mb_substr($productName, 0, 30)) ?></title>
 <style>
 @page { margin:0; size:80mm 297mm; }
 * { margin:0; padding:0; box-sizing:border-box; }
@@ -20,17 +21,17 @@ body { font-family:Arial,Helvetica,sans-serif; width:80mm; }
 .config-bar { display:none; }
 .label-grid { display:flex; flex-wrap:wrap; padding:2mm 0 0 2mm; }
 .label {
-    width:35mm; height:20mm; margin:0 0 2mm 2mm;
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    border:1px dashed #ccc; overflow:hidden; padding:1mm;
+    width:35mm; min-height:16mm; margin:0 0 2mm 2mm;
+    display:flex; flex-direction:column; align-items:center;
+    border:1px dashed #ccc; overflow:hidden; padding:0.8mm;
 }
-.label .name { font-size:7px; font-weight:bold; text-align:center; line-height:1.1; max-height:5mm; overflow:hidden; word-break:break-all; }
-.label .desc { font-size:6px; color:#555; text-align:center; line-height:1.1; max-height:4mm; overflow:hidden; margin:1px 0; }
-.label .price { font-size:10px; font-weight:bold; margin:1px 0; }
-.label .price-ws { font-size:6px; color:#666; }
-.label .barcode-wrap { margin-top:1px; }
+.label .row-produ { font-size:6px; font-weight:bold; text-align:center; line-height:1.15; max-height:7mm; overflow:hidden; word-break:break-all; width:100%; }
+.label .row-id { font-size:6px; color:#555; text-align:center; margin:1px 0; }
+.label .row-price { font-size:10px; font-weight:bold; margin:1px 0; }
+.label .row-price-ws { font-size:6px; color:#666; }
+.label .barcode-wrap { margin-top:1px; line-height:0; }
 @media print {
-    .label { border:none; border:1px dashed #ccc; }
+    .label { border:none; }
     .config-bar { display:none !important; }
 }
 @media screen {
@@ -40,7 +41,6 @@ body { font-family:Arial,Helvetica,sans-serif; width:80mm; }
     .config-bar .btn-print { margin-left:10px; }
     .label-grid { background:#fff; border-radius:8px; padding:4mm; max-width:180mm; }
     .label { border:1px solid #ddd; border-radius:2px; }
-    .no-print { display:block; }
 }
 </style>
 </head><body>
@@ -57,18 +57,13 @@ body { font-family:Arial,Helvetica,sans-serif; width:80mm; }
         ? $codscan
         : Barcode::ean13((int)($v['idcodgusto'] ?? 0));
     $variantName = htmlspecialchars((string)($v['nomgusto'] ?? ''));
-    $displayName = htmlspecialchars($productName);
-    $displayFull = $variantName ? $productName . ' - ' . $variantName : $productName;
-    if (mb_strlen($displayFull) > 25) $displayFull = mb_substr($displayFull, 0, 24) . '…';
 ?>
     <div class="label">
-        <div class="name"><span class="name-base"><?= htmlspecialchars($productName) ?></span><?php if ($variantName): ?> <span class="name-variant">- <?= $variantName ?></span><?php endif; ?></div>
-        <?php if ($descripcion !== '' && $showDesc): ?>
-        <div class="desc"><?= htmlspecialchars(mb_substr($descripcion, 0, 40)) ?></div>
-        <?php endif; ?>
-        <div class="price">$<?= $priceGross ?></div>
-        <div class="price-ws">May: $<?= $priceGrossWs ?></div>
-        <div class="barcode-wrap"><?= Barcode::ean13Svg($ean) ?></div>
+        <div class="row-produ"><?= htmlspecialchars(mb_substr($productName, 0, 50)) ?></div>
+        <div class="row-id">#<?= $idprodu ?><?php if ($variantName): ?> / <span class="name-variant"><?= $variantName ?></span><?php endif; ?></div>
+        <div class="row-price">$<?= $priceGross ?></div>
+        <div class="row-price-ws">May: $<?= $priceGrossWs ?></div>
+        <div class="barcode-wrap"><?= Barcode::ean13Svg($ean, 28) ?></div>
     </div>
 <?php endforeach; ?>
 </div>
@@ -78,12 +73,15 @@ function toggleLabels() {
     const showDesc = document.getElementById('chkDesc').checked;
     const showVar = document.getElementById('chkVariant').checked;
     document.querySelectorAll('#labelGrid .label').forEach(function(el) {
-        el.querySelector('.price').style.display = showPrice ? '' : 'none';
-        el.querySelector('.price-ws').style.display = showPrice ? '' : 'none';
-        const descEl = el.querySelector('.desc');
-        if (descEl) descEl.style.display = showDesc ? '' : 'none';
+        el.querySelector('.row-price').style.display = showPrice ? '' : 'none';
+        el.querySelector('.row-price-ws').style.display = showPrice ? '' : 'none';
         const varEl = el.querySelector('.name-variant');
         if (varEl) varEl.style.display = showVar ? '' : 'none';
+        const idEl = el.querySelector('.row-id');
+        if (idEl) {
+            const txt = idEl.textContent || '';
+            idEl.style.display = (!showVar && txt.includes(' / ')) ? 'none' : '';
+        }
     });
 }
 toggleLabels();

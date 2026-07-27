@@ -17,7 +17,7 @@ final class Barcode
         return $digits . $check;
     }
 
-    public static function ean13Svg(string $ean): string
+    public static function ean13Svg(string $ean, int $barHeight = 38): string
     {
         if (strlen($ean) !== 13 || !ctype_digit($ean)) {
             $ean = str_pad($ean, 13, '0');
@@ -63,21 +63,20 @@ final class Barcode
         foreach ($bars as $b) $totalWidth += $b['w'];
         $scale = 2;
         $svgWidth = $totalWidth * $scale;
-        $svgHeight = 60;
 
         $x = 0;
         $rects = '';
         foreach ($bars as $b) {
             if ($b['c'] === '#000') {
-                $rects .= '<rect x="' . $x * $scale . '" y="0" width="' . ($b['w'] * $scale) . '" height="' . $svgHeight . '" fill="#000"/>';
+                $rects .= '<rect x="' . $x * $scale . '" y="0" width="' . ($b['w'] * $scale) . '" height="' . $barHeight . '" fill="#000"/>';
             }
             $x += $b['w'];
         }
 
-        $textY = $svgHeight + 12;
-        $svgHeight += 16;
+        $textY = $barHeight + 12;
+        $totalSvgHeight = $barHeight + 16;
 
-        return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' . $svgWidth . ' ' . $svgHeight . '" style="width:100%;max-width:' . $svgWidth . 'px;height:auto">
+        return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' . $svgWidth . ' ' . $totalSvgHeight . '" style="width:100%;max-width:' . $svgWidth . 'px;height:auto">
             ' . $rects . '
             <text x="7" y="' . ($textY - 2) . '" font-family="monospace" font-size="10" fill="#000">' . $ean[0] . '</text>
             <text x="' . (7 * $scale + 5) . '" y="' . ($textY - 2) . '" font-family="monospace" font-size="10" fill="#000">' . substr($ean, 1, 6) . '</text>
