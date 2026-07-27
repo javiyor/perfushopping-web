@@ -35,7 +35,7 @@ final class Barcode
 
         for ($i = 0; $i < 6; $i++) {
             $d = (int)$ean[$i + 1];
-            $code = $patterns[0][1][$d];
+            $code = $patterns[0][$d + 1];
             for ($j = 0; $j < 7; $j++) {
                 $bars[] = ['w' => 1, 'c' => $code[$j] === '1' ? '#000' : '#fff'];
             }
@@ -49,7 +49,7 @@ final class Barcode
 
         for ($i = 7; $i < 13; $i++) {
             $d = (int)$ean[$i];
-            $code = $patterns[0][1][$d];
+            $code = $patterns[0][$d + 1];
             for ($j = 0; $j < 7; $j++) {
                 $bars[] = ['w' => 1, 'c' => $code[$j] === '1' ? '#000' : '#fff'];
             }
