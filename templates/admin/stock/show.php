@@ -3,6 +3,9 @@ $producto = $producto ?? null;
 $variantes = $variantes ?? [];
 $stockDepositos = $stockDepositos ?? [];
 $movimientos = $movimientos ?? [];
+$comprasVentas = $comprasVentas ?? [];
+$movCompras = $movCompras ?? [];
+$movVentas = $movVentas ?? [];
 if (!$producto):
 ?>
     <div class="alert alert-warning">Producto no encontrado.</div>
@@ -96,14 +99,31 @@ if (!$producto):
                             <th>Depósito</th>
                             <th>Variedad</th>
                             <th class="text-center">Stock</th>
+                            <th class="text-center">Comprado</th>
+                            <th class="text-center">Vendido</th>
                         </tr>
                     </thead>
                     <tbody>
+                        <?php
+                        $cvMap = [];
+                        foreach ($comprasVentas as $cv) {
+                            $key = (int)$cv['iddepo'] . '-' . ((int)($cv['idcodgusto'] ?? 0));
+                            $cvMap[$key] = $cv;
+                        }
+                        ?>
                         <?php foreach ($stockDepositos as $sd): ?>
+                            <?php
+                            $key = (int)$sd['iddepo'] . '-' . ((int)($sd['idcodgusto'] ?? 0));
+                            $cv = $cvMap[$key] ?? null;
+                            $comprado = $cv ? (int)$cv['unidades_compradas'] : 0;
+                            $vendido = $cv ? (int)$cv['unidades_vendidas'] : 0;
+                            ?>
                             <tr>
                                 <td><?= htmlspecialchars((string)($sd['nomdepo'] ?? '-')) ?></td>
                                 <td class="small"><?= htmlspecialchars((string)($sd['nomgusto'] ?? 'Principal')) ?></td>
-                                <td class="text-center"><?= (int)($sd['stock'] ?? 0) ?></td>
+                                <td class="text-center fw-bold"><?= (int)($sd['stock'] ?? 0) ?></td>
+                                <td class="text-center text-success small"><?= $comprado ?></td>
+                                <td class="text-center text-danger small"><?= $vendido ?></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -112,9 +132,83 @@ if (!$producto):
         </div>
         <?php endif; ?>
 
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+                <span>Movimientos de Compras</span>
+                <span class="badge bg-secondary"><?= count($movCompras) ?></span>
+            </div>
+            <?php if ($movCompras): ?>
+            <div class="table-responsive" style="max-height:300px;overflow-y:auto">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Variedad</th>
+                            <th class="text-center">Cantidad</th>
+                            <th>Depósito</th>
+                            <th>Observaciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($movCompras as $m): ?>
+                            <?php $cant = (int)($m['canti'] ?? 0); ?>
+                            <?php $ingreso = $m['iddepoh'] !== null; ?>
+                            <tr>
+                                <td class="small"><?= htmlspecialchars((string)($m['mov_fecha'] ?? '-')) ?></td>
+                                <td class="small"><?= htmlspecialchars((string)($m['nomgusto'] ?? '-')) ?></td>
+                                <td class="text-center fw-bold <?= $ingreso ? 'text-success' : 'text-danger' ?>"><?= $ingreso ? '+' : '-' ?><?= $cant ?></td>
+                                <td class="small"><?= htmlspecialchars((string)($m['nom_depoh'] ?? $m['nom_depod'] ?? '-')) ?></td>
+                                <td class="small text-muted"><?= htmlspecialchars((string)($m['notas'] ?? '')) ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php else: ?>
+            <div class="card-body text-muted text-center small">Sin movimientos de compras</div>
+            <?php endif; ?>
+        </div>
+
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+                <span>Movimientos de Ventas</span>
+                <span class="badge bg-secondary"><?= count($movVentas) ?></span>
+            </div>
+            <?php if ($movVentas): ?>
+            <div class="table-responsive" style="max-height:300px;overflow-y:auto">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Variedad</th>
+                            <th class="text-center">Cantidad</th>
+                            <th>Depósito</th>
+                            <th>Observaciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($movVentas as $m): ?>
+                            <?php $cant = (int)($m['canti'] ?? 0); ?>
+                            <?php $salida = $m['iddepod'] !== null; ?>
+                            <tr>
+                                <td class="small"><?= htmlspecialchars((string)($m['mov_fecha'] ?? '-')) ?></td>
+                                <td class="small"><?= htmlspecialchars((string)($m['nomgusto'] ?? '-')) ?></td>
+                                <td class="text-center fw-bold <?= $salida ? 'text-danger' : 'text-success' ?>"><?= $salida ? '-' : '+' ?><?= $cant ?></td>
+                                <td class="small"><?= htmlspecialchars((string)($m['nom_depod'] ?? $m['nom_depoh'] ?? '-')) ?></td>
+                                <td class="small text-muted"><?= htmlspecialchars((string)($m['notas'] ?? '')) ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php else: ?>
+            <div class="card-body text-muted text-center small">Sin movimientos de ventas</div>
+            <?php endif; ?>
+        </div>
+
         <div class="card shadow-sm">
             <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
-                <span>Movimientos</span>
+                <span>Movimientos (stock entre depósitos / sin clasificar)</span>
                 <span class="badge bg-secondary"><?= count($movimientos) ?></span>
             </div>
             <?php if ($movimientos): ?>

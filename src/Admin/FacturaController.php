@@ -252,7 +252,7 @@ final class FacturaController
                 $idcodgusto = $it['idcodgusto'];
                 $qty = $it['qty'];
                 if ($idprodu) {
-                    $stockRepo->registrarAjuste($idprodu, $idcodgusto, $depoId, -$qty, 'Factura ' . $codigo, (int)$adminUser['id']);
+                    $stockRepo->registrarAjuste($idprodu, $idcodgusto, $depoId, -$qty, 'Factura ' . $codigo, (int)$adminUser['id'], 'venta');
                 }
             }
         }
@@ -384,7 +384,7 @@ final class FacturaController
                     $idcodgusto = (int)($it['idcodgusto'] ?? 0) ?: null;
                     $qty = (int)($it['qty'] ?? 0);
                     if ($idprodu) {
-                        $stockRepo->registrarAjuste($idprodu, $idcodgusto, $depoId, $qty, 'Anulación Factura ' . ($f['codigo'] ?? ''), (int)$adminUser['id']);
+                        $stockRepo->registrarAjuste($idprodu, $idcodgusto, $depoId, $qty, 'Anulación Factura ' . ($f['codigo'] ?? ''), (int)$adminUser['id'], 'devolucion_venta');
                     }
                 }
             }

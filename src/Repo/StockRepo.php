@@ -29,16 +29,31 @@ final class StockRepo
             $where[] = '(p.stocact IS NOT NULL AND p.stocact > 5)';
         }
 
-        $sql = '
+        $sql = "
             SELECT p.idprodu, p.codprodu, p.produ, p.precio, p.precomp, p.stocact, p.stocdep, p.codepar, p.enweb, p.observ, p.imagen,
-                   d.nomdepar, COUNT(g.idcodgusto) AS variantes
+                   d.nomdepar, COUNT(g.idcodgusto) AS variantes,
+                   COALESCE(cv.total_comprado, 0) AS total_comprado,
+                   COALESCE(cv.total_vendido, 0) AS total_vendido
             FROM producto p
             LEFT JOIN gustos g ON g.idprodu = p.idprodu AND g.discont = 0
             LEFT JOIN departa d ON d.codepar = p.codepar
-            WHERE ' . implode(' AND ', $where) . '
+            LEFT JOIN (
+                SELECT
+                    sd.idprodu,
+                    COALESCE(SUM(CASE WHEN sc.tipo_movimiento = 'compra' THEN sd.canti ELSE 0 END), 0)
+                        - COALESCE(SUM(CASE WHEN sc.tipo_movimiento = 'devolucion_compra' THEN sd.canti ELSE 0 END), 0) AS total_comprado,
+                    COALESCE(SUM(CASE WHEN sc.tipo_movimiento = 'venta' THEN sd.canti ELSE 0 END), 0)
+                        - COALESCE(SUM(CASE WHEN sc.tipo_movimiento = 'devolucion_venta' THEN sd.canti ELSE 0 END), 0) AS total_vendido
+                FROM stockdet sd
+                INNER JOIN stockcab sc ON sc.idcabstock = sd.idstockcab
+                WHERE sc.tipo_movimiento IS NOT NULL
+                GROUP BY sd.idprodu
+            ) cv ON cv.idprodu = p.idprodu
+            WHERE " . implode(' AND ', $where) . "
             GROUP BY p.idprodu
             ORDER BY p.stocact ASC, p.produ ASC
-            LIMIT ' . $limit;
+            LIMIT {$limit}
+        ";
         $st = Db::pdo()->prepare($sql);
         $st->execute($params);
         return $st->fetchAll();
@@ -138,6 +153,90 @@ final class StockRepo
         return $st->fetchAll();
     }
 
+    public function comprasVentasPorDeposito(int $idprodu, ?int $idcodgusto = null): array
+    {
+        $params = [':idp' => $idprodu];
+        $gustoWhere = '';
+        if ($idcodgusto) {
+            $gustoWhere = 'AND sd.idcodgusto = :idg';
+            $params[':idg'] = $idcodgusto;
+        }
+
+        $sql = "
+            SELECT
+                d.iddepo,
+                d.nomdepo,
+                sd.idprodu,
+                sd.idcodgusto,
+                g.nomgusto,
+                COALESCE(SUM(CASE WHEN sc.tipo_movimiento = 'compra' THEN sd.canti ELSE 0 END), 0) AS comprado,
+                COALESCE(SUM(CASE WHEN sc.tipo_movimiento = 'devolucion_compra' THEN sd.canti ELSE 0 END), 0) AS dev_compra,
+                COALESCE(SUM(CASE WHEN sc.tipo_movimiento = 'venta' THEN sd.canti ELSE 0 END), 0) AS vendido,
+                COALESCE(SUM(CASE WHEN sc.tipo_movimiento = 'devolucion_venta' THEN sd.canti ELSE 0 END), 0) AS dev_venta
+            FROM stockdet sd
+            INNER JOIN stockcab sc ON sc.idcabstock = sd.idstockcab
+            INNER JOIN deposito d ON d.iddepo IN (sc.iddepoh, sc.iddepod)
+            LEFT JOIN gustos g ON g.idcodgusto = sd.idcodgusto
+            WHERE d.marca = 2
+              AND sc.tipo_movimiento IS NOT NULL
+              AND sd.idprodu = :idp
+              {$gustoWhere}
+            GROUP BY d.iddepo, d.nomdepo, sd.idprodu, sd.idcodgusto, g.nomgusto
+            ORDER BY d.nomdepo
+        ";
+        $st = Db::pdo()->prepare($sql);
+        $st->execute($params);
+        $rows = $st->fetchAll();
+
+        foreach ($rows as &$r) {
+            $r['unidades_compradas'] = (int)$r['comprado'] - (int)$r['dev_compra'];
+            $r['unidades_vendidas'] = (int)$r['vendido'] - (int)$r['dev_venta'];
+        }
+        return $rows;
+    }
+
+    public function movimientosPorTipo(int $idprodu, ?int $idcodgusto = null, string $tipo = '', int $limit = 100): array
+    {
+        $limit = max(1, min(500, $limit));
+        $params = [':idp' => $idprodu];
+        $where = 'sd.idprodu = :idp';
+
+        if ($idcodgusto) {
+            $where .= ' AND sd.idcodgusto = :idg';
+            $params[':idg'] = $idcodgusto;
+        }
+
+        if ($tipo === 'transferencia') {
+            $where .= ' AND sc.iddepoh IS NOT NULL AND sc.iddepod IS NOT NULL';
+        } elseif ($tipo === 'compra') {
+            $where .= " AND sc.tipo_movimiento IN ('compra', 'devolucion_compra')";
+        } elseif ($tipo === 'venta') {
+            $where .= " AND sc.tipo_movimiento IN ('venta', 'devolucion_venta')";
+        } elseif ($tipo === '') {
+            $where .= ' AND sc.tipo_movimiento IS NULL';
+        } else {
+            $where .= ' AND sc.tipo_movimiento = :tipo';
+            $params[':tipo'] = $tipo;
+        }
+
+        $sql = "
+            SELECT sd.*, sc.fecha AS mov_fecha, sc.iddepoh, sc.iddepod, sc.notas, sc.tipo_movimiento,
+                   dh.nomdepo AS nom_depoh, dd.nomdepo AS nom_depod,
+                   g.nomgusto, g.codscan
+            FROM stockdet sd
+            INNER JOIN stockcab sc ON sd.idstockcab = sc.idcabstock
+            LEFT JOIN deposito dh ON dh.iddepo = sc.iddepoh
+            LEFT JOIN deposito dd ON dd.iddepo = sc.iddepod
+            LEFT JOIN gustos g ON g.idcodgusto = sd.idcodgusto
+            WHERE {$where}
+            ORDER BY sc.fecha DESC, sd.idstockcab DESC
+            LIMIT {$limit}
+        ";
+        $st = Db::pdo()->prepare($sql);
+        $st->execute($params);
+        return $st->fetchAll();
+    }
+
     public function searchProducts(string $q, int $limit = 20): array
     {
         $limit = max(1, min(50, $limit));
@@ -173,7 +272,8 @@ final class StockRepo
         int $iddepo,
         int $cantidad,
         string $motivo,
-        int $adminUserId
+        int $adminUserId,
+        string $tipoMovimiento = 'ajuste'
     ): int {
         $pdo = Db::pdo();
         $pdo->beginTransaction();
@@ -194,10 +294,15 @@ final class StockRepo
 
             // 1. Insert stockcab
             $st = $pdo->prepare('
-                INSERT INTO stockcab (iddepoh, iddepod, fecha)
-                VALUES (:depoh, :depod, CURDATE())
+                INSERT INTO stockcab (iddepoh, iddepod, fecha, notas, tipo_movimiento)
+                VALUES (:depoh, :depod, CURDATE(), :notas, :tipo)
             ');
-            $st->execute([':depoh' => $iddepoh, ':depod' => $iddepod]);
+            $st->execute([
+                ':depoh' => $iddepoh,
+                ':depod' => $iddepod,
+                ':notas' => $motivo,
+                ':tipo' => $tipoMovimiento,
+            ]);
             $cabId = (int)$pdo->lastInsertId();
 
             // 2. Insert stockdet

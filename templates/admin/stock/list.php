@@ -66,15 +66,19 @@ $stockFilters = ['' => 'Todos', 'sin_stock' => 'Sin stock', 'bajo_stock' => 'Sto
                     <th class="text-end">Precio</th>
                     <th class="text-end">Costo</th>
                     <th class="text-center">Stock</th>
+                    <th class="text-center">Comp.</th>
+                    <th class="text-center">Vend.</th>
                     <th style="width:50px"></th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (!$list): ?>
-                    <tr><td colspan="9" class="text-muted text-center">Sin productos.</td></tr>
+                    <tr><td colspan="11" class="text-muted text-center">Sin productos.</td></tr>
                 <?php else: ?>
-                    <?php foreach ($list as $p): ?>
+                        <?php foreach ($list as $p): ?>
                         <?php $stock = (int)($p['stocact'] ?? 0); ?>
+                        <?php $comprado = (int)($p['total_comprado'] ?? 0); ?>
+                        <?php $vendido = (int)($p['total_vendido'] ?? 0); ?>
                         <tr>
                             <td>
                                 <?php if ($p['imagen'] ?? ''): ?>
@@ -98,6 +102,8 @@ $stockFilters = ['' => 'Todos', 'sin_stock' => 'Sin stock', 'bajo_stock' => 'Sto
                                     <span class="badge bg-success"><?= $stock ?></span>
                                 <?php endif; ?>
                             </td>
+                            <td class="text-center small text-success"><?= $comprado ?></td>
+                            <td class="text-center small text-danger"><?= $vendido ?></td>
                             <td><a class="btn btn-sm btn-outline-secondary" href="/admin/stock/<?= (int)($p['idprodu'] ?? 0) ?>"><i class="bi bi-eye"></i></a></td>
                         </tr>
                     <?php endforeach; ?>

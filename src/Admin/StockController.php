@@ -50,6 +50,9 @@ final class StockController
         $variantes = $repo->variantesConStock($id);
         $stockDepositos = $repo->stockPorDeposito($id);
         $movimientos = $repo->movimientos($id);
+        $comprasVentas = $repo->comprasVentasPorDeposito($id);
+        $movCompras = $repo->movimientosPorTipo($id, null, 'compra');
+        $movVentas = $repo->movimientosPorTipo($id, null, 'venta');
 
         echo View::adminPage('admin/stock/show.php', [
             'adminUser' => $adminUser,
@@ -57,6 +60,9 @@ final class StockController
             'variantes' => $variantes,
             'stockDepositos' => $stockDepositos,
             'movimientos' => $movimientos,
+            'comprasVentas' => $comprasVentas,
+            'movCompras' => $movCompras,
+            'movVentas' => $movVentas,
             'csrf' => Csrf::token(),
             'pageTitle' => $producto['produ'] ?? 'Producto',
         ]);
