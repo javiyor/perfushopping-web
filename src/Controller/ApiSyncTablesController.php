@@ -129,12 +129,13 @@ final class ApiSyncTablesController
 
     private function syncGustos(\PDO $pdo, array $rows): int
     {
-        $cols = array_keys($rows[0]);
-        $preserve = ['discont'];
-        $updateCols = array_values(array_diff($cols, $preserve));
-        $insertCols = implode(', ', $cols);
-        $placeholders = implode(', ', array_map(fn($c) => ":{$c}", $cols));
+        // Only sync core gustos columns — logistics columns are managed via admin UI
+        $allCols = ['idcodgusto', 'idprodu', 'nomgusto', 'codscan', 'stockact'];
+        $insertCols = implode(', ', $allCols);
+        $placeholders = implode(', ', array_map(fn($c) => ":{$c}", $allCols));
+        $updateCols = array_diff($allCols, ['idcodgusto']);
         $setClauses = implode(', ', array_map(fn($c) => "{$c} = VALUES({$c})", $updateCols));
+        $setClauses .= ', discont = COALESCE(VALUES(discont), discont)';
 
         $stmt = $pdo->prepare(
             "INSERT INTO gustos ({$insertCols}) VALUES ({$placeholders})
@@ -147,9 +148,11 @@ final class ApiSyncTablesController
             if ($idcodgusto <= 0) {
                 continue;
             }
-            foreach ($cols as $c) {
-                $stmt->bindValue(":{$c}", $r[$c] ?? null);
-            }
+            $stmt->bindValue(':idcodgusto', $idcodgusto, \PDO::PARAM_INT);
+            $stmt->bindValue(':idprodu', (int)($r['idprodu'] ?? 0), \PDO::PARAM_INT);
+            $stmt->bindValue(':nomgusto', $r['nomgusto'] ?? '');
+            $stmt->bindValue(':codscan', $r['codscan'] ?? null);
+            $stmt->bindValue(':stockact', (int)($r['stockact'] ?? 0), \PDO::PARAM_INT);
             $stmt->execute();
             $count++;
         }
