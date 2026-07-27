@@ -49,6 +49,12 @@ final class ApiSyncTablesController
 
         try {
             $pdo = Db::pdo();
+
+            // DDL (ALTER/CREATE/DROP) causes implicit commit, so run before transaction
+            if ($table === 'gustos') {
+                $this->ensureGustosUniqueIndex($pdo);
+            }
+
             $pdo->beginTransaction();
             $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
 
@@ -123,8 +129,6 @@ final class ApiSyncTablesController
 
     private function syncGustos(\PDO $pdo, array $rows): int
     {
-        $this->ensureGustosUniqueIndex($pdo);
-
         $cols = array_keys($rows[0]);
         $preserve = ['discont'];
         $updateCols = array_values(array_diff($cols, $preserve));
@@ -173,11 +177,10 @@ final class ApiSyncTablesController
                 $pdo->exec('CREATE TABLE gustos_new LIKE gustos');
                 $pdo->exec('ALTER TABLE gustos_new ADD UNIQUE INDEX uq_gustos_idcodgusto (idcodgusto)');
                 $pdo->exec('INSERT IGNORE INTO gustos_new SELECT * FROM gustos WHERE idcodgusto > 0');
-                $pdo->exec('INSERT INTO gustos_new SELECT * FROM gustos WHERE idcodgusto IS NULL OR idcodgusto <= 0');
+                $pdo->exec('INSERT IGNORE INTO gustos_new SELECT * FROM gustos WHERE idcodgusto IS NULL OR idcodgusto <= 0');
                 $pdo->exec('DROP TABLE gustos');
                 $pdo->exec('RENAME TABLE gustos_new TO gustos');
-                // Now add the index
-                $pdo->exec('ALTER TABLE gustos ADD UNIQUE INDEX uq_gustos_idcodgusto (idcodgusto)');
+                // gustos_new already had the index, so gustos now has it too
             }
         }
     }
