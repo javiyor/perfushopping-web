@@ -161,8 +161,13 @@ final class ApiSyncTablesController
         try {
             $pdo->exec('ALTER TABLE gustos ADD UNIQUE INDEX uq_gustos_idcodgusto (idcodgusto)');
         } catch (\Throwable $e) {
-            // Index may already exist or duplicates need cleanup
-            if (str_contains($e->getMessage(), 'Duplicate entry')) {
+            $msg = $e->getMessage();
+            // Index already exists — nothing to do
+            if (str_contains($msg, 'Duplicate key name')) {
+                return;
+            }
+            // Duplicate entries need cleanup
+            if (str_contains($msg, 'Duplicate entry')) {
                 $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
                 // Copy deduped rows into new table with unique index
                 $pdo->exec('CREATE TABLE gustos_new LIKE gustos');
