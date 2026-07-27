@@ -169,10 +169,20 @@ final class StockRepo
                 sd.idprodu,
                 sd.idcodgusto,
                 g.nomgusto,
-                COALESCE(SUM(CASE WHEN sc.tipo_movimiento = 'compra' THEN sd.canti ELSE 0 END), 0) AS comprado,
-                COALESCE(SUM(CASE WHEN sc.tipo_movimiento = 'devolucion_compra' THEN sd.canti ELSE 0 END), 0) AS dev_compra,
-                COALESCE(SUM(CASE WHEN sc.tipo_movimiento = 'venta' THEN sd.canti ELSE 0 END), 0) AS vendido,
-                COALESCE(SUM(CASE WHEN sc.tipo_movimiento = 'devolucion_venta' THEN sd.canti ELSE 0 END), 0) AS dev_venta
+                COALESCE(SUM(
+                    CASE
+                        WHEN sc.tipo_movimiento = 'compra' AND d.iddepo = sc.iddepoh THEN sd.canti
+                        WHEN sc.tipo_movimiento = 'devolucion_compra' AND d.iddepo = sc.iddepod THEN -sd.canti
+                        ELSE 0
+                    END
+                ), 0) AS unidades_compradas,
+                COALESCE(SUM(
+                    CASE
+                        WHEN sc.tipo_movimiento = 'venta' AND d.iddepo = sc.iddepod THEN sd.canti
+                        WHEN sc.tipo_movimiento = 'devolucion_venta' AND d.iddepo = sc.iddepoh THEN -sd.canti
+                        ELSE 0
+                    END
+                ), 0) AS unidades_vendidas
             FROM stockdet sd
             INNER JOIN stockcab sc ON sc.idcabstock = sd.idstockcab
             INNER JOIN deposito d ON d.iddepo IN (sc.iddepoh, sc.iddepod)
@@ -186,13 +196,7 @@ final class StockRepo
         ";
         $st = Db::pdo()->prepare($sql);
         $st->execute($params);
-        $rows = $st->fetchAll();
-
-        foreach ($rows as &$r) {
-            $r['unidades_compradas'] = (int)$r['comprado'] - (int)$r['dev_compra'];
-            $r['unidades_vendidas'] = (int)$r['vendido'] - (int)$r['dev_venta'];
-        }
-        return $rows;
+        return $st->fetchAll();
     }
 
     public function movimientosPorTipo(int $idprodu, ?int $idcodgusto = null, string $tipo = '', int $limit = 100): array
