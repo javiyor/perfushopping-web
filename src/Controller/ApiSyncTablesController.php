@@ -123,11 +123,18 @@ final class ApiSyncTablesController
 
     private function syncGustos(\PDO $pdo, array $rows): int
     {
-        $updateCols = ['nomgusto', 'codscan', 'stockact'];
-        $setClauses = implode(', ', array_map(fn($c) => "{$c} = :{$c}", $updateCols));
+        $this->ensureGustosUniqueIndex($pdo);
 
-        $updateStmt = $pdo->prepare(
-            "UPDATE gustos SET {$setClauses} WHERE idcodgusto = :idcodgusto"
+        $cols = array_keys($rows[0]);
+        $preserve = ['discont'];
+        $updateCols = array_values(array_diff($cols, $preserve));
+        $insertCols = implode(', ', $cols);
+        $placeholders = implode(', ', array_map(fn($c) => ":{$c}", $cols));
+        $setClauses = implode(', ', array_map(fn($c) => "{$c} = VALUES({$c})", $updateCols));
+
+        $stmt = $pdo->prepare(
+            "INSERT INTO gustos ({$insertCols}) VALUES ({$placeholders})
+             ON DUPLICATE KEY UPDATE {$setClauses}"
         );
 
         $count = 0;
@@ -136,35 +143,38 @@ final class ApiSyncTablesController
             if ($idcodgusto <= 0) {
                 continue;
             }
-
-            // Try UPDATE first
-            $updateStmt->bindValue(':idcodgusto', $idcodgusto, \PDO::PARAM_INT);
-            foreach ($updateCols as $c) {
-                $updateStmt->bindValue(":{$c}", $r[$c] ?? null);
+            foreach ($cols as $c) {
+                $stmt->bindValue(":{$c}", $r[$c] ?? null);
             }
-            $updateStmt->execute();
-
-            if ($updateStmt->rowCount() > 0) {
-                $count++;
-                continue;
-            }
-
-            // INSERT new row (must include idprodu to link to product)
-            $insertCols = array_merge(['idcodgusto', 'idprodu'], $updateCols);
-            $insCols = implode(', ', $insertCols);
-            $insPlaces = implode(', ', array_map(fn($c) => ":{$c}", $insertCols));
-            $insertStmt = $pdo->prepare(
-                "INSERT INTO gustos ({$insCols}) VALUES ({$insPlaces})"
-            );
-            $insertStmt->bindValue(':idcodgusto', $idcodgusto, \PDO::PARAM_INT);
-            $insertStmt->bindValue(':idprodu', (int)($r['idprodu'] ?? 0), \PDO::PARAM_INT);
-            foreach ($updateCols as $c) {
-                $insertStmt->bindValue(":{$c}", $r[$c] ?? null);
-            }
-            $insertStmt->execute();
+            $stmt->execute();
             $count++;
         }
         return $count;
+    }
+
+    private function ensureGustosUniqueIndex(\PDO $pdo): void
+    {
+        static $done = false;
+        if ($done) return;
+        $done = true;
+
+        try {
+            $pdo->exec('ALTER TABLE gustos ADD UNIQUE INDEX uq_gustos_idcodgusto (idcodgusto)');
+        } catch (\Throwable $e) {
+            // Index may already exist or duplicates need cleanup
+            if (str_contains($e->getMessage(), 'Duplicate entry')) {
+                $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
+                // Copy deduped rows into new table with unique index
+                $pdo->exec('CREATE TABLE gustos_new LIKE gustos');
+                $pdo->exec('ALTER TABLE gustos_new ADD UNIQUE INDEX uq_gustos_idcodgusto (idcodgusto)');
+                $pdo->exec('INSERT IGNORE INTO gustos_new SELECT * FROM gustos WHERE idcodgusto > 0');
+                $pdo->exec('INSERT INTO gustos_new SELECT * FROM gustos WHERE idcodgusto IS NULL OR idcodgusto <= 0');
+                $pdo->exec('DROP TABLE gustos');
+                $pdo->exec('RENAME TABLE gustos_new TO gustos');
+                // Now add the index
+                $pdo->exec('ALTER TABLE gustos ADD UNIQUE INDEX uq_gustos_idcodgusto (idcodgusto)');
+            }
+        }
     }
 
     private function syncInsertIgnore(\PDO $pdo, string $table, array $rows): int
