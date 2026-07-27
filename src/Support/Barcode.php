@@ -77,7 +77,7 @@ final class Barcode
         $textY = $svgHeight + 12;
         $svgHeight += 16;
 
-        return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' . $svgWidth . ' ' . $svgHeight . '" style="width:' . $svgWidth . 'px;height:' . $svgHeight . 'px">
+        return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' . $svgWidth . ' ' . $svgHeight . '" style="width:100%;max-width:' . $svgWidth . 'px;height:auto">
             ' . $rects . '
             <text x="7" y="' . ($textY - 2) . '" font-family="monospace" font-size="10" fill="#000">' . $ean[0] . '</text>
             <text x="' . (7 * $scale + 5) . '" y="' . ($textY - 2) . '" font-family="monospace" font-size="10" fill="#000">' . substr($ean, 1, 6) . '</text>

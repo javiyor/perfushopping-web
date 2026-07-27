@@ -34,7 +34,10 @@ body { font-family:Arial,Helvetica,sans-serif; width:80mm; }
 </head><body>
 <div class="label-grid">
 <?php foreach ($variants as $v):
-    $ean = Barcode::ean13((int)($v['idcodgusto'] ?? 0));
+    $codscan = trim((string)($v['codscan'] ?? ''));
+    $ean = ($codscan !== '' && strlen($codscan) === 13 && ctype_digit($codscan))
+        ? $codscan
+        : Barcode::ean13((int)($v['idcodgusto'] ?? 0));
     $variantName = htmlspecialchars((string)($v['nomgusto'] ?? ''));
     $displayName = $variantName ? $productName . ' - ' . $variantName : $productName;
     if (mb_strlen($displayName) > 25) $displayName = mb_substr($displayName, 0, 24) . '…';
