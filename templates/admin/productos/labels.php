@@ -48,7 +48,8 @@ body { font-family:Arial,Helvetica,sans-serif; width:80mm; }
     <label><input type="checkbox" id="chkPrice" <?= $showPrice ? 'checked' : '' ?> onchange="toggleLabels()"> Precio</label>
     <label><input type="checkbox" id="chkDesc" <?= $showDesc ? 'checked' : '' ?> onchange="toggleLabels()"> Descripción</label>
     <label><input type="checkbox" id="chkVariant" <?= $showVariant ? 'checked' : '' ?> onchange="toggleLabels()"> Variedad</label>
-    <button class="btn-print" onclick="window.print()">Imprimir</button>
+    <label>Cant: <input type="number" id="qtyLabels" value="1" min="1" max="99" style="width:40px"></label>
+    <button class="btn-print" onclick="duplicateLabels()">Imprimir</button>
 </div>
 <div class="label-grid" id="labelGrid">
 <?php foreach ($variants as $v):
@@ -85,6 +86,20 @@ function toggleLabels() {
     });
 }
 toggleLabels();
+
+function duplicateLabels() {
+    const qty = parseInt(document.getElementById('qtyLabels').value) || 1;
+    if (qty <= 1) { window.print(); return; }
+    const grid = document.getElementById('labelGrid');
+    const originalLabels = Array.from(grid.querySelectorAll('.label'));
+    originalLabels.forEach(function(el) {
+        for (var i = 1; i < qty; i++) {
+            var clone = el.cloneNode(true);
+            grid.appendChild(clone);
+        }
+    });
+    window.print();
+}
 </script>
 <script>window.print();</script>
 </body></html>
