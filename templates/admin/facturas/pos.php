@@ -214,11 +214,13 @@ $csrfToken = $csrf ?? '';
                     </div>
                 </div>
                 <hr />
+                <div id="efectivoFields">
                 <label class="small text-muted">Monto recibido ($)</label>
-                <input class="form-control form-control-sm mb-2" id="montoRecibido" type="number" value="0" min="0" />
+                <input class="form-control form-control-sm mb-2" id="montoRecibido" type="number" value="0" min="0" step="0.01" />
                 <div class="d-flex justify-content-between small">
                     <span>Vuelto:</span>
-                    <strong id="vueltoDisplay">$0</strong>
+                    <strong id="vueltoDisplay">$0,00</strong>
+                </div>
                 </div>
             </div>
         </div>
@@ -519,10 +521,12 @@ function recalcTotals() {
     document.getElementById('posIvaRow').style.display = isRI ? 'flex' : 'none';
     document.getElementById('posSubtotal').textContent = '$' + fmtPrice(isRI ? subtotal : total);
     document.getElementById('posIva').textContent = '$' + fmtPrice(iva);
-    document.getElementById('posTotal').textContent = '$' + fmtPrice(total - descuento);
+    const totalConDto = total - descuento;
+    document.getElementById('posTotal').textContent = '$' + fmtPrice(totalConDto);
 
-    const recibido = parseInt(document.getElementById('montoRecibido').value) || 0;
-    const vuelto = Math.max(0, recibido - total);
+    const esEfectivo = document.getElementById('formaPago').value === 'efectivo';
+    const recibido = parseInt(parseFloat(document.getElementById('montoRecibido').value) * 100) || 0;
+    const vuelto = esEfectivo && recibido > 0 ? Math.max(0, recibido - totalConDto) : 0;
     document.getElementById('vueltoDisplay').textContent = '$' + fmtPrice(vuelto);
 }
 
@@ -676,6 +680,12 @@ if (presInput) {
 // ── Cheque fields toggle ──
 document.getElementById('formaPago').addEventListener('change', function() {
     document.getElementById('posChequeData').style.display = this.value === 'cheque' ? 'block' : 'none';
+    const esEfectivo = this.value === 'efectivo';
+    document.getElementById('efectivoFields').style.display = esEfectivo ? 'block' : 'none';
+    if (!esEfectivo) {
+        document.getElementById('montoRecibido').value = '0';
+    }
+    recalcTotals();
 });
 
 // ── Submit ──
