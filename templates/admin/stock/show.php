@@ -225,13 +225,18 @@ if (!$producto):
                     </thead>
                     <tbody>
                         <?php foreach ($movimientos as $m): ?>
-                            <?php $cant = (int)($m['canti'] ?? 0); ?>
+                            <?php
+                            $cant = (int)($m['canti'] ?? 0);
+                            // VFP: iddepod = desde (origen), iddepoh = hacia (destino)
+                            $origen = $m['nom_depod'] ?? $m['nom_depoh'] ?? '-';
+                            $destino = $m['nom_depoh'] ?? $m['nom_depod'] ?? '-';
+                            ?>
                             <tr>
                                 <td class="small"><?= htmlspecialchars((string)($m['mov_fecha'] ?? '-')) ?></td>
                                 <td class="small"><?= htmlspecialchars((string)($m['nomgusto'] ?? '-')) ?></td>
                                 <td class="text-center fw-bold <?= $cant > 0 ? 'text-success' : 'text-danger' ?>"><?= $cant > 0 ? '+' : '' ?><?= $cant ?></td>
-                                <td class="small"><?= htmlspecialchars((string)($m['nom_depoh'] ?? '-')) ?></td>
-                                <td class="small"><?= htmlspecialchars((string)($m['nom_depod'] ?? '-')) ?></td>
+                                <td class="small"><?= htmlspecialchars($origen) ?></td>
+                                <td class="small"><?= htmlspecialchars($destino) ?></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
