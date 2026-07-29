@@ -7,39 +7,71 @@ use Perfushopping\Web\Infra\Db;
 
 final class StockRepo
 {
-    public function listarStock(string $q = '', int $codepar = 0, string $stockFilter = '', int $limit = 80): array
+    public function listarStock(string $q = '', int $codepar = 0, string $stockFilter = '', int $codrub = 0, int $codsub = 0, int $codprove = 0, int $limit = 80, ?int $iddepo = null): array
     {
         $limit = max(1, min(200, $limit));
         $params = [];
         $where = ['p.enweb = 1'];
 
         if ($q !== '') {
-            $where[] = '(p.produ LIKE :like OR p.codprodu LIKE :like OR p.codprodup LIKE :like)';
+            $where[] = '(p.produ LIKE :like OR p.codprodu LIKE :like OR p.codprodup LIKE :like OR g.nomgusto LIKE :like2 OR g.codscan LIKE :like3)';
             $params[':like'] = '%' . $q . '%';
+            $params[':like2'] = '%' . $q . '%';
+            $params[':like3'] = '%' . $q . '%';
         }
         if ($codepar > 0) {
             $where[] = 'p.codepar = :codepar';
             $params[':codepar'] = $codepar;
         }
+        if ($codrub > 0) {
+            $where[] = 'p.codrub = :codrub';
+            $params[':codrub'] = $codrub;
+        }
+        if ($codsub > 0) {
+            $where[] = 'p.codsub = :codsub';
+            $params[':codsub'] = $codsub;
+        }
+        if ($codprove > 0) {
+            $where[] = 'p.codprove = :codprove';
+            $params[':codprove'] = $codprove;
+        }
+
+        $stockSel = 'COALESCE(g.stockact, 0) AS stock_variante';
+        $stockWhere = '';
         if ($stockFilter === 'sin_stock') {
-            $where[] = '(p.stocact IS NULL OR p.stocact <= 0)';
+            $stockWhere = 'AND (g.stockact IS NULL OR g.stockact <= 0)';
         } elseif ($stockFilter === 'bajo_stock') {
-            $where[] = '(p.stocact IS NOT NULL AND p.stocact > 0 AND p.stocact <= 5)';
+            $stockWhere = 'AND (g.stockact IS NOT NULL AND g.stockact > 0 AND g.stockact <= 5)';
         } elseif ($stockFilter === 'con_stock') {
-            $where[] = '(p.stocact IS NOT NULL AND p.stocact > 5)';
+            $stockWhere = 'AND (g.stockact IS NOT NULL AND g.stockact > 5)';
+        }
+
+        $depJoin = '';
+        $depSel = '0 AS stock_deposito';
+        if ($iddepo) {
+            $depJoin = "LEFT JOIN stock s ON s.idcodgusto = g.idcodgusto AND s.iddepo = :iddepo";
+            $params[':iddepo'] = $iddepo;
+            $depSel = 'COALESCE(s.stock, 0) AS stock_deposito';
         }
 
         $sql = "
-            SELECT p.idprodu, p.codprodu, p.produ, p.precio, p.precomp, p.stocact, p.stocdep, p.codepar, p.enweb, p.observ, p.imagen,
-                   d.nomdepar, COUNT(g.idcodgusto) AS variantes,
+            SELECT p.idprodu, p.codprodu, p.produ, p.codprodup, p.precio, p.precomp, p.stocact, p.stocdep, p.codepar, p.enweb, p.observ, p.imagen,
+                   d.nomdepar, g.idcodgusto, g.nomgusto, g.codscan,
+                   r.nomrub, s.nomsub, pv.razon AS nomprovee,
+                   {$stockSel},
+                   {$depSel},
                    COALESCE(cv.total_comprado, 0) AS total_comprado,
                    COALESCE(cv.total_vendido, 0) AS total_vendido
             FROM producto p
-            LEFT JOIN gustos g ON g.idprodu = p.idprodu AND g.discont = 0
+            INNER JOIN gustos g ON g.idprodu = p.idprodu AND g.discont = 0
             LEFT JOIN departa d ON d.codepar = p.codepar
+            LEFT JOIN rubros r ON r.codrub = p.codrub
+            LEFT JOIN subrubro s ON s.codsub = p.codsub
+            LEFT JOIN proveedo pv ON pv.codprove = p.codprove
+            {$depJoin}
             LEFT JOIN (
                 SELECT
-                    sd.idprodu,
+                    sd.idcodgusto,
                     COALESCE(SUM(
                         CASE
                             WHEN sc.iddepod = 7 AND dh.marca = 2 THEN sd.canti
@@ -72,11 +104,10 @@ final class StockRepo
                 INNER JOIN stockcab sc ON sc.idcabstock = sd.idstockcab
                 LEFT JOIN deposito dh ON dh.iddepo = sc.iddepoh
                 LEFT JOIN deposito dd ON dd.iddepo = sc.iddepod
-                GROUP BY sd.idprodu
-            ) cv ON cv.idprodu = p.idprodu
-            WHERE " . implode(' AND ', $where) . "
-            GROUP BY p.idprodu
-            ORDER BY p.stocact ASC, p.produ ASC
+                GROUP BY sd.idcodgusto
+            ) cv ON cv.idcodgusto = g.idcodgusto
+            WHERE " . implode(' AND ', $where) . " {$stockWhere}
+            ORDER BY p.produ ASC, g.nomgusto ASC
             LIMIT {$limit}
         ";
         $st = Db::pdo()->prepare($sql);
@@ -301,7 +332,8 @@ final class StockRepo
     public function registrarAjuste(
         int $idprodu,
         ?int $idcodgusto,
-        int $iddepo,
+        int $iddepodesde,
+        int $iddepohasta,
         int $cantidad,
         string $motivo,
         int $adminUserId,
@@ -314,15 +346,9 @@ final class StockRepo
             // iddepoh = deposit receiving goods (adds to stock)
             // iddepod = deposit sending goods (subtracts from stock)
             // canti is always positive
-            if ($cantidad >= 0) {
-                $iddepoh = $iddepo;
-                $iddepod = null;
-                $canti = $cantidad;
-            } else {
-                $iddepoh = null;
-                $iddepod = $iddepo;
-                $canti = abs($cantidad);
-            }
+            $iddepoh = $iddepohasta > 0 ? $iddepohasta : null;
+            $iddepod = $iddepodesde > 0 ? $iddepodesde : null;
+            $canti = max(1, $cantidad);
 
             // 1. Insert stockcab
             $st = $pdo->prepare('
@@ -349,47 +375,23 @@ final class StockRepo
                 ':cant' => $canti,
             ]);
 
-            // 3. Update/insert stock table per deposit
-            $st = $pdo->prepare('
-                SELECT idstock, stock FROM stock
-                WHERE iddepo = :depo AND idprodu = :prod AND (idcodgusto = :gusto OR (idcodgusto IS NULL AND :gusto2 IS NULL))
-                LIMIT 1
-            ');
-            $st->execute([
-                ':depo' => $iddepo,
-                ':prod' => $idprodu,
-                ':gusto' => $idcodgusto ?: null,
-                ':gusto2' => $idcodgusto ?: null,
-            ]);
-            $existing = $st->fetch();
-
-            $netChange = $cantidad;
-            if ($existing) {
-                $newStock = (int)$existing['stock'] + $netChange;
-                $st = $pdo->prepare('UPDATE stock SET stock = :s WHERE idstock = :id LIMIT 1');
-                $st->execute([':s' => max(0, $newStock), ':id' => (int)$existing['idstock']]);
-            } else {
-                $newStock = max(0, $netChange);
-                $st = $pdo->prepare('
-                    INSERT INTO stock (iddepo, idprodu, idcodgusto, stock)
-                    VALUES (:depo, :prod, :gusto, :s)
-                ');
-                $st->execute([
-                    ':depo' => $iddepo,
-                    ':prod' => $idprodu,
-                    ':gusto' => $idcodgusto ?: null,
-                    ':s' => $newStock,
-                ]);
+            // 3. Update stock table — subtract from origin (desde)
+            if ($iddepod) {
+                $this->updateStockDeposit($idprodu, $idcodgusto, $iddepod, -$canti);
+            }
+            // 4. Update stock table — add to destination (hasta)
+            if ($iddepoh) {
+                $this->updateStockDeposit($idprodu, $idcodgusto, $iddepoh, $canti);
             }
 
-            // 4. Recalculate producto.stocact
+            // 5. Recalculate producto.stocact
             $st = $pdo->prepare('SELECT COALESCE(SUM(stock), 0) FROM stock WHERE idprodu = :prod');
             $st->execute([':prod' => $idprodu]);
             $totalStock = (int)$st->fetchColumn();
             $pdo->prepare('UPDATE producto SET stocact = :s WHERE idprodu = :id LIMIT 1')
                 ->execute([':s' => $totalStock, ':id' => $idprodu]);
 
-            // 5. Update gustos.stockact if variant
+            // 6. Update gustos.stockact if variant
             if ($idcodgusto) {
                 $st = $pdo->prepare('SELECT COALESCE(SUM(stock), 0) FROM stock WHERE idcodgusto = :g');
                 $st->execute([':g' => $idcodgusto]);
@@ -403,6 +405,40 @@ final class StockRepo
         } catch (\Throwable $e) {
             $pdo->rollBack();
             throw $e;
+        }
+    }
+
+    private function updateStockDeposit(int $idprodu, ?int $idcodgusto, int $iddepo, int $delta): void
+    {
+        $pdo = Db::pdo();
+        $st = $pdo->prepare('
+            SELECT idstock, stock FROM stock
+            WHERE iddepo = :depo AND idprodu = :prod AND (idcodgusto = :gusto OR (idcodgusto IS NULL AND :gusto2 IS NULL))
+            LIMIT 1
+        ');
+        $st->execute([
+            ':depo' => $iddepo,
+            ':prod' => $idprodu,
+            ':gusto' => $idcodgusto ?: null,
+            ':gusto2' => $idcodgusto ?: null,
+        ]);
+        $existing = $st->fetch();
+
+        if ($existing) {
+            $newStock = (int)$existing['stock'] + $delta;
+            $pdo->prepare('UPDATE stock SET stock = :s WHERE idstock = :id LIMIT 1')
+                ->execute([':s' => max(0, $newStock), ':id' => (int)$existing['idstock']]);
+        } else {
+            $newStock = max(0, $delta);
+            $pdo->prepare('
+                INSERT INTO stock (iddepo, idprodu, idcodgusto, stock)
+                VALUES (:depo, :prod, :gusto, :s)
+            ')->execute([
+                ':depo' => $iddepo,
+                ':prod' => $idprodu,
+                ':gusto' => $idcodgusto ?: null,
+                ':s' => $newStock,
+            ]);
         }
     }
 

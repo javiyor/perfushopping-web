@@ -42,23 +42,27 @@ $variantes = $variantes ?? [];
                     </div>
 
                     <div class="row g-2 mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label small fw-semibold">Depósito</label>
-                            <select class="form-select form-select-sm" name="iddepo" required>
-                                <option value="">Seleccionar...</option>
+                        <div class="col-md-5">
+                            <label class="form-label small fw-semibold">Depósito desde <span class="text-muted">(resta)</span></label>
+                            <select class="form-select form-select-sm" name="iddepodesde">
+                                <option value="">Ninguno (solo ingreso)</option>
                                 <?php foreach ($depositos as $d): ?>
                                     <option value="<?= (int)$d['iddepo'] ?>"><?= htmlspecialchars($d['nomdepo'] ?? '') ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label small fw-semibold">Cantidad</label>
-                            <input class="form-control form-control-sm" type="number" name="cantidad" required step="1" placeholder="Ej: 10 o -5" />
-                            <div class="form-text">Positivo = ingreso, Negativo = egreso</div>
+                        <div class="col-md-5">
+                            <label class="form-label small fw-semibold">Depósito hasta <span class="text-muted">(suma)</span></label>
+                            <select class="form-select form-select-sm" name="iddepohasta">
+                                <option value="">Ninguno (solo egreso)</option>
+                                <?php foreach ($depositos as $d): ?>
+                                    <option value="<?= (int)$d['iddepo'] ?>"><?= htmlspecialchars($d['nomdepo'] ?? '') ?></option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label small fw-semibold">Stock resultante</label>
-                            <div class="form-control form-control-sm bg-light" id="stockResultante" style="min-height:31px">-</div>
+                        <div class="col-md-2">
+                            <label class="form-label small fw-semibold">Cantidad</label>
+                            <input class="form-control form-control-sm" type="number" name="cantidad" required min="1" step="1" placeholder="Ej: 10" />
                         </div>
                     </div>
 
@@ -80,14 +84,17 @@ $variantes = $variantes ?? [];
             <div class="card-body small">
                 <p>Usá este formulario para registrar ajustes manuales de stock:</p>
                 <ul class="mb-0">
-                    <li><strong>Ingreso:</strong> cantidad positiva (ej: 10)</li>
-                    <li><strong>Egreso:</strong> cantidad negativa (ej: -5)</li>
-                    <li>Seleccioná el depósito donde se aplica el movimiento</li>
+                    <li><strong>Depósito desde:</strong> origen del movimiento (resta stock)</li>
+                    <li><strong>Depósito hasta:</strong> destino del movimiento (suma stock)</li>
+                    <li>La cantidad es <strong>siempre positiva</strong></li>
+                    <li>Si solo querés <strong>ingresar</strong> stock, dejá "Desde" vacío</li>
+                    <li>Si solo querés <strong>egresar</strong> stock, dejá "Hasta" vacío</li>
+                    <li>Para <strong>transferir</strong> entre depósitos, completá ambos</li>
                     <li>Si el producto tiene variantes, podés ajustar una específica o dejar "Todas" para ajustar el producto base</li>
                     <li>El motivo es obligatorio para mantener trazabilidad</li>
                 </ul>
                 <hr />
-                <p class="text-muted mb-0">Los ajustes quedan registrados en <code>stockcab</code>/<code>stockdet</code> con origen NULL (sin origen) y se actualizan las tablas <code>stock</code>, <code>producto.stocact</code> y <code>gustos.stockact</code> automáticamente.</p>
+                <p class="text-muted mb-0">Los ajustes quedan registrados en <code>stockcab</code>/<code>stockdet</code> y se actualizan las tablas <code>stock</code>, <code>producto.stocact</code> y <code>gustos.stockact</code> automáticamente.</p>
             </div>
         </div>
     </div>
@@ -105,9 +112,6 @@ const productoLabel = document.getElementById('productoLabel');
 const clearBtn = document.getElementById('clearProducto');
 const varianteGroup = document.getElementById('varianteGroup');
 const varianteSelect = document.getElementById('varianteSelect');
-const cantidadInput = document.querySelector('[name="cantidad"]');
-const stockResultante = document.getElementById('stockResultante');
-
 function updateVariants(variants) {
     currentVariants = variants || [];
     varianteSelect.innerHTML = '<option value="0">Todas (producto base)</option>';
@@ -115,13 +119,6 @@ function updateVariants(variants) {
         varianteSelect.innerHTML += '<option value="' + v.idcodgusto + '">' + escHtml(v.nomgusto) + '</option>';
     });
     varianteGroup.style.display = variants.length ? '' : 'none';
-}
-
-function updateStockResultante() {
-    if (!selectedProduct) { stockResultante.textContent = '-'; return; }
-    const base = parseInt(selectedProduct.stocact || 0);
-    const cant = parseInt(cantidadInput.value) || 0;
-    stockResultante.textContent = base + cant;
 }
 
 function selectProduct(p) {
@@ -135,10 +132,7 @@ function selectProduct(p) {
     // fetch variants
     fetch('/admin/stock/ajuste/variantes?id=' + p.idprodu)
         .then(r => r.json())
-        .then(variants => {
-            updateVariants(variants);
-            updateStockResultante();
-        })
+        .then(variants => updateVariants(variants))
         .catch(() => updateVariants([]));
 }
 
@@ -148,7 +142,6 @@ function clearProducto() {
     selectedDiv.classList.add('d-none');
     productoLabel.textContent = '';
     updateVariants([]);
-    stockResultante.textContent = '-';
 }
 
 function escHtml(s) {
@@ -201,7 +194,6 @@ document.addEventListener('click', function(e) {
 });
 
 clearBtn.addEventListener('click', clearProducto);
-cantidadInput.addEventListener('input', updateStockResultante);
 
 if (selectedProduct) {
     searchInput.placeholder = selectedProduct.produ + ' (cambiar)';

@@ -20,8 +20,13 @@ final class StockController
         $q = trim((string)($_GET['q'] ?? ''));
         $codepar = (int)($_GET['codepar'] ?? 0);
         $stockFilter = trim((string)($_GET['stock'] ?? ''));
-        $list = $repo->listarStock($q, $codepar, $stockFilter);
-        $departamentos = $repo->departamentos();
+        $codrub = (int)($_GET['codrub'] ?? 0);
+        $codsub = (int)($_GET['codsub'] ?? 0);
+        $codprove = (int)($_GET['codprove'] ?? 0);
+        $list = $repo->listarStock($q, $codepar, $stockFilter, $codrub, $codsub, $codprove);
+        $rubros = $repo->grillaRubros();
+        $subrubros = $repo->grillaSubrubros();
+        $proveedores = $repo->grillaProveedores();
 
         echo View::adminPage('admin/stock/list.php', [
             'adminUser' => $adminUser,
@@ -29,7 +34,12 @@ final class StockController
             'q' => $q,
             'codepar' => $codepar,
             'stockFilter' => $stockFilter,
-            'departamentos' => $departamentos,
+            'codrub' => $codrub,
+            'codsub' => $codsub,
+            'codprove' => $codprove,
+            'rubros' => $rubros,
+            'subrubros' => $subrubros,
+            'proveedores' => $proveedores,
             'csrf' => Csrf::token(),
             'pageTitle' => 'Stock',
         ]);
@@ -104,18 +114,19 @@ final class StockController
 
         $idprodu = (int)($_POST['idprodu'] ?? 0);
         $idcodgusto = (int)($_POST['idcodgusto'] ?? 0) ?: null;
-        $iddepo = (int)($_POST['iddepo'] ?? 0);
+        $iddepodesde = (int)($_POST['iddepodesde'] ?? 0);
+        $iddepohasta = (int)($_POST['iddepohasta'] ?? 0);
         $cantidad = (int)($_POST['cantidad'] ?? 0);
         $motivo = trim((string)($_POST['motivo'] ?? ''));
 
-        if ($idprodu <= 0 || $iddepo <= 0 || $cantidad === 0 || $motivo === '') {
+        if ($idprodu <= 0 || $cantidad <= 0 || $motivo === '' || ($iddepodesde <= 0 && $iddepohasta <= 0)) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Completá todos los campos requeridos.'];
             Response::redirect('/admin/stock/ajuste');
         }
 
         try {
             $repo = new StockRepo();
-            $repo->registrarAjuste($idprodu, $idcodgusto, $iddepo, $cantidad, $motivo, (int)$adminUser['id']);
+            $repo->registrarAjuste($idprodu, $idcodgusto, $iddepodesde, $iddepohasta, $cantidad, $motivo, (int)$adminUser['id']);
             $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Ajuste de stock registrado correctamente.'];
         } catch (\Throwable $e) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Error al registrar ajuste: ' . $e->getMessage()];

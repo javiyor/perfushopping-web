@@ -3,7 +3,12 @@ $list = $list ?? [];
 $q = (string)($q ?? '');
 $codepar = (int)($codepar ?? 0);
 $stockFilter = (string)($stockFilter ?? '');
-$departamentos = $departamentos ?? [];
+$codrub = (int)($codrub ?? 0);
+$codsub = (int)($codsub ?? 0);
+$codprove = (int)($codprove ?? 0);
+$rubros = $rubros ?? [];
+$subrubros = $subrubros ?? [];
+$proveedores = $proveedores ?? [];
 $stockFilters = ['' => 'Todos', 'sin_stock' => 'Sin stock', 'bajo_stock' => 'Stock bajo (≤5)', 'con_stock' => 'Con stock (>5)'];
 ?>
 <div class="d-flex justify-content-between align-items-start mb-3">
@@ -24,14 +29,30 @@ $stockFilters = ['' => 'Todos', 'sin_stock' => 'Sin stock', 'bajo_stock' => 'Sto
 <div class="card shadow-sm mb-3">
     <div class="card-body">
         <form method="get" action="/admin/stock" class="row g-2">
-            <div class="col-lg-4">
+            <div class="col-lg-3">
                 <input class="form-control form-control-sm" name="q" value="<?= htmlspecialchars($q) ?>" placeholder="Buscar producto..." />
             </div>
             <div class="col-lg-2">
-                <select class="form-select form-select-sm" name="codepar">
-                    <option value="0">Todos los dptos.</option>
-                    <?php foreach ($departamentos as $d): ?>
-                        <option value="<?= (int)$d['codepar'] ?>" <?= $codepar === (int)$d['codepar'] ? 'selected' : '' ?>><?= htmlspecialchars($d['nomdepar'] ?? '') ?></option>
+                <select class="form-select form-select-sm" name="codprove">
+                    <option value="0">Todos los proveedores</option>
+                    <?php foreach ($proveedores as $p): ?>
+                        <option value="<?= (int)$p['codprove'] ?>" <?= $codprove === (int)$p['codprove'] ? 'selected' : '' ?>><?= htmlspecialchars($p['nomprovee'] ?? '') ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-lg-2">
+                <select class="form-select form-select-sm" name="codsub">
+                    <option value="0">Todas las marcas</option>
+                    <?php foreach ($subrubros as $s): ?>
+                        <option value="<?= (int)$s['codsub'] ?>" <?= $codsub === (int)$s['codsub'] ? 'selected' : '' ?>><?= htmlspecialchars($s['nomsub'] ?? '') ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-lg-2">
+                <select class="form-select form-select-sm" name="codrub">
+                    <option value="0">Todas las categorías</option>
+                    <?php foreach ($rubros as $r): ?>
+                        <option value="<?= (int)$r['codrub'] ?>" <?= $codrub === (int)$r['codrub'] ? 'selected' : '' ?>><?= htmlspecialchars($r['nomrub'] ?? '') ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
@@ -42,11 +63,11 @@ $stockFilters = ['' => 'Todos', 'sin_stock' => 'Sin stock', 'bajo_stock' => 'Sto
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="col-lg-2">
-                <button class="btn btn-accent btn-sm w-100" type="submit"><i class="bi bi-search"></i> Buscar</button>
+            <div class="col-lg-1">
+                <button class="btn btn-accent btn-sm w-100" type="submit"><i class="bi bi-search"></i></button>
             </div>
-            <div class="col-lg-2">
-                <?php if ($q !== '' || $codepar > 0 || $stockFilter !== ''): ?>
+            <div class="col-lg-1">
+                <?php if ($q !== '' || $codprove > 0 || $codsub > 0 || $codrub > 0 || $stockFilter !== ''): ?>
                     <a class="btn btn-outline-secondary btn-sm w-100" href="/admin/stock">Limpiar</a>
                 <?php endif; ?>
             </div>
@@ -61,14 +82,14 @@ $stockFilters = ['' => 'Todos', 'sin_stock' => 'Sin stock', 'bajo_stock' => 'Sto
                 <tr>
                     <th style="width:40px"></th>
                     <th>Producto</th>
+                    <th>Variedad</th>
                     <th>Código</th>
-                    <th>Departamento</th>
-                    <th>Variantes</th>
+                    <th>Proveedor</th>
+                    <th>Marca</th>
+                    <th>Categoría</th>
                     <th class="text-end">Precio</th>
                     <th class="text-end">Costo</th>
                     <th class="text-center">Stock</th>
-                    <th class="text-center">Comp.</th>
-                    <th class="text-center">Vend.</th>
                     <th class="text-center" style="width:60px">Pedir</th>
                     <th style="width:50px"></th>
                 </tr>
@@ -78,9 +99,7 @@ $stockFilters = ['' => 'Todos', 'sin_stock' => 'Sin stock', 'bajo_stock' => 'Sto
                     <tr><td colspan="12" class="text-muted text-center">Sin productos.</td></tr>
                 <?php else: ?>
                         <?php foreach ($list as $p): ?>
-                        <?php $stock = (int)($p['stocact'] ?? 0); ?>
-                        <?php $comprado = (int)($p['total_comprado'] ?? 0); ?>
-                        <?php $vendido = (int)($p['total_vendido'] ?? 0); ?>
+                        <?php $stock = (int)($p['stock_variante'] ?? 0); ?>
                         <tr>
                             <td>
                                 <?php if ($p['imagen'] ?? ''): ?>
@@ -90,9 +109,11 @@ $stockFilters = ['' => 'Todos', 'sin_stock' => 'Sin stock', 'bajo_stock' => 'Sto
                                 <?php endif; ?>
                             </td>
                             <td><strong><?= htmlspecialchars((string)($p['produ'] ?? '-')) ?></strong></td>
-                            <td class="small text-muted"><?= htmlspecialchars((string)($p['codprodu'] ?? '')) ?></td>
-                            <td class="small"><?= htmlspecialchars((string)($p['nomdepar'] ?? '-')) ?></td>
-                            <td class="text-center"><?= (int)($p['variantes'] ?? 0) ?></td>
+                            <td class="small"><?= htmlspecialchars((string)($p['nomgusto'] ?? '-')) ?></td>
+                            <td class="small text-muted"><?= htmlspecialchars((string)($p['codscan'] ?: $p['codprodu'] ?? '')) ?></td>
+                            <td class="small"><?= htmlspecialchars((string)($p['nomprovee'] ?? '-')) ?></td>
+                            <td class="small"><?= htmlspecialchars((string)($p['nomsub'] ?? '-')) ?></td>
+                            <td class="small"><?= htmlspecialchars((string)($p['nomrub'] ?? '-')) ?></td>
                             <td class="text-end small">$<?= number_format((float)($p['precio'] ?? 0), 2, ',', '.') ?></td>
                             <td class="text-end small text-muted">$<?= number_format((float)($p['precomp'] ?? 0), 2, ',', '.') ?></td>
                             <td class="text-center">
@@ -104,12 +125,14 @@ $stockFilters = ['' => 'Todos', 'sin_stock' => 'Sin stock', 'bajo_stock' => 'Sto
                                     <span class="badge bg-success"><?= $stock ?></span>
                                 <?php endif; ?>
                             </td>
-                            <td class="text-center small text-success"><?= $comprado ?></td>
-                            <td class="text-center small text-danger"><?= $vendido ?></td>
                             <td class="text-center">
                                 <input type="number" class="form-control form-control-sm np-qty" style="width:55px;text-align:center" min="0" value="0"
                                     data-idprodu="<?= (int)($p['idprodu'] ?? 0) ?>"
-                                    data-producto="<?= htmlspecialchars((string)($p['produ'] ?? ''), ENT_QUOTES) ?>" />
+                                    data-idcodgusto="<?= (int)($p['idcodgusto'] ?? 0) ?>"
+                                    data-producto="<?= htmlspecialchars((string)($p['produ'] ?? ''), ENT_QUOTES) ?>"
+                                    data-variedad="<?= htmlspecialchars((string)($p['nomgusto'] ?? ''), ENT_QUOTES) ?>"
+                                    data-codscan="<?= htmlspecialchars((string)($p['codscan'] ?? ''), ENT_QUOTES) ?>"
+                                    data-codprodup="<?= htmlspecialchars((string)($p['codprodup'] ?? ''), ENT_QUOTES) ?>" />
                             </td>
                             <td><a class="btn btn-sm btn-outline-secondary" href="/admin/stock/<?= (int)($p['idprodu'] ?? 0) ?>"><i class="bi bi-eye"></i></a></td>
                         </tr>
