@@ -526,12 +526,15 @@ final class FacturaController
             }
         }
 
+        $empresa = (new \Perfushopping\Web\Repo\EmpresaRepo())->getDefault();
+
         echo View::render('admin/facturas/print.php', [
             'factura' => $factura,
             'items' => $items,
             'pagos' => $pagos,
             'formato' => $formato,
             'qrUrl' => $qrUrl,
+            'empresa' => $empresa,
         ]);
     }
 

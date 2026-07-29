@@ -233,6 +233,7 @@
             <a href="/admin/correo"><i class="bi bi-truck"></i>Correo Argentino</a>
             <a href="/admin/capacitaciones"><i class="bi bi-calendar-event"></i>Capacitaciones</a>
             <a href="/admin/cheques"><i class="bi bi-file-text"></i>Cheques</a>
+            <a href="/admin/empresa"><i class="bi bi-building"></i>Empresa</a>
             <a href="/admin/sucursales"><i class="bi bi-building"></i>Sucursales</a>
             <a href="/admin/promo-tarjetas"><i class="bi bi-credit-card-2-front"></i>Promo Tarjetas</a>
             <a href="/admin/email"><i class="bi bi-envelope"></i>Email</a>

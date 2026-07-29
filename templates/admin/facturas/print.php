@@ -4,6 +4,7 @@ use Perfushopping\Web\Support\Format;
 $factura = $factura ?? null;
 $items = $items ?? [];
 $pagos = $pagos ?? [];
+$empresa = $empresa ?? null;
 $formato = in_array($formato ?? '', ['a4','80mm','58mm']) ? $formato : '80mm';
 if (!$factura) exit;
 
@@ -64,10 +65,14 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
 <body>
     <?php if ($autoPrint): ?><script>window.onload=function(){setTimeout(function(){window.print()},500)}</script><?php endif; ?>
     <div class="header">
-        <img class="logo" src="/assets/brand/logo-header.png" alt="Perfushopping" onerror="this.style.display='none'" />
-        <div class="razon">PERFUSHOPPING S.R.L.</div>
-        <div class="data">CUIT: 30-12345678-9</div>
-        <div class="data">Dirección fiscal</div>
+        <?php $logo = $empresa['logo'] ?? ''; ?>
+        <img class="logo" src="<?= $logo ? htmlspecialchars($logo) : '/assets/brand/logo-header.png' ?>" alt="<?= htmlspecialchars($empresa['nomemp'] ?? 'Perfushopping') ?>" onerror="this.style.display='none'" />
+        <div class="razon"><?= htmlspecialchars($empresa['razon_emp'] ?? 'PERFUSHOPPING S.R.L.') ?></div>
+        <?php if ($empresa['cuit'] ?? ''): ?><div class="data">CUIT: <?= htmlspecialchars($empresa['cuit']) ?></div><?php endif; ?>
+        <?php if ($empresa['ing_brutos'] ?? ''): ?><div class="data">Ing. Brutos: <?= htmlspecialchars($empresa['ing_brutos']) ?></div><?php endif; ?>
+        <?php if ($empresa['dire_emp'] ?? ''): ?><div class="data"><?= htmlspecialchars($empresa['dire_emp']) ?></div><?php endif; ?>
+        <?php if ($empresa['telefono'] ?? ''): ?><div class="data">Tel: <?= htmlspecialchars($empresa['telefono']) ?></div><?php endif; ?>
+        <?php if ($empresa['mail'] ?? ''): ?><div class="data"><?= htmlspecialchars($empresa['mail']) ?></div><?php endif; ?>
         <hr />
         <h1><?= htmlspecialchars($tipoLabels[$factura['tipo_comprobante'] ?? 'FACT-B'] ?? $factura['tipo_comprobante'] ?? '') ?></h1>
         <div class="data">Código: <strong><?= htmlspecialchars($factura['codigo'] ?? '') ?></strong></div>
@@ -152,7 +157,7 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
     <?php endif; ?>
     <div class="footer">
         <p>Gracias por su compra</p>
-        <p>Perfushopping — www.perfushopping.com</p>
+        <p><?= htmlspecialchars($empresa['nomemp'] ?? 'Perfushopping') ?> — www.perfushopping.com</p>
     </div>
 
     <div class="no-print" style="text-align:center;margin-top:20px">

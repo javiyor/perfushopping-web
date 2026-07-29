@@ -71,6 +71,7 @@ use Perfushopping\Web\Admin\OrdenPagoController as AdminOrdenPagoController;
 use Perfushopping\Web\Admin\EmailController as AdminEmailController;
 use Perfushopping\Web\Admin\BadgeController as AdminBadgeController;
 use Perfushopping\Web\Admin\SucursalController as AdminSucursalController;
+use Perfushopping\Web\Admin\EmpresaController as AdminEmpresaController;
 
 $router = new Router();
 
@@ -303,6 +304,11 @@ $router->post('/admin/cheques/estado', [AdminChequeController::class, 'estado'])
 // Admin - Sucursales
 $router->get('/admin/sucursales', [AdminSucursalController::class, 'index']);
 $router->post('/admin/sucursales/save', [AdminSucursalController::class, 'save']);
+
+// Admin - Empresa
+$router->get('/admin/empresa', [AdminEmpresaController::class, 'edit']);
+$router->post('/admin/empresa/guardar', [AdminEmpresaController::class, 'save']);
+$router->post('/admin/empresa/logo/eliminar', [AdminEmpresaController::class, 'removeLogo']);
 
 // Admin - Email (IMAP)
 $router->get('/admin/email', [AdminEmailController::class, 'inbox']);

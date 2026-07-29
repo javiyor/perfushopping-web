@@ -3,6 +3,7 @@ use Perfushopping\Web\Support\Format;
 
 $recibo = $recibo ?? null;
 $pagos = $pagos ?? [];
+$empresa = $empresa ?? null;
 $formato = in_array($formato ?? '', ['a4','80mm','58mm']) ? $formato : '80mm';
 if (!$recibo) exit;
 
@@ -52,9 +53,12 @@ $formaPagoLabels = [
 </head>
 <body>
     <div class="header">
-        <img class="logo" src="/assets/brand/logo-header.png" alt="Perfushopping" onerror="this.style.display='none'" />
-        <div class="razon">PERFUSHOPPING S.R.L.</div>
-        <div class="data" style="text-align:center">CUIT: 30-12345678-9</div>
+        <?php $logo = $empresa['logo'] ?? ''; ?>
+        <img class="logo" src="<?= $logo ? htmlspecialchars($logo) : '/assets/brand/logo-header.png' ?>" alt="<?= htmlspecialchars($empresa['nomemp'] ?? 'Perfushopping') ?>" onerror="this.style.display='none'" />
+        <div class="razon"><?= htmlspecialchars($empresa['razon_emp'] ?? 'PERFUSHOPPING S.R.L.') ?></div>
+        <?php if ($empresa['cuit'] ?? ''): ?><div class="data" style="text-align:center">CUIT: <?= htmlspecialchars($empresa['cuit']) ?></div><?php endif; ?>
+        <?php if ($empresa['dire_emp'] ?? ''): ?><div class="data" style="text-align:center"><?= htmlspecialchars($empresa['dire_emp']) ?></div><?php endif; ?>
+        <?php if ($empresa['telefono'] ?? ''): ?><div class="data" style="text-align:center">Tel: <?= htmlspecialchars($empresa['telefono']) ?></div><?php endif; ?>
         <hr />
         <h1>RECIBO</h1>
         <div class="data" style="text-align:center">Código: <strong><?= htmlspecialchars($recibo['codigo'] ?? '') ?></strong></div>
@@ -107,7 +111,7 @@ $formaPagoLabels = [
     <hr />
     <div class="footer">
         <p>Gracias por su pago</p>
-        <p>Perfushopping — www.perfushopping.com</p>
+        <p><?= htmlspecialchars($empresa['nomemp'] ?? 'Perfushopping') ?> — www.perfushopping.com</p>
     </div>
 
     <div class="no-print" style="text-align:center;margin-top:20px">

@@ -318,10 +318,13 @@ final class ReciboController
         }
         $pagos = $repo->pagos($id);
 
+        $empresa = (new \Perfushopping\Web\Repo\EmpresaRepo())->getDefault();
+
         echo View::render('admin/recibos/print.php', [
             'recibo' => $recibo,
             'pagos' => $pagos,
             'formato' => $formato,
+            'empresa' => $empresa,
         ]);
     }
 }
