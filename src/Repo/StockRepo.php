@@ -109,18 +109,10 @@ final class StockRepo
             ) cv ON cv.idcodgusto = g.idcodgusto
             LEFT JOIN (
               SELECT s.idcodgusto,
-                GROUP_CONCAT(CONCAT(d.nomdepo, ': ', s.neto) ORDER BY d.nomdepo SEPARATOR ' | ') AS stock_depositos
-              FROM (
-                SELECT sd.idcodgusto, d.iddepo,
-                  COALESCE(SUM(CASE WHEN sc.iddepoh = d.iddepo THEN sd.canti END), 0)
-                  - COALESCE(SUM(CASE WHEN sc.iddepod = d.iddepo THEN sd.canti END), 0) AS neto
-                FROM stockdet sd
-                INNER JOIN stockcab sc ON sc.idcabstock = sd.idstockcab
-                INNER JOIN deposito d ON d.marca = 2 AND (d.iddepo = sc.iddepoh OR d.iddepo = sc.iddepod)
-                GROUP BY sd.idcodgusto, d.iddepo
-                HAVING neto > 0
-              ) s
-              INNER JOIN deposito d ON d.iddepo = s.iddepo
+                GROUP_CONCAT(CONCAT(d.nomdepo, ': ', s.stock) ORDER BY d.nomdepo SEPARATOR ' | ') AS stock_depositos
+              FROM stock s
+              INNER JOIN deposito d ON d.iddepo = s.iddepo AND d.marca = 2
+              WHERE s.stock > 0
               GROUP BY s.idcodgusto
             ) dep_dist ON dep_dist.idcodgusto = g.idcodgusto
             WHERE " . implode(' AND ', $where) . " {$stockWhere}
