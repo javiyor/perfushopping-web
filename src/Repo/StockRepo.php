@@ -62,21 +62,7 @@ final class StockRepo
                    {$depSel},
                    COALESCE(cv.total_comprado, 0) AS total_comprado,
                    COALESCE(cv.total_vendido, 0) AS total_vendido,
-                   (SELECT GROUP_CONCAT(CONCAT(d.nomdepo, ': ', (COALESCE(e.ent, 0) - COALESCE(s.sal, 0))) SEPARATOR ' | ')
-                    FROM (
-                      SELECT iddepoh AS iddepo FROM stockcab sc INNER JOIN stockdet sd ON sd.idstockcab = sc.idcabstock WHERE sd.idcodgusto = g.idcodgusto AND sc.iddepoh IS NOT NULL
-                      UNION
-                      SELECT iddepod AS iddepo FROM stockcab sc INNER JOIN stockdet sd ON sd.idstockcab = sc.idcabstock WHERE sd.idcodgusto = g.idcodgusto AND sc.iddepod IS NOT NULL
-                    ) depos
-                    LEFT JOIN (
-                      SELECT sc.iddepoh AS iddepo, SUM(sd.canti) AS ent FROM stockcab sc INNER JOIN stockdet sd ON sd.idstockcab = sc.idcabstock WHERE sd.idcodgusto = g.idcodgusto AND sc.iddepoh IS NOT NULL GROUP BY sc.iddepoh
-                    ) e ON e.iddepo = depos.iddepo
-                    LEFT JOIN (
-                      SELECT sc.iddepod AS iddepo, SUM(sd.canti) AS sal FROM stockcab sc INNER JOIN stockdet sd ON sd.idstockcab = sc.idcabstock WHERE sd.idcodgusto = g.idcodgusto AND sc.iddepod IS NOT NULL GROUP BY sc.iddepod
-                    ) s ON s.iddepo = depos.iddepo
-                    INNER JOIN deposito d ON d.iddepo = depos.iddepo AND d.marca = 2
-                    HAVING (COALESCE(e.ent, 0) - COALESCE(s.sal, 0)) > 0
-                   ) AS stock_depositos
+                   dep_dist.stock_depositos
             FROM producto p
             INNER JOIN gustos g ON g.idprodu = p.idprodu AND g.discont = 0
             LEFT JOIN departa d ON d.codepar = p.codepar
@@ -121,6 +107,22 @@ final class StockRepo
                 LEFT JOIN deposito dd ON dd.iddepo = sc.iddepod
                 GROUP BY sd.idcodgusto
             ) cv ON cv.idcodgusto = g.idcodgusto
+            LEFT JOIN (
+              SELECT s.idcodgusto,
+                GROUP_CONCAT(CONCAT(d.nomdepo, ': ', s.neto) ORDER BY d.nomdepo SEPARATOR ' | ') AS stock_depositos
+              FROM (
+                SELECT sd.idcodgusto, d.iddepo,
+                  COALESCE(SUM(CASE WHEN sc.iddepoh = d.iddepo THEN sd.canti END), 0)
+                  - COALESCE(SUM(CASE WHEN sc.iddepod = d.iddepo THEN sd.canti END), 0) AS neto
+                FROM stockdet sd
+                INNER JOIN stockcab sc ON sc.idcabstock = sd.idstockcab
+                INNER JOIN deposito d ON d.marca = 2 AND (d.iddepo = sc.iddepoh OR d.iddepo = sc.iddepod)
+                GROUP BY sd.idcodgusto, d.iddepo
+                HAVING neto > 0
+              ) s
+              INNER JOIN deposito d ON d.iddepo = s.iddepo
+              GROUP BY s.idcodgusto
+            ) dep_dist ON dep_dist.idcodgusto = g.idcodgusto
             WHERE " . implode(' AND ', $where) . " {$stockWhere}
             ORDER BY p.produ ASC, g.nomgusto ASC
             LIMIT {$limit}
