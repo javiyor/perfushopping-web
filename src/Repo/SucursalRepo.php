@@ -13,16 +13,16 @@ final class SucursalRepo
         return $st->fetchAll();
     }
 
-    public function save(?int $id, string $nomsuc, string $numsuc, int $puntoVenta, ?int $iddepo, int $activo): int
+    public function save(?int $id, string $nomsuc, string $numsuc, int $puntoVenta, ?int $iddepo, int $activo, string $direccion = '', string $telefono = '', string $email = ''): int
     {
         $pdo = Db::pdo();
         if ($id) {
-            $st = $pdo->prepare('UPDATE admin_sucursales SET nomsuc=:n, numsuc=:ns, punto_venta=:pv, iddepo=:depo, activo=:a, updated_at=NOW() WHERE id=:id LIMIT 1');
-            $st->execute([':n' => $nomsuc, ':ns' => $numsuc, ':pv' => $puntoVenta, ':depo' => $iddepo, ':a' => $activo, ':id' => $id]);
+            $st = $pdo->prepare('UPDATE admin_sucursales SET nomsuc=:n, numsuc=:ns, punto_venta=:pv, iddepo=:depo, activo=:a, direccion=:dir, telefono=:tel, email=:em, updated_at=NOW() WHERE id=:id LIMIT 1');
+            $st->execute([':n' => $nomsuc, ':ns' => $numsuc, ':pv' => $puntoVenta, ':depo' => $iddepo, ':a' => $activo, ':dir' => $direccion, ':tel' => $telefono, ':em' => $email, ':id' => $id]);
             return $id;
         }
-        $st = $pdo->prepare('INSERT INTO admin_sucursales (idsucemp, nomsuc, numsuc, punto_venta, iddepo, activo, created_at, updated_at) VALUES (0, :n, :ns, :pv, :depo, :a, NOW(), NOW())');
-        $st->execute([':n' => $nomsuc, ':ns' => $numsuc, ':pv' => $puntoVenta, ':depo' => $iddepo, ':a' => $activo]);
+        $st = $pdo->prepare('INSERT INTO admin_sucursales (idsucemp, nomsuc, numsuc, punto_venta, iddepo, activo, direccion, telefono, email, created_at, updated_at) VALUES (0, :n, :ns, :pv, :depo, :a, :dir, :tel, :em, NOW(), NOW())');
+        $st->execute([':n' => $nomsuc, ':ns' => $numsuc, ':pv' => $puntoVenta, ':depo' => $iddepo, ':a' => $activo, ':dir' => $direccion, ':tel' => $telefono, ':em' => $email]);
         return (int)$pdo->lastInsertId();
     }
 

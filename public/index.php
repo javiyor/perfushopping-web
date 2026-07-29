@@ -72,6 +72,7 @@ use Perfushopping\Web\Admin\EmailController as AdminEmailController;
 use Perfushopping\Web\Admin\BadgeController as AdminBadgeController;
 use Perfushopping\Web\Admin\SucursalController as AdminSucursalController;
 use Perfushopping\Web\Admin\EmpresaController as AdminEmpresaController;
+use Perfushopping\Web\Admin\NotaPedidoController as AdminNotaPedidoController;
 
 $router = new Router();
 
@@ -258,6 +259,12 @@ $router->get('/admin/stock/grilla', [AdminStockGrillaController::class, 'index']
 $router->post('/admin/stock/grilla/generar-oc', [AdminStockGrillaController::class, 'generarOC']);
 $router->get('/admin/stock/grilla/oc-pdf/(?P<id>\d+)', [AdminStockGrillaController::class, 'exportarPDF']);
 $router->get('/admin/stock/grilla/oc-excel/(?P<id>\d+)', [AdminStockGrillaController::class, 'exportarExcel']);
+
+// Admin - Notas de pedido
+$router->get('/admin/nota-pedido/nueva', [AdminNotaPedidoController::class, 'create']);
+$router->post('/admin/nota-pedido/guardar', [AdminNotaPedidoController::class, 'store']);
+$router->get('/admin/nota-pedido/(?P<id>\d+)', [AdminNotaPedidoController::class, 'show']);
+$router->get('/admin/nota-pedido/buscar-proveedores', [AdminNotaPedidoController::class, 'searchProveedores']);
 
 // Admin - Configuración de impresión
 $router->get('/admin/impresion/config', [AdminPrintConfigController::class, 'index']);

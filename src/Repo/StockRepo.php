@@ -40,13 +40,38 @@ final class StockRepo
             LEFT JOIN (
                 SELECT
                     sd.idprodu,
-                    COALESCE(SUM(CASE WHEN sc.tipo_movimiento = 'compra' THEN sd.canti ELSE 0 END), 0)
-                        - COALESCE(SUM(CASE WHEN sc.tipo_movimiento = 'devolucion_compra' THEN sd.canti ELSE 0 END), 0) AS total_comprado,
-                    COALESCE(SUM(CASE WHEN sc.tipo_movimiento = 'venta' THEN sd.canti ELSE 0 END), 0)
-                        - COALESCE(SUM(CASE WHEN sc.tipo_movimiento = 'devolucion_venta' THEN sd.canti ELSE 0 END), 0) AS total_vendido
+                    COALESCE(SUM(
+                        CASE
+                            WHEN sc.iddepod = 7 AND dh.marca = 2 THEN sd.canti
+                            WHEN sc.tipo_movimiento = 'compra' AND sc.iddepoh IS NOT NULL AND sc.iddepod IS NULL THEN sd.canti
+                            ELSE 0
+                        END
+                    ), 0)
+                    - COALESCE(SUM(
+                        CASE
+                            WHEN sc.iddepoh = 7 AND dd.marca = 2 THEN sd.canti
+                            WHEN sc.tipo_movimiento = 'devolucion_compra' AND sc.iddepoh IS NULL AND sc.iddepod IS NOT NULL THEN sd.canti
+                            ELSE 0
+                        END
+                    ), 0) AS total_comprado,
+                    COALESCE(SUM(
+                        CASE
+                            WHEN sc.iddepoh = 6 AND dd.marca = 2 THEN sd.canti
+                            WHEN sc.tipo_movimiento = 'venta' AND sc.iddepoh IS NULL AND sc.iddepod IS NOT NULL THEN sd.canti
+                            ELSE 0
+                        END
+                    ), 0)
+                    - COALESCE(SUM(
+                        CASE
+                            WHEN sc.iddepod = 6 AND dh.marca = 2 THEN sd.canti
+                            WHEN sc.tipo_movimiento = 'devolucion_venta' AND sc.iddepoh IS NOT NULL AND sc.iddepod IS NULL THEN sd.canti
+                            ELSE 0
+                        END
+                    ), 0) AS total_vendido
                 FROM stockdet sd
                 INNER JOIN stockcab sc ON sc.idcabstock = sd.idstockcab
-                WHERE sc.tipo_movimiento IS NOT NULL
+                LEFT JOIN deposito dh ON dh.iddepo = sc.iddepoh
+                LEFT JOIN deposito dd ON dd.iddepo = sc.iddepod
                 GROUP BY sd.idprodu
             ) cv ON cv.idprodu = p.idprodu
             WHERE " . implode(' AND ', $where) . "
@@ -171,15 +196,19 @@ final class StockRepo
                 g.nomgusto,
                 COALESCE(SUM(
                     CASE
-                        WHEN sc.tipo_movimiento = 'compra' AND d.iddepo = sc.iddepoh THEN sd.canti
-                        WHEN sc.tipo_movimiento = 'devolucion_compra' AND d.iddepo = sc.iddepod THEN -sd.canti
+                        WHEN sc.iddepod = 7 AND sc.iddepoh = d.iddepo THEN sd.canti
+                        WHEN sc.tipo_movimiento = 'compra' AND sc.iddepoh IS NOT NULL AND sc.iddepod IS NULL AND d.iddepo = sc.iddepoh THEN sd.canti
+                        WHEN sc.iddepoh = 7 AND sc.iddepod = d.iddepo THEN -sd.canti
+                        WHEN sc.tipo_movimiento = 'devolucion_compra' AND sc.iddepoh IS NULL AND sc.iddepod IS NOT NULL AND d.iddepo = sc.iddepod THEN -sd.canti
                         ELSE 0
                     END
                 ), 0) AS unidades_compradas,
                 COALESCE(SUM(
                     CASE
-                        WHEN sc.tipo_movimiento = 'venta' AND d.iddepo = sc.iddepod THEN sd.canti
-                        WHEN sc.tipo_movimiento = 'devolucion_venta' AND d.iddepo = sc.iddepoh THEN -sd.canti
+                        WHEN sc.iddepod = d.iddepo AND sc.iddepoh = 6 THEN sd.canti
+                        WHEN sc.tipo_movimiento = 'venta' AND sc.iddepoh IS NULL AND sc.iddepod IS NOT NULL AND d.iddepo = sc.iddepod THEN sd.canti
+                        WHEN sc.iddepod = 6 AND sc.iddepoh = d.iddepo THEN -sd.canti
+                        WHEN sc.tipo_movimiento = 'devolucion_venta' AND sc.iddepoh IS NOT NULL AND sc.iddepod IS NULL AND d.iddepo = sc.iddepoh THEN -sd.canti
                         ELSE 0
                     END
                 ), 0) AS unidades_vendidas
@@ -188,7 +217,6 @@ final class StockRepo
             INNER JOIN deposito d ON d.iddepo IN (sc.iddepoh, sc.iddepod)
             LEFT JOIN gustos g ON g.idcodgusto = sd.idcodgusto
             WHERE d.marca = 2
-              AND sc.tipo_movimiento IS NOT NULL
               AND sd.idprodu = :idp
               {$gustoWhere}
             GROUP BY d.iddepo, d.nomdepo, sd.idprodu, sd.idcodgusto, g.nomgusto

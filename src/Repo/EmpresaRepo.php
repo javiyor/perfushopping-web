@@ -28,7 +28,7 @@ final class EmpresaRepo
     {
         $fields = [];
         $params = [':id' => $id];
-        foreach (['nomemp', 'razon_emp', 'dire_emp', 'telefono', 'cuit', 'ing_brutos', 'mail', 'codtip', 'logo'] as $col) {
+        foreach (['nomemp', 'razon_emp', 'dire_emp', 'telefono', 'cuit', 'ing_brutos', 'mail', 'codtip', 'logo', 'web'] as $col) {
             if (array_key_exists($col, $data)) {
                 $fields[] = "$col = :$col";
                 $params[$col] = $data[$col];

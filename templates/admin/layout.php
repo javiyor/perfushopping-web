@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Admin - Perfushopping</title>
+    <title>Admin - <?= $empresaNombre ?></title>
     <link rel="icon" href="/assets/brand/favicon.ico" sizes="any" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
@@ -177,6 +177,10 @@
         $sucursalNombre = $suc['nomsuc'] ?? '';
     }
 
+    $empresa = (new \Perfushopping\Web\Repo\EmpresaRepo())->getDefault();
+    $empresaLogo = !empty($empresa['logo']) ? '/uploads/' . ltrim($empresa['logo'], '/') : '/assets/brand/logo-header.png';
+    $empresaNombre = htmlspecialchars($empresa['nomemp'] ?? 'Perfushopping');
+
     $flash = $_SESSION['admin_flash'] ?? null;
     unset($_SESSION['admin_flash']);
     $currentPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
@@ -185,8 +189,8 @@
     <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="document.getElementById('adminSidebar').classList.remove('open')"></div>
     <aside class="sidebar" id="adminSidebar">
         <div class="sidebar-brand">
-            <img src="/assets/brand/logo-header.png" alt="PF" />
-            <span>Perfushopping</span>
+            <img src="<?= $empresaLogo ?>" alt="PF" onerror="this.style.display='none'" />
+            <span><?= $empresaNombre ?></span>
         </div>
         <nav class="sidebar-nav">
             <div class="nav-section">General</div>
@@ -222,6 +226,7 @@
             <a href="/admin/proveedores"><i class="bi bi-truck"></i>Proveedores</a>
             <a href="/admin/proveedores/ctacte"><i class="bi bi-currency-dollar"></i>Cta Cte Proveedores</a>
             <a href="/admin/ordenes-compra"><i class="bi bi-cart-plus"></i>Órdenes compra</a>
+            <a href="/admin/nota-pedido/nueva"><i class="bi bi-file-text"></i>Nota pedido</a>
             <a href="/admin/ordenes-pago"><i class="bi bi-credit-card"></i>Órdenes pago</a>
             <a href="/admin/ordenes-compra/fletes"><i class="bi bi-truck"></i>Fletes</a>
 

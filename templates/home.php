@@ -6,29 +6,35 @@ $q = (string)($_GET['q'] ?? '');
 $codrub = (int)($_GET['codrub'] ?? 0);
 $codsub = (int)($_GET['codsub'] ?? 0);
 $isNovedades = ($q === '' && $codrub === 0 && $codsub === 0);
+$empresa = (new \Perfushopping\Web\Repo\EmpresaRepo())->getDefault();
+$empresaNombre = htmlspecialchars($empresa['nomemp'] ?? 'Perfushopping');
+$empresaTel = htmlspecialchars($empresa['telefono'] ?? '3482 765798');
+$empresaMail = htmlspecialchars($empresa['mail'] ?? 'clientes@perfushopping.com.ar');
+$empresaDir = htmlspecialchars($empresa['dire_emp'] ?? '9 de julio 1610 - Hipolito Irigoyen 465 - Reconquista, Santa Fe - Argentina');
+$empresaWhatsapp = preg_replace('/[^0-9]/', '', $empresa['telefono'] ?? '543482765798') ?: '543482765798';
 ?>
 
 <div class="hero">
   <div style="display:flex;justify-content:center;">
-    <img src="/assets/brand/logo-banner.jpg" alt="Perfushopping" loading="eager" decoding="async" style="width:80%;max-width:900px;height:auto;border-radius:22px;border:1px solid rgba(216,178,90,0.18);box-shadow:0 22px 70px rgba(0,0,0,0.55);" />
+    <img src="/assets/brand/logo-banner.jpg" alt="<?= $empresaNombre ?>" loading="eager" decoding="async" style="width:80%;max-width:900px;height:auto;border-radius:22px;border:1px solid rgba(216,178,90,0.18);box-shadow:0 22px 70px rgba(0,0,0,0.55);" />
   </div>
-  <h1>Perfushopping</h1>
+  <h1><?= $empresaNombre ?></h1>
   <p>Carrito de compras. Compra, paga facil y seguro en cuotas con Mercado Pago.</p>
 </div>
 
 <div class="page" style="margin-top:16px">
   <?php if ($isNovedades): ?>
     <div style="margin-top:10px;color:rgba(246,244,239,0.72);line-height:1.55">
-      Tel: <a href="https://wa.me/543482765798?text=Hola%20Perfushopping" target="_blank" rel="noopener" style="text-decoration:underline"><strong>3482 765798</strong></a> &middot; Mail: <a href="mailto:clientes@perfushopping.com.ar" style="text-decoration:underline">clientes@perfushopping.com.ar</a><br />
-      Direcciones: 9 de julio 1610 - Hipolito Irigoyen 465 - Reconquista, Santa Fe - Argentina<br />
+      Tel: <a href="https://wa.me/<?= $empresaWhatsapp ?>?text=Hola%20<?= urlencode($empresaNombre) ?>" target="_blank" rel="noopener" style="text-decoration:underline"><strong><?= $empresaTel ?></strong></a> &middot; Mail: <a href="mailto:<?= $empresaMail ?>" style="text-decoration:underline"><?= $empresaMail ?></a><br />
+      Direcciones: <?= $empresaDir ?><br />
       Instagram: <a href="https://www.instagram.com/perfushopping" target="_blank" rel="noopener" style="text-decoration:underline">@perfushopping</a>
     </div>
     <h3 style="margin:10px 0 0;color:var(--gold);font-family:Georgia, 'Times New Roman', serif;letter-spacing:0.7px">Novedades</h3>
   <?php else: ?>
     <h3 style="margin:0;color:var(--gold);font-family:Georgia, 'Times New Roman', serif;letter-spacing:0.7px">Catalogo</h3>
     <div style="margin-top:10px;color:rgba(246,244,239,0.72);line-height:1.55">
-      Tel: <a href="https://wa.me/543482765798?text=Hola%20Perfushopping" target="_blank" rel="noopener" style="text-decoration:underline"><strong>3482 765798</strong></a> &middot; Mail: <a href="mailto:clientes@perfushopping.com.ar" style="text-decoration:underline">clientes@perfushopping.com.ar</a><br />
-      Direcciones: 9 de julio 1610 - Hipolito Irigoyen 465 - Reconquista, Santa Fe - Argentina<br />
+      Tel: <a href="https://wa.me/<?= $empresaWhatsapp ?>?text=Hola%20<?= urlencode($empresaNombre) ?>" target="_blank" rel="noopener" style="text-decoration:underline"><strong><?= $empresaTel ?></strong></a> &middot; Mail: <a href="mailto:<?= $empresaMail ?>" style="text-decoration:underline"><?= $empresaMail ?></a><br />
+      Direcciones: <?= $empresaDir ?><br />
       Instagram: <a href="https://www.instagram.com/perfushopping" target="_blank" rel="noopener" style="text-decoration:underline">@perfushopping</a>
     </div>
   <?php endif; ?>

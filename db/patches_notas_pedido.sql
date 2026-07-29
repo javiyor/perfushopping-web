@@ -1,0 +1,28 @@
+CREATE TABLE IF NOT EXISTS notas_pedido (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  codigo VARCHAR(30) NOT NULL,
+  proveedor_id INT DEFAULT NULL,
+  proveedor_nombre VARCHAR(255) DEFAULT NULL,
+  transporte VARCHAR(255) DEFAULT NULL,
+  envio_direccion VARCHAR(255) DEFAULT NULL,
+  envio_ciudad VARCHAR(120) DEFAULT NULL,
+  envio_telefono VARCHAR(60) DEFAULT NULL,
+  notas TEXT DEFAULT NULL,
+  created_by INT DEFAULT NULL,
+  created_at DATE DEFAULT NULL,
+  updated_at DATETIME DEFAULT NULL,
+  UNIQUE KEY idx_np_codigo (codigo)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS notas_pedido_items (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  nota_id INT NOT NULL,
+  idprodu INT DEFAULT NULL,
+  idcodgusto INT DEFAULT NULL,
+  producto VARCHAR(255) DEFAULT NULL,
+  variedad VARCHAR(255) DEFAULT NULL,
+  codscan VARCHAR(60) DEFAULT NULL,
+  codprodup VARCHAR(60) DEFAULT NULL,
+  qty INT NOT NULL DEFAULT 0,
+  KEY idx_npi_nota (nota_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

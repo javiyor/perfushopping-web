@@ -49,8 +49,11 @@ Perfushopping no se responsabiliza por interrupciones del servicio, demoras de t
 Perfushopping puede actualizar estos Terminos. La version vigente se publicara en el sitio con su fecha.
 
 11) Contacto
-Tel: 3482 765798
-Mail: clientes@perfushopping.com.ar
-Direcciones: 9 de julio 1610 - Reconquista, Santa Fe / Hipolito Irigoyen 465 - Reconquista, Santa Fe - Argentina
+<?php
+$e = (new \Perfushopping\Web\Repo\EmpresaRepo())->getDefault();
+echo 'Tel: ' . htmlspecialchars($e['telefono'] ?? '3482 765798') . "\n";
+echo 'Mail: ' . htmlspecialchars($e['mail'] ?? 'clientes@perfushopping.com.ar') . "\n";
+echo 'Direcciones: ' . htmlspecialchars($e['dire_emp'] ?? '9 de julio 1610 - Hipolito Irigoyen 465 - Reconquista, Santa Fe - Argentina');
+?>
   </div>
 </div>

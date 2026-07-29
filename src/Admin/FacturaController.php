@@ -429,7 +429,13 @@ final class FacturaController
         $adminUser = $auth->requireSesion();
 
         $q = trim((string)($_GET['q'] ?? ''));
-        $results = (new FacturaRepo())->searchProducts($q);
+        $iddepo = null;
+        $sucId = $auth->getSucursalId();
+        if ($sucId > 0) {
+            $suc = (new \Perfushopping\Web\Repo\SucursalRepo())->findById($sucId);
+            $iddepo = $suc ? (int)($suc['iddepo'] ?? 0) : null;
+        }
+        $results = (new FacturaRepo())->searchProducts($q, 20, $iddepo ?: null);
 
         Response::json($results);
     }
@@ -560,6 +566,13 @@ final class FacturaController
 
         $items = $repo->items($id);
 
+        $empresaRepo = new \Perfushopping\Web\Repo\EmpresaRepo();
+        $empresa = $empresaRepo->getDefault();
+        $empresaNombre = htmlspecialchars($empresa['nomemp'] ?? 'Perfushopping');
+        $empresaWeb = htmlspecialchars($empresa['web'] ?? 'www.perfushopping.com');
+        $empresaLogoUrl = !empty($empresa['logo']) ? '/uploads/' . ltrim($empresa['logo'], '/') : '/assets/brand/logo-header.png';
+        $baseUrl = (isset($_SERVER['REQUEST_SCHEME']) ? $_SERVER['REQUEST_SCHEME'] : 'https') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
+
         $tipoLabels = ['FACT-A'=>'Factura A','FACT-B'=>'Factura B','FACT-C'=>'Factura C','NC'=>'Nota de Crédito','ND'=>'Nota de Débito'];
         $tipo = $tipoLabels[$factura['tipo_comprobante'] ?? 'FACT-B'] ?? $factura['tipo_comprobante'] ?? '';
 
@@ -573,14 +586,13 @@ final class FacturaController
             $rows .= '</tr>';
         }
 
-        $baseUrl = (isset($_SERVER['REQUEST_SCHEME']) ? $_SERVER['REQUEST_SCHEME'] : 'https') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
         $attachmentHtml = '<!doctype html><html><head><meta charset="utf-8"><title>' . htmlspecialchars($factura['codigo'] ?? '') . '</title>';
         $attachmentHtml .= '<style>body{font-family:Arial,sans-serif;font-size:14px;color:#333;max-width:600px;margin:0 auto;padding:20px}';
         $attachmentHtml .= 'table{width:100%;border-collapse:collapse;margin:12px 0}th,td{padding:6px 8px;text-align:left;border-bottom:1px solid #ddd}';
         $attachmentHtml .= 'th{background:#f5f5f5}.total{font-size:18px;font-weight:bold;border-top:2px solid #333;padding-top:8px;margin-top:4px}';
         $attachmentHtml .= '.footer{margin-top:20px;font-size:12px;color:#888;text-align:center}';
         $attachmentHtml .= 'h1{font-size:22px;margin:0 0 4px}.logo{max-width:140px;margin-bottom:8px}</style></head><body>';
-        $attachmentHtml .= '<div style="text-align:center"><img class="logo" src="' . $baseUrl . '/assets/brand/logo-header.png" alt="Perfushopping" /></div>';
+        $attachmentHtml .= '<div style="text-align:center"><img class="logo" src="' . $baseUrl . $empresaLogoUrl . '" alt="' . $empresaNombre . '" /></div>';
         $attachmentHtml .= '<h1 style="text-align:center">' . htmlspecialchars($tipo) . '</h1>';
         $attachmentHtml .= '<p style="text-align:center;color:#666">Código: <strong>' . htmlspecialchars($factura['codigo'] ?? '') . '</strong> — Fecha: ' . htmlspecialchars($factura['fecha'] ?? '') . '</p>';
         if ($factura['cae'] ?? '') {
@@ -600,7 +612,7 @@ final class FacturaController
         if ($desc > 0) $attachmentHtml .= '<p style="color:#dc3545">Descuento: -' . Format::moneyRoundedFromCents($desc) . '</p>';
         $attachmentHtml .= '<p class="total">TOTAL: ' . Format::moneyRoundedFromCents((int)($factura['total_cents'] ?? 0)) . '</p></div>';
         $attachmentHtml .= '<hr style="border:none;border-top:1px solid #ddd" />';
-        $attachmentHtml .= '<div class="footer"><p>Gracias por su compra</p><p>Perfushopping — www.perfushopping.com</p></div>';
+        $attachmentHtml .= '<div class="footer"><p>Gracias por su compra</p><p>' . $empresaNombre . ' — ' . $empresaWeb . '</p></div>';
         $attachmentHtml .= '<p style="text-align:center;font-size:11px;color:#999">Versión imprimible: <a href="' . $baseUrl . '/admin/facturas/imprimir/' . $id . '">' . $baseUrl . '/admin/facturas/imprimir/' . $id . '</a></p>';
         $attachmentHtml .= '</body></html>';
 
@@ -617,7 +629,7 @@ final class FacturaController
             $emailBody .= '<p>CAE: <strong>' . htmlspecialchars($factura['cae']) . '</strong> — Vto: ' . htmlspecialchars($factura['cae_vto'] ?? '') . '</p>';
         }
         $emailBody .= '<p>Podés descargar la factura desde el adjunto o ver la versión imprimible aquí: <a href="' . $baseUrl . '/admin/facturas/imprimir/' . $id . '">' . $baseUrl . '/admin/facturas/imprimir/' . $id . '</a></p>';
-        $emailBody .= '<p>Gracias por su compra.<br/>Perfushopping</p>';
+        $emailBody .= '<p>Gracias por su compra.<br/>' . $empresaNombre . '</p>';
 
         try {
             (new SmtpMailer())->send($to, 'Factura ' . ($factura['codigo'] ?? ''), $emailBody, '', $attachments);

@@ -361,6 +361,8 @@ function searchProd(q) {
                 const priceCents = p.precio ? Math.round(parseFloat(p.precio) * 100) : 0;
                 const ivaRate = p.tiva || 21;
                 const displayPrice = getDisplayPrice(priceCents, ivaRate);
+                const stockDep = p.stock_deposito ?? 0;
+                const stockTot = p.stock_total ?? 0;
 
                 // Barcode scan auto-add
                 if (p.matched_variant) {
@@ -382,10 +384,15 @@ function searchProd(q) {
 
                 const div = document.createElement('div');
                 div.className = 'pos-result-item';
+                div.style.flexWrap = 'wrap';
                 div.innerHTML = `
-                    <div>
+                    <div style="flex:1;min-width:0">
                         <div class="prod-name">${esc(p.produ)}</div>
                         <div class="prod-code">${esc(p.codprodu)} ${p.codprodup ? '| ' + esc(p.codprodup) : ''}</div>
+                        <div style="font-size:11px;color:#6c757d;margin-top:2px">
+                            <span class="text-success fw-semibold">Dep: ${stockDep}</span>
+                            <span class="ms-2 text-muted">Total: ${stockTot}</span>
+                        </div>
                     </div>
                     <div class="prod-price">$${fmtPrice(displayPrice)}</div>
                 `;
@@ -419,7 +426,13 @@ function showVariantPicker(p, priceCents, ivaRate) {
     html += '<div class="fw-bold mb-2">' + esc(p.produ) + ' — elegí variedad:</div>';
     p.variants.forEach(v => {
         const cs = v.codscan ? ' (' + v.codscan + ')' : '';
-        html += '<div class="suggestion-item" data-id="' + v.idcodgusto + '" data-nom="' + esc(v.nomgusto) + '">' + esc(v.nomgusto) + cs + '</div>';
+        const vStockDep = v.stock_deposito ?? 0;
+        const vStockTot = v.stock_total ?? 0;
+        html += '<div class="suggestion-item" data-id="' + v.idcodgusto + '" data-nom="' + esc(v.nomgusto) + '">'
+            + esc(v.nomgusto) + cs
+            + ' <span class="text-success" style="font-size:11px">Dep: ' + vStockDep + '</span>'
+            + ' <span class="text-muted" style="font-size:11px">Total: ' + vStockTot + '</span>'
+            + '</div>';
     });
     html += '</div>';
     prodResults.innerHTML = html;

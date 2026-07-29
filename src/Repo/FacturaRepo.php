@@ -182,7 +182,7 @@ final class FacturaRepo
         $st->execute([':i' => $id]);
     }
 
-    public function searchProducts(string $q, int $limit = 20): array
+    public function searchProducts(string $q, int $limit = 20, ?int $iddepo = null): array
     {
         $limit = max(1, min(50, $limit));
         $q = trim($q);
@@ -192,7 +192,7 @@ final class FacturaRepo
         $params = [':like' => '%' . $q . '%'];
 
         $sql = '
-            SELECT p.idprodu, p.codprodu, p.produ, p.precio, p.precomp, p.codprodup, p.enweb,
+            SELECT p.idprodu, p.codprodu, p.produ, p.precio, p.precomp, p.codprodup, p.enweb, p.stocact,
                    i.codivaprodu, i.tiva
             FROM producto p
             LEFT JOIN ivaprodu i ON i.codivaprodu = p.iva
@@ -207,7 +207,7 @@ final class FacturaRepo
         $matchedVariant = null;
         if (ctype_digit($q) || preg_match('/^\d{8,13}$/', $q)) {
             $st2 = $pdo->prepare('
-                SELECT p.idprodu, p.codprodu, p.produ, p.precio, p.precomp, p.codprodup, p.enweb,
+                SELECT p.idprodu, p.codprodu, p.produ, p.precio, p.precomp, p.codprodup, p.enweb, p.stocact,
                        i.codivaprodu, i.tiva,
                        g.idcodgusto, g.nomgusto AS matched_nomgusto
                 FROM gustos g
@@ -238,6 +238,7 @@ final class FacturaRepo
         $matchedV = $matchedVariant;
         foreach ($products as $idx => $pr) {
             $idprodu = (int)$pr['idprodu'];
+
             $st3 = $pdo->prepare('
                 SELECT idcodgusto, nomgusto, codscan, stockact
                 FROM gustos
@@ -248,6 +249,34 @@ final class FacturaRepo
             ');
             $st3->execute([':id' => $idprodu]);
             $products[$idx]['variants'] = $st3->fetchAll();
+
+            $products[$idx]['stock_total'] = (int)($pr['stocact'] ?? 0);
+
+            $products[$idx]['stock_deposito'] = 0;
+            if ($iddepo) {
+                $st4 = $pdo->prepare('
+                    SELECT COALESCE(SUM(stock), 0)
+                    FROM stock
+                    WHERE idprodu = :p AND iddepo = :d
+                ');
+                $st4->execute([':p' => $idprodu, ':d' => $iddepo]);
+                $products[$idx]['stock_deposito'] = (int)$st4->fetchColumn();
+            }
+
+            foreach (($products[$idx]['variants'] ?? []) as $vi => $v) {
+                $idg = (int)$v['idcodgusto'];
+                $products[$idx]['variants'][$vi]['stock_total'] = (int)($v['stockact'] ?? 0);
+                $products[$idx]['variants'][$vi]['stock_deposito'] = 0;
+                if ($iddepo) {
+                    $st5 = $pdo->prepare('
+                        SELECT COALESCE(SUM(stock), 0)
+                        FROM stock
+                        WHERE idcodgusto = :g AND iddepo = :d
+                    ');
+                    $st5->execute([':g' => $idg, ':d' => $iddepo]);
+                    $products[$idx]['variants'][$vi]['stock_deposito'] = (int)$st5->fetchColumn();
+                }
+            }
         }
 
         if ($matchedV) {

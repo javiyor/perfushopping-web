@@ -16,6 +16,7 @@ $stockFilters = ['' => 'Todos', 'sin_stock' => 'Sin stock', 'bajo_stock' => 'Sto
             <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
             <button class="btn btn-outline-secondary btn-sm" type="submit"><i class="bi bi-arrow-repeat"></i> Recalcular</button>
         </form>
+        <button class="btn btn-accent btn-sm" id="btnNotaPedido" onclick="irANotaPedido()"><i class="bi bi-file-text"></i> Nota de pedido</button>
         <a class="btn btn-accent btn-sm" href="/admin/stock/ajuste"><i class="bi bi-pencil-square"></i> Ajuste manual</a>
     </div>
 </div>
@@ -68,12 +69,13 @@ $stockFilters = ['' => 'Todos', 'sin_stock' => 'Sin stock', 'bajo_stock' => 'Sto
                     <th class="text-center">Stock</th>
                     <th class="text-center">Comp.</th>
                     <th class="text-center">Vend.</th>
+                    <th class="text-center" style="width:60px">Pedir</th>
                     <th style="width:50px"></th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (!$list): ?>
-                    <tr><td colspan="11" class="text-muted text-center">Sin productos.</td></tr>
+                    <tr><td colspan="12" class="text-muted text-center">Sin productos.</td></tr>
                 <?php else: ?>
                         <?php foreach ($list as $p): ?>
                         <?php $stock = (int)($p['stocact'] ?? 0); ?>
@@ -104,6 +106,11 @@ $stockFilters = ['' => 'Todos', 'sin_stock' => 'Sin stock', 'bajo_stock' => 'Sto
                             </td>
                             <td class="text-center small text-success"><?= $comprado ?></td>
                             <td class="text-center small text-danger"><?= $vendido ?></td>
+                            <td class="text-center">
+                                <input type="number" class="form-control form-control-sm np-qty" style="width:55px;text-align:center" min="0" value="0"
+                                    data-idprodu="<?= (int)($p['idprodu'] ?? 0) ?>"
+                                    data-producto="<?= htmlspecialchars((string)($p['produ'] ?? ''), ENT_QUOTES) ?>" />
+                            </td>
                             <td><a class="btn btn-sm btn-outline-secondary" href="/admin/stock/<?= (int)($p['idprodu'] ?? 0) ?>"><i class="bi bi-eye"></i></a></td>
                         </tr>
                     <?php endforeach; ?>
@@ -112,3 +119,26 @@ $stockFilters = ['' => 'Todos', 'sin_stock' => 'Sin stock', 'bajo_stock' => 'Sto
         </table>
     </div>
 </div>
+
+<script>
+function irANotaPedido() {
+    const items = [];
+    document.querySelectorAll('.np-qty').forEach(function(inp) {
+        const qty = parseInt(inp.value) || 0;
+        if (qty <= 0) return;
+        items.push({
+            idprodu: parseInt(inp.dataset.idprodu) || 0,
+            producto: inp.dataset.producto || '',
+            qty: qty,
+        });
+    });
+    if (items.length === 0) {
+        alert('Primero ingresá cantidades en la columna "Pedir".');
+        return;
+    }
+    try {
+        sessionStorage.setItem('np_items', JSON.stringify(items));
+    } catch(e) {}
+    window.location.href = '/admin/nota-pedido/nueva';
+}
+</script>

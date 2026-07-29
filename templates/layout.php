@@ -3,6 +3,9 @@ use Perfushopping\Web\Support\Csrf;
 use Perfushopping\Web\Support\Env;
 /** @var string $body */
 $appName = Env::get('APP_NAME', 'Perfushopping');
+$empresa = (new \Perfushopping\Web\Repo\EmpresaRepo())->getDefault();
+$empresaNombre = htmlspecialchars($empresa['nomemp'] ?? $appName);
+$empresaLogoUrl = !empty($empresa['logo']) ? '/uploads/' . ltrim($empresa['logo'], '/') : '/assets/brand/logo-header.png';
 $user = $user ?? null;
 $isWholesale = $isWholesale ?? false;
 $flash = $_SESSION['flash'] ?? null;
@@ -13,7 +16,7 @@ unset($_SESSION['flash']);
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title><?= htmlspecialchars($appName) ?></title>
+    <title><?= $empresaNombre ?></title>
     <link rel="icon" href="/assets/brand/favicon.ico" sizes="any" />
     <link rel="stylesheet" href="/assets/app.css" />
     <script defer src="/assets/app.js"></script>
@@ -22,9 +25,9 @@ unset($_SESSION['flash']);
     <div class="wrap">
       <div class="topbar">
         <a class="brand" href="/">
-          <img class="brand-mark" src="/assets/brand/logo-header.png" alt="Perfushopping" loading="eager" decoding="async" />
+          <img class="brand-mark" src="<?= $empresaLogoUrl ?>" alt="<?= $empresaNombre ?>" loading="eager" decoding="async" onerror="this.style.display='none'" />
           <div>
-            <div class="brand-title">Perfushopping</div>
+            <div class="brand-title"><?= $empresaNombre ?></div>
             <span class="brand-sub">Todo lo que te gusta y te hace sentir bien</span>
           </div>
         </a>

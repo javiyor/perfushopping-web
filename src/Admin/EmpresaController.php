@@ -19,11 +19,15 @@ final class EmpresaController
         $repo = new EmpresaRepo();
         $empresa = $repo->getDefault();
         $tiposIva = $repo->tiposIva();
+        $sucursales = (new \Perfushopping\Web\Repo\SucursalRepo())->findAll();
+        $depositos = (new \Perfushopping\Web\Repo\SucursalRepo())->listarDepositos();
 
         echo View::adminPage('admin/empresa/edit.php', [
             'adminUser' => $adminUser,
             'empresa' => $empresa,
             'tiposIva' => $tiposIva,
+            'sucursales' => $sucursales,
+            'depositos' => $depositos,
             'csrf' => Csrf::token(),
             'pageTitle' => 'Datos de la empresa',
         ]);
@@ -48,6 +52,7 @@ final class EmpresaController
             'cuit' => trim((string)($_POST['cuit'] ?? '')),
             'ing_brutos' => trim((string)($_POST['ing_brutos'] ?? '')),
             'mail' => trim((string)($_POST['mail'] ?? '')),
+            'web' => trim((string)($_POST['web'] ?? '')),
             'codtip' => (int)($_POST['codtip'] ?? 0) ?: null,
         ];
 

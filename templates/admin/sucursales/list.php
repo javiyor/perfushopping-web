@@ -10,6 +10,9 @@
                 <tr>
                     <th>ID</th>
                     <th>Nombre</th>
+                    <th>Dirección</th>
+                    <th>Teléfono</th>
+                    <th>Email</th>
                     <th>Núm. Suc.</th>
                     <th>Pto. Venta</th>
                     <th>Depósito</th>
@@ -22,6 +25,9 @@
                 <tr>
                     <td class="text-muted"><?= (int)$s['id'] ?></td>
                     <td><?= htmlspecialchars((string)($s['nomsuc'] ?? '')) ?></td>
+                    <td class="small"><?= htmlspecialchars((string)($s['direccion'] ?? '')) ?></td>
+                    <td class="small"><?= htmlspecialchars((string)($s['telefono'] ?? '')) ?></td>
+                    <td class="small"><?= htmlspecialchars((string)($s['email'] ?? '')) ?></td>
                     <td><?= htmlspecialchars((string)($s['numsuc'] ?? '')) ?></td>
                     <td><?= (int)($s['punto_venta'] ?? 0) ?></td>
                     <td>
@@ -50,7 +56,7 @@
                 </tr>
                 <?php endforeach; ?>
                 <?php if (!$list): ?>
-                <tr><td colspan="7" class="text-center text-muted py-4">No hay sucursales registradas.</td></tr>
+                <tr><td colspan="10" class="text-center text-muted py-4">No hay sucursales registradas.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
@@ -71,6 +77,20 @@
                 <div class="mb-3">
                     <label class="form-label">Nombre</label>
                     <input type="text" name="nomsuc" id="inputNomsuc" class="form-control" required />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Dirección</label>
+                    <input type="text" name="direccion" id="inputDireccion" class="form-control" />
+                </div>
+                <div class="row mb-3">
+                    <div class="col">
+                        <label class="form-label">Teléfono</label>
+                        <input type="text" name="telefono" id="inputTelefono" class="form-control" />
+                    </div>
+                    <div class="col">
+                        <label class="form-label">Email</label>
+                        <input type="email" name="email" id="inputEmail" class="form-control" />
+                    </div>
                 </div>
                 <div class="row mb-3">
                     <div class="col">
@@ -109,6 +129,9 @@ const sucursales = <?= json_encode(array_map(function($s) {
     return [
         'id' => (int)$s['id'],
         'nomsuc' => $s['nomsuc'] ?? '',
+        'direccion' => $s['direccion'] ?? '',
+        'telefono' => $s['telefono'] ?? '',
+        'email' => $s['email'] ?? '',
         'numsuc' => $s['numsuc'] ?? '',
         'punto_venta' => (int)($s['punto_venta'] ?? 0),
         'iddepo' => (int)($s['iddepo'] ?? 0),
@@ -120,6 +143,9 @@ function abrirModal(id) {
     const modal = new bootstrap.Modal(document.getElementById('modalSucursal'));
     document.getElementById('inputId').value = '';
     document.getElementById('inputNomsuc').value = '';
+    document.getElementById('inputDireccion').value = '';
+    document.getElementById('inputTelefono').value = '';
+    document.getElementById('inputEmail').value = '';
     document.getElementById('inputNumsuc').value = '';
     document.getElementById('inputPuntoVenta').value = '1';
     document.getElementById('inputIddepo').value = '';
@@ -131,6 +157,9 @@ function abrirModal(id) {
         if (s) {
             document.getElementById('inputId').value = s.id;
             document.getElementById('inputNomsuc').value = s.nomsuc;
+            document.getElementById('inputDireccion').value = s.direccion;
+            document.getElementById('inputTelefono').value = s.telefono;
+            document.getElementById('inputEmail').value = s.email;
             document.getElementById('inputNumsuc').value = s.numsuc;
             document.getElementById('inputPuntoVenta').value = s.punto_venta;
             document.getElementById('inputIddepo').value = s.iddepo || '';

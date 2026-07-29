@@ -49,8 +49,11 @@ Conservamos los datos el tiempo necesario para cumplir las finalidades indicadas
 
 8) Derechos y contacto
 Podes solicitar actualizacion/correccion de tus datos o hacer consultas:
-- clientes@perfushopping.com.ar
-- Tel: 3482 765798
+<?php
+$e = (new \Perfushopping\Web\Repo\EmpresaRepo())->getDefault();
+echo '- ' . htmlspecialchars($e['mail'] ?? 'clientes@perfushopping.com.ar') . "\n";
+echo '- Tel: ' . htmlspecialchars($e['telefono'] ?? '3482 765798');
+?>
 
 9) Cambios
 Podemos actualizar esta Politica. Publicaremos la version vigente con su fecha.
