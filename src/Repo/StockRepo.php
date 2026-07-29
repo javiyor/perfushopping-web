@@ -61,7 +61,12 @@ final class StockRepo
                    {$stockSel},
                    {$depSel},
                    COALESCE(cv.total_comprado, 0) AS total_comprado,
-                   COALESCE(cv.total_vendido, 0) AS total_vendido
+                   COALESCE(cv.total_vendido, 0) AS total_vendido,
+                   (SELECT GROUP_CONCAT(CONCAT(d.nomdepo, ': ', s.stock) SEPARATOR ' | ')
+                    FROM stock s
+                    INNER JOIN deposito d ON d.iddepo = s.iddepo AND d.marca = 2
+                    WHERE s.idcodgusto = g.idcodgusto AND s.stock > 0
+                   ) AS stock_depositos
             FROM producto p
             INNER JOIN gustos g ON g.idprodu = p.idprodu AND g.discont = 0
             LEFT JOIN departa d ON d.codepar = p.codepar

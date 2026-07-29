@@ -91,13 +91,14 @@ $stockFilters = ['' => 'Todos', 'sin_stock' => 'Sin stock', 'bajo_stock' => 'Sto
                     <th class="text-end">Precio</th>
                     <th class="text-end">Costo</th>
                     <th class="text-center">Stock</th>
+                    <th class="text-center">Stock x dep.</th>
                     <th class="text-center" style="width:60px">Pedir</th>
                     <th style="width:50px"></th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (!$list): ?>
-                    <tr><td colspan="12" class="text-muted text-center">Sin productos.</td></tr>
+                    <tr>                    <td colspan="13" class="text-muted text-center">Sin productos.</td></tr>
                 <?php else: ?>
                         <?php foreach ($list as $p): ?>
                         <?php $stock = (int)($p['stock_variante'] ?? 0); ?>
@@ -126,6 +127,7 @@ $stockFilters = ['' => 'Todos', 'sin_stock' => 'Sin stock', 'bajo_stock' => 'Sto
                                     <span class="badge bg-success"><?= $stock ?></span>
                                 <?php endif; ?>
                             </td>
+                            <td class="small text-muted" style="max-width:200px;white-space:normal;word-break:break-word"><?= htmlspecialchars((string)($p['stock_depositos'] ?? '')) ?: '-' ?></td>
                             <td class="text-center">
                                 <input type="number" class="form-control form-control-sm np-qty" style="width:55px;text-align:center" min="0" value="0"
                                     data-idprodu="<?= (int)($p['idprodu'] ?? 0) ?>"
