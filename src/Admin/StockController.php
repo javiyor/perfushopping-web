@@ -45,6 +45,52 @@ final class StockController
         ]);
     }
 
+    public function exportarExcel(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requireSesion();
+
+        $repo = new StockRepo();
+        $q = trim((string)($_GET['q'] ?? ''));
+        $codepar = (int)($_GET['codepar'] ?? 0);
+        $stockFilter = trim((string)($_GET['stock'] ?? ''));
+        $codrub = (int)($_GET['codrub'] ?? 0);
+        $codsub = (int)($_GET['codsub'] ?? 0);
+        $codprove = (int)($_GET['codprove'] ?? 0);
+        $list = $repo->listarStock($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, 1000);
+
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="stock.csv"');
+
+        $out = fopen('php://output', 'w');
+        fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
+
+        fputcsv($out, [
+            'Producto', 'Variedad', 'Código', 'Cód. barra', 'Cód. proveedor',
+            'Proveedor', 'Marca', 'Categoría',
+            'Precio', 'Costo', 'Stock',
+        ]);
+
+        foreach ($list as $p) {
+            fputcsv($out, [
+                $p['produ'] ?? '',
+                $p['nomgusto'] ?? '',
+                $p['codprodu'] ?? '',
+                $p['codscan'] ?? '',
+                $p['codprodup'] ?? '',
+                $p['nomprovee'] ?? '',
+                $p['nomsub'] ?? '',
+                $p['nomrub'] ?? '',
+                number_format((float)($p['precio'] ?? 0), 2, ',', '.'),
+                number_format((float)($p['precomp'] ?? 0), 2, ',', '.'),
+                (int)($p['stock_variante'] ?? 0),
+            ]);
+        }
+
+        fclose($out);
+        exit;
+    }
+
     public function show(array $params): void
     {
         $auth = new AdminAuthService();

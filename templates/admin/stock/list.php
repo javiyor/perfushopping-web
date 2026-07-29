@@ -23,6 +23,7 @@ $stockFilters = ['' => 'Todos', 'sin_stock' => 'Sin stock', 'bajo_stock' => 'Sto
         </form>
         <button class="btn btn-accent btn-sm" id="btnNotaPedido" onclick="irANotaPedido()"><i class="bi bi-file-text"></i> Nota de pedido</button>
         <a class="btn btn-accent btn-sm" href="/admin/stock/ajuste"><i class="bi bi-pencil-square"></i> Ajuste manual</a>
+        <a class="btn btn-outline-success btn-sm" href="/admin/stock/exportar-excel?<?= htmlspecialchars($_SERVER['QUERY_STRING'] ?? '') ?>"><i class="bi bi-file-earmark-excel"></i> Excel</a>
     </div>
 </div>
 
@@ -151,7 +152,11 @@ function irANotaPedido() {
         if (qty <= 0) return;
         items.push({
             idprodu: parseInt(inp.dataset.idprodu) || 0,
+            idcodgusto: parseInt(inp.dataset.idcodgusto) || 0,
             producto: inp.dataset.producto || '',
+            variedad: inp.dataset.variedad || '',
+            codscan: inp.dataset.codscan || '',
+            codprodup: inp.dataset.codprodup || '',
             qty: qty,
         });
     });
