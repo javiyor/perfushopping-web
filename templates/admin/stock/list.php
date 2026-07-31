@@ -13,6 +13,24 @@ $subrubros = $subrubros ?? [];
 $proveedores = $proveedores ?? [];
 $stockFilters = ['' => 'Todos', 'sin_stock' => 'Sin stock', 'bajo_stock' => 'Stock bajo (≤5)', 'con_stock' => 'Con stock'];
 $isSuper = ($adminUser['rol'] ?? '') === 'superadmin';
+$page = (int)($page ?? 1);
+$lastPage = (int)($lastPage ?? 1);
+$perPage = (int)($perPage ?? 80);
+$total = (int)($total ?? 0);
+$qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $desde, $hasta): string {
+    $p = [
+        'q' => $q, 'codepar' => $codepar, 'stock' => $stockFilter,
+        'codrub' => $codrub, 'codsub' => $codsub, 'codprove' => $codprove,
+        'desde' => $desde, 'hasta' => $hasta,
+    ];
+    foreach ($overrides as $k => $v) {
+        $p[$k] = $v;
+    }
+    foreach ($p as $k => $v) {
+        if ($v === '' || $v === 0) unset($p[$k]);
+    }
+    return http_build_query($p);
+};
 ?>
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
@@ -197,6 +215,19 @@ $isSuper = ($adminUser['rol'] ?? '') === 'superadmin';
             <?php endif; ?>
         </table>
     </div>
+    <?php if ($lastPage > 1): ?>
+    <div class="card-footer d-flex justify-content-between align-items-center small py-2">
+        <span class="text-muted"><?= $total ?> filas &middot; P&aacute;gina <?= $page ?> de <?= $lastPage ?></span>
+        <div class="d-flex gap-2">
+            <?php if ($page > 1): ?>
+                <a class="btn btn-sm btn-outline-secondary" href="/admin/stock?<?= $qs(['page' => $page - 1]) ?>">&laquo; Anterior</a>
+            <?php endif; ?>
+            <?php if ($page < $lastPage): ?>
+                <a class="btn btn-sm btn-outline-secondary" href="/admin/stock?<?= $qs(['page' => $page + 1]) ?>">Siguiente &raquo;</a>
+            <?php endif; ?>
+        </div>
+    </div>
+    <?php endif; ?>
 </div>
 
 <script>

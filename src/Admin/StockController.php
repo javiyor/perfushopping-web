@@ -27,7 +27,11 @@ final class StockController
         $hasta = trim((string)($_GET['hasta'] ?? ''));
         if ($desde === '') $desde = date('Y-m-01', strtotime('first day of last month'));
         if ($hasta === '') $hasta = date('Y-m-t', strtotime('last day of last month'));
-        $list = $repo->listarStock($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, 80, null, $desde, $hasta);
+        $page = max(1, (int)($_GET['page'] ?? 1));
+        $perPage = 80;
+        $list = $repo->listarStock($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $perPage, null, $desde, $hasta, $page);
+        $total = $repo->contarStock($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, null, $desde, $hasta);
+        $lastPage = (int)ceil($total / $perPage);
         $rubros = $repo->grillaRubros();
         $subrubros = $repo->grillaSubrubros();
         $proveedores = $repo->grillaProveedores();
@@ -43,6 +47,10 @@ final class StockController
             'codprove' => $codprove,
             'desde' => $desde,
             'hasta' => $hasta,
+            'page' => $page,
+            'perPage' => $perPage,
+            'total' => $total,
+            'lastPage' => $lastPage,
             'rubros' => $rubros,
             'subrubros' => $subrubros,
             'proveedores' => $proveedores,

@@ -150,9 +150,11 @@ if (!$producto):
                         </tr>
                     </thead>
                     <tbody>
+                        <?php $totalCompras = 0; ?>
                         <?php foreach ($movCompras as $m): ?>
                             <?php $cant = (int)($m['canti'] ?? 0); ?>
                             <?php $ingreso = $m['iddepoh'] !== null; ?>
+                            <?php $totalCompras += $ingreso ? $cant : -$cant; ?>
                             <tr>
                                 <td class="small"><?= htmlspecialchars((string)($m['mov_fecha'] ?? '-')) ?></td>
                                 <td class="small"><?= htmlspecialchars((string)($m['nomgusto'] ?? '-')) ?></td>
@@ -162,6 +164,13 @@ if (!$producto):
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
+                    <tfoot class="table-light">
+                        <tr>
+                            <td colspan="2" class="text-end fw-bold">Total</td>
+                            <td class="text-center fw-bold"><?= $totalCompras >= 0 ? '+' : '' ?><?= $totalCompras ?></td>
+                            <td colspan="2"></td>
+                        </tr>
+                    </tfoot>
                 </table>
             </div>
             <?php else: ?>
@@ -187,9 +196,11 @@ if (!$producto):
                         </tr>
                     </thead>
                     <tbody>
+                        <?php $totalVentas = 0; ?>
                         <?php foreach ($movVentas as $m): ?>
                             <?php $cant = (int)($m['canti'] ?? 0); ?>
                             <?php $salida = $m['iddepod'] !== null; ?>
+                            <?php $totalVentas += $salida ? -$cant : $cant; ?>
                             <tr>
                                 <td class="small"><?= htmlspecialchars((string)($m['mov_fecha'] ?? '-')) ?></td>
                                 <td class="small"><?= htmlspecialchars((string)($m['nomgusto'] ?? '-')) ?></td>
@@ -199,6 +210,13 @@ if (!$producto):
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
+                    <tfoot class="table-light">
+                        <tr>
+                            <td colspan="2" class="text-end fw-bold">Total</td>
+                            <td class="text-center fw-bold"><?= $totalVentas >= 0 ? '+' : '' ?><?= $totalVentas ?></td>
+                            <td colspan="2"></td>
+                        </tr>
+                    </tfoot>
                 </table>
             </div>
             <?php else: ?>

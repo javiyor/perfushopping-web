@@ -7,9 +7,71 @@ use Perfushopping\Web\Infra\Db;
 
 final class StockRepo
 {
-    public function listarStock(string $q = '', int $codepar = 0, string $stockFilter = '', int $codrub = 0, int $codsub = 0, int $codprove = 0, int $limit = 80, ?int $iddepo = null, string $desde = '', string $hasta = ''): array
+    public function listarStock(string $q = '', int $codepar = 0, string $stockFilter = '', int $codrub = 0, int $codsub = 0, int $codprove = 0, int $limit = 80, ?int $iddepo = null, string $desde = '', string $hasta = '', int $page = 1): array
     {
         $limit = max(1, min(200, $limit));
+        $page = max(1, $page);
+        $offset = ($page - 1) * $limit;
+
+        [$where, $stockWhere, $depDepo, $params] = $this->stockFilterParts($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $iddepo, $desde, $hasta);
+
+        $sql = "
+            SELECT p.idprodu, p.codprodu, p.produ, p.codprodup, p.precio, p.precomp, p.stocact, p.stocdep, p.codepar, p.enweb, p.observ, p.imagen,
+                   d.nomdepar, g.idcodgusto, g.nomgusto, g.codscan, g.discont,
+                   r.nomrub, s.nomsub, pv.razon AS nomprovee,
+                   dep.iddepo, dep.nomdepo,
+                   COALESCE(dep.stock, 0) AS stock_deposito,
+                   COALESCE(cv.total_vendido, 0) AS total_vendido
+            FROM producto p
+            INNER JOIN gustos g ON g.idprodu = p.idprodu
+            LEFT JOIN departa d ON d.codepar = p.codepar
+            LEFT JOIN rubros r ON r.codrub = p.codrub
+            LEFT JOIN subrubro s ON s.codsub = p.codsub
+            LEFT JOIN proveedo pv ON pv.codprove = p.codprove
+            LEFT JOIN (
+                SELECT sd.idcodgusto,
+                    ABS(COALESCE(SUM(
+                        CASE
+                            WHEN sc.iddepod = 6 THEN sd.canti
+                            WHEN sc.iddepoh = 6 THEN -sd.canti
+                            ELSE 0
+                        END
+                    ), 0)) AS total_vendido
+                FROM stockdet sd
+                INNER JOIN stockcab sc ON sc.idcabstock = sd.idstockcab
+                WHERE sd.idcodgusto > 0
+                  AND sc.fecha >= :desde
+                  AND sc.fecha < DATE_ADD(:hasta, INTERVAL 1 DAY)
+                GROUP BY sd.idcodgusto
+            ) cv ON cv.idcodgusto = g.idcodgusto
+            " . $this->depSubquery($depDepo) . "
+            WHERE " . implode(' AND ', $where) . " {$stockWhere}
+            ORDER BY p.produ ASC, g.nomgusto ASC, dep.nomdepo ASC
+            LIMIT {$offset}, {$limit}
+        ";
+        $st = Db::pdo()->prepare($sql);
+        $st->execute($params);
+        return $st->fetchAll();
+    }
+
+    public function contarStock(string $q = '', int $codepar = 0, string $stockFilter = '', int $codrub = 0, int $codsub = 0, int $codprove = 0, ?int $iddepo = null, string $desde = '', string $hasta = ''): int
+    {
+        [$where, $stockWhere, $depDepo, $params] = $this->stockFilterParts($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $iddepo, $desde, $hasta);
+
+        $sql = "
+            SELECT COUNT(*)
+            FROM producto p
+            INNER JOIN gustos g ON g.idprodu = p.idprodu
+            " . $this->depSubquery($depDepo) . "
+            WHERE " . implode(' AND ', $where) . " {$stockWhere}
+        ";
+        $st = Db::pdo()->prepare($sql);
+        $st->execute($params);
+        return (int)$st->fetchColumn();
+    }
+
+    private function stockFilterParts(string $q, int $codepar, string $stockFilter, int $codrub, int $codsub, int $codprove, ?int $iddepo, string $desde, string $hasta): array
+    {
         $params = [];
         $where = ['p.enweb = 1'];
 
@@ -56,35 +118,12 @@ final class StockRepo
             $params[':iddepo'] = $iddepo;
         }
 
-        $sql = "
-            SELECT p.idprodu, p.codprodu, p.produ, p.codprodup, p.precio, p.precomp, p.stocact, p.stocdep, p.codepar, p.enweb, p.observ, p.imagen,
-                   d.nomdepar, g.idcodgusto, g.nomgusto, g.codscan, g.discont,
-                   r.nomrub, s.nomsub, pv.razon AS nomprovee,
-                   dep.iddepo, dep.nomdepo,
-                   COALESCE(dep.stock, 0) AS stock_deposito,
-                   COALESCE(cv.total_vendido, 0) AS total_vendido
-            FROM producto p
-            INNER JOIN gustos g ON g.idprodu = p.idprodu
-            LEFT JOIN departa d ON d.codepar = p.codepar
-            LEFT JOIN rubros r ON r.codrub = p.codrub
-            LEFT JOIN subrubro s ON s.codsub = p.codsub
-            LEFT JOIN proveedo pv ON pv.codprove = p.codprove
-            LEFT JOIN (
-                SELECT sd.idcodgusto,
-                    ABS(COALESCE(SUM(
-                        CASE
-                            WHEN sc.iddepod = 6 THEN sd.canti
-                            WHEN sc.iddepoh = 6 THEN -sd.canti
-                            ELSE 0
-                        END
-                    ), 0)) AS total_vendido
-                FROM stockdet sd
-                INNER JOIN stockcab sc ON sc.idcabstock = sd.idstockcab
-                WHERE sd.idcodgusto > 0
-                  AND sc.fecha >= :desde
-                  AND sc.fecha < DATE_ADD(:hasta, INTERVAL 1 DAY)
-                GROUP BY sd.idcodgusto
-            ) cv ON cv.idcodgusto = g.idcodgusto
+        return [$where, $stockWhere, $depDepo, $params];
+    }
+
+    private function depSubquery(string $depDepo): string
+    {
+        return "
             LEFT JOIN (
                 SELECT ds.idcodgusto, ds.iddepo, d.nomdepo, ds.neto AS stock
                 FROM (
@@ -107,13 +146,7 @@ final class StockRepo
                 INNER JOIN deposito d ON d.iddepo = ds.iddepo AND d.marca = 2
                 WHERE ds.neto > 0 {$depDepo}
             ) dep ON dep.idcodgusto = g.idcodgusto
-            WHERE " . implode(' AND ', $where) . " {$stockWhere}
-            ORDER BY p.produ ASC, g.nomgusto ASC, dep.nomdepo ASC
-            LIMIT {$limit}
         ";
-        $st = Db::pdo()->prepare($sql);
-        $st->execute($params);
-        return $st->fetchAll();
     }
 
     public function productoDetalle(int $idprodu): ?array
@@ -191,6 +224,7 @@ final class StockRepo
             $where .= ' AND sd.idcodgusto = :idg';
             $params[':idg'] = $idcodgusto;
         }
+        $where .= " AND (sc.tipo_movimiento IS NULL OR sc.tipo_movimiento NOT IN ('compra', 'devolucion_compra', 'venta', 'devolucion_venta'))";
 
         $sql = "
             SELECT sd.*, sc.fecha AS mov_fecha, sc.iddepoh, sc.iddepod,
