@@ -32,7 +32,7 @@ final class StockRepo
             LEFT JOIN departa d ON d.codepar = p.codepar
             LEFT JOIN rubros r ON r.codrub = p.codrub
             LEFT JOIN subrubro s ON s.codsub = p.codsub
-            LEFT JOIN proveedo pv ON pv.codprove = p.codprove
+            LEFT JOIN proveedo pv ON pv.idprovee = p.codprove
             LEFT JOIN (
                 SELECT sd.idcodgusto,
                     ABS(COALESCE(SUM(
@@ -658,9 +658,9 @@ final class StockRepo
     public function grillaProveedores(): array
     {
         $st = Db::pdo()->query("
-            SELECT DISTINCT CAST(pv.codprove AS CHAR) AS codprove, pv.razon AS nomprovee
+            SELECT DISTINCT pv.idprovee AS codprove, pv.razon AS nomprovee
             FROM producto p
-            INNER JOIN proveedo pv ON pv.codprove = p.codprove
+            INNER JOIN proveedo pv ON pv.idprovee = p.codprove
             WHERE p.enweb = 1 AND p.codprove IS NOT NULL AND p.codprove != ''
             ORDER BY pv.razon ASC
         ");
@@ -715,7 +715,7 @@ final class StockRepo
                    (SELECT MIN(g.codscan) FROM gustos g WHERE g.idprodu = p.idprodu AND g.codscan IS NOT NULL AND g.codscan != '' LIMIT 1) AS codscan,
                    COALESCE(v.vendidos, 0) AS vendidos
             FROM producto p
-            LEFT JOIN proveedo pv ON pv.codprove = p.codprove
+            LEFT JOIN proveedo pv ON pv.idprovee = p.codprove
             {$ventasJoin}
             WHERE " . implode(' AND ', $where) . "
             ORDER BY v.vendidos DESC, p.produ ASC

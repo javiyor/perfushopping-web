@@ -12,7 +12,7 @@ final class ProveedorRepo
         $st = Db::pdo()->query('
             SELECT p.*, COUNT(pr.idprodu) AS product_count
             FROM proveedo p
-            LEFT JOIN producto pr ON pr.codprove = p.codprove
+            LEFT JOIN producto pr ON pr.codprove = p.idprovee
             GROUP BY p.idprovee
             ORDER BY p.razon ASC
         ');
@@ -62,7 +62,7 @@ final class ProveedorRepo
 
     public function delete(int $idprovee): void
     {
-        $st = Db::pdo()->prepare('UPDATE producto SET codprove = NULL WHERE codprove = (SELECT codprove FROM proveedo WHERE idprovee = :i)');
+        $st = Db::pdo()->prepare('UPDATE producto SET codprove = NULL WHERE codprove = (SELECT idprovee FROM proveedo WHERE idprovee = :i)');
         $st->execute([':i' => $idprovee]);
         $st = Db::pdo()->prepare('DELETE FROM proveedo WHERE idprovee = :i LIMIT 1');
         $st->execute([':i' => $idprovee]);
@@ -72,7 +72,7 @@ final class ProveedorRepo
     {
         $st = Db::pdo()->prepare('
             SELECT COUNT(*) FROM producto pr
-            INNER JOIN proveedo p ON p.codprove = pr.codprove
+            INNER JOIN proveedo p ON p.idprovee = pr.codprove
             WHERE p.idprovee = :i
         ');
         $st->execute([':i' => $idprovee]);

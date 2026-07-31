@@ -383,7 +383,7 @@ final class AdminProductRepo
             FROM producto p
             LEFT JOIN subrubro s ON s.codsub = p.codsub
             LEFT JOIN rubros r ON r.codrub = p.codrub
-            LEFT JOIN proveedo pv ON pv.codprove = p.codprove
+            LEFT JOIN proveedo pv ON pv.idprovee = p.codprove
         ';
 
         $stCount = $pdo->prepare('SELECT COUNT(*) ' . $from . $whereClause);

@@ -95,7 +95,7 @@ final class NotaPedidoRepo
         $q = trim($q);
         if ($q === '') return [];
         $st = Db::pdo()->prepare('
-            SELECT codprove, razon, cuit, direccion, telefono, mail, cond_iva
+            SELECT idprovee, codprove, razon, cuit
             FROM proveedo
             WHERE razon LIKE :q OR cuit LIKE :q OR codprove LIKE :q
             LIMIT ' . max(1, min(20, $limit))

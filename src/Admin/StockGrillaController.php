@@ -82,13 +82,13 @@ final class StockGrillaController
             $proveedorId = null;
 
             if ($codprove !== '') {
-                // Look up supplier name
-                $pv = Db::pdo()->prepare('SELECT CAST(codprove AS CHAR) AS codprove, razon AS nomprovee FROM proveedo WHERE codprove = :cp LIMIT 1');
+                // Look up supplier name (producto.codprove = proveedo.idprovee)
+                $pv = Db::pdo()->prepare('SELECT razon AS nomprovee FROM proveedo WHERE idprovee = :cp LIMIT 1');
                 $pv->execute([':cp' => $codprove]);
                 $pRow = $pv->fetch();
                 if ($pRow) {
                     $proveedorNombre = $pRow['nomprovee'];
-                    $proveedorId = trim((string)($pRow['codprove'] ?? ''));
+                    $proveedorId = $codprove;
                 }
             }
 

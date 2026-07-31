@@ -88,7 +88,7 @@ $ivaOptions = $ivaOptions ?? [];
                             <select class="form-select form-select-sm" name="codprove">
                                 <option value="">— Sin proveedor —</option>
                                 <?php foreach ($proveedores as $prov): ?>
-                                    <option value="<?= htmlspecialchars((string)($prov['codprove'] ?? '')) ?>"><?= htmlspecialchars((string)($prov['razon'] ?? '')) ?></option>
+                                    <option value="<?= (int)($prov['idprovee'] ?? 0) ?>"><?= htmlspecialchars((string)($prov['razon'] ?? '')) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>

@@ -153,7 +153,7 @@ provInput.addEventListener('input', function() {
                     div.innerHTML = '<strong>' + esc(pv.razon) + '</strong> <span class="text-muted">' + esc(pv.cuit || '') + '</span>';
                     div.addEventListener('mousedown', function(e) {
                         e.preventDefault();
-                        document.getElementById('proveedorId').value = pv.codprove || 0;
+                        document.getElementById('proveedorId').value = pv.idprovee || 0;
                         document.getElementById('proveedorNombre').value = pv.razon || '';
                         provInput.value = pv.razon || '';
                         const info = document.getElementById('proveedorInfo');

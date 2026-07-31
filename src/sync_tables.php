@@ -141,6 +141,59 @@ function syncProducto(PDO $origin, PDO $dest, int $chunkSize, callable $log): vo
     $log("[producto] OK — {$synced} registros (enweb intacto)");
 }
 
+// ── Helper: sync proveedo preservando idprovee del origen ──
+// producto.codprove apunta a proveedo.idprovee, así que el id debe quedar
+// igual al origen. Se usa INSERT...ON DUPLICATE KEY UPDATE (match por idprovee)
+// en vez de REPLACE para no resetear columnas extra que existan en el destino
+// (ej. datos cargados desde el panel admin) ni borrar registros.
+function syncProveedo(PDO $origin, PDO $dest, int $chunkSize, callable $log): void
+{
+    $table = 'proveedo';
+    $colsStmt = $origin->query("
+        SELECT COLUMN_NAME FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '{$table}'
+        ORDER BY ORDINAL_POSITION
+    ");
+    $cols = $colsStmt ? array_map(fn($r) => $r['COLUMN_NAME'], $colsStmt->fetchAll(PDO::FETCH_ASSOC)) : [];
+    if (!$cols) {
+        $log("[{$table}] La tabla no existe en el ORIGEN o no tiene columnas");
+        return;
+    }
+
+    $total = (int)$origin->query("SELECT COUNT(*) FROM {$table}")->fetchColumn();
+    $log("[{$table}] {$total} registros a sincronizar (match por idprovee, sin borrar datos del destino)");
+
+    $insertCols = implode(', ', $cols);
+    $placeholders = implode(', ', array_map(fn($c) => ":{$c}", $cols));
+    $updates = implode(', ', array_map(fn($c) => "{$c} = VALUES({$c})", $cols));
+    $stmt = $dest->prepare("INSERT INTO {$table} ({$insertCols}) VALUES ({$placeholders}) ON DUPLICATE KEY UPDATE {$updates}");
+
+    $offset = 0;
+    $synced = 0;
+    while ($offset < $total) {
+        $rows = $origin->query("SELECT * FROM {$table} LIMIT {$chunkSize} OFFSET {$offset}")->fetchAll(PDO::FETCH_ASSOC);
+        if (!$rows) break;
+
+        $dest->beginTransaction();
+        try {
+            foreach ($rows as $r) {
+                foreach ($cols as $c) {
+                    $stmt->bindValue(":{$c}", $r[$c] ?? null);
+                }
+                $stmt->execute();
+                $synced++;
+            }
+            $dest->commit();
+        } catch (\Throwable $e) {
+            $dest->rollBack();
+            throw $e;
+        }
+        $offset += $chunkSize;
+        $log("[{$table}] {$synced}/{$total}");
+    }
+    $log("[{$table}] OK — {$synced} registros");
+}
+
 // ── Ejecutar ──
 $log("=== INICIO SINCRONIZACIÓN ===");
 $log("Origen: {$originCfg['host']}/{$originCfg['db']} → Destino: local");
@@ -151,6 +204,7 @@ try {
     $dest->commit();
 
     syncProducto($origin, $dest, $chunkSize, $log);
+    syncProveedo($origin, $dest, $chunkSize, $log);
     syncReplace($origin, $dest, 'gustos', ['idcodgusto', 'idprodu', 'nomgusto', 'codscan', 'precio', 'precio1', 'stockact', 'stockreal', 'discont', 'peso', 'fecbaja', 'fecha', 'codigogusto', 'descripcion'], $chunkSize, $log);
     syncReplace($origin, $dest, 'stockcab', ['idcabstock', 'iddepoh', 'iddepod', 'fecha', 'observ'], $chunkSize, $log);
     syncReplace($origin, $dest, 'stockdet', ['idstockdet', 'idstockcab', 'idprodu', 'idcodgusto', 'canti'], $chunkSize, $log);
