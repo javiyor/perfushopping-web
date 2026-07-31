@@ -15,6 +15,11 @@ final class StockRepo
 
         [$where, $stockWhere, $depDepo, $params] = $this->stockFilterParts($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $iddepo, $desde, $hasta);
 
+        if ($desde === '') $desde = date('Y-m-01', strtotime('first day of last month'));
+        if ($hasta === '') $hasta = date('Y-m-t', strtotime('last day of last month'));
+        $params[':desde'] = $desde;
+        $params[':hasta'] = $hasta;
+
         $sql = "
             SELECT p.idprodu, p.codprodu, p.produ, p.codprodup, p.precio, p.precomp, p.stocact, p.stocdep, p.codepar, p.enweb, p.observ, p.imagen,
                    d.nomdepar, g.idcodgusto, g.nomgusto, g.codscan, g.discont,
@@ -74,11 +79,6 @@ final class StockRepo
     {
         $params = [];
         $where = ['p.enweb = 1'];
-
-        if ($desde === '') $desde = date('Y-m-01', strtotime('first day of last month'));
-        if ($hasta === '') $hasta = date('Y-m-t', strtotime('last day of last month'));
-        $params[':desde'] = $desde;
-        $params[':hasta'] = $hasta;
 
         if ($q !== '') {
             $where[] = '(p.produ LIKE :like OR p.codprodu LIKE :like OR p.codprodup LIKE :like OR g.nomgusto LIKE :like2 OR g.codscan LIKE :like3)';
