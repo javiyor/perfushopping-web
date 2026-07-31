@@ -6,10 +6,12 @@ $stockFilter = (string)($stockFilter ?? '');
 $codrub = (int)($codrub ?? 0);
 $codsub = (int)($codsub ?? 0);
 $codprove = (int)($codprove ?? 0);
+$desde = (string)($desde ?? '');
+$hasta = (string)($hasta ?? '');
 $rubros = $rubros ?? [];
 $subrubros = $subrubros ?? [];
 $proveedores = $proveedores ?? [];
-$stockFilters = ['' => 'Todos', 'sin_stock' => 'Sin stock', 'bajo_stock' => 'Stock bajo (≤5)', 'con_stock' => 'Con stock (>5)'];
+$stockFilters = ['' => 'Todos', 'sin_stock' => 'Sin stock', 'bajo_stock' => 'Stock bajo (≤5)', 'con_stock' => 'Con stock'];
 $isSuper = ($adminUser['rol'] ?? '') === 'superadmin';
 ?>
 <div class="d-flex justify-content-between align-items-start mb-3">
@@ -68,12 +70,18 @@ $isSuper = ($adminUser['rol'] ?? '') === 'superadmin';
                     <?php endforeach; ?>
                 </select>
             </div>
+            <div class="col-lg-2">
+                <input type="date" class="form-control form-control-sm" name="desde" value="<?= htmlspecialchars($desde) ?>" />
+            </div>
+            <div class="col-lg-2">
+                <input type="date" class="form-control form-control-sm" name="hasta" value="<?= htmlspecialchars($hasta) ?>" />
+            </div>
             <div class="col-lg-1">
                 <button class="btn btn-accent btn-sm w-100" type="submit"><i class="bi bi-search"></i></button>
             </div>
             <div class="col-lg-1">
                 <?php if ($q !== '' || $codprove > 0 || $codsub > 0 || $codrub > 0 || $stockFilter !== ''): ?>
-                    <a class="btn btn-outline-secondary btn-sm w-100" href="/admin/stock">Limpiar</a>
+                    <a class="btn btn-outline-secondary btn-sm w-100" href="/admin/stock?desde=<?= urlencode($desde) ?>&hasta=<?= urlencode($hasta) ?>">Limpiar</a>
                 <?php endif; ?>
             </div>
         </form>
@@ -88,6 +96,7 @@ $isSuper = ($adminUser['rol'] ?? '') === 'superadmin';
                     <th style="width:40px"></th>
                     <th>Producto</th>
                     <th>Variedad</th>
+                    <th>Sucursal</th>
                     <th>Código</th>
                     <th>Proveedor</th>
                     <th>Marca</th>
@@ -95,7 +104,6 @@ $isSuper = ($adminUser['rol'] ?? '') === 'superadmin';
                     <th class="text-end">Precio</th>
                     <th class="text-end">Costo</th>
                     <th class="text-center">Stock</th>
-                    <th class="text-center">Stock x dep.</th>
                     <th class="text-center">Ventas</th>
                     <th class="text-center" style="width:60px">Pedir</th>
                     <?php if ($isSuper): ?>
@@ -108,8 +116,19 @@ $isSuper = ($adminUser['rol'] ?? '') === 'superadmin';
                 <?php if (!$list): ?>
                     <tr><td colspan="<?= $isSuper ? 15 : 14 ?>" class="text-muted text-center">Sin productos.</td></tr>
                 <?php else: ?>
-                        <?php foreach ($list as $p): ?>
-                        <?php $stock = (int)($p['stock_variante'] ?? 0); ?>
+                    <?php
+                    $prevId = -1;
+                    $totalStockValor = 0.0;
+                    $totalVendidoValor = 0.0;
+                    $prevVentaId = -1;
+                    ?>
+                    <?php foreach ($list as $p): ?>
+                        <?php $gid = (int)($p['idcodgusto'] ?? 0); $isFirst = ($gid !== $prevId); $prevId = $gid; ?>
+                        <?php $stock = (int)($p['stock_deposito'] ?? 0); ?>
+                        <?php
+                        $totalStockValor += $stock * (float)($p['precomp'] ?? 0);
+                        if ($gid !== $prevVentaId) { $totalVendidoValor += (float)($p['total_vendido'] ?? 0) * (float)($p['precomp'] ?? 0); $prevVentaId = $gid; }
+                        ?>
                         <tr>
                             <td>
                                 <?php if ($p['imagen'] ?? ''): ?>
@@ -120,6 +139,7 @@ $isSuper = ($adminUser['rol'] ?? '') === 'superadmin';
                             </td>
                             <td><strong><?= htmlspecialchars((string)($p['produ'] ?? '-')) ?></strong></td>
                             <td class="small"><?= htmlspecialchars((string)($p['nomgusto'] ?? '-')) ?></td>
+                            <td class="small text-muted"><?= htmlspecialchars((string)($p['nomdepo'] ?? '-')) ?></td>
                             <td class="small text-muted"><?= htmlspecialchars((string)($p['codscan'] ?: $p['codprodu'] ?? '')) ?></td>
                             <td class="small"><?= htmlspecialchars((string)($p['nomprovee'] ?? '-')) ?></td>
                             <td class="small"><?= htmlspecialchars((string)($p['nomsub'] ?? '-')) ?></td>
@@ -135,22 +155,25 @@ $isSuper = ($adminUser['rol'] ?? '') === 'superadmin';
                                     <span class="badge bg-success"><?= $stock ?></span>
                                 <?php endif; ?>
                             </td>
-                            <td class="small text-muted" style="max-width:200px;white-space:normal;word-break:break-word"><?= htmlspecialchars((string)($p['stock_depositos'] ?? '')) ?: '-' ?></td>
-                            <td class="text-center"><?= (int)($p['total_vendido'] ?? 0) ?></td>
+                            <td class="text-center"><?= $isFirst ? (int)($p['total_vendido'] ?? 0) : '' ?></td>
                             <td class="text-center">
-                                <input type="number" class="form-control form-control-sm np-qty" style="width:55px;text-align:center" min="0" value="0"
-                                    data-idprodu="<?= (int)($p['idprodu'] ?? 0) ?>"
-                                    data-idcodgusto="<?= (int)($p['idcodgusto'] ?? 0) ?>"
-                                    data-producto="<?= htmlspecialchars((string)($p['produ'] ?? ''), ENT_QUOTES) ?>"
-                                    data-variedad="<?= htmlspecialchars((string)($p['nomgusto'] ?? ''), ENT_QUOTES) ?>"
-                                    data-codscan="<?= htmlspecialchars((string)($p['codscan'] ?? ''), ENT_QUOTES) ?>"
-                                    data-codprodup="<?= htmlspecialchars((string)($p['codprodup'] ?? ''), ENT_QUOTES) ?>" />
+                                <?php if ($isFirst): ?>
+                                    <input type="number" class="form-control form-control-sm np-qty" style="width:55px;text-align:center" min="0" value="0"
+                                        data-idprodu="<?= (int)($p['idprodu'] ?? 0) ?>"
+                                        data-idcodgusto="<?= $gid ?>"
+                                        data-producto="<?= htmlspecialchars((string)($p['produ'] ?? ''), ENT_QUOTES) ?>"
+                                        data-variedad="<?= htmlspecialchars((string)($p['nomgusto'] ?? ''), ENT_QUOTES) ?>"
+                                        data-codscan="<?= htmlspecialchars((string)($p['codscan'] ?? ''), ENT_QUOTES) ?>"
+                                        data-codprodup="<?= htmlspecialchars((string)($p['codprodup'] ?? ''), ENT_QUOTES) ?>" />
+                                <?php endif; ?>
                             </td>
                             <?php if ($isSuper): ?>
                                 <td class="text-center">
-                                    <input type="checkbox" class="form-check-input np-disc" style="cursor:pointer"
-                                        data-idcodgusto="<?= (int)($p['idcodgusto'] ?? 0) ?>"
-                                        <?= (int)($p['discont'] ?? 0) === 1 ? 'checked' : '' ?> />
+                                    <?php if ($isFirst): ?>
+                                        <input type="checkbox" class="form-check-input np-disc" style="cursor:pointer"
+                                            data-idcodgusto="<?= $gid ?>"
+                                            <?= (int)($p['discont'] ?? 0) === 1 ? 'checked' : '' ?> />
+                                    <?php endif; ?>
                                 </td>
                             <?php endif; ?>
                             <td><a class="btn btn-sm btn-outline-secondary" href="/admin/stock/<?= (int)($p['idprodu'] ?? 0) ?>"><i class="bi bi-eye"></i></a></td>
@@ -158,6 +181,20 @@ $isSuper = ($adminUser['rol'] ?? '') === 'superadmin';
                     <?php endforeach; ?>
                 <?php endif; ?>
             </tbody>
+            <?php if ($list): ?>
+                <tfoot class="table-light">
+                    <tr>
+                        <td colspan="10" class="text-end fw-bold">Total</td>
+                        <td class="text-center fw-bold">$<?= number_format($totalStockValor, 2, ',', '.') ?></td>
+                        <td class="text-center fw-bold">$<?= number_format($totalVendidoValor, 2, ',', '.') ?></td>
+                        <td></td>
+                        <?php if ($isSuper): ?>
+                            <td></td>
+                        <?php endif; ?>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            <?php endif; ?>
         </table>
     </div>
 </div>

@@ -7,11 +7,16 @@ use Perfushopping\Web\Infra\Db;
 
 final class StockRepo
 {
-    public function listarStock(string $q = '', int $codepar = 0, string $stockFilter = '', int $codrub = 0, int $codsub = 0, int $codprove = 0, int $limit = 80, ?int $iddepo = null): array
+    public function listarStock(string $q = '', int $codepar = 0, string $stockFilter = '', int $codrub = 0, int $codsub = 0, int $codprove = 0, int $limit = 80, ?int $iddepo = null, string $desde = '', string $hasta = ''): array
     {
         $limit = max(1, min(200, $limit));
         $params = [];
         $where = ['p.enweb = 1'];
+
+        if ($desde === '') $desde = date('Y-m-01', strtotime('first day of last month'));
+        if ($hasta === '') $hasta = date('Y-m-t', strtotime('last day of last month'));
+        $params[':desde'] = $desde;
+        $params[':hasta'] = $hasta;
 
         if ($q !== '') {
             $where[] = '(p.produ LIKE :like OR p.codprodu LIKE :like OR p.codprodup LIKE :like OR g.nomgusto LIKE :like2 OR g.codscan LIKE :like3)';
@@ -36,79 +41,74 @@ final class StockRepo
             $params[':codprove'] = $codprove;
         }
 
-        $stockSel = 'COALESCE(dep_dist.stock_variante, 0) AS stock_variante';
         $stockWhere = '';
         if ($stockFilter === 'sin_stock') {
-            $stockWhere = 'AND (dep_dist.stock_variante IS NULL OR dep_dist.stock_variante <= 0)';
+            $stockWhere = 'AND dep.idcodgusto IS NULL';
         } elseif ($stockFilter === 'bajo_stock') {
-            $stockWhere = 'AND (dep_dist.stock_variante IS NOT NULL AND dep_dist.stock_variante > 0 AND dep_dist.stock_variante <= 5)';
+            $stockWhere = 'AND dep.stock > 0 AND dep.stock <= 5';
         } elseif ($stockFilter === 'con_stock') {
-            $stockWhere = 'AND (dep_dist.stock_variante IS NOT NULL AND dep_dist.stock_variante > 5)';
+            $stockWhere = 'AND dep.stock > 0';
         }
 
-        $depJoin = '';
-        $depSel = '0 AS stock_deposito';
+        $depDepo = '';
         if ($iddepo) {
-            $depJoin = "LEFT JOIN stock s ON s.idcodgusto = g.idcodgusto AND s.iddepo = :iddepo";
+            $depDepo = 'AND ds.iddepo = :iddepo';
             $params[':iddepo'] = $iddepo;
-            $depSel = 'COALESCE(s.stock, 0) AS stock_deposito';
         }
 
         $sql = "
             SELECT p.idprodu, p.codprodu, p.produ, p.codprodup, p.precio, p.precomp, p.stocact, p.stocdep, p.codepar, p.enweb, p.observ, p.imagen,
                    d.nomdepar, g.idcodgusto, g.nomgusto, g.codscan, g.discont,
                    r.nomrub, s.nomsub, pv.razon AS nomprovee,
-                   {$stockSel},
-                   {$depSel},
-                   COALESCE(cv.total_vendido, 0) AS total_vendido,
-                   dep_dist.stock_depositos
+                   dep.iddepo, dep.nomdepo,
+                   COALESCE(dep.stock, 0) AS stock_deposito,
+                   COALESCE(cv.total_vendido, 0) AS total_vendido
             FROM producto p
             INNER JOIN gustos g ON g.idprodu = p.idprodu
             LEFT JOIN departa d ON d.codepar = p.codepar
             LEFT JOIN rubros r ON r.codrub = p.codrub
             LEFT JOIN subrubro s ON s.codsub = p.codsub
             LEFT JOIN proveedo pv ON pv.codprove = p.codprove
-            {$depJoin}
             LEFT JOIN (
                 SELECT sd.idcodgusto,
-                    COALESCE(SUM(
+                    ABS(COALESCE(SUM(
                         CASE
                             WHEN sc.iddepod = 6 THEN sd.canti
                             WHEN sc.iddepoh = 6 THEN -sd.canti
                             ELSE 0
                         END
-                    ), 0) AS total_vendido
+                    ), 0)) AS total_vendido
                 FROM stockdet sd
                 INNER JOIN stockcab sc ON sc.idcabstock = sd.idstockcab
                 WHERE sd.idcodgusto > 0
+                  AND sc.fecha >= :desde
+                  AND sc.fecha < DATE_ADD(:hasta, INTERVAL 1 DAY)
                 GROUP BY sd.idcodgusto
             ) cv ON cv.idcodgusto = g.idcodgusto
             LEFT JOIN (
-              SELECT ds.idcodgusto,
-                SUM(ds.neto) AS stock_variante,
-                GROUP_CONCAT(CONCAT(d.nomdepo, ': ', ds.neto) ORDER BY d.nomdepo SEPARATOR ' | ') AS stock_depositos
-              FROM (
-                SELECT t.idcodgusto, t.iddepo, SUM(t.neto) AS neto
+                SELECT ds.idcodgusto, ds.iddepo, d.nomdepo, ds.neto AS stock
                 FROM (
-                  SELECT sd.idcodgusto, sc.iddepoh AS iddepo, SUM(sd.canti) AS neto
-                  FROM stockdet sd
-                  INNER JOIN stockcab sc ON sc.idcabstock = sd.idstockcab
-                  WHERE sc.iddepoh IS NOT NULL AND sd.idcodgusto > 0
-                  GROUP BY sd.idcodgusto, sc.iddepoh
-                  UNION ALL
-                  SELECT sd.idcodgusto, sc.iddepod AS iddepo, -SUM(sd.canti) AS neto
-                  FROM stockdet sd
-                  INNER JOIN stockcab sc ON sc.idcabstock = sd.idstockcab
-                  WHERE sc.iddepod IS NOT NULL AND sd.idcodgusto > 0
-                  GROUP BY sd.idcodgusto, sc.iddepod
-                ) t
-                GROUP BY t.idcodgusto, t.iddepo
-              ) ds
-              INNER JOIN deposito d ON d.iddepo = ds.iddepo AND d.marca = 2
-              GROUP BY ds.idcodgusto
-            ) dep_dist ON dep_dist.idcodgusto = g.idcodgusto
+                    SELECT t.idcodgusto, t.iddepo, SUM(t.neto) AS neto
+                    FROM (
+                        SELECT sd.idcodgusto, sc.iddepoh AS iddepo, SUM(sd.canti) AS neto
+                        FROM stockdet sd
+                        INNER JOIN stockcab sc ON sc.idcabstock = sd.idstockcab
+                        WHERE sc.iddepoh IS NOT NULL AND sd.idcodgusto > 0
+                        GROUP BY sd.idcodgusto, sc.iddepoh
+                        UNION ALL
+                        SELECT sd.idcodgusto, sc.iddepod AS iddepo, -SUM(sd.canti) AS neto
+                        FROM stockdet sd
+                        INNER JOIN stockcab sc ON sc.idcabstock = sd.idstockcab
+                        WHERE sc.iddepod IS NOT NULL AND sd.idcodgusto > 0
+                        GROUP BY sd.idcodgusto, sc.iddepod
+                    ) t
+                    GROUP BY t.idcodgusto, t.iddepo
+                ) ds
+                INNER JOIN deposito d ON d.iddepo = ds.iddepo AND d.marca = 2
+                WHERE ds.neto > 0 {$depDepo}
+            ) dep ON dep.idcodgusto = g.idcodgusto
             WHERE " . implode(' AND ', $where) . " {$stockWhere}
-            ORDER BY p.produ ASC, g.nomgusto ASC
+            ORDER BY p.produ ASC, g.nomgusto ASC, dep.nomdepo ASC
             LIMIT {$limit}
         ";
         $st = Db::pdo()->prepare($sql);

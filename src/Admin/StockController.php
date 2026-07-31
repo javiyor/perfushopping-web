@@ -23,7 +23,11 @@ final class StockController
         $codrub = (int)($_GET['codrub'] ?? 0);
         $codsub = (int)($_GET['codsub'] ?? 0);
         $codprove = (int)($_GET['codprove'] ?? 0);
-        $list = $repo->listarStock($q, $codepar, $stockFilter, $codrub, $codsub, $codprove);
+        $desde = trim((string)($_GET['desde'] ?? ''));
+        $hasta = trim((string)($_GET['hasta'] ?? ''));
+        if ($desde === '') $desde = date('Y-m-01', strtotime('first day of last month'));
+        if ($hasta === '') $hasta = date('Y-m-t', strtotime('last day of last month'));
+        $list = $repo->listarStock($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, 80, null, $desde, $hasta);
         $rubros = $repo->grillaRubros();
         $subrubros = $repo->grillaSubrubros();
         $proveedores = $repo->grillaProveedores();
@@ -37,6 +41,8 @@ final class StockController
             'codrub' => $codrub,
             'codsub' => $codsub,
             'codprove' => $codprove,
+            'desde' => $desde,
+            'hasta' => $hasta,
             'rubros' => $rubros,
             'subrubros' => $subrubros,
             'proveedores' => $proveedores,
@@ -57,7 +63,11 @@ final class StockController
         $codrub = (int)($_GET['codrub'] ?? 0);
         $codsub = (int)($_GET['codsub'] ?? 0);
         $codprove = (int)($_GET['codprove'] ?? 0);
-        $list = $repo->listarStock($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, 1000);
+        $desde = trim((string)($_GET['desde'] ?? ''));
+        $hasta = trim((string)($_GET['hasta'] ?? ''));
+        if ($desde === '') $desde = date('Y-m-01', strtotime('first day of last month'));
+        if ($hasta === '') $hasta = date('Y-m-t', strtotime('last day of last month'));
+        $list = $repo->listarStock($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, 1000, null, $desde, $hasta);
 
         header('Content-Type: text/csv; charset=utf-8');
         header('Content-Disposition: attachment; filename="stock.csv"');
@@ -66,7 +76,7 @@ final class StockController
         fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
 
         fputcsv($out, [
-            'Producto', 'Variedad', 'Código', 'Cód. barra', 'Cód. proveedor',
+            'Producto', 'Variedad', 'Sucursal', 'Código', 'Cód. barra', 'Cód. proveedor',
             'Proveedor', 'Marca', 'Categoría',
             'Precio', 'Costo', 'Stock', 'Ventas',
         ]);
@@ -75,6 +85,7 @@ final class StockController
             fputcsv($out, [
                 $p['produ'] ?? '',
                 $p['nomgusto'] ?? '',
+                $p['nomdepo'] ?? '',
                 $p['codprodu'] ?? '',
                 $p['codscan'] ?? '',
                 $p['codprodup'] ?? '',
@@ -83,7 +94,7 @@ final class StockController
                 $p['nomrub'] ?? '',
                 number_format((float)($p['precio'] ?? 0), 2, ',', '.'),
                 number_format((float)($p['precomp'] ?? 0), 2, ',', '.'),
-                (int)($p['stock_variante'] ?? 0),
+                (int)($p['stock_deposito'] ?? 0),
                 (int)($p['total_vendido'] ?? 0),
             ]);
         }
