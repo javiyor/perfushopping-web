@@ -145,123 +145,67 @@ $qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $
                     <tr><td colspan="<?= $isSuper ? 15 : 14 ?>" class="text-muted text-center">Sin productos.</td></tr>
                 <?php else: ?>
                     <?php
+                    $prevId = -1;
                     $totalStockValor = 0.0;
                     $totalVendidoValor = 0.0;
                     $prevVentaId = -1;
-                    foreach ($list as $p) {
-                        $totalStockValor += (int)($p['stock_deposito'] ?? 0) * (float)($p['precomp'] ?? 0);
-                        $gid = (int)($p['idcodgusto'] ?? 0);
-                        if ($gid !== $prevVentaId) {
-                            $totalVendidoValor += (float)($p['total_vendido'] ?? 0) * (float)($p['precomp'] ?? 0);
-                            $prevVentaId = $gid;
-                        }
-                    }
-                    $grupos = [];
-                    foreach ($list as $p) {
-                        $idp = (int)$p['idprodu'];
-                        $gid = (int)($p['idcodgusto'] ?? 0);
-                        if (!isset($grupos[$idp])) $grupos[$idp] = ['producto' => $p, 'variantes' => []];
-                        if (!isset($grupos[$idp]['variantes'][$gid])) $grupos[$idp]['variantes'][$gid] = ['variante' => $p, 'depositos' => []];
-                        $grupos[$idp]['variantes'][$gid]['depositos'][] = $p;
-                    }
-                    $tdsVacios = static function (int $n): void {
-                        for ($i = 0; $i < $n; $i++) echo '<td></td>';
-                    };
                     ?>
-                    <?php foreach ($grupos as $grp): ?>
+                    <?php foreach ($list as $p): ?>
+                        <?php $gid = (int)($p['idcodgusto'] ?? 0); $isFirst = ($gid !== $prevId); $prevId = $gid; ?>
+                        <?php $stock = (int)($p['stock_deposito'] ?? 0); ?>
                         <?php
-                        $p = $grp['producto'];
-                        $varcount = count($grp['variantes']);
-                        $rowsProducto = [];
-                        foreach ($grp['variantes'] as $v) {
-                            $depositos = array_values(array_filter($v['depositos'], static fn($d) => ($d['iddepo'] ?? null) !== null));
-                            $rowsProducto[] = ['tipo' => 'variante', 'v' => $v, 'depositos' => $depositos];
-                            foreach ($depositos as $d) $rowsProducto[] = ['tipo' => 'deposito', 'd' => $d];
-                        }
-                        $totalRows = count($rowsProducto);
-                        $idx = 0;
-                        $vi = 0;
+                        $totalStockValor += $stock * (float)($p['precomp'] ?? 0);
+                        if ($gid !== $prevVentaId) { $totalVendidoValor += (float)($p['total_vendido'] ?? 0) * (float)($p['precomp'] ?? 0); $prevVentaId = $gid; }
                         ?>
-                        <?php foreach ($rowsProducto as $row): ?>
-                            <?php
-                            $idx++;
-                            $vi += ($row['tipo'] === 'variante') ? 1 : 0;
-                            $isLast = ($idx === $totalRows);
-                            $isHeader = ($row['tipo'] === 'variante');
-                            $isFirstVariant = ($isHeader && $vi === 1);
-                            $border = $isLast ? 'border-bottom:2px solid #6c757d' : ($isHeader ? 'border-bottom:1px dotted #adb5bd' : '');
-                            ?>
-                            <tr style="<?= $border ?>">
-                            <?php if ($isHeader): ?>
-                                <?php
-                                $v = $row['v'];
-                                $gid = (int)($v['variante']['idcodgusto'] ?? 0);
-                                $vTotal = 0;
-                                foreach ($row['depositos'] as $d) { $vTotal += (int)($d['stock_deposito'] ?? 0); }
-                                ?>
-                                <?php if ($isFirstVariant): ?>
-                                    <td rowspan="<?= $varcount ?>" style="vertical-align:middle">
-                                        <?php if ($p['imagen'] ?? ''): ?>
-                                            <img src="<?= htmlspecialchars(\Perfushopping\Web\Support\Format::uploadUrl((string)$p['imagen'])) ?>" style="width:32px;height:32px;object-fit:cover;border-radius:4px" alt="" />
-                                        <?php else: ?>
-                                            <span class="text-muted"><i class="bi bi-image"></i></span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td rowspan="<?= $varcount ?>" style="vertical-align:middle"><strong><?= htmlspecialchars((string)($p['produ'] ?? '-')) ?></strong></td>
-                                    <td class="fw-semibold"><?= htmlspecialchars((string)($v['variante']['nomgusto'] ?? '-')) ?></td>
-                                    <td></td>
-                                    <td rowspan="<?= $varcount ?>" style="vertical-align:middle" class="small text-muted"><?= htmlspecialchars((string)($v['variante']['codscan'] ?: $p['codprodu'] ?? '')) ?></td>
-                                    <td rowspan="<?= $varcount ?>" style="vertical-align:middle" class="small"><?= htmlspecialchars((string)($p['nomprovee'] ?? '-')) ?></td>
-                                    <td rowspan="<?= $varcount ?>" style="vertical-align:middle" class="small"><?= htmlspecialchars((string)($p['nomsub'] ?? '-')) ?></td>
-                                    <td rowspan="<?= $varcount ?>" style="vertical-align:middle" class="small"><?= htmlspecialchars((string)($p['nomrub'] ?? '-')) ?></td>
-                                    <td rowspan="<?= $varcount ?>" style="vertical-align:middle" class="text-end small">$<?= number_format((float)($p['precio'] ?? 0), 2, ',', '.') ?></td>
-                                    <td rowspan="<?= $varcount ?>" style="vertical-align:middle" class="text-end small text-muted">$<?= number_format((float)($p['precomp'] ?? 0), 2, ',', '.') ?></td>
+                        <tr>
+                            <td>
+                                <?php if ($p['imagen'] ?? ''): ?>
+                                    <img src="<?= htmlspecialchars(\Perfushopping\Web\Support\Format::uploadUrl((string)$p['imagen'])) ?>" style="width:32px;height:32px;object-fit:cover;border-radius:4px" alt="" />
                                 <?php else: ?>
-                                    <?php $tdsVacios(2); ?>
-                                    <td class="fw-semibold"><?= htmlspecialchars((string)($v['variante']['nomgusto'] ?? '-')) ?></td>
-                                    <td></td>
-                                    <?php $tdsVacios(6); ?>
+                                    <span class="text-muted"><i class="bi bi-image"></i></span>
                                 <?php endif; ?>
-                                <td class="text-center">
-                                    <?php if ($vTotal <= 0): ?>
-                                        <span class="badge bg-danger">0</span>
-                                    <?php elseif ($vTotal <= 5): ?>
-                                        <span class="badge bg-warning text-dark"><?= $vTotal ?></span>
-                                    <?php else: ?>
-                                        <span class="badge bg-success"><?= $vTotal ?></span>
-                                    <?php endif; ?>
-                                </td>
-                                <td class="text-center"><?= (int)($v['variante']['total_vendido'] ?? 0) ?></td>
-                                <td class="text-center">
+                            </td>
+                            <td><strong><?= htmlspecialchars((string)($p['produ'] ?? '-')) ?></strong></td>
+                            <td class="small"><?= htmlspecialchars((string)($p['nomgusto'] ?? '-')) ?></td>
+                            <td class="small text-muted"><?= htmlspecialchars((string)($p['nomdepo'] ?? '-')) ?></td>
+                            <td class="small text-muted"><?= htmlspecialchars((string)($p['codscan'] ?: $p['codprodu'] ?? '')) ?></td>
+                            <td class="small"><?= htmlspecialchars((string)($p['nomprovee'] ?? '-')) ?></td>
+                            <td class="small"><?= htmlspecialchars((string)($p['nomsub'] ?? '-')) ?></td>
+                            <td class="small"><?= htmlspecialchars((string)($p['nomrub'] ?? '-')) ?></td>
+                            <td class="text-end small">$<?= number_format((float)($p['precio'] ?? 0), 2, ',', '.') ?></td>
+                            <td class="text-end small text-muted">$<?= number_format((float)($p['precomp'] ?? 0), 2, ',', '.') ?></td>
+                            <td class="text-center">
+                                <?php if ($stock <= 0): ?>
+                                    <span class="badge bg-danger">0</span>
+                                <?php elseif ($stock <= 5): ?>
+                                    <span class="badge bg-warning text-dark"><?= $stock ?></span>
+                                <?php else: ?>
+                                    <span class="badge bg-success"><?= $stock ?></span>
+                                <?php endif; ?>
+                            </td>
+                            <td class="text-center"><?= $isFirst ? (int)($p['total_vendido'] ?? 0) : '' ?></td>
+                            <td class="text-center">
+                                <?php if ($isFirst): ?>
                                     <input type="number" class="form-control form-control-sm np-qty" style="width:55px;text-align:center" min="0" value="0"
                                         data-idprodu="<?= (int)($p['idprodu'] ?? 0) ?>"
                                         data-idcodgusto="<?= $gid ?>"
                                         data-producto="<?= htmlspecialchars((string)($p['produ'] ?? ''), ENT_QUOTES) ?>"
-                                        data-variedad="<?= htmlspecialchars((string)($v['variante']['nomgusto'] ?? ''), ENT_QUOTES) ?>"
-                                        data-codscan="<?= htmlspecialchars((string)($v['variante']['codscan'] ?? ''), ENT_QUOTES) ?>"
+                                        data-variedad="<?= htmlspecialchars((string)($p['nomgusto'] ?? ''), ENT_QUOTES) ?>"
+                                        data-codscan="<?= htmlspecialchars((string)($p['codscan'] ?? ''), ENT_QUOTES) ?>"
                                         data-codprodup="<?= htmlspecialchars((string)($p['codprodup'] ?? ''), ENT_QUOTES) ?>" />
-                                </td>
-                                <?php if ($isSuper): ?>
-                                <td class="text-center">
-                                    <input type="checkbox" class="form-check-input np-disc" style="cursor:pointer"
-                                        data-idcodgusto="<?= $gid ?>"
-                                        <?= (int)($v['variante']['discont'] ?? 0) === 1 ? 'checked' : '' ?> />
-                                </td>
                                 <?php endif; ?>
-                                <td><a class="btn btn-sm btn-outline-secondary" href="/admin/stock/<?= (int)($p['idprodu'] ?? 0) ?>"><i class="bi bi-eye"></i></a></td>
-                            <?php else: ?>
-                                <?php $tdsVacios(2); ?>
-                                <td></td>
-                                <td class="small text-muted" style="padding-left:24px"><span class="text-muted">&rarr;</span> <?= htmlspecialchars((string)($row['d']['nomdepo'] ?? '-')) ?></td>
-                                <?php $tdsVacios(6); ?>
-                                <td class="text-center small"><?= (int)($row['d']['stock_deposito'] ?? 0) ?></td>
-                                <td></td>
-                                <td></td>
-                                <?php if ($isSuper): ?><td></td><?php endif; ?>
-                                <td></td>
+                            </td>
+                            <?php if ($isSuper): ?>
+                                <td class="text-center">
+                                    <?php if ($isFirst): ?>
+                                        <input type="checkbox" class="form-check-input np-disc" style="cursor:pointer"
+                                            data-idcodgusto="<?= $gid ?>"
+                                            <?= (int)($p['discont'] ?? 0) === 1 ? 'checked' : '' ?> />
+                                    <?php endif; ?>
+                                </td>
                             <?php endif; ?>
-                            </tr>
-                        <?php endforeach; ?>
+                            <td><a class="btn btn-sm btn-outline-secondary" href="/admin/stock/<?= (int)($p['idprodu'] ?? 0) ?>"><i class="bi bi-eye"></i></a></td>
+                        </tr>
                     <?php endforeach; ?>
                 <?php endif; ?>
             </tbody>
