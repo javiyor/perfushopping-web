@@ -157,7 +157,7 @@ $qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $
                         $totalStockValor += $stock * (float)($p['precomp'] ?? 0);
                         if ($gid !== $prevVentaId) { $totalVendidoValor += (float)($p['total_vendido'] ?? 0) * (float)($p['precomp'] ?? 0); $prevVentaId = $gid; }
                         ?>
-                        <tr>
+                        <tr style="<?= $isFirst ? 'border-top:2px solid #adb5bd' : '' ?>">
                             <td>
                                 <?php if ($p['imagen'] ?? ''): ?>
                                     <img src="<?= htmlspecialchars(\Perfushopping\Web\Support\Format::uploadUrl((string)$p['imagen'])) ?>" style="width:32px;height:32px;object-fit:cover;border-radius:4px" alt="" />
