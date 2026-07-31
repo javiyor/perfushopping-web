@@ -5,7 +5,7 @@ $codepar = (int)($codepar ?? 0);
 $stockFilter = (string)($stockFilter ?? '');
 $codrub = (int)($codrub ?? 0);
 $codsub = (int)($codsub ?? 0);
-$codprove = (int)($codprove ?? 0);
+$codprove = trim((string)($codprove ?? ''));
 $iddepo = (int)($iddepo ?? 0);
 $desde = (string)($desde ?? '');
 $hasta = (string)($hasta ?? '');
@@ -61,9 +61,9 @@ $qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $
             </div>
             <div class="col-lg-2">
                 <select class="form-select form-select-sm" name="codprove">
-                    <option value="0">Todos los proveedores</option>
+                    <option value="">Todos los proveedores</option>
                     <?php foreach ($proveedores as $p): ?>
-                        <option value="<?= (int)$p['codprove'] ?>" <?= $codprove === (int)$p['codprove'] ? 'selected' : '' ?>><?= htmlspecialchars($p['nomprovee'] ?? '') ?></option>
+                        <option value="<?= htmlspecialchars((string)($p['codprove'] ?? '')) ?>" <?= $codprove === (string)($p['codprove'] ?? '') ? 'selected' : '' ?>><?= htmlspecialchars($p['nomprovee'] ?? '') ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
@@ -108,7 +108,7 @@ $qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $
                 <button class="btn btn-accent btn-sm w-100" type="submit"><i class="bi bi-search"></i></button>
             </div>
             <div class="col-lg-1">
-                <?php if ($q !== '' || $codprove > 0 || $codsub > 0 || $codrub > 0 || $stockFilter !== '' || $iddepo > 0): ?>
+                <?php if ($q !== '' || $codprove !== '' || $codsub > 0 || $codrub > 0 || $stockFilter !== '' || $iddepo > 0): ?>
                     <a class="btn btn-outline-secondary btn-sm w-100" href="/admin/stock?desde=<?= urlencode($desde) ?>&hasta=<?= urlencode($hasta) ?>">Limpiar</a>
                 <?php endif; ?>
             </div>

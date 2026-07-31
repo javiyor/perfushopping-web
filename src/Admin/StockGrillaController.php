@@ -27,7 +27,7 @@ final class StockGrillaController
         $q = trim((string)($_GET['q'] ?? ''));
         $codrub = (int)($_GET['codrub'] ?? 0);
         $codsub = (int)($_GET['codsub'] ?? 0);
-        $codprove = (int)($_GET['codprove'] ?? 0);
+        $codprove = trim((string)($_GET['codprove'] ?? ''));
         $desde = trim((string)($_GET['desde'] ?? ''));
         $hasta = trim((string)($_GET['hasta'] ?? ''));
 
@@ -77,18 +77,18 @@ final class StockGrillaController
             $prod = $repo->productoDetalle($idprodu);
             if (!$prod) continue;
 
-            $codprove = (int)($prod['codprove'] ?? 0);
+            $codprove = trim((string)($prod['codprove'] ?? ''));
             $proveedorNombre = '(sin proveedor)';
             $proveedorId = null;
 
-            if ($codprove > 0) {
+            if ($codprove !== '') {
                 // Look up supplier name
-                $pv = Db::pdo()->prepare('SELECT codprove, razon AS nomprovee FROM proveedo WHERE codprove = :cp LIMIT 1');
+                $pv = Db::pdo()->prepare('SELECT CAST(codprove AS CHAR) AS codprove, razon AS nomprovee FROM proveedo WHERE codprove = :cp LIMIT 1');
                 $pv->execute([':cp' => $codprove]);
                 $pRow = $pv->fetch();
                 if ($pRow) {
                     $proveedorNombre = $pRow['nomprovee'];
-                    $proveedorId = (int)$pRow['codprove'];
+                    $proveedorId = trim((string)($pRow['codprove'] ?? ''));
                 }
             }
 

@@ -8,7 +8,7 @@ $proveedores = $proveedores ?? [];
 $q = (string)($q ?? '');
 $codrub = (int)($codrub ?? 0);
 $codsub = (int)($codsub ?? 0);
-$codprove = (int)($codprove ?? 0);
+$codprove = trim((string)($codprove ?? ''));
 $desde = (string)($desde ?? '');
 $hasta = (string)($hasta ?? '');
 ?>
@@ -26,7 +26,7 @@ $hasta = (string)($hasta ?? '');
             <i class="bi bi-funnel"></i> Filtros
         </a>
     </div>
-    <div class="collapse<?= $q !== '' || $codrub > 0 || $codsub > 0 || $codprove > 0 || $desde !== '' || $hasta !== '' ? ' show' : '' ?>" id="filtrosCollapse">
+    <div class="collapse<?= $q !== '' || $codrub > 0 || $codsub > 0 || $codprove !== '' || $desde !== '' || $hasta !== '' ? ' show' : '' ?>" id="filtrosCollapse">
         <div class="card-body">
             <form method="get" action="/admin/stock/grilla" class="row g-2">
                 <div class="col-md-3">
@@ -52,7 +52,7 @@ $hasta = (string)($hasta ?? '');
                     <select class="form-select form-select-sm" name="codprove">
                         <option value="">Todos</option>
                         <?php foreach ($proveedores as $pv): ?>
-                            <option value="<?= (int)$pv['codprove'] ?>" <?= $codprove === (int)$pv['codprove'] ? 'selected' : '' ?>><?= htmlspecialchars($pv['nomprovee'] ?? '') ?></option>
+                            <option value="<?= htmlspecialchars((string)($pv['codprove'] ?? '')) ?>" <?= $codprove === (string)($pv['codprove'] ?? '') ? 'selected' : '' ?>><?= htmlspecialchars($pv['nomprovee'] ?? '') ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>

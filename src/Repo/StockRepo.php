@@ -7,7 +7,7 @@ use Perfushopping\Web\Infra\Db;
 
 final class StockRepo
 {
-    public function listarStock(string $q = '', int $codepar = 0, string $stockFilter = '', int $codrub = 0, int $codsub = 0, int $codprove = 0, int $limit = 80, ?int $iddepo = null, string $desde = '', string $hasta = '', int $page = 1): array
+    public function listarStock(string $q = '', int $codepar = 0, string $stockFilter = '', int $codrub = 0, int $codsub = 0, string $codprove = '', int $limit = 80, ?int $iddepo = null, string $desde = '', string $hasta = '', int $page = 1): array
     {
         $limit = max(1, min(200, $limit));
         $page = max(1, $page);
@@ -59,7 +59,7 @@ final class StockRepo
         return $st->fetchAll();
     }
 
-    public function contarStock(string $q = '', int $codepar = 0, string $stockFilter = '', int $codrub = 0, int $codsub = 0, int $codprove = 0, ?int $iddepo = null, string $desde = '', string $hasta = ''): int
+    public function contarStock(string $q = '', int $codepar = 0, string $stockFilter = '', int $codrub = 0, int $codsub = 0, string $codprove = '', ?int $iddepo = null, string $desde = '', string $hasta = ''): int
     {
         [$where, $stockWhere, $depDepo, $params] = $this->stockFilterParts($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $iddepo, $desde, $hasta);
 
@@ -75,7 +75,7 @@ final class StockRepo
         return (int)$st->fetchColumn();
     }
 
-    private function stockFilterParts(string $q, int $codepar, string $stockFilter, int $codrub, int $codsub, int $codprove, ?int $iddepo, string $desde, string $hasta): array
+    private function stockFilterParts(string $q, int $codepar, string $stockFilter, int $codrub, int $codsub, string $codprove, ?int $iddepo, string $desde, string $hasta): array
     {
         $params = [];
         $where = ['p.enweb = 1'];
@@ -98,7 +98,7 @@ final class StockRepo
             $where[] = 'p.codsub = :codsub';
             $params[':codsub'] = $codsub;
         }
-        if ($codprove > 0) {
+        if ($codprove !== '') {
             $where[] = 'p.codprove = :codprove';
             $params[':codprove'] = $codprove;
         }
@@ -658,16 +658,16 @@ final class StockRepo
     public function grillaProveedores(): array
     {
         $st = Db::pdo()->query("
-            SELECT DISTINCT pv.codprove, pv.razon AS nomprovee
+            SELECT DISTINCT CAST(pv.codprove AS CHAR) AS codprove, pv.razon AS nomprovee
             FROM producto p
             INNER JOIN proveedo pv ON pv.codprove = p.codprove
-            WHERE p.enweb = 1 AND p.codprove IS NOT NULL AND p.codprove > 0
+            WHERE p.enweb = 1 AND p.codprove IS NOT NULL AND p.codprove != ''
             ORDER BY pv.razon ASC
         ");
         return $st->fetchAll();
     }
 
-    public function grillaProductos(string $q = '', int $codrub = 0, int $codsub = 0, int $codprove = 0, string $desde = '', string $hasta = '', int $limit = 500): array
+    public function grillaProductos(string $q = '', int $codrub = 0, int $codsub = 0, string $codprove = '', string $desde = '', string $hasta = '', int $limit = 500): array
     {
         $limit = max(1, min(1000, $limit));
         $params = [];
@@ -681,7 +681,7 @@ final class StockRepo
             $where[] = 'p.codsub = :cs';
             $params[':cs'] = $codsub;
         }
-        if ($codprove > 0) {
+        if ($codprove !== '') {
             $where[] = 'p.codprove = :cp';
             $params[':cp'] = $codprove;
         }

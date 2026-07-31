@@ -22,7 +22,7 @@ final class StockController
         $stockFilter = trim((string)($_GET['stock'] ?? ''));
         $codrub = (int)($_GET['codrub'] ?? 0);
         $codsub = (int)($_GET['codsub'] ?? 0);
-        $codprove = (int)($_GET['codprove'] ?? 0);
+        $codprove = trim((string)($_GET['codprove'] ?? ''));
         $desde = trim((string)($_GET['desde'] ?? ''));
         $hasta = trim((string)($_GET['hasta'] ?? ''));
         $iddepo = (int)($_GET['iddepo'] ?? 0);
@@ -74,7 +74,7 @@ final class StockController
         $stockFilter = trim((string)($_GET['stock'] ?? ''));
         $codrub = (int)($_GET['codrub'] ?? 0);
         $codsub = (int)($_GET['codsub'] ?? 0);
-        $codprove = (int)($_GET['codprove'] ?? 0);
+        $codprove = trim((string)($_GET['codprove'] ?? ''));
         $desde = trim((string)($_GET['desde'] ?? ''));
         $hasta = trim((string)($_GET['hasta'] ?? ''));
         $iddepo = (int)($_GET['iddepo'] ?? 0);

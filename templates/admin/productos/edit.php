@@ -25,10 +25,10 @@ $formatDate = static fn(string $d): string => (trim($d) === '' || $d === '0000-0
 $selectedRubro = (int)($product['codrub'] ?? 0);
 $selectedSubrubro = (int)($product['codsub'] ?? 0);
 $selectedDepartamento = (int)($product['codepar'] ?? 0);
-$selectedProveedor = (int)($product['codprove'] ?? 0);
+$selectedProveedor = (string)($product['codprove'] ?? '');
 $selectedRazon = '';
 foreach ($proveedores as $prov) {
-    if ((int)($prov['codprove'] ?? 0) === $selectedProveedor) {
+    if ((string)($prov['codprove'] ?? '') === $selectedProveedor) {
         $selectedRazon = htmlspecialchars((string)($prov['razon'] ?? ''));
         break;
     }
@@ -114,7 +114,7 @@ foreach ($proveedores as $prov) {
                             <select class="form-select form-select-sm" name="codprove">
                                 <option value="">— Sin proveedor —</option>
                                 <?php foreach ($proveedores as $prov): ?>
-                                    <option value="<?= (int)($prov['codprove'] ?? 0) ?>"<?= ((int)($prov['codprove'] ?? 0) === $selectedProveedor) ? ' selected' : '' ?>><?= htmlspecialchars((string)($prov['razon'] ?? '')) ?></option>
+                                    <option value="<?= htmlspecialchars((string)($prov['codprove'] ?? '')) ?>"<?= ((string)($prov['codprove'] ?? '') === $selectedProveedor) ? ' selected' : '' ?>><?= htmlspecialchars((string)($prov['razon'] ?? '')) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
