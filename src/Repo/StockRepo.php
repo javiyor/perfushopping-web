@@ -208,6 +208,12 @@ final class StockRepo
         return $st->fetchAll();
     }
 
+    public function grillaDepositos(): array
+    {
+        $st = Db::pdo()->query('SELECT iddepo, nomdepo FROM deposito WHERE marca = 2 ORDER BY nomdepo ASC');
+        return $st->fetchAll();
+    }
+
     public function departamentos(): array
     {
         $st = Db::pdo()->query('SELECT codepar, nomdepar FROM departa ORDER BY nomdepar ASC');

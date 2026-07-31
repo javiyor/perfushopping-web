@@ -25,16 +25,18 @@ final class StockController
         $codprove = (int)($_GET['codprove'] ?? 0);
         $desde = trim((string)($_GET['desde'] ?? ''));
         $hasta = trim((string)($_GET['hasta'] ?? ''));
+        $iddepo = (int)($_GET['iddepo'] ?? 0);
         if ($desde === '') $desde = date('Y-m-01', strtotime('first day of last month'));
         if ($hasta === '') $hasta = date('Y-m-t', strtotime('last day of last month'));
         $page = max(1, (int)($_GET['page'] ?? 1));
         $perPage = 80;
-        $list = $repo->listarStock($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $perPage, null, $desde, $hasta, $page);
-        $total = $repo->contarStock($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, null, $desde, $hasta);
+        $list = $repo->listarStock($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $perPage, $iddepo ?: null, $desde, $hasta, $page);
+        $total = $repo->contarStock($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $iddepo ?: null, $desde, $hasta);
         $lastPage = (int)ceil($total / $perPage);
         $rubros = $repo->grillaRubros();
         $subrubros = $repo->grillaSubrubros();
         $proveedores = $repo->grillaProveedores();
+        $depositos = $repo->grillaDepositos();
 
         echo View::adminPage('admin/stock/list.php', [
             'adminUser' => $adminUser,
@@ -45,6 +47,7 @@ final class StockController
             'codrub' => $codrub,
             'codsub' => $codsub,
             'codprove' => $codprove,
+            'iddepo' => $iddepo,
             'desde' => $desde,
             'hasta' => $hasta,
             'page' => $page,
@@ -54,6 +57,7 @@ final class StockController
             'rubros' => $rubros,
             'subrubros' => $subrubros,
             'proveedores' => $proveedores,
+            'depositos' => $depositos,
             'csrf' => Csrf::token(),
             'pageTitle' => 'Stock',
         ]);
@@ -73,9 +77,10 @@ final class StockController
         $codprove = (int)($_GET['codprove'] ?? 0);
         $desde = trim((string)($_GET['desde'] ?? ''));
         $hasta = trim((string)($_GET['hasta'] ?? ''));
+        $iddepo = (int)($_GET['iddepo'] ?? 0);
         if ($desde === '') $desde = date('Y-m-01', strtotime('first day of last month'));
         if ($hasta === '') $hasta = date('Y-m-t', strtotime('last day of last month'));
-        $list = $repo->listarStock($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, 1000, null, $desde, $hasta);
+        $list = $repo->listarStock($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, 1000, $iddepo ?: null, $desde, $hasta);
 
         header('Content-Type: text/csv; charset=utf-8');
         header('Content-Disposition: attachment; filename="stock.csv"');
