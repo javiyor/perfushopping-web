@@ -10,6 +10,7 @@ $rubros = $rubros ?? [];
 $subrubros = $subrubros ?? [];
 $proveedores = $proveedores ?? [];
 $stockFilters = ['' => 'Todos', 'sin_stock' => 'Sin stock', 'bajo_stock' => 'Stock bajo (≤5)', 'con_stock' => 'Con stock (>5)'];
+$isSuper = ($adminUser['rol'] ?? '') === 'superadmin';
 ?>
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
@@ -24,6 +25,9 @@ $stockFilters = ['' => 'Todos', 'sin_stock' => 'Sin stock', 'bajo_stock' => 'Sto
         <button class="btn btn-accent btn-sm" id="btnNotaPedido" onclick="irANotaPedido()"><i class="bi bi-file-text"></i> Nota de pedido</button>
         <a class="btn btn-accent btn-sm" href="/admin/stock/ajuste"><i class="bi bi-pencil-square"></i> Ajuste manual</a>
         <a class="btn btn-outline-success btn-sm" href="/admin/stock/exportar-excel?<?= htmlspecialchars($_SERVER['QUERY_STRING'] ?? '') ?>"><i class="bi bi-file-earmark-excel"></i> Excel</a>
+        <?php if ($isSuper): ?>
+            <button class="btn btn-outline-danger btn-sm" onclick="eliminarDiscontinuadas()"><i class="bi bi-trash"></i> Eliminar disc.</button>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -92,13 +96,17 @@ $stockFilters = ['' => 'Todos', 'sin_stock' => 'Sin stock', 'bajo_stock' => 'Sto
                     <th class="text-end">Costo</th>
                     <th class="text-center">Stock</th>
                     <th class="text-center">Stock x dep.</th>
+                    <th class="text-center">Ventas</th>
                     <th class="text-center" style="width:60px">Pedir</th>
+                    <?php if ($isSuper): ?>
+                        <th class="text-center" style="width:50px">Disc.</th>
+                    <?php endif; ?>
                     <th style="width:50px"></th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (!$list): ?>
-                    <tr>                    <td colspan="13" class="text-muted text-center">Sin productos.</td></tr>
+                    <tr><td colspan="<?= $isSuper ? 15 : 14 ?>" class="text-muted text-center">Sin productos.</td></tr>
                 <?php else: ?>
                         <?php foreach ($list as $p): ?>
                         <?php $stock = (int)($p['stock_variante'] ?? 0); ?>
@@ -128,6 +136,7 @@ $stockFilters = ['' => 'Todos', 'sin_stock' => 'Sin stock', 'bajo_stock' => 'Sto
                                 <?php endif; ?>
                             </td>
                             <td class="small text-muted" style="max-width:200px;white-space:normal;word-break:break-word"><?= htmlspecialchars((string)($p['stock_depositos'] ?? '')) ?: '-' ?></td>
+                            <td class="text-center"><?= (int)($p['total_vendido'] ?? 0) ?></td>
                             <td class="text-center">
                                 <input type="number" class="form-control form-control-sm np-qty" style="width:55px;text-align:center" min="0" value="0"
                                     data-idprodu="<?= (int)($p['idprodu'] ?? 0) ?>"
@@ -137,6 +146,13 @@ $stockFilters = ['' => 'Todos', 'sin_stock' => 'Sin stock', 'bajo_stock' => 'Sto
                                     data-codscan="<?= htmlspecialchars((string)($p['codscan'] ?? ''), ENT_QUOTES) ?>"
                                     data-codprodup="<?= htmlspecialchars((string)($p['codprodup'] ?? ''), ENT_QUOTES) ?>" />
                             </td>
+                            <?php if ($isSuper): ?>
+                                <td class="text-center">
+                                    <input type="checkbox" class="form-check-input np-disc" style="cursor:pointer"
+                                        data-idcodgusto="<?= (int)($p['idcodgusto'] ?? 0) ?>"
+                                        <?= (int)($p['discont'] ?? 0) === 1 ? 'checked' : '' ?> />
+                                </td>
+                            <?php endif; ?>
                             <td><a class="btn btn-sm btn-outline-secondary" href="/admin/stock/<?= (int)($p['idprodu'] ?? 0) ?>"><i class="bi bi-eye"></i></a></td>
                         </tr>
                     <?php endforeach; ?>
@@ -170,5 +186,47 @@ function irANotaPedido() {
         sessionStorage.setItem('np_items', JSON.stringify(items));
     } catch(e) {}
     window.location.href = '/admin/nota-pedido/nueva';
+}
+
+const csrfToken = <?= json_encode($csrf ?? '') ?>;
+
+document.querySelectorAll('.np-disc').forEach(function(cb) {
+    cb.addEventListener('change', function() {
+        const fd = new FormData();
+        fd.append('_csrf', csrfToken);
+        fd.append('idcodgusto', this.dataset.idcodgusto);
+        if (this.checked) fd.append('discont', '1');
+        fetch('/admin/stock/discont', { method: 'POST', body: fd })
+            .then(r => r.json())
+            .then(res => {
+                if (!res.ok) {
+                    alert('Error al actualizar discontinuada: ' + (res.error || 'desconocido'));
+                    this.checked = !this.checked;
+                }
+            })
+            .catch(() => {
+                alert('Error de conexión');
+                this.checked = !this.checked;
+            });
+    });
+});
+
+function eliminarDiscontinuadas() {
+    const ids = [];
+    document.querySelectorAll('.np-disc:checked').forEach(function(cb) {
+        ids.push(parseInt(cb.dataset.idcodgusto) || 0);
+    });
+    if (ids.length === 0) {
+        alert('No hay variedades discontinuadas seleccionadas.');
+        return;
+    }
+    if (!confirm('Eliminar definitivamente ' + ids.length + ' variedad(es) discontinuada(s)? Esta acción no se puede deshacer.')) return;
+
+    const fd = new FormData();
+    fd.append('_csrf', csrfToken);
+    ids.forEach(id => fd.append('ids[]', String(id)));
+    fetch('/admin/stock/eliminar-discontinuadas', { method: 'POST', body: fd })
+        .then(() => window.location.reload())
+        .catch(() => alert('Error al eliminar.'));
 }
 </script>

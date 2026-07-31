@@ -256,6 +256,8 @@ $router->get('/admin/stock/ajuste/(?P<id>\d+)', [AdminStockController::class, 'a
 $router->post('/admin/stock/ajuste/guardar', [AdminStockController::class, 'storeAjuste']);
 $router->get('/admin/stock/ajuste/buscar-productos', [AdminStockController::class, 'searchAjusteProductos']);
 $router->get('/admin/stock/ajuste/variantes', [AdminStockController::class, 'ajusteVariantes']);
+$router->post('/admin/stock/discont', [AdminStockController::class, 'toggleDiscont']);
+$router->post('/admin/stock/eliminar-discontinuadas', [AdminStockController::class, 'eliminarDiscontinuadas']);
 $router->get('/admin/stock/grilla', [AdminStockGrillaController::class, 'index']);
 $router->post('/admin/stock/grilla/generar-oc', [AdminStockGrillaController::class, 'generarOC']);
 $router->get('/admin/stock/grilla/oc-pdf/(?P<id>\d+)', [AdminStockGrillaController::class, 'exportarPDF']);

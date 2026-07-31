@@ -36,14 +36,14 @@ final class StockRepo
             $params[':codprove'] = $codprove;
         }
 
-        $stockSel = 'COALESCE(g.stockact, 0) AS stock_variante';
+        $stockSel = 'COALESCE(dep_dist.stock_variante, 0) AS stock_variante';
         $stockWhere = '';
         if ($stockFilter === 'sin_stock') {
-            $stockWhere = 'AND (g.stockact IS NULL OR g.stockact <= 0)';
+            $stockWhere = 'AND (dep_dist.stock_variante IS NULL OR dep_dist.stock_variante <= 0)';
         } elseif ($stockFilter === 'bajo_stock') {
-            $stockWhere = 'AND (g.stockact IS NOT NULL AND g.stockact > 0 AND g.stockact <= 5)';
+            $stockWhere = 'AND (dep_dist.stock_variante IS NOT NULL AND dep_dist.stock_variante > 0 AND dep_dist.stock_variante <= 5)';
         } elseif ($stockFilter === 'con_stock') {
-            $stockWhere = 'AND (g.stockact IS NOT NULL AND g.stockact > 5)';
+            $stockWhere = 'AND (dep_dist.stock_variante IS NOT NULL AND dep_dist.stock_variante > 5)';
         }
 
         $depJoin = '';
@@ -56,64 +56,56 @@ final class StockRepo
 
         $sql = "
             SELECT p.idprodu, p.codprodu, p.produ, p.codprodup, p.precio, p.precomp, p.stocact, p.stocdep, p.codepar, p.enweb, p.observ, p.imagen,
-                   d.nomdepar, g.idcodgusto, g.nomgusto, g.codscan,
+                   d.nomdepar, g.idcodgusto, g.nomgusto, g.codscan, g.discont,
                    r.nomrub, s.nomsub, pv.razon AS nomprovee,
                    {$stockSel},
                    {$depSel},
-                   COALESCE(cv.total_comprado, 0) AS total_comprado,
                    COALESCE(cv.total_vendido, 0) AS total_vendido,
                    dep_dist.stock_depositos
             FROM producto p
-            INNER JOIN gustos g ON g.idprodu = p.idprodu AND g.discont = 0
+            INNER JOIN gustos g ON g.idprodu = p.idprodu
             LEFT JOIN departa d ON d.codepar = p.codepar
             LEFT JOIN rubros r ON r.codrub = p.codrub
             LEFT JOIN subrubro s ON s.codsub = p.codsub
             LEFT JOIN proveedo pv ON pv.codprove = p.codprove
             {$depJoin}
             LEFT JOIN (
-                SELECT
-                    sd.idcodgusto,
+                SELECT sd.idcodgusto,
                     COALESCE(SUM(
                         CASE
-                            WHEN sc.iddepod = 7 AND dh.marca = 2 THEN sd.canti
-                            WHEN sc.tipo_movimiento = 'compra' AND sc.iddepoh IS NOT NULL AND sc.iddepod IS NULL THEN sd.canti
-                            ELSE 0
-                        END
-                    ), 0)
-                    - COALESCE(SUM(
-                        CASE
-                            WHEN sc.iddepoh = 7 AND dd.marca = 2 THEN sd.canti
-                            WHEN sc.tipo_movimiento = 'devolucion_compra' AND sc.iddepoh IS NULL AND sc.iddepod IS NOT NULL THEN sd.canti
-                            ELSE 0
-                        END
-                    ), 0) AS total_comprado,
-                    COALESCE(SUM(
-                        CASE
-                            WHEN sc.iddepoh = 6 AND dd.marca = 2 THEN sd.canti
-                            WHEN sc.tipo_movimiento = 'venta' AND sc.iddepoh IS NULL AND sc.iddepod IS NOT NULL THEN sd.canti
-                            ELSE 0
-                        END
-                    ), 0)
-                    - COALESCE(SUM(
-                        CASE
-                            WHEN sc.iddepod = 6 AND dh.marca = 2 THEN sd.canti
-                            WHEN sc.tipo_movimiento = 'devolucion_venta' AND sc.iddepoh IS NOT NULL AND sc.iddepod IS NULL THEN sd.canti
+                            WHEN sc.iddepod = 6 THEN sd.canti
+                            WHEN sc.iddepoh = 6 THEN -sd.canti
                             ELSE 0
                         END
                     ), 0) AS total_vendido
                 FROM stockdet sd
-                INNER JOIN stockcab sc ON sc.idcabstock = sd.idstockcab
-                LEFT JOIN deposito dh ON dh.iddepo = sc.iddepoh
-                LEFT JOIN deposito dd ON dd.iddepo = sc.iddepod
+                INNER JOIN stockcab sc ON sc.idstockcab = sd.idstockcab
+                WHERE sd.idcodgusto > 0
                 GROUP BY sd.idcodgusto
             ) cv ON cv.idcodgusto = g.idcodgusto
             LEFT JOIN (
-              SELECT s.idcodgusto,
-                GROUP_CONCAT(CONCAT(d.nomdepo, ': ', s.stock) ORDER BY d.nomdepo SEPARATOR ' | ') AS stock_depositos
-              FROM stock s
-              INNER JOIN deposito d ON d.iddepo = s.iddepo AND d.marca = 2
-              WHERE s.stock > 0
-              GROUP BY s.idcodgusto
+              SELECT ds.idcodgusto,
+                SUM(ds.neto) AS stock_variante,
+                GROUP_CONCAT(CONCAT(d.nomdepo, ': ', ds.neto) ORDER BY d.nomdepo SEPARATOR ' | ') AS stock_depositos
+              FROM (
+                SELECT t.idcodgusto, t.iddepo, SUM(t.neto) AS neto
+                FROM (
+                  SELECT sd.idcodgusto, sc.iddepoh AS iddepo, SUM(sd.canti) AS neto
+                  FROM stockdet sd
+                  INNER JOIN stockcab sc ON sc.idstockcab = sd.idstockcab
+                  WHERE sc.iddepoh IS NOT NULL AND sd.idcodgusto > 0
+                  GROUP BY sd.idcodgusto, sc.iddepoh
+                  UNION ALL
+                  SELECT sd.idcodgusto, sc.iddepod AS iddepo, -SUM(sd.canti) AS neto
+                  FROM stockdet sd
+                  INNER JOIN stockcab sc ON sc.idstockcab = sd.idstockcab
+                  WHERE sc.iddepod IS NOT NULL AND sd.idcodgusto > 0
+                  GROUP BY sd.idcodgusto, sc.iddepod
+                ) t
+                GROUP BY t.idcodgusto, t.iddepo
+              ) ds
+              INNER JOIN deposito d ON d.iddepo = ds.iddepo AND d.marca = 2
+              GROUP BY ds.idcodgusto
             ) dep_dist ON dep_dist.idcodgusto = g.idcodgusto
             WHERE " . implode(' AND ', $where) . " {$stockWhere}
             ORDER BY p.produ ASC, g.nomgusto ASC
@@ -448,6 +440,43 @@ final class StockRepo
                 ':gusto' => $idcodgusto ?: null,
                 ':s' => $newStock,
             ]);
+        }
+    }
+
+    public function setDiscont(int $idcodgusto, int $discont): void
+    {
+        $st = Db::pdo()->prepare('UPDATE gustos SET discont = :d WHERE idcodgusto = :g LIMIT 1');
+        $st->execute([':d' => $discont ? 1 : 0, ':g' => $idcodgusto]);
+    }
+
+    public function eliminarDiscontinuadas(array $ids): int
+    {
+        $ids = array_values(array_filter(array_map('intval', $ids), static fn (int $i): bool => $i > 0));
+        if (empty($ids)) return 0;
+
+        $pdo = Db::pdo();
+        $pdo->beginTransaction();
+        try {
+            $in = implode(',', $ids);
+            $st = $pdo->query("SELECT idprodu FROM gustos WHERE idcodgusto IN ({$in}) GROUP BY idprodu");
+            $productIds = array_map('intval', $st->fetchAll(\PDO::FETCH_COLUMN));
+
+            $pdo->exec("DELETE FROM stock WHERE idcodgusto IN ({$in})");
+            $pdo->exec("DELETE FROM gustos WHERE idcodgusto IN ({$in})");
+            $count = $pdo->exec("DELETE FROM stockdet WHERE idcodgusto IN ({$in})");
+
+            foreach ($productIds as $idprodu) {
+                $s = $pdo->prepare('SELECT COALESCE(SUM(stock), 0) FROM stock WHERE idprodu = :p');
+                $s->execute([':p' => $idprodu]);
+                $pdo->prepare('UPDATE producto SET stocact = :s WHERE idprodu = :id LIMIT 1')
+                    ->execute([':s' => (int)$s->fetchColumn(), ':id' => $idprodu]);
+            }
+
+            $pdo->commit();
+            return $count;
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
         }
     }
 

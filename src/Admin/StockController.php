@@ -68,7 +68,7 @@ final class StockController
         fputcsv($out, [
             'Producto', 'Variedad', 'Código', 'Cód. barra', 'Cód. proveedor',
             'Proveedor', 'Marca', 'Categoría',
-            'Precio', 'Costo', 'Stock',
+            'Precio', 'Costo', 'Stock', 'Ventas',
         ]);
 
         foreach ($list as $p) {
@@ -84,6 +84,7 @@ final class StockController
                 number_format((float)($p['precio'] ?? 0), 2, ',', '.'),
                 number_format((float)($p['precomp'] ?? 0), 2, ',', '.'),
                 (int)($p['stock_variante'] ?? 0),
+                (int)($p['total_vendido'] ?? 0),
             ]);
         }
 
@@ -227,5 +228,47 @@ final class StockController
 
         $repo = new StockRepo();
         Response::json($repo->variantesPorProducto($id));
+    }
+
+    public function toggleDiscont(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requireSesion();
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $idcodgusto = (int)($_POST['idcodgusto'] ?? 0);
+        $discont = isset($_POST['discont']) ? 1 : 0;
+        if ($idcodgusto <= 0) {
+            Response::json(['ok' => false, 'error' => 'ID inválido']);
+            return;
+        }
+
+        try {
+            (new StockRepo())->setDiscont($idcodgusto, $discont);
+            Response::json(['ok' => true]);
+        } catch (\Throwable $e) {
+            Response::json(['ok' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function eliminarDiscontinuadas(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requireRol('superadmin');
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $ids = $_POST['ids'] ?? [];
+        if (!is_array($ids) || empty($ids)) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Seleccioná variedades discontinuadas para eliminar.'];
+            Response::redirect('/admin/stock');
+        }
+
+        try {
+            $count = (new StockRepo())->eliminarDiscontinuadas($ids);
+            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => "Variedades eliminadas: {$count}"];
+        } catch (\Throwable $e) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Error al eliminar: ' . $e->getMessage()];
+        }
+        Response::redirect('/admin/stock');
     }
 }
