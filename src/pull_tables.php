@@ -86,7 +86,7 @@ function postChunk(string $table, array $rows): void
 }
 
 // ── Run ──
-$tables = ['producto', 'gustos', 'stockcab', 'stockdet'];
+$tables = ['producto', 'gustos', 'stockcab', 'stockdet', 'proveedo'];
 $start = microtime(true);
 
 $log("=== INICIO PULL desde {$apiUrl} ===");

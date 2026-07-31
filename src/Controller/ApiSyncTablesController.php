@@ -38,7 +38,7 @@ final class ApiSyncTablesController
         $table = (string)($json['table'] ?? '');
         $rows = $json['rows'] ?? [];
 
-        if (!in_array($table, ['producto', 'gustos', 'stockcab', 'stockdet'], true)) {
+        if (!in_array($table, ['producto', 'gustos', 'stockcab', 'stockdet', 'proveedo'], true)) {
             Response::json(['ok' => false, 'error' => "Invalid table: {$table}"], 400);
             return;
         }
@@ -74,6 +74,8 @@ final class ApiSyncTablesController
                 }
             } elseif ($table === 'stockcab') {
                 $count = $this->syncInsertIgnore($pdo, $table, $rows);
+            } elseif ($table === 'proveedo') {
+                $count = $this->syncProveedo($pdo, $rows);
             } else {
                 $count = $this->syncReplace($pdo, $table, $rows);
             }
@@ -216,6 +218,33 @@ final class ApiSyncTablesController
         $placeholders = implode(', ', array_map(fn($c) => ":{$c}", $cols));
 
         $stmt = $pdo->prepare("REPLACE INTO {$table} ({$insertCols}) VALUES ({$placeholders})");
+
+        $count = 0;
+        foreach ($rows as $r) {
+            foreach ($cols as $c) {
+                $stmt->bindValue(":{$c}", $r[$c] ?? null);
+            }
+            $stmt->execute();
+            $count++;
+        }
+        return $count;
+    }
+
+    private function syncProveedo(\PDO $pdo, array $rows): int
+    {
+        // producto.codprove apunta a proveedo.idprovee: el id debe quedar igual
+        // al origen. ON DUPLICATE KEY UPDATE (match por idprovee) sin borrar ni
+        // resetear columnas extra del destino (ej. datos cargados en el panel admin).
+        $cols = array_keys($rows[0]);
+        $updateCols = array_diff($cols, ['idprovee']);
+        $setClauses = implode(', ', array_map(fn($c) => "{$c} = VALUES({$c})", $updateCols));
+        $insertCols = implode(', ', $cols);
+        $placeholders = implode(', ', array_map(fn($c) => ":{$c}", $cols));
+
+        $stmt = $pdo->prepare(
+            "INSERT INTO proveedo ({$insertCols}) VALUES ({$placeholders})
+             ON DUPLICATE KEY UPDATE {$setClauses}"
+        );
 
         $count = 0;
         foreach ($rows as $r) {

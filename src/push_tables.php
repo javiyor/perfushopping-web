@@ -11,7 +11,7 @@
  * Opcional:
  *   --url=https://perfushopping.ar/api/v1/sync-tables
  *   --chunk=500
- *   --tables=producto,gustos,stockcab,stockdet
+ *   --tables=producto,gustos,stockcab,stockdet,proveedo
  */
 
 declare(strict_types=1);
@@ -27,8 +27,8 @@ foreach ($argv ?? [] as $a) {
 $apiUrl = $args['url'] ?? 'https://perfushopping.ar/api/v1/sync-tables';
 $token  = $args['token'] ?? getenv('SYNC_TOKEN') ?? '';
 $chunk  = max(50, min(2000, (int)($args['chunk'] ?? 500)));
-$tables = isset($args['tables']) ? explode(',', $args['tables']) : ['producto', 'gustos', 'stockcab', 'stockdet'];
-$tables = array_intersect($tables, ['producto', 'gustos', 'stockcab', 'stockdet']);
+$tables = isset($args['tables']) ? explode(',', $args['tables']) : ['producto', 'gustos', 'stockcab', 'stockdet', 'proveedo'];
+$tables = array_intersect($tables, ['producto', 'gustos', 'stockcab', 'stockdet', 'proveedo']);
 
 if ($token === '') {
     echo "[ERROR] Usá --token=MISECRET o setéá SYNC_TOKEN en el entorno\n";
