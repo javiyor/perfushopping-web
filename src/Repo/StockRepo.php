@@ -79,7 +79,7 @@ final class StockRepo
                         END
                     ), 0) AS total_vendido
                 FROM stockdet sd
-                INNER JOIN stockcab sc ON sc.idstockcab = sd.idstockcab
+                INNER JOIN stockcab sc ON sc.idcabstock = sd.idstockcab
                 WHERE sd.idcodgusto > 0
                 GROUP BY sd.idcodgusto
             ) cv ON cv.idcodgusto = g.idcodgusto
@@ -92,13 +92,13 @@ final class StockRepo
                 FROM (
                   SELECT sd.idcodgusto, sc.iddepoh AS iddepo, SUM(sd.canti) AS neto
                   FROM stockdet sd
-                  INNER JOIN stockcab sc ON sc.idstockcab = sd.idstockcab
+                  INNER JOIN stockcab sc ON sc.idcabstock = sd.idstockcab
                   WHERE sc.iddepoh IS NOT NULL AND sd.idcodgusto > 0
                   GROUP BY sd.idcodgusto, sc.iddepoh
                   UNION ALL
                   SELECT sd.idcodgusto, sc.iddepod AS iddepo, -SUM(sd.canti) AS neto
                   FROM stockdet sd
-                  INNER JOIN stockcab sc ON sc.idstockcab = sd.idstockcab
+                  INNER JOIN stockcab sc ON sc.idcabstock = sd.idstockcab
                   WHERE sc.iddepod IS NOT NULL AND sd.idcodgusto > 0
                   GROUP BY sd.idcodgusto, sc.iddepod
                 ) t
