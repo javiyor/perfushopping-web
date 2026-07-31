@@ -122,7 +122,7 @@ $qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $
             <thead>
                 <tr>
                     <th style="width:40px"></th>
-                    <th>Producto</th>
+                    <th style="min-width:200px">Producto</th>
                     <th>Variedad</th>
                     <th>Sucursal</th>
                     <th>Código</th>
@@ -131,11 +131,11 @@ $qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $
                     <th>Categoría</th>
                     <th class="text-end">Precio</th>
                     <th class="text-end">Costo</th>
-                    <th class="text-center">Stock</th>
-                    <th class="text-center">Ventas</th>
+                    <th class="text-center" style="width:55px">Stock</th>
+                    <th class="text-center" style="width:60px">Ventas</th>
                     <th class="text-center" style="width:60px">Pedir</th>
                     <?php if ($isSuper): ?>
-                        <th class="text-center" style="width:50px">Disc.</th>
+                        <th class="text-center" style="width:38px">Disc.</th>
                     <?php endif; ?>
                     <th style="width:50px"></th>
                 </tr>
