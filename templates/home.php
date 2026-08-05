@@ -14,14 +14,20 @@ $empresaTel = htmlspecialchars($empresa['telefono'] ?? '3482 765798');
 $empresaMail = htmlspecialchars($empresa['mail'] ?? 'clientes@perfushopping.com.ar');
 $empresaDir = htmlspecialchars($empresa['dire_emp'] ?? '9 de julio 1610 - Hipolito Irigoyen 465 - Reconquista, Santa Fe - Argentina');
 $empresaWhatsapp = preg_replace('/[^0-9]/', '', $empresa['telefono'] ?? '543482765798') ?: '543482765798';
+$empresaHorarios = 'Lunes a Viernes 08:00-19:00 | Sabados 08:00-13:00';
 ?>
 
 <div class="hero">
   <div style="display:flex;justify-content:center;">
-    <img src="<?= htmlspecialchars($empresaBanner) ?>" alt="<?= $empresaNombre ?>" loading="eager" decoding="async" style="width:80%;max-width:900px;height:auto;border-radius:22px;border:1px solid rgba(216,178,90,0.18);box-shadow:0 22px 70px rgba(0,0,0,0.55);" />
+    <img src="<?= htmlspecialchars($empresaBanner) ?>" alt="<?= $empresaNombre ?>" loading="eager" decoding="async" style="width:26%;max-width:300px;height:auto;border-radius:22px;border:1px solid rgba(216,178,90,0.18);box-shadow:0 22px 70px rgba(0,0,0,0.55);" />
   </div>
   <h1><?= $empresaNombre ?></h1>
   <p>Carrito de compras. Compra, paga facil y seguro en cuotas con Mercado Pago.</p>
+  <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:14px">
+    <span class="pill">Envios a todo el pais</span>
+    <span class="pill secondary">3 y 6 cuotas con Mercado Pago</span>
+    <span class="pill secondary">Retire en el local</span>
+  </div>
 </div>
 
 <div class="page" style="margin-top:16px">
@@ -96,3 +102,13 @@ $empresaWhatsapp = preg_replace('/[^0-9]/', '', $empresa['telefono'] ?? '5434827
     <?php endforeach; ?>
   </div>
 <?php endif; ?>
+
+<div class="page" style="margin-top:26px;padding-top:18px;border-top:1px solid rgba(216,178,90,0.25)">
+  <h3 style="margin:0;color:var(--gold);font-family:Georgia, 'Times New Roman', serif;letter-spacing:0.7px">Contacto y horarios</h3>
+  <div style="margin-top:10px;color:rgba(246,244,239,0.78);line-height:1.7">
+    <div>WhatsApp: <a href="https://wa.me/<?= $empresaWhatsapp ?>?text=Hola%20<?= urlencode($empresaNombre) ?>" target="_blank" rel="noopener" style="text-decoration:underline"><strong><?= $empresaTel ?></strong></a></div>
+    <div>Mail: <a href="mailto:<?= $empresaMail ?>" style="text-decoration:underline"><?= $empresaMail ?></a></div>
+    <div>Direcciones: <?= $empresaDir ?></div>
+    <div>Horarios: <?= htmlspecialchars($empresaHorarios) ?></div>
+  </div>
+</div>
