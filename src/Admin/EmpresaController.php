@@ -53,6 +53,9 @@ final class EmpresaController
             'ing_brutos' => trim((string)($_POST['ing_brutos'] ?? '')),
             'mail' => trim((string)($_POST['mail'] ?? '')),
             'web' => trim((string)($_POST['web'] ?? '')),
+            'benef1' => trim((string)($_POST['benef1'] ?? '')),
+            'benef2' => trim((string)($_POST['benef2'] ?? '')),
+            'benef3' => trim((string)($_POST['benef3'] ?? '')),
             'codtip' => (int)($_POST['codtip'] ?? 0) ?: null,
         ];
 

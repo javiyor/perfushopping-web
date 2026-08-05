@@ -15,6 +15,12 @@ $empresaMail = htmlspecialchars($empresa['mail'] ?? 'clientes@perfushopping.com.
 $empresaDir = htmlspecialchars($empresa['dire_emp'] ?? '9 de julio 1610 - Hipolito Irigoyen 465 - Reconquista, Santa Fe - Argentina');
 $empresaWhatsapp = preg_replace('/[^0-9]/', '', $empresa['telefono'] ?? '543482765798') ?: '543482765798';
 $empresaHorarios = 'Lunes a Viernes 08:00-19:00 | Sabados 08:00-13:00';
+$defaultBenefs = ['Envios a todo el pais', '3 y 6 cuotas con Mercado Pago', 'Retire en el local'];
+$benefs = [];
+foreach ([1, 2, 3] as $bi) {
+    $v = trim((string)($empresa['benef' . $bi] ?? ''));
+    $benefs[] = $v !== '' ? $v : $defaultBenefs[$bi - 1];
+}
 ?>
 
 <div class="hero">
@@ -24,9 +30,9 @@ $empresaHorarios = 'Lunes a Viernes 08:00-19:00 | Sabados 08:00-13:00';
   <h1><?= $empresaNombre ?></h1>
   <p>Carrito de compras. Compra, paga facil y seguro en cuotas con Mercado Pago.</p>
   <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:14px">
-    <span class="pill">Envios a todo el pais</span>
-    <span class="pill secondary">3 y 6 cuotas con Mercado Pago</span>
-    <span class="pill secondary">Retire en el local</span>
+    <?php foreach ($benefs as $i => $benef): ?>
+      <span class="<?= $i === 0 ? 'pill' : 'pill secondary' ?>"><?= htmlspecialchars($benef) ?></span>
+    <?php endforeach; ?>
   </div>
 </div>
 

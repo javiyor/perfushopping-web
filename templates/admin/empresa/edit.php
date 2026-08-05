@@ -76,6 +76,27 @@ if (!$empresa):
                     </div>
                 </div>
             </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-white fw-semibold">Portada de la web</div>
+                <div class="card-body">
+                    <p class="small text-muted mb-2">Beneficios que se muestran en el home. Si los dejás vacíos se usan los valores por defecto.</p>
+                    <div class="row g-2">
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label small">Beneficio 1</label>
+                            <input class="form-control form-control-sm" name="benef1" value="<?= htmlspecialchars((string)($empresa['benef1'] ?? '')) ?>" placeholder="Envios a todo el pais" />
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label small">Beneficio 2</label>
+                            <input class="form-control form-control-sm" name="benef2" value="<?= htmlspecialchars((string)($empresa['benef2'] ?? '')) ?>" placeholder="3 y 6 cuotas con Mercado Pago" />
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label small">Beneficio 3</label>
+                            <input class="form-control form-control-sm" name="benef3" value="<?= htmlspecialchars((string)($empresa['benef3'] ?? '')) ?>" placeholder="Retire en el local" />
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="col-lg-4">

@@ -29,7 +29,7 @@ final class EmpresaRepo
         $existing = $this->columns();
         $fields = [];
         $params = [':id' => $id];
-        foreach (['nomemp', 'razon_emp', 'dire_emp', 'telefono', 'cuit', 'ing_brutos', 'mail', 'codtip', 'logo', 'web'] as $col) {
+        foreach (['nomemp', 'razon_emp', 'dire_emp', 'telefono', 'cuit', 'ing_brutos', 'mail', 'codtip', 'logo', 'web', 'benef1', 'benef2', 'benef3'] as $col) {
             if (!in_array($col, $existing, true)) {
                 continue;
             }
