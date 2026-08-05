@@ -84,7 +84,7 @@ final class AdminProductRepo
         // Data
         $offset = ($page - 1) * $perPage;
         $dataSql = '
-            SELECT DISTINCT p.idprodu, p.codprodu, p.produ, p.precio, p.precio1, p.imagen, p.enweb, p.fecompra,
+            SELECT DISTINCT p.idprodu, p.codprodu, p.produ, p.precio, p.precio1, p.imagen, p.enweb, p.fecompra, p.observ,
               r.nomrub,
               s.nomsub,
               i.tiva,
@@ -262,6 +262,12 @@ final class AdminProductRepo
             ':ganan2' => $ganan2,
             ':id' => $idprodu,
         ]);
+    }
+
+    public function saveDescription(int $idprodu, string $description): void
+    {
+        $st = Db::pdo()->prepare('UPDATE producto SET observ = :observ WHERE idprodu = :id LIMIT 1');
+        $st->execute([':observ' => $description, ':id' => $idprodu]);
     }
 
     public function deleteProduct(int $idprodu): void

@@ -191,37 +191,37 @@ $sortLink = fn(string $col) => '/admin/productos?' . http_build_query(array_merg
 <?php else: ?>
     <div class="row g-3">
         <?php foreach ($products as $item):
-            $itemId = (int)($item['idprodu'] ?? 0);
-            $itemIva = (float)($item['tiva'] ?? 0);
-            $itemGross = (float)($item['precio'] ?? 0) * (1 + ($itemIva / 100));
-            $query = [];
-            if ($q !== '') $query['q'] = $q;
-            if ($codsub > 0) $query['codsub'] = (string)$codsub;
-            if ($codrub > 0) $query['codrub'] = (string)$codrub;
-            $href = '/admin/productos/' . $itemId . ($query ? '?' . http_build_query($query) : '');
-        ?>
-            <div class="col-lg-4 col-md-6">
-                <a href="<?= htmlspecialchars($href) ?>" class="text-decoration-none">
-                    <div class="card shadow-sm h-100">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start mb-1">
-                                <strong>#<?= $itemId ?></strong>
-                                <span class="badge <?= ((int)($item['enweb'] ?? 0) === 1) ? 'bg-success' : 'bg-secondary' ?>"><?= ((int)($item['enweb'] ?? 0) === 1) ? 'En web' : 'Oculto' ?></span>
-                            </div>
-                            <h6 class="card-title mb-1" style="font-size:14px"><?= htmlspecialchars((string)($item['produ'] ?? '')) ?></h6>
-                            <div class="small text-muted">
-                                <?= htmlspecialchars((string)($item['nomsub'] ?? '-')) ?> · <?= htmlspecialchars((string)($item['nomrub'] ?? '-')) ?>
-                            </div>
-                            <div class="d-flex justify-content-between mt-2 small">
-                                <span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)round($itemGross * 100))) ?></span>
-                                <span><?= (int)($item['variants_count'] ?? 0) ?> var.</span>
+                        $itemId = (int)($item['idprodu'] ?? 0);
+                        $itemIva = (float)($item['tiva'] ?? 0);
+                        $itemGross = (float)($item['precio'] ?? 0) * (1 + ($itemIva / 100));
+                        $query = [];
+                        if ($q !== '') $query['q'] = $q;
+                        if ($codsub > 0) $query['codsub'] = (string)$codsub;
+                        if ($codrub > 0) $query['codrub'] = (string)$codrub;
+                        $href = '/admin/productos/' . $itemId . ($query ? '?' . http_build_query($query) : '');
+                    ?>
+                        <div class="col-lg-4 col-md-6">
+                            <div class="card shadow-sm h-100">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start mb-1">
+                                        <strong>#<?= $itemId ?></strong>
+                                        <span class="badge <?= ((int)($item['enweb'] ?? 0) === 1) ? 'bg-success' : 'bg-secondary' ?>"><?= ((int)($item['enweb'] ?? 0) === 1) ? 'En web' : 'Oculto' ?></span>
+                                    </div>
+                                    <h6 class="card-title mb-1" style="font-size:14px"><a href="<?= htmlspecialchars($href) ?>" class="text-decoration-none"><?= htmlspecialchars((string)($item['produ'] ?? '')) ?></a></h6>
+                                    <div class="small text-muted mb-2">
+                                        <?= htmlspecialchars((string)($item['nomsub'] ?? '-')) ?> · <?= htmlspecialchars((string)($item['nomrub'] ?? '-')) ?>
+                                    </div>
+                                    <textarea class="form-control form-control-sm inline-desc mb-2" rows="2" data-idprodu="<?= $itemId ?>" data-csrf="<?= htmlspecialchars($csrf ?? '') ?>" placeholder="Descripción..."><?= htmlspecialchars((string)($item['observ'] ?? '')) ?></textarea>
+                                    <span class="desc-status small text-success" style="display:none">Guardado</span>
+                                    <div class="d-flex justify-content-between mt-1 small">
+                                        <span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)round($itemGross * 100))) ?></span>
+                                        <span><?= (int)($item['variants_count'] ?? 0) ?> var.</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </a>
-            </div>
-        <?php endforeach; ?>
-    </div>
+                    <?php endforeach; ?>
+                </div>
 <?php endif; ?>
 
 <?php if ($totalPages > 1): ?>
@@ -262,3 +262,30 @@ $sortLink = fn(string $col) => '/admin/productos?' . http_build_query(array_merg
         </nav>
     </div>
 <?php endif; ?>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.inline-desc').forEach(function (ta) {
+        ta.addEventListener('change', function () {
+            const textarea = this;
+            const idprodu = textarea.dataset.idprodu;
+            const csrf = textarea.dataset.csrf;
+            const status = textarea.closest('.card-body').querySelector('.desc-status');
+            fetch('/admin/productos/save-description', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: new URLSearchParams({_csrf: csrf, idprodu: idprodu, observ: textarea.value})
+            }).then(r => r.json()).then(res => {
+                if (status) {
+                    status.style.display = 'inline';
+                    status.textContent = res.ok ? 'Guardado' : 'Error';
+                    status.className = 'desc-status small ' + (res.ok ? 'text-success' : 'text-danger');
+                    setTimeout(() => { status.style.display = 'none'; }, 1500);
+                }
+            }).catch(() => {
+                if (status) { status.style.display = 'inline'; status.textContent = 'Error de conexión'; status.className = 'desc-status small text-danger'; }
+            });
+        });
+    });
+});
+</script>

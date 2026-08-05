@@ -221,6 +221,24 @@ final class ProductController
         Response::redirect('/admin/productos/' . $idprodu);
     }
 
+    public function saveDescription(array $params): void
+    {
+        $this->auth->requireSesion();
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $idprodu = (int)($_POST['idprodu'] ?? 0);
+        $observ = trim((string)($_POST['observ'] ?? ''));
+
+        $product = $this->repo->find($idprodu);
+        if (!$product) {
+            Response::json(['ok' => false, 'error' => 'Producto no encontrado.'], 404);
+            return;
+        }
+
+        $this->repo->saveDescription($idprodu, $observ);
+        Response::json(['ok' => true]);
+    }
+
     public function uploadMainImage(array $params): void
     {
         $this->auth->requireSesion();
