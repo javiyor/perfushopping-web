@@ -143,6 +143,16 @@ $ivaOptions = $ivaOptions ?? [];
 </form>
 
 <script>
+function ordenarSelect(sel) {
+    const cf = new Intl.Collator('es', {sensitivity: 'base', numeric: true});
+    const opts = Array.from(sel.options);
+    opts.sort((a, b) => {
+        if (a.value === '') return -1;
+        if (b.value === '') return 1;
+        return cf.compare(a.text, b.text);
+    });
+    opts.forEach(o => sel.appendChild(o));
+}
 function agregarCatalogo(tipo, nombreLabel) {
     const csrf = document.querySelector('input[name="_csrf"]').value;
     const nombre = prompt('Nombre de la nueva ' + nombreLabel + ':', '');
@@ -160,12 +170,14 @@ function agregarCatalogo(tipo, nombreLabel) {
             opt.value = res.id;
             opt.textContent = res.nombre;
             sel.appendChild(opt);
+            ordenarSelect(sel);
             sel.value = String(res.id);
         } else {
             alert(res.error || 'Error al crear');
         }
     }).catch(() => alert('Error de conexión'));
 }
+document.querySelectorAll('select[name="codrub"], select[name="codsub"], select[name="codepar"]').forEach(ordenarSelect);
 document.querySelectorAll('.calc-trigger').forEach(el => {
     el.addEventListener('input', autoCalcPrices);
     el.addEventListener('change', autoCalcPrices);
