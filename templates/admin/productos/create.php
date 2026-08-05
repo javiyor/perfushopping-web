@@ -148,10 +148,6 @@ function agregarCatalogo(tipo, nombreLabel) {
     const nombre = prompt('Nombre de la nueva ' + nombreLabel + ':', '');
     if (!nombre || !nombre.trim()) return;
     const body = new URLSearchParams({_csrf: csrf, type: tipo, nombre: nombre.trim()});
-    if (tipo === 'subrubro') {
-        const rubSel = document.querySelector('select[name="codrub"]');
-        if (rubSel && rubSel.value) body.append('codrub', rubSel.value);
-    }
     fetch('/admin/productos/crear-catalogo', {
         method: 'POST',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},

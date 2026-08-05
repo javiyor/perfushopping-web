@@ -205,9 +205,8 @@ final class ProductController
                     $id = (int)$pdo->lastInsertId();
                     break;
                 case 'subrubro':
-                    $codrub = (int)($_POST['codrub'] ?? 0);
-                    $st = $pdo->prepare('INSERT INTO subrubro (codrub, nomsub) VALUES (:cr, :n)');
-                    $st->execute([':cr' => $codrub > 0 ? $codrub : null, ':n' => $nombre]);
+                    $st = $pdo->prepare('INSERT INTO subrubro (nomsub) VALUES (:n)');
+                    $st->execute([':n' => $nombre]);
                     $id = (int)$pdo->lastInsertId();
                     break;
                 case 'departamento':
