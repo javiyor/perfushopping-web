@@ -43,6 +43,7 @@ final class ProductController
             'ivaOptions' => $ivaOptions,
             'csrf' => Csrf::token(),
             'flash' => $_SESSION['admin_flash'] ?? null,
+            'showOnboarding' => $this->tickOnboarding((int)$adminUser['id']),
             'pageTitle' => 'Nuevo producto',
         ]);
         unset($_SESSION['admin_flash']);
@@ -179,6 +180,7 @@ final class ProductController
             'proveedores' => $proveedores,
             'csrf' => Csrf::token(),
             'flash' => $_SESSION['admin_flash'] ?? null,
+            'showOnboarding' => $this->tickOnboarding((int)$adminUser['id']),
             'pageTitle' => 'Producto: ' . htmlspecialchars(mb_substr((string)($product['produ'] ?? ''), 0, 40)),
         ]);
         unset($_SESSION['admin_flash']);
@@ -222,6 +224,16 @@ final class ProductController
         } catch (\Throwable $e) {
             Response::json(['ok' => false, 'error' => $e->getMessage()], 500);
         }
+    }
+
+    private function tickOnboarding(int $adminUserId): bool
+    {
+        $repo = new \Perfushopping\Web\Repo\AdminUserRepo();
+        if ($repo->onboardingVistas($adminUserId) >= 2) {
+            return false;
+        }
+        $repo->incrementarOnboarding($adminUserId);
+        return true;
     }
 
     public function save(array $params): void

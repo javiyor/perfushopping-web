@@ -13,6 +13,8 @@ $ivaOptions = $ivaOptions ?? [];
     </ol>
 </nav>
 
+<?php include __DIR__ . '/_producto_manual.php'; ?>
+
 <form method="post" action="/admin/productos/crear">
     <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
 

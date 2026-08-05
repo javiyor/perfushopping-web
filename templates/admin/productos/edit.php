@@ -42,6 +42,8 @@ foreach ($proveedores as $prov) {
     </ol>
 </nav>
 
+<?php include __DIR__ . '/_producto_manual.php'; ?>
+
 <div class="card shadow-sm mb-2">
     <div class="card-body py-2">
         <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">

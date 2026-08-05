@@ -61,6 +61,20 @@ final class AdminUserRepo
         $st->execute([':i' => $id]);
     }
 
+    public function onboardingVistas(int $id): int
+    {
+        $st = Db::pdo()->prepare('SELECT onboarding_vistas FROM admin_users WHERE id = :i LIMIT 1');
+        $st->execute([':i' => $id]);
+        $v = $st->fetchColumn();
+        return is_numeric($v) ? (int)$v : 0;
+    }
+
+    public function incrementarOnboarding(int $id): void
+    {
+        $st = Db::pdo()->prepare('UPDATE admin_users SET onboarding_vistas = onboarding_vistas + 1 WHERE id = :i LIMIT 1');
+        $st->execute([':i' => $id]);
+    }
+
     public static function rolOptions(): array
     {
         return [
