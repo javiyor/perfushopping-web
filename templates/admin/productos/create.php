@@ -76,21 +76,9 @@ $ivaOptions = $ivaOptions ?? [];
                                 </select>
                                 <button class="btn btn-outline-secondary btn-sm" type="button" title="Nueva marca / subrubro" onclick="agregarCatalogo('subrubro', 'marca')"><i class="bi bi-plus-lg"></i></button>
                             </div>
-                        </div>
+</div>
                         <div class="col-md-6">
-                            <label class="form-label small">Marca / Subrubro</label>
-                            <select class="form-select form-select-sm" name="codsub">
-                                <option value="">— Sin marca —</option>
-                                <?php foreach ($subrubros as $sub): ?>
-                                    <option value="<?= (int)($sub['codsub'] ?? 0) ?>"><?= htmlspecialchars((string)($sub['nomsub'] ?? '')) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="row g-2 mb-3">
-                        <div class="col-md-6">
-<label class="form-label small">Departamento</label>
+                            <label class="form-label small">Departamento</label>
                             <div class="input-group">
                                 <select class="form-select form-select-sm" name="codepar">
                                     <option value="">— Sin departamento —</option>
