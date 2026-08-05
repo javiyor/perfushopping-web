@@ -8,6 +8,8 @@ $codsub = (int)($_GET['codsub'] ?? 0);
 $isNovedades = ($q === '' && $codrub === 0 && $codsub === 0);
 $empresa = (new \Perfushopping\Web\Repo\EmpresaRepo())->getDefault();
 $empresaNombre = htmlspecialchars($empresa['nomemp'] ?? 'Perfushopping');
+$empresaLogo = trim((string)($empresa['logo'] ?? ''));
+$empresaBanner = $empresaLogo !== '' ? Format::uploadUrl($empresaLogo) : '/assets/brand/logo-banner.jpg';
 $empresaTel = htmlspecialchars($empresa['telefono'] ?? '3482 765798');
 $empresaMail = htmlspecialchars($empresa['mail'] ?? 'clientes@perfushopping.com.ar');
 $empresaDir = htmlspecialchars($empresa['dire_emp'] ?? '9 de julio 1610 - Hipolito Irigoyen 465 - Reconquista, Santa Fe - Argentina');
@@ -16,7 +18,7 @@ $empresaWhatsapp = preg_replace('/[^0-9]/', '', $empresa['telefono'] ?? '5434827
 
 <div class="hero">
   <div style="display:flex;justify-content:center;">
-    <img src="/assets/brand/logo-banner.jpg" alt="<?= $empresaNombre ?>" loading="eager" decoding="async" style="width:80%;max-width:900px;height:auto;border-radius:22px;border:1px solid rgba(216,178,90,0.18);box-shadow:0 22px 70px rgba(0,0,0,0.55);" />
+    <img src="<?= htmlspecialchars($empresaBanner) ?>" alt="<?= $empresaNombre ?>" loading="eager" decoding="async" style="width:80%;max-width:900px;height:auto;border-radius:22px;border:1px solid rgba(216,178,90,0.18);box-shadow:0 22px 70px rgba(0,0,0,0.55);" />
   </div>
   <h1><?= $empresaNombre ?></h1>
   <p>Carrito de compras. Compra, paga facil y seguro en cuotas con Mercado Pago.</p>

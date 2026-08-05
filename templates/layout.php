@@ -1,11 +1,13 @@
 <?php
 use Perfushopping\Web\Support\Csrf;
 use Perfushopping\Web\Support\Env;
+use Perfushopping\Web\Support\Format;
 /** @var string $body */
 $appName = Env::get('APP_NAME', 'Perfushopping');
 $empresa = (new \Perfushopping\Web\Repo\EmpresaRepo())->getDefault();
 $empresaNombre = htmlspecialchars($empresa['nomemp'] ?? $appName);
-$empresaLogoUrl = !empty($empresa['logo']) ? '/uploads/' . ltrim($empresa['logo'], '/') : '/assets/brand/logo-header.png';
+$empresaLogo = trim((string)($empresa['logo'] ?? ''));
+$empresaLogoUrl = $empresaLogo !== '' ? Format::uploadUrl($empresaLogo) : '/assets/brand/logo-header.png';
 $user = $user ?? null;
 $isWholesale = $isWholesale ?? false;
 $flash = $_SESSION['flash'] ?? null;

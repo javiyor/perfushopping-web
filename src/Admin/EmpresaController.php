@@ -60,7 +60,7 @@ final class EmpresaController
         if (!empty($_FILES['logo']) && $_FILES['logo']['error'] === UPLOAD_ERR_OK) {
             $ext = strtolower(pathinfo($_FILES['logo']['name'], PATHINFO_EXTENSION));
             if (in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'webp'], true)) {
-                $uploadDir = APP_BASE_DIR . '/upload/empresa';
+                $uploadDir = self::logoUploadDir();
                 if (!is_dir($uploadDir)) {
                     mkdir($uploadDir, 0755, true);
                 }
@@ -86,7 +86,7 @@ final class EmpresaController
         $repo = new EmpresaRepo();
         $empresa = $repo->getDefault();
         if ($empresa && ($empresa['logo'] ?? '')) {
-            $filePath = APP_BASE_DIR . '/' . ltrim($empresa['logo'], '/');
+            $filePath = self::logoUploadDir() . '/' . basename((string)$empresa['logo']);
             if (file_exists($filePath)) {
                 unlink($filePath);
             }
@@ -95,5 +95,11 @@ final class EmpresaController
 
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Logo eliminado.'];
         Response::redirect('/admin/empresa');
+    }
+
+    private static function logoUploadDir(): string
+    {
+        $webroot = (string)($_SERVER['DOCUMENT_ROOT'] ?? APP_BASE_DIR);
+        return rtrim($webroot, '/\\') . '/upload/empresa';
     }
 }
