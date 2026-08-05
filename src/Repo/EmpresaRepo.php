@@ -26,9 +26,13 @@ final class EmpresaRepo
 
     public function update(int $id, array $data): void
     {
+        $existing = $this->columns();
         $fields = [];
         $params = [':id' => $id];
         foreach (['nomemp', 'razon_emp', 'dire_emp', 'telefono', 'cuit', 'ing_brutos', 'mail', 'codtip', 'logo', 'web'] as $col) {
+            if (!in_array($col, $existing, true)) {
+                continue;
+            }
             if (array_key_exists($col, $data)) {
                 $fields[] = "$col = :$col";
                 $params[$col] = $data[$col];
@@ -38,6 +42,18 @@ final class EmpresaRepo
         $sql = 'UPDATE empre SET ' . implode(', ', $fields) . ' WHERE idempre = :id LIMIT 1';
         $st = Db::pdo()->prepare($sql);
         $st->execute($params);
+    }
+
+    private static ?array $empreColumns = null;
+
+    private function columns(): array
+    {
+        if (self::$empreColumns !== null) {
+            return self::$empreColumns;
+        }
+        $st = Db::pdo()->query('SHOW COLUMNS FROM empre');
+        self::$empreColumns = array_column($st->fetchAll(), 'Field');
+        return self::$empreColumns;
     }
 
     public function tiposIva(): array
