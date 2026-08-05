@@ -163,6 +163,7 @@ $router->get('/admin/correo/saved', [AdminCorreoController::class, 'savedAgencie
 $router->get('/admin/productos', [AdminProductControllerNew::class, 'index']);
 $router->get('/admin/productos/nuevo', [AdminProductControllerNew::class, 'create']);
 $router->post('/admin/productos/crear', [AdminProductControllerNew::class, 'store']);
+$router->post('/admin/productos/crear-catalogo', [AdminProductControllerNew::class, 'crearCatalogo']);
 $router->get('/admin/productos/(?P<id>\d+)', [AdminProductControllerNew::class, 'show']);
 $router->post('/admin/productos/save', [AdminProductControllerNew::class, 'save']);
 $router->post('/admin/productos/save-description', [AdminProductControllerNew::class, 'saveDescription']);

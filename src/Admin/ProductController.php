@@ -184,6 +184,47 @@ final class ProductController
         unset($_SESSION['admin_flash']);
     }
 
+    public function crearCatalogo(array $params): void
+    {
+        $this->auth->requireSesion();
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $type = trim((string)($_POST['type'] ?? ''));
+        $nombre = trim((string)($_POST['nombre'] ?? ''));
+        if ($nombre === '') {
+            Response::json(['ok' => false, 'error' => 'El nombre es obligatorio.'], 422);
+            return;
+        }
+
+        try {
+            $pdo = \Perfushopping\Web\Infra\Db::pdo();
+            switch ($type) {
+                case 'rubro':
+                    $st = $pdo->prepare('INSERT INTO rubros (nomrub) VALUES (:n)');
+                    $st->execute([':n' => $nombre]);
+                    $id = (int)$pdo->lastInsertId();
+                    break;
+                case 'subrubro':
+                    $codrub = (int)($_POST['codrub'] ?? 0);
+                    $st = $pdo->prepare('INSERT INTO subrubro (codrub, nomsub) VALUES (:cr, :n)');
+                    $st->execute([':cr' => $codrub > 0 ? $codrub : null, ':n' => $nombre]);
+                    $id = (int)$pdo->lastInsertId();
+                    break;
+                case 'departamento':
+                    $st = $pdo->prepare('INSERT INTO departa (nomdepar) VALUES (:n)');
+                    $st->execute([':n' => $nombre]);
+                    $id = (int)$pdo->lastInsertId();
+                    break;
+                default:
+                    Response::json(['ok' => false, 'error' => 'Tipo invalido.'], 422);
+                    return;
+            }
+            Response::json(['ok' => true, 'id' => $id, 'nombre' => $nombre], 200);
+        } catch (\Throwable $e) {
+            Response::json(['ok' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
     public function save(array $params): void
     {
         $this->auth->requireSesion();

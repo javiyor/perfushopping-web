@@ -82,12 +82,27 @@ foreach ($proveedores as $prov) {
                     <div class="row g-1 mb-1">
                         <div class="col-md-6">
                             <label class="form-label small">Categoría</label>
-                            <select class="form-select form-select-sm" name="codrub">
-                                <option value="">— Sin categoría —</option>
-                                <?php foreach ($rubros as $rub): ?>
-                                    <option value="<?= (int)($rub['codrub'] ?? 0) ?>"<?= ((int)($rub['codrub'] ?? 0) === $selectedRubro) ? ' selected' : '' ?>><?= htmlspecialchars((string)($rub['nomrub'] ?? '')) ?></option>
-                                <?php endforeach; ?>
-                            </select>
+                            <div class="input-group">
+                                <select class="form-select form-select-sm" name="codrub">
+                                    <option value="">— Sin categoría —</option>
+                                    <?php foreach ($rubros as $rub): ?>
+                                        <option value="<?= (int) ($rub['codrub'] ?? 0) ?>"<?= ((int) ($rub['codrub'] ?? 0) === $selectedRubro) ? ' selected' : '' ?>><?= htmlspecialchars((string) ($rub['nomrub'] ?? '')) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <button class="btn btn-outline-secondary btn-sm" type="button" title="Nueva categoría" onclick="agregarCatalogo('rubro', 'categoría')"><i class="bi bi-plus-lg"></i></button>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small">Marca / Subrubro</label>
+                            <div class="input-group">
+                                <select class="form-select form-select-sm" name="codsub">
+                                    <option value="">— Sin marca —</option>
+                                    <?php foreach ($subrubros as $sub): ?>
+                                        <option value="<?= (int) ($sub['codsub'] ?? 0) ?>"<?= ((int) ($sub['codsub'] ?? 0) === $selectedSubrubro) ? ' selected' : '' ?>><?= htmlspecialchars((string) ($sub['nomsub'] ?? '')) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <button class="btn btn-outline-secondary btn-sm" type="button" title="Nueva marca / subrubro" onclick="agregarCatalogo('subrubro', 'marca')"><i class="bi bi-plus-lg"></i></button>
+                            </div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small">Marca / Subrubro</label>
@@ -100,14 +115,17 @@ foreach ($proveedores as $prov) {
                         </div>
                     </div>
                     <div class="row g-1">
-                        <div class="col-md-6">
+<div class="col-md-6">
                             <label class="form-label small">Departamento</label>
-                            <select class="form-select form-select-sm" name="codepar">
-                                <option value="">— Sin departamento —</option>
-                                <?php foreach ($departamentos as $dep): ?>
-                                    <option value="<?= (int)($dep['codepar'] ?? 0) ?>"<?= ((int)($dep['codepar'] ?? 0) === $selectedDepartamento) ? ' selected' : '' ?>><?= htmlspecialchars((string)($dep['nomdepar'] ?? '')) ?></option>
-                                <?php endforeach; ?>
-                            </select>
+                            <div class="input-group">
+                                <select class="form-select form-select-sm" name="codepar">
+                                    <option value="">— Sin departamento —</option>
+                                    <?php foreach ($departamentos as $dep): ?>
+                                        <option value="<?= (int) ($dep['codepar'] ?? 0) ?>"<?= ((int) ($dep['codepar'] ?? 0) === $selectedDepartamento) ? ' selected' : '' ?>><?= htmlspecialchars((string) ($dep['nomdepar'] ?? '')) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <button class="btn btn-outline-secondary btn-sm" type="button" title="Nuevo departamento" onclick="agregarCatalogo('departamento', 'departamento')"><i class="bi bi-plus-lg"></i></button>
+                            </div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small">Proveedor</label>
@@ -371,6 +389,33 @@ foreach ($proveedores as $prov) {
 </div>
 
 <script>
+function agregarCatalogo(tipo, nombreLabel) {
+    const csrf = document.querySelector('input[name="_csrf"]').value;
+    const nombre = prompt('Nombre de la nueva ' + nombreLabel + ':', '');
+    if (!nombre || !nombre.trim()) return;
+    const body = new URLSearchParams({_csrf: csrf, type: tipo, nombre: nombre.trim()});
+    if (tipo === 'subrubro') {
+        const rubSel = document.querySelector('select[name="codrub"]');
+        if (rubSel && rubSel.value) body.append('codrub', rubSel.value);
+    }
+    fetch('/admin/productos/crear-catalogo', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: body
+    }).then(r => r.json()).then(res => {
+        if (res.ok) {
+            const map = {rubro: 'codrub', subrubro: 'codsub', departamento: 'codepar'};
+            const sel = document.querySelector('select[name="' + map[tipo] + '"]');
+            const opt = document.createElement('option');
+            opt.value = res.id;
+            opt.textContent = res.nombre;
+            sel.appendChild(opt);
+            sel.value = String(res.id);
+        } else {
+            alert(res.error || 'Error al crear');
+        }
+    }).catch(() => alert('Error de conexión'));
+}
 function generarEan(btn, idcodgusto) {
     const input = btn.closest('.input-group').querySelector('.codscan-input');
     const padded = String(idcodgusto).padStart(12, '9');
