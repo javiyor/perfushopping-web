@@ -314,11 +314,15 @@ final class FacturaRepo
         $q = trim($q);
         if ($q === '') return [];
 
+        $condIvaExpr = $this->clientesTieneCondicionIva()
+            ? 'COALESCE(c.condicion_iva, \'consumidor_final\')'
+            : '\'consumidor_final\'';
+
         $st = Db::pdo()->prepare('
             SELECT COALESCE(w.id, 0) AS id, c.idclien,
                    c.razon AS name, c.cuit, c.direc, c.tele AS phone, c.mail AS email,
                    c.Localidad AS city,
-                   COALESCE(c.condicion_iva, \'consumidor_final\') AS condicion_iva
+                   ' . $condIvaExpr . ' AS condicion_iva
             FROM clientes c
             LEFT JOIN web_users w ON w.cliente_id = c.idclien
             WHERE c.razon LIKE :like OR c.cuit LIKE :like2
@@ -331,6 +335,21 @@ final class FacturaRepo
             $r['condicion_iva'] = self::normalizeCondIva($r['condicion_iva'] ?? null);
         }
         return $rows;
+    }
+
+    private static ?bool $clientesCondicionIva = null;
+
+    private function clientesTieneCondicionIva(): bool
+    {
+        if (self::$clientesCondicionIva === null) {
+            try {
+                $cols = Db::pdo()->query('SHOW COLUMNS FROM clientes');
+                self::$clientesCondicionIva = in_array('condicion_iva', array_column($cols->fetchAll(), 'Field'), true);
+            } catch (\Throwable $e) {
+                self::$clientesCondicionIva = false;
+            }
+        }
+        return self::$clientesCondicionIva;
     }
 
     public function findRemitosDisponibles(string $q, int $limit = 10): array
@@ -481,10 +500,10 @@ final class FacturaRepo
         if ($razon === '') return null;
 
         $direc = trim($data['direc'] ?? '');
-        $localidad = trim($data['localidad'] ?? '');
         $tele = trim($data['tele'] ?? '');
         $mail = trim($data['mail'] ?? '');
         $condIva = self::normalizeCondIva($data['condicion_iva'] ?? 'consumidor_final');
+        $tieneCondIva = $this->clientesTieneCondicionIva();
 
         $existing = null;
         if ($cuit !== '') {
@@ -494,42 +513,37 @@ final class FacturaRepo
         }
 
         if ($existing) {
+            $setCond = $tieneCondIva ? ', condicion_iva = :ci' : '';
             $st = Db::pdo()->prepare('
-                UPDATE clientes SET razon = :r, direc = :d, Localidad = :l, tele = :t, mail = :m, condicion_iva = :ci
+                UPDATE clientes SET razon = :r, direc = :d, tele = :t, mail = :m' . $setCond . '
                 WHERE idclien = :id LIMIT 1
             ');
-            $st->execute([
-                ':r' => $razon,
-                ':d' => $direc,
-                ':l' => $localidad,
-                ':t' => $tele,
-                ':m' => $mail,
-                ':ci' => $condIva,
-                ':id' => $existing['idclien'],
-            ]);
+            $params = [':r' => $razon, ':d' => $direc, ':t' => $tele, ':m' => $mail, ':id' => $existing['idclien']];
+            if ($tieneCondIva) $params[':ci'] = $condIva;
+            $st->execute($params);
             $idclien = (int)$existing['idclien'];
         } else {
+            $condCol = $tieneCondIva ? ', condicion_iva' : '';
+            $condVal = $tieneCondIva ? ', :ci' : '';
             $st = Db::pdo()->prepare('
-                INSERT INTO clientes (razon, cuit, direc, Localidad, tele, mail, condicion_iva, activo, fealta)
-                VALUES (:r, :c, :d, :l, :t, :m, :ci, 1, NOW())
+                INSERT INTO clientes (razon, cuit, direc, tele, mail, activo, fealta' . $condCol . ')
+                VALUES (:r, :c, :d, :t, :m, 1, NOW()' . $condVal . ')
             ');
-            $st->execute([
-                ':r' => $razon,
-                ':c' => $cuit,
-                ':d' => $direc,
-                ':l' => $localidad,
-                ':t' => $tele,
-                ':m' => $mail,
-                ':ci' => $condIva,
-            ]);
+            $params = [':r' => $razon, ':c' => $cuit, ':d' => $direc, ':t' => $tele, ':m' => $mail];
+            if ($tieneCondIva) $params[':ci'] = $condIva;
+            $st->execute($params);
             $idclien = (int)Db::pdo()->lastInsertId();
         }
 
+        // Return in same shape as findClienteWeb
+        $condIvaExpr = $tieneCondIva
+            ? 'COALESCE(c.condicion_iva, \'consumidor_final\')'
+            : '\'consumidor_final\'';
         $st = Db::pdo()->prepare('
             SELECT COALESCE(w.id, 0) AS id, c.idclien,
                    c.razon AS name, c.cuit, c.direc, c.tele AS phone, c.mail AS email,
                    c.Localidad AS city,
-                   COALESCE(c.condicion_iva, \'consumidor_final\') AS condicion_iva
+                   ' . $condIvaExpr . ' AS condicion_iva
             FROM clientes c
             LEFT JOIN web_users w ON w.cliente_id = c.idclien
             WHERE c.idclien = :id LIMIT 1
