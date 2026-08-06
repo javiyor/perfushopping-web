@@ -28,13 +28,6 @@ final class ProductRepo
         $where[] = "p.fecompra <> '0000-00-00'";
         $where[] = 'p.fecompra > DATE_SUB(CURDATE(), INTERVAL 6 MONTH)';
 
-        // If the user is not searching or filtering, show only "novedades" (<30 days).
-        if ($q === '' && $codrub <= 0 && $codsub <= 0) {
-            $where[] = 'p.fecalta IS NOT NULL';
-            $where[] = "p.fecalta <> '0000-00-00'";
-            $where[] = 'p.fecalta <= CURDATE()';
-            $where[] = 'p.fecalta > DATE_SUB(CURDATE(), INTERVAL 30 DAY)';
-        }
         if ($codrub > 0) {
             $where[] = 'p.codrub = :codrub';
             $params[':codrub'] = $codrub;
