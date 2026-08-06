@@ -186,10 +186,24 @@ $discriminaIva = in_array($factura['tipo_comprobante'] ?? '', ['FACT-A']);
                     <span>
                         <?php if (($pg['forma_pago'] ?? '') === 'cheque'): ?>
                             <span class="badge bg-info">Cheque</span>
-                            <?php if ($pg['cheque_banco'] ?? ''): ?>
-                                <div class="text-muted" style="font-size:11px"><?= htmlspecialchars($pg['cheque_banco']) ?> N°<?= htmlspecialchars($pg['numero_cheque'] ?? '') ?></div>
+                            <?php $bancoChq = $pg['banco_nombre'] ?? $pg['cheque_banco'] ?? ''; ?>
+                            <?php if ($bancoChq): ?>
+                                <div class="text-muted" style="font-size:11px"><?= htmlspecialchars($bancoChq) ?> N°<?= htmlspecialchars($pg['numero_cheque'] ?? '') ?></div>
                             <?php endif; ?>
                             <a href="/admin/cheques/<?= (int)($pg['cheque_id'] ?? 0) ?>" class="small">Ver cheque</a>
+                        <?php elseif (($pg['forma_pago'] ?? '') === 'tarjeta_credito'): ?>
+                            <span class="badge bg-primary">Tarjeta de crédito</span>
+                            <?php if ($pg['cupon_numero'] ?? ''): ?>
+                                <div class="text-muted" style="font-size:11px">Cupón N°<?= htmlspecialchars($pg['cupon_numero']) ?></div>
+                            <?php endif; ?>
+                            <?php if ((int)($pg['cupon_monto_cents'] ?? 0) > 0): ?>
+                                <div class="text-muted" style="font-size:11px">Valor cupón: <?= htmlspecialchars(Format::moneyRoundedFromCents((int)$pg['cupon_monto_cents'])) ?></div>
+                            <?php endif; ?>
+                        <?php elseif (($pg['forma_pago'] ?? '') === 'cuenta_corriente'): ?>
+                            <span class="badge bg-warning text-dark">Cuenta corriente</span>
+                            <?php if ($pg['plazo_descripcion'] ?? ''): ?>
+                                <div class="text-muted" style="font-size:11px"><?= htmlspecialchars($pg['plazo_descripcion']) ?><?= $pg['plazo_cuotas'] > 1 ? ' (cuotas: ' . (int)$pg['plazo_cuotas'] . ')' : '' ?></div>
+                            <?php endif; ?>
                         <?php else: ?>
                             <?= htmlspecialchars($formaPagoLabels[$pg['forma_pago'] ?? ''] ?? $pg['forma_pago'] ?? '') ?>
                         <?php endif; ?>

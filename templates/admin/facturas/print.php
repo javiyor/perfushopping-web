@@ -143,7 +143,11 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
     <hr />
     <div class="totals">
         <?php foreach ($pagos as $pg): ?>
-        <div class="row"><span><?= htmlspecialchars($formaPagoLabels[$pg['forma_pago'] ?? ''] ?? $pg['forma_pago'] ?? '') ?>:</span><span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($pg['monto_cents'] ?? 0))) ?></span></div>
+        <?php $label = $formaPagoLabels[$pg['forma_pago'] ?? ''] ?? $pg['forma_pago'] ?? ''; ?>
+        <?php if ($label === 'Cheque'): $label = 'Cheque' . ($pg['banco_nombre'] ?? $pg['cheque_banco'] ?? '' ? ' ' . htmlspecialchars($pg['banco_nombre'] ?? $pg['cheque_banco']) : '') . ($pg['numero_cheque'] ? ' N°' . htmlspecialchars($pg['numero_cheque']) : ''); endif; ?>
+        <?php if ($pg['forma_pago'] === 'tarjeta_credito'): $label .= $pg['cupon_numero'] ? ' - Cupón N°' . htmlspecialchars($pg['cupon_numero']) : ''; endif; ?>
+        <?php if ($pg['forma_pago'] === 'cuenta_corriente'): $label .= $pg['plazo_descripcion'] ? ' - ' . htmlspecialchars($pg['plazo_descripcion']) : ''; endif; ?>
+        <div class="row"><span><?= htmlspecialchars($label) ?>:</span><span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($pg['monto_cents'] ?? 0))) ?></span></div>
         <?php endforeach; ?>
     </div>
     <?php endif; ?>

@@ -76,6 +76,8 @@ final class FacturaController
             'presupuestoId' => $presupuestoId,
             'presupuestoItems' => $presupuestoItems,
             'vendedores' => $vendedores,
+            'bancos' => $this->bancos(),
+            'plazos' => $this->plazos(),
             'csrf' => Csrf::token(),
             'pageTitle' => 'Nueva factura',
         ]);
@@ -131,18 +133,31 @@ final class FacturaController
 
         $pagosRaw = $input['pagos'] ?? [];
         $pagos = [];
+        $bancoNombres = [];
+        if ($pagosRaw) {
+            $st = \Perfushopping\Web\Infra\Db::pdo()->query('SELECT idban, nombanc FROM bancos');
+            foreach ($st->fetchAll() as $b) {
+                $bancoNombres[(int)$b['idban']] = (string)$b['nombanc'];
+            }
+        }
         foreach ($pagosRaw as $pg) {
             $monto = (int)($pg['monto_cents'] ?? 0);
             if ($monto <= 0) continue;
             $formaPagoP = trim((string)($pg['forma_pago'] ?? 'efectivo'));
+            $bancoId = null;
             $chequeId = null;
             if ($formaPagoP === 'cheque' && !empty($pg['cheque'])) {
                 $chq = $pg['cheque'];
+                $bancoId = (int)($chq['banco_id'] ?? 0) ?: null;
+                $bancoEmisor = trim((string)($chq['banco'] ?? ''));
+                if (!$bancoEmisor && $bancoId) {
+                    $bancoEmisor = $bancoNombres[$bancoId] ?? '';
+                }
                 $chequeRepo = new ChequeRepo();
                 $chequeId = $chequeRepo->create([
                     'tipo' => 'tercero',
                     'estado' => 'en_cartera',
-                    'banco_emisor' => trim((string)($chq['banco'] ?? '')),
+                    'banco_emisor' => $bancoEmisor,
                     'numero_cheque' => trim((string)($chq['numero'] ?? '')),
                     'titular' => trim((string)($chq['titular'] ?? '')),
                     'cuit_titular' => trim((string)($chq['cuit'] ?? '')),
@@ -157,6 +172,10 @@ final class FacturaController
                 'forma_pago' => $formaPagoP,
                 'monto_cents' => $monto,
                 'cheque_id' => $chequeId,
+                'cupon_numero' => $formaPagoP === 'tarjeta_credito' ? trim((string)($pg['cupon_numero'] ?? '')) : null,
+                'cupon_monto_cents' => $formaPagoP === 'tarjeta_credito' ? (int)($pg['cupon_monto_cents'] ?? 0) : null,
+                'idplazo' => $formaPagoP === 'cuenta_corriente' ? ((int)($pg['idplazo'] ?? 0) ?: null) : null,
+                'banco_id' => $bancoId,
             ];
         }
 
@@ -421,6 +440,20 @@ final class FacturaController
         (new FacturaRepo())->delete($id);
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Factura eliminada.'];
         Response::redirect('/admin/facturas');
+    }
+
+    private function bancos(): array
+    {
+        $st = \Perfushopping\Web\Infra\Db::pdo()->query('SELECT idban, nombanc, numbanc FROM bancos ORDER BY nombanc ASC');
+        $rows = $st->fetchAll();
+        return is_array($rows) ? $rows : [];
+    }
+
+    private function plazos(): array
+    {
+        $st = \Perfushopping\Web\Infra\Db::pdo()->query('SELECT idplazo, dias, cuotas, descripcion, pricuo, tipo FROM plazopago ORDER BY cuotas ASC, dias ASC, idplazo ASC');
+        $rows = $st->fetchAll();
+        return is_array($rows) ? $rows : [];
     }
 
     public function searchProducts(array $params): void

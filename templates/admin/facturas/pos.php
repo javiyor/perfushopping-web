@@ -4,6 +4,8 @@ $remitoItems = $remitoItems ?? [];
 $presupuestoId = (int)($presupuestoId ?? 0);
 $presupuestoItems = $presupuestoItems ?? [];
 $csrfToken = $csrf ?? '';
+$bancos = $bancos ?? [];
+$plazos = $plazos ?? [];
 ?>
 <style>
 .pos-layout { display:flex; gap:20px; align-items:flex-start; }
@@ -191,36 +193,19 @@ $csrfToken = $csrf ?? '';
 
     <div class="pos-right">
         <div class="card shadow-sm mb-3">
-            <div class="card-header bg-white fw-semibold">Forma de pago</div>
+            <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-cash-stack"></i> Formas de pago</span>
+                <button class="btn btn-sm btn-outline-primary" type="button" onclick="addPagoLine()"><i class="bi bi-plus-lg"></i> Agregar</button>
+            </div>
             <div class="card-body">
-                <select class="form-select form-select-sm" id="formaPago">
-                    <option value="efectivo">Efectivo</option>
-                    <option value="transferencia">Transferencia bancaria</option>
-                    <option value="tarjeta_credito">Tarjeta de crédito</option>
-                    <option value="tarjeta_debito">Tarjeta de débito</option>
-                    <option value="mercadopago">Mercado Pago</option>
-                    <option value="cuenta_corriente">Cuenta corriente</option>
-                    <option value="cheque">Cheque de terceros</option>
-                </select>
-                <div id="posChequeData" class="mt-2 p-2 bg-light rounded" style="display:none">
-                    <h6 class="small fw-bold mb-2"><i class="bi bi-file-text"></i> Datos del cheque</h6>
-                    <div class="row g-1">
-                        <div class="col-6 mb-1"><input class="form-control form-control-sm" id="chequeBanco" placeholder="Banco" /></div>
-                        <div class="col-6 mb-1"><input class="form-control form-control-sm" id="chequeNumero" placeholder="N° de cheque" /></div>
-                        <div class="col-6 mb-1"><input class="form-control form-control-sm" id="chequeTitular" placeholder="Titular" /></div>
-                        <div class="col-6 mb-1"><input class="form-control form-control-sm" id="chequeCuit" placeholder="CUIT" /></div>
-                        <div class="col-6 mb-1"><label class="small">Vencimiento</label><input class="form-control form-control-sm" id="chequeVencimiento" type="date" /></div>
-                        <div class="col-6 mb-1"><label class="small">Monto del cheque</label><div class="input-group input-group-sm"><span class="input-group-text">$</span><input class="form-control" id="chequeMontoCents" type="number" placeholder="En centavos" /></div></div>
-                    </div>
+                <div id="pagosContainer"></div>
+                <div class="d-flex justify-content-between align-items-center small mt-2 pt-2 border-top">
+                    <span class="text-muted">Pagado:</span>
+                    <strong id="pagosTotal">$0,00</strong>
                 </div>
-                <hr />
-                <div id="efectivoFields">
-                <label class="small text-muted">Monto recibido ($)</label>
-                <input class="form-control form-control-sm mb-2" id="montoRecibido" type="number" value="0" min="0" step="0.01" />
-                <div class="d-flex justify-content-between small">
-                    <span>Vuelto:</span>
+                <div class="d-flex justify-content-between align-items-center small">
+                    <span class="text-muted">Vuelto:</span>
                     <strong id="vueltoDisplay">$0,00</strong>
-                </div>
                 </div>
             </div>
         </div>
@@ -537,13 +522,14 @@ function recalcTotals() {
     const totalConDto = total - descuento;
     document.getElementById('posTotal').textContent = '$' + fmtPrice(totalConDto);
 
-    const esEfectivo = document.getElementById('formaPago').value === 'efectivo';
-    const recibido = parseInt(parseFloat(document.getElementById('montoRecibido').value) * 100) || 0;
-    const vuelto = esEfectivo && recibido > 0 ? Math.max(0, recibido - totalConDto) : 0;
+    let pagado = 0;
+    document.querySelectorAll('#pagosContainer .fp-monto').forEach(inp => {
+        pagado += parseInt(parseFloat(inp.value) * 100) || 0;
+    });
+    const vuelto = pagado > totalConDto ? pagado - totalConDto : 0;
+    document.getElementById('pagosTotal').textContent = '$' + fmtPrice(pagado);
     document.getElementById('vueltoDisplay').textContent = '$' + fmtPrice(vuelto);
 }
-
-document.getElementById('montoRecibido').addEventListener('input', recalcTotals);
 
 // ── Client search ──
 const cliInput = document.getElementById('clienteSearch');
@@ -690,16 +676,85 @@ if (presInput) {
     });
 }
 
-// ── Cheque fields toggle ──
-document.getElementById('formaPago').addEventListener('change', function() {
-    document.getElementById('posChequeData').style.display = this.value === 'cheque' ? 'block' : 'none';
-    const esEfectivo = this.value === 'efectivo';
-    document.getElementById('efectivoFields').style.display = esEfectivo ? 'block' : 'none';
-    if (!esEfectivo) {
-        document.getElementById('montoRecibido').value = '0';
+// ── Payment lines (multi-pago) ──
+const BANCOS = <?= json_encode($bancos, JSON_UNESCAPED_UNICODE) ?>;
+const PLAZOS = <?= json_encode($plazos, JSON_UNESCAPED_UNICODE) ?>;
+const FORMAS_PAGO = [
+    ['efectivo', 'Efectivo'],
+    ['transferencia', 'Transferencia bancaria'],
+    ['tarjeta_credito', 'Tarjeta de crédito'],
+    ['tarjeta_debito', 'Tarjeta de débito'],
+    ['mercadopago', 'Mercado Pago'],
+    ['cuenta_corriente', 'Cuenta corriente'],
+    ['cheque', 'Cheque de terceros'],
+];
+
+function addPagoLine(forma) {
+    const container = document.getElementById('pagosContainer');
+    const div = document.createElement('div');
+    div.className = 'pago-line border rounded p-2 mb-2 bg-light';
+    div.innerHTML = `
+        <div class="row g-1 align-items-center">
+            <div class="col-7">
+                <select class="form-select form-select-sm fp-forma" onchange="onPagoFormaChange(this)">
+                    ${FORMA_PAGO.map(f => `<option value="${f[0]}"${forma == f[0] ? ' selected' : ''}>${f[1]}</option>`).join('')}
+                </select>
+            </div>
+            <div class="col-4">
+                <div class="input-group input-group-sm"><span class="input-group-text">$</span><input class="form-control fp-monto" type="number" min="0" step="0.01" value="0" oninput="recalcTotals()" /></div>
+            </div>
+            <div class="col-1 text-end">
+                <button class="btn btn-sm btn-outline-danger fp-del" type="button" onclick="removePagoLine(this)"><i class="bi bi-x-lg"></i></button>
+            </div>
+        </div>
+        <div class="fp-extra mt-2"></div>`;
+    container.appendChild(div);
+    onPagoFormaChange(div.querySelector('.fp-forma'));
+    recalcTotals();
+}
+
+function removePagoLine(btn) {
+    btn.closest('.pago-line').remove();
+    recalcTotals();
+}
+
+function onPagoFormaChange(sel) {
+    const line = sel.closest('.pago-line');
+    const extra = line.querySelector('.fp-extra');
+    const forma = sel.value;
+    if (forma === 'tarjeta_credito') {
+        extra.innerHTML = `
+            <div class="row g-1">
+                <div class="col-6"><label class="small text-muted">N° de cupón</label><input class="form-control form-control-sm fp-cupon" placeholder="N° de cupón" /></div>
+                <div class="col-6"><label class="small text-muted">Valor del cupón ($)</label><input class="form-control form-control-sm fp-cuponmonto" type="number" min="0" step="0.01" oninput="recalcTotals()" /></div>
+            </div>`;
+    } else if (forma === 'cuenta_corriente') {
+        let opts = '<option value="">— Sin plazo —</option>';
+        PLAZOS.forEach(p => { opts += `<option value="${p.idplazo}">${esc(p.descripcion)}</option>`; });
+        extra.innerHTML = `
+            <div class="row g-1">
+                <div class="col-12"><label class="small text-muted">Plazo / cuotas</label>
+                    <select class="form-select form-select-sm fp-plazo">${opts}</select>
+                </div>
+            </div>`;
+    } else if (forma === 'cheque') {
+        let bopts = '<option value="">— Seleccionar banco —</option>';
+        BANCOS.forEach(b => { bopts += `<option value="${b.idban}">${esc(b.nombanc)}</option>`; });
+        extra.innerHTML = `
+            <div class="row g-1">
+                <div class="col-6"><label class="small text-muted">Banco</label><select class="form-select form-select-sm fp-banco">${bopts}</select></div>
+                <div class="col-6"><label class="small text-muted">N° de cheque</label><input class="form-control form-control-sm fp-chequenum" /></div>
+                <div class="col-6"><label class="small text-muted">Titular</label><input class="form-control form-control-sm fp-chequetitular" /></div>
+                <div class="col-6"><label class="small text-muted">CUIT</label><input class="form-control form-control-sm fp-chequecuit" /></div>
+                <div class="col-6"><label class="small text-muted">Vencimiento</label><input class="form-control form-control-sm fp-chequevenc" type="date" /></div>
+            </div>`;
+    } else {
+        extra.innerHTML = '';
     }
     recalcTotals();
-});
+}
+
+addPagoLine('efectivo');
 
 // ── Submit ──
 function submitFactura() {
@@ -715,9 +770,7 @@ function submitFactura() {
     const clienteCuit = document.getElementById('clienteCuit').textContent || '';
     const clienteCondIva = document.getElementById('clienteCondIva').value || 'consumidor_final';
     const clienteErpId = parseInt(document.getElementById('clienteErpId').value) || 0;
-    const formaPago = document.getElementById('formaPago').value;
     const notas = document.getElementById('facturaNotas').value;
-    const montoRecibido = parseInt(document.getElementById('montoRecibido').value) || 0;
 
     const descPct = parseInt(document.getElementById('posDescuento').value) || 0;
     const totalBruto = cart.reduce((sum, item) => {
@@ -727,12 +780,53 @@ function submitFactura() {
     }, 0);
     const descuentoCents = descPct > 0 ? Math.round(totalBruto * descPct / 100) : 0;
 
+    const pagos = [];
+    document.querySelectorAll('#pagosContainer .pago-line').forEach(line => {
+        const forma = line.querySelector('.fp-forma').value;
+        const monto = parseInt(parseFloat(line.querySelector('.fp-monto').value) * 100) || 0;
+        if (monto <= 0) return;
+        const entry = { forma_pago: forma, monto_cents: monto };
+        if (forma === 'tarjeta_credito') {
+            entry.cupon_numero = (line.querySelector('.fp-cupon').value || '').trim();
+            entry.cupon_monto_cents = parseInt(parseFloat(line.querySelector('.fp-cuponmonto').value) * 100) || null;
+        } else if (forma === 'cuenta_corriente') {
+            entry.idplazo = parseInt(line.querySelector('.fp-plazo').value) || null;
+        } else if (forma === 'cheque') {
+            const bancoSel = line.querySelector('.fp-banco');
+            entry.cheque = {
+                banco_id: parseInt(bancoSel.value) || null,
+                banco: bancoSel.selectedIndex >= 0 ? bancoSel.options[bancoSel.selectedIndex].text : '',
+                numero: line.querySelector('.fp-chequenum').value,
+                titular: line.querySelector('.fp-chequetitular').value,
+                cuit: line.querySelector('.fp-chequecuit').value,
+                vencimiento: line.querySelector('.fp-chequevenc').value,
+            };
+        }
+        pagos.push(entry);
+    });
+    if (pagos.length === 0) {
+        alert('Agregá al menos una forma de pago (con monto mayor a cero).');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-receipt"></i> FACTURAR';
+        return;
+    }
+    const totalFactura = totalBruto - descuentoCents;
+    const totalPagado = pagos.reduce((s, p) => s + p.monto_cents, 0);
+    if (totalPagado < totalFactura) {
+        const ok = confirm('El total pagado ($' + fmtPrice(totalPagado) + ') es menor que el total de la factura ($' + fmtPrice(totalFactura) + '). ¿Continuar igual?');
+        if (!ok) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-receipt"></i> FACTURAR';
+            return;
+        }
+    }
+
     const presupuestoId = parseInt(document.getElementById('presupuestoId').value) || 0;
     const vendedorEl = document.getElementById('vendedorId');
     const payload = {
         _csrf: document.getElementById('csrfToken').value,
         tipo_comprobante: tipo,
-        forma_pago: formaPago,
+        forma_pago: pagos[0].forma_pago,
         remito_id: remitoId,
         presupuesto_id: presupuestoId,
         vendedor_id: vendedorEl ? parseInt(vendedorEl.value) || null : null,
@@ -755,18 +849,7 @@ function submitFactura() {
             unit_price_cents: item.net_price_cents,
             iva_rate: item.iva_rate,
         })),
-        pagos: [{
-            forma_pago: formaPago,
-            monto_cents: totalBruto - descuentoCents,
-            cheque: formaPago === 'cheque' ? {
-                banco: document.getElementById('chequeBanco').value,
-                numero: document.getElementById('chequeNumero').value,
-                titular: document.getElementById('chequeTitular').value,
-                cuit: document.getElementById('chequeCuit').value,
-                vencimiento: document.getElementById('chequeVencimiento').value,
-                monto_cents: parseInt(document.getElementById('chequeMontoCents').value) || 0,
-            } : null,
-        }],
+        pagos: pagos,
     };
 
     fetch('/admin/facturas/guardar', {
