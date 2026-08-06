@@ -123,15 +123,36 @@ final class CajaRepo
 
     public function totalRecibos(string $fecha, int $puntoVenta): int
     {
+        $pvWhere = '';
+        $params = [':fec' => $fecha];
+        if ($this->recibosTienePuntoVenta()) {
+            $pvWhere = ' AND r.punto_venta = :pv';
+            $params[':pv'] = $puntoVenta;
+        }
         $st = Db::pdo()->prepare("
             SELECT COALESCE(SUM(r.monto_cents), 0)
             FROM recibos r
             WHERE r.estado = 'emitido'
               AND r.fecha = :fec
-              AND r.punto_venta = :pv
+              $pvWhere
         ");
-        $st->execute([':fec' => $fecha, ':pv' => $puntoVenta]);
+        $st->execute($params);
         return (int)$st->fetchColumn();
+    }
+
+    private static ?array $recibosColumns = null;
+
+    private function recibosTienePuntoVenta(): bool
+    {
+        if (self::$recibosColumns === null) {
+            try {
+                $st = Db::pdo()->query('SHOW COLUMNS FROM recibos');
+                self::$recibosColumns = array_column($st->fetchAll(), 'Field');
+            } catch (\Throwable $e) {
+                self::$recibosColumns = [];
+            }
+        }
+        return in_array('punto_venta', self::$recibosColumns, true);
     }
 
     public function arqueos(int $cajaId): array

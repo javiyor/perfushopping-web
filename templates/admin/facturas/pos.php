@@ -697,7 +697,7 @@ function addPagoLine(forma) {
         <div class="row g-1 align-items-center">
             <div class="col-7">
                 <select class="form-select form-select-sm fp-forma" onchange="onPagoFormaChange(this)">
-                    ${FORMA_PAGO.map(f => `<option value="${f[0]}"${forma == f[0] ? ' selected' : ''}>${f[1]}</option>`).join('')}
+                    ${FORMAS_PAGO.map(f => `<option value="${f[0]}"${forma == f[0] ? ' selected' : ''}>${f[1]}</option>`).join('')}
                 </select>
             </div>
             <div class="col-4">

@@ -133,7 +133,7 @@ final class ReporteRepo
     {
         $params = [':desde' => $desde, ':hasta' => $hasta];
         $pvWhere = '';
-        if ($puntoVenta > 0) {
+        if ($puntoVenta > 0 && $this->recibosTienePuntoVenta()) {
             $pvWhere = ' AND r.punto_venta = :pv';
             $params[':pv'] = $puntoVenta;
         }
@@ -148,6 +148,21 @@ final class ReporteRepo
         ");
         $st->execute($params);
         return $st->fetch() ?: ['cantidad' => 0, 'total_cents' => 0];
+    }
+
+    private static ?array $recibosColumns = null;
+
+    private function recibosTienePuntoVenta(): bool
+    {
+        if (self::$recibosColumns === null) {
+            try {
+                $st = Db::pdo()->query('SHOW COLUMNS FROM recibos');
+                self::$recibosColumns = array_column($st->fetchAll(), 'Field');
+            } catch (\Throwable $e) {
+                self::$recibosColumns = [];
+            }
+        }
+        return in_array('punto_venta', self::$recibosColumns, true);
     }
 
     public function facturasPorTipo(string $desde, string $hasta, int $puntoVenta = 0): array
