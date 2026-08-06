@@ -63,16 +63,25 @@ final class AdminUserRepo
 
     public function onboardingVistas(int $id): int
     {
-        $st = Db::pdo()->prepare('SELECT onboarding_vistas FROM admin_users WHERE id = :i LIMIT 1');
-        $st->execute([':i' => $id]);
-        $v = $st->fetchColumn();
-        return is_numeric($v) ? (int)$v : 0;
+        try {
+            $st = Db::pdo()->prepare('SELECT onboarding_vistas FROM admin_users WHERE id = :i LIMIT 1');
+            $st->execute([':i' => $id]);
+            $v = $st->fetchColumn();
+            return is_numeric($v) ? (int)$v : 0;
+        } catch (\Throwable $e) {
+            error_log('AdminUserRepo::onboardingVistas error: ' . $e->getMessage());
+            return 0;
+        }
     }
 
     public function incrementarOnboarding(int $id): void
     {
-        $st = Db::pdo()->prepare('UPDATE admin_users SET onboarding_vistas = onboarding_vistas + 1 WHERE id = :i LIMIT 1');
-        $st->execute([':i' => $id]);
+        try {
+            $st = Db::pdo()->prepare('UPDATE admin_users SET onboarding_vistas = onboarding_vistas + 1 WHERE id = :i LIMIT 1');
+            $st->execute([':i' => $id]);
+        } catch (\Throwable $e) {
+            error_log('AdminUserRepo::incrementarOnboarding error: ' . $e->getMessage());
+        }
     }
 
     public static function rolOptions(): array
