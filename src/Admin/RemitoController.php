@@ -155,7 +155,7 @@ final class RemitoController
                 $qty = $it['qty'];
                 if ($idprodu) {
                     $tipoMov = $tipo === 'entrada' ? 'compra' : 'venta';
-                    $stockRepo->registrarAjuste($idprodu, $idcodgusto, $depoId, $sign * $qty, 'Remito ' . $codigo, (int)$adminUser['id'], $tipoMov);
+                    $stockRepo->registrarAjuste($idprodu, $idcodgusto, $sign === -1 ? $depoId : 0, $sign === 1 ? $depoId : 0, $qty, 'Remito ' . $codigo, (int)$adminUser['id'], $tipoMov);
                 }
             }
         }
@@ -228,7 +228,7 @@ final class RemitoController
                     $qty = (int)($it['qty'] ?? 0);
                     if ($idprodu) {
                         $tipoMov = $remitoTipo === 'entrada' ? 'devolucion_compra' : 'devolucion_venta';
-                        $stockRepo->registrarAjuste($idprodu, $idcodgusto, $depoId, $sign * $qty, 'Anulación Remito ' . ($r['codigo'] ?? ''), (int)$adminUser['id'], $tipoMov);
+                        $stockRepo->registrarAjuste($idprodu, $idcodgusto, $sign === -1 ? $depoId : 0, $sign === 1 ? $depoId : 0, $qty, 'Anulación Remito ' . ($r['codigo'] ?? ''), (int)$adminUser['id'], $tipoMov);
                     }
                 }
             }
