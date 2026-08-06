@@ -408,8 +408,7 @@ final class FacturaRepo
     }
 
     public function findClienteByIdclien(int $idclien): ?array
-    {
-        $st = Db::pdo()->prepare('
+    {        $st = Db::pdo()->prepare('
             SELECT c.*
             FROM clientes c
             WHERE c.idclien = :id
@@ -465,6 +464,74 @@ final class FacturaRepo
                    c.Localidad AS city,
                    COALESCE(c.condicion_iva, \'consumidor_final\') AS condicion_iva
             FROM clientes c
+            WHERE c.idclien = :id LIMIT 1
+        ');
+        $st->execute([':id' => $idclien]);
+        $r = $st->fetch();
+        if ($r) {
+            $r['condicion_iva'] = self::normalizeCondIva($r['condicion_iva'] ?? null);
+        }
+        return $r ?: null;
+    }
+
+    public function crearClientePos(array $data): ?array
+    {
+        $cuit = trim($data['cuit'] ?? '');
+        $razon = trim($data['razon'] ?? '');
+        if ($razon === '') return null;
+
+        $direc = trim($data['direc'] ?? '');
+        $localidad = trim($data['localidad'] ?? '');
+        $tele = trim($data['tele'] ?? '');
+        $mail = trim($data['mail'] ?? '');
+        $condIva = self::normalizeCondIva($data['condicion_iva'] ?? 'consumidor_final');
+
+        $existing = null;
+        if ($cuit !== '') {
+            $st = Db::pdo()->prepare('SELECT * FROM clientes WHERE cuit = :c LIMIT 1');
+            $st->execute([':c' => $cuit]);
+            $existing = $st->fetch();
+        }
+
+        if ($existing) {
+            $st = Db::pdo()->prepare('
+                UPDATE clientes SET razon = :r, direc = :d, Localidad = :l, tele = :t, mail = :m, condicion_iva = :ci
+                WHERE idclien = :id LIMIT 1
+            ');
+            $st->execute([
+                ':r' => $razon,
+                ':d' => $direc,
+                ':l' => $localidad,
+                ':t' => $tele,
+                ':m' => $mail,
+                ':ci' => $condIva,
+                ':id' => $existing['idclien'],
+            ]);
+            $idclien = (int)$existing['idclien'];
+        } else {
+            $st = Db::pdo()->prepare('
+                INSERT INTO clientes (razon, cuit, direc, Localidad, tele, mail, condicion_iva, activo, fealta)
+                VALUES (:r, :c, :d, :l, :t, :m, :ci, 1, NOW())
+            ');
+            $st->execute([
+                ':r' => $razon,
+                ':c' => $cuit,
+                ':d' => $direc,
+                ':l' => $localidad,
+                ':t' => $tele,
+                ':m' => $mail,
+                ':ci' => $condIva,
+            ]);
+            $idclien = (int)Db::pdo()->lastInsertId();
+        }
+
+        $st = Db::pdo()->prepare('
+            SELECT COALESCE(w.id, 0) AS id, c.idclien,
+                   c.razon AS name, c.cuit, c.direc, c.tele AS phone, c.mail AS email,
+                   c.Localidad AS city,
+                   COALESCE(c.condicion_iva, \'consumidor_final\') AS condicion_iva
+            FROM clientes c
+            LEFT JOIN web_users w ON w.cliente_id = c.idclien
             WHERE c.idclien = :id LIMIT 1
         ');
         $st->execute([':id' => $idclien]);

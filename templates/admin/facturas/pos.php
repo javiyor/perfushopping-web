@@ -157,8 +157,65 @@ $plazos = $plazos ?? [];
     <span id="clienteCuit" class="text-muted small"></span>
     <input type="hidden" id="clienteCondIva" value="consumidor_final" />
     <button class="btn btn-sm btn-outline-secondary" type="button" onclick="clearCliente()" title="Consumidor Final"><i class="bi bi-person-x"></i></button>
+    <button class="btn btn-sm btn-outline-success" type="button" data-bs-toggle="modal" data-bs-target="#nuevoClienteModal" title="Cargar nuevo cliente"><i class="bi bi-person-plus"></i> Nuevo</button>
 </div>
 <div id="clienteSuggestions" style="position:relative"></div>
+
+<!-- Nuevo cliente modal -->
+<div class="modal fade" id="nuevoClienteModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-person-plus"></i> Nuevo cliente</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-2">
+                    <label class="form-label small">Nombre / Razón social *</label>
+                    <input type="text" class="form-control form-control-sm" id="ncRazon" autocomplete="off" />
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small">CUIT</label>
+                    <input type="text" class="form-control form-control-sm" id="ncCuit" maxlength="11" autocomplete="off" placeholder="11 dígitos" />
+                </div>
+                <div class="row g-2 mb-2">
+                    <div class="col-6">
+                        <label class="form-label small">Teléfono</label>
+                        <input type="text" class="form-control form-control-sm" id="ncTele" autocomplete="off" />
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small">Email</label>
+                        <input type="text" class="form-control form-control-sm" id="ncMail" autocomplete="off" />
+                    </div>
+                </div>
+                <div class="row g-2 mb-2">
+                    <div class="col-6">
+                        <label class="form-label small">Dirección</label>
+                        <input type="text" class="form-control form-control-sm" id="ncDirec" autocomplete="off" />
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small">Localidad</label>
+                        <input type="text" class="form-control form-control-sm" id="ncLocalidad" autocomplete="off" />
+                    </div>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small">Condición frente al IVA</label>
+                    <select class="form-select form-select-sm" id="ncCondIva">
+                        <option value="consumidor_final">Consumidor Final</option>
+                        <option value="monotributista">Monotributista</option>
+                        <option value="responsable_inscripto">Responsable Inscripto</option>
+                        <option value="exento">Exento</option>
+                    </select>
+                </div>
+                <div id="ncError" class="alert alert-danger small py-2" style="display:none"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-sm btn-accent" id="ncSaveBtn" onclick="guardarNuevoCliente()"><i class="bi bi-check-lg"></i> Guardar y usar</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <div class="pos-layout">
     <div class="pos-left">
@@ -601,6 +658,65 @@ function clearCliente() {
     cliSuggestions.innerHTML = '';
     renderCart();
 }
+
+// ── Nuevo cliente (directo desde el POS) ──
+function guardarNuevoCliente() {
+    const razon = document.getElementById('ncRazon').value.trim();
+    const cuit = document.getElementById('ncCuit').value.trim();
+    if (!razon) { alert('Ingresá el nombre del cliente.'); return; }
+    const btn = document.getElementById('ncSaveBtn');
+    btn.disabled = true;
+    document.getElementById('ncError').style.display = 'none';
+
+    const body = new URLSearchParams();
+    body.append('_csrf', document.getElementById('csrfToken').value);
+    body.append('razon', razon);
+    body.append('cuit', cuit);
+    body.append('tele', document.getElementById('ncTele').value.trim());
+    body.append('mail', document.getElementById('ncMail').value.trim());
+    body.append('direc', document.getElementById('ncDirec').value.trim());
+    body.append('localidad', document.getElementById('ncLocalidad').value.trim());
+    body.append('condicion_iva', document.getElementById('ncCondIva').value);
+
+    fetch('/admin/facturas/clientes/crear', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString(),
+    })
+    .then(r => r.text().then(text => {
+        try {
+            const res = JSON.parse(text);
+            if (res.ok && res.cliente) {
+                const modal = bootstrap.Modal.getInstance(document.getElementById('nuevoClienteModal'));
+                if (modal) modal.hide();
+                selectCliente(res.cliente);
+                document.getElementById('ncRazon').value = '';
+                document.getElementById('ncCuit').value = '';
+                document.getElementById('ncTele').value = '';
+                document.getElementById('ncMail').value = '';
+                document.getElementById('ncDirec').value = '';
+                document.getElementById('ncLocalidad').value = '';
+                document.getElementById('ncCondIva').value = 'consumidor_final';
+            } else {
+                document.getElementById('ncError').textContent = res.error || 'Error al crear el cliente.';
+                document.getElementById('ncError').style.display = '';
+            }
+        } catch (e) {
+            document.getElementById('ncError').textContent = 'Error del servidor: ' + text.substring(0, 200);
+            document.getElementById('ncError').style.display = '';
+        }
+        btn.disabled = false;
+    }))
+    .catch(err => {
+        document.getElementById('ncError').textContent = 'Error de conexión: ' + err.message;
+        document.getElementById('ncError').style.display = '';
+        btn.disabled = false;
+    });
+}
+
+document.getElementById('nuevoClienteModal').addEventListener('shown.bs.modal', function() {
+    document.getElementById('ncRazon').focus();
+});
 
 // ── Remito search ──
 const remInput = document.getElementById('remitoSearch');

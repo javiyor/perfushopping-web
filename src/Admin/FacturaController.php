@@ -479,9 +479,38 @@ final class FacturaController
         Response::json($results);
     }
 
-    public function searchClientes(array $params): void
+    public function crearCliente(array $params): void
     {
         $auth = new AdminAuthService();
+        $adminUser = $auth->requireSesion();
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $razon = trim((string)($_POST['razon'] ?? ''));
+        if ($razon === '') {
+            Response::json(['ok' => false, 'error' => 'El nombre del cliente es obligatorio.'], 422);
+            return;
+        }
+
+        $cliente = (new FacturaRepo())->crearClientePos([
+            'razon' => $razon,
+            'cuit' => trim((string)($_POST['cuit'] ?? '')),
+            'direc' => trim((string)($_POST['direc'] ?? '')),
+            'localidad' => trim((string)($_POST['localidad'] ?? '')),
+            'tele' => trim((string)($_POST['tele'] ?? '')),
+            'mail' => trim((string)($_POST['mail'] ?? '')),
+            'condicion_iva' => trim((string)($_POST['condicion_iva'] ?? 'consumidor_final')),
+        ]);
+
+        if (!$cliente) {
+            Response::json(['ok' => false, 'error' => 'Error al crear el cliente.'], 500);
+            return;
+        }
+
+        Response::json(['ok' => true, 'cliente' => $cliente]);
+    }
+
+    public function searchClientes(array $params): void
+    {        $auth = new AdminAuthService();
         $adminUser = $auth->requireSesion();
 
         $q = trim((string)($_GET['q'] ?? ''));
