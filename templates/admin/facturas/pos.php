@@ -725,8 +725,7 @@ function onPagoFormaChange(sel) {
     if (forma === 'tarjeta_credito') {
         extra.innerHTML = `
             <div class="row g-1">
-                <div class="col-6"><label class="small text-muted">N° de cupón</label><input class="form-control form-control-sm fp-cupon" placeholder="N° de cupón" /></div>
-                <div class="col-6"><label class="small text-muted">Valor del cupón ($)</label><input class="form-control form-control-sm fp-cuponmonto" type="number" min="0" step="0.01" oninput="recalcTotals()" /></div>
+                <div class="col-12"><label class="small text-muted">N° de cupón</label><input class="form-control form-control-sm fp-cupon" placeholder="N° de cupón" /></div>
             </div>`;
     } else if (forma === 'cuenta_corriente') {
         let opts = '<option value="">— Sin plazo —</option>';
@@ -788,7 +787,7 @@ function submitFactura() {
         const entry = { forma_pago: forma, monto_cents: monto };
         if (forma === 'tarjeta_credito') {
             entry.cupon_numero = (line.querySelector('.fp-cupon').value || '').trim();
-            entry.cupon_monto_cents = parseInt(parseFloat(line.querySelector('.fp-cuponmonto').value) * 100) || null;
+            entry.cupon_monto_cents = monto || null;
         } else if (forma === 'cuenta_corriente') {
             entry.idplazo = parseInt(line.querySelector('.fp-plazo').value) || null;
         } else if (forma === 'cheque') {
