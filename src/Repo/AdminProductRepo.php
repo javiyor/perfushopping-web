@@ -26,7 +26,7 @@ final class AdminProductRepo
         $sortDir = strtolower($order) === 'asc' ? 'ASC' : 'DESC';
 
         $params = [];
-        $where = ['p.fecompra > DATE_SUB(CURDATE(), INTERVAL 6 MONTH)'];
+        $where = [];
         $searchJoin = '';
         if ($q !== '') {
             $searchWhere = [];
