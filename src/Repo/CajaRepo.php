@@ -124,7 +124,7 @@ final class CajaRepo
     public function totalRecibos(string $fecha, int $puntoVenta): int
     {
         $st = Db::pdo()->prepare("
-            SELECT COALESCE(SUM(r.total_cents), 0)
+            SELECT COALESCE(SUM(r.monto_cents), 0)
             FROM recibos r
             WHERE r.estado = 'emitido'
               AND r.fecha = :fec

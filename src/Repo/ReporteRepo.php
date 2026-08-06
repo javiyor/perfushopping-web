@@ -140,7 +140,7 @@ final class ReporteRepo
         $st = Db::pdo()->prepare("
             SELECT
                 COUNT(*) AS cantidad,
-                COALESCE(SUM(r.total_cents), 0) AS total_cents
+                COALESCE(SUM(r.monto_cents), 0) AS total_cents
             FROM recibos r
             WHERE r.estado = 'emitido'
               AND r.fecha BETWEEN :desde AND :hasta
