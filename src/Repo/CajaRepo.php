@@ -42,11 +42,17 @@ final class CajaRepo
 
     public function cerrar(int $id, int $montoCierreCents, int $cerradaPor, int $montoRetiradoCents = 0): void
     {
-        $st = Db::pdo()->prepare('
-            UPDATE caja_aperturas SET estado = \'cerrada\', monto_cierre_cents = :mon, monto_retirado_cents = :ret, cerrada_por = :cp, updated_at = NOW()
+        $retSql = '';
+        $params = [':mon' => $montoCierreCents, ':cp' => $cerradaPor, ':i' => $id];
+        if ($this->aperturasTieneMontoRetirado()) {
+            $retSql = ', monto_retirado_cents = :ret';
+            $params[':ret'] = $montoRetiradoCents;
+        }
+        $st = Db::pdo()->prepare("
+            UPDATE caja_aperturas SET estado = 'cerrada', monto_cierre_cents = :mon{$retSql}, cerrada_por = :cp, updated_at = NOW()
             WHERE id = :i LIMIT 1
-        ');
-        $st->execute([':mon' => $montoCierreCents, ':ret' => $montoRetiradoCents, ':cp' => $cerradaPor, ':i' => $id]);
+        ");
+        $st->execute($params);
     }
 
     public function agregarMovimiento(int $cajaId, string $tipo, string $concepto, int $montoCents, int $createdBy): int
@@ -153,6 +159,21 @@ final class CajaRepo
             }
         }
         return in_array('punto_venta', self::$recibosColumns, true);
+    }
+
+    private static ?array $aperturasColumns = null;
+
+    private function aperturasTieneMontoRetirado(): bool
+    {
+        if (self::$aperturasColumns === null) {
+            try {
+                $st = Db::pdo()->query('SHOW COLUMNS FROM caja_aperturas');
+                self::$aperturasColumns = array_column($st->fetchAll(), 'Field');
+            } catch (\Throwable $e) {
+                self::$aperturasColumns = [];
+            }
+        }
+        return in_array('monto_retirado_cents', self::$aperturasColumns, true);
     }
 
     public function arqueos(int $cajaId): array
