@@ -47,4 +47,13 @@ final class Env
         }
         return $v;
     }
+
+    public static function isDemo(): bool
+    {
+        if (self::get('APP_DEMO') === '1') {
+            return true;
+        }
+        $host = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
+        return $host !== '' && str_contains($host, 'organizing.5amsoftware.com.ar');
+    }
 }

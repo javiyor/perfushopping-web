@@ -93,6 +93,12 @@ final class FacturaRepo
         return $st->fetchAll();
     }
 
+    public function countActivas(): int
+    {
+        $st = Db::pdo()->query("SELECT COUNT(*) FROM facturas WHERE estado <> 'anulada'");
+        return (int)$st->fetchColumn();
+    }
+
     public function nextCodigo(string $tipo = 'FACT-B'): string
     {
         $st = Db::pdo()->query("SELECT COUNT(*) FROM facturas WHERE YEAR(created_at) = YEAR(CURDATE())");

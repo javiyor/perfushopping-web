@@ -334,6 +334,12 @@ final class AdminProductRepo
         return (int)$st->fetchColumn();
     }
 
+    public function countProductos(): int
+    {
+        $st = Db::pdo()->query('SELECT COUNT(*) FROM producto');
+        return (int)$st->fetchColumn();
+    }
+
     public function insertVariantImage(int $idprodu, int $idcodgusto, string $filename): int
     {
         $st = Db::pdo()->prepare('INSERT INTO imagen (rutaimg, idprodu, idcodgusto) VALUES (:r, :p, :g)');

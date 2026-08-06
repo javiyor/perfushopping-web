@@ -189,6 +189,12 @@ final class FacturaController
         $formaPago = $pagos[0]['forma_pago'] ?? 'efectivo';
 
         $repo = new FacturaRepo();
+
+        if (\Perfushopping\Web\Support\Env::isDemo() && $repo->countActivas() >= 20) {
+            Response::json(['ok' => false, 'error' => 'La demo permite un máximo de 20 facturas.']);
+            return;
+        }
+
         $codigo = $repo->nextCodigo($tipo);
 
         $clienteDirec = trim((string)($cliente['direc'] ?? ''));

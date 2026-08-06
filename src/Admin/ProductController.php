@@ -54,6 +54,11 @@ final class ProductController
         $this->auth->requireSesion();
         Csrf::check($_POST['_csrf'] ?? null);
 
+        if (\Perfushopping\Web\Support\Env::isDemo() && $this->repo->countProductos() >= 20) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'La demo permite un máximo de 20 productos en el catálogo.'];
+            Response::redirect('/admin/productos/nuevo');
+        }
+
         $produ = trim((string)($_POST['produ'] ?? ''));
         if ($produ === '') {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'El nombre del producto es obligatorio.'];
