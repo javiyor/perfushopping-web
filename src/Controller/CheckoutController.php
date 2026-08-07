@@ -178,7 +178,7 @@ final class CheckoutController
         if ($codLugar <= 0) {
             $errors[] = 'Selecciona localidad.';
         }
-        if (!$isWholesale && $paymentMethod !== 'transfer' && $tarjetaId <= 0) {
+        if (!$isWholesale && $paymentMethod === 'mp' && $tarjetaId <= 0) {
             $errors[] = 'Selecciona tarjeta.';
         }
         if ($cuotas !== 3 && $cuotas !== 6) {
@@ -237,7 +237,7 @@ final class CheckoutController
         // Promotions apply only to retail MP payments
         $discountPercent = 0.0;
         $recargoPercent = 0.0;
-        if (!$isWholesale && $paymentMethod !== 'transfer') {
+        if (!$isWholesale && $paymentMethod === 'mp') {
             $weekday = (int)date('w') + 1; // 1=domingo
             $promo = (new PromoRepo())->bestPromoForTarjeta($tarjetaId, $weekday);
             if ($promo) {
@@ -398,6 +398,16 @@ final class CheckoutController
         if ($isWholesale || $paymentMethod === 'transfer') {
             $_SESSION['flash'] = ['type' => 'ok', 'text' => 'Pedido generado. Te mostramos los datos de transferencia.'];
             Response::redirect('/pay/mp/pending?order=' . urlencode($code) . '&mode=transfer');
+        }
+
+        // Store Nave checkout intent in session
+        if ($paymentMethod === 'nave') {
+            $_SESSION['nave_checkout'] = [
+                'order_id' => $orderId,
+                'order_code' => $code,
+                'total_cents' => $totalFinal,
+            ];
+            Response::redirect('/pay/nave/start');
         }
 
         // Store MP checkout intent in session

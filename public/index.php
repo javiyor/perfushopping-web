@@ -26,6 +26,7 @@ use Perfushopping\Web\Controller\CartController;
 use Perfushopping\Web\Controller\CheckoutController;
 use Perfushopping\Web\Controller\AuthController;
 use Perfushopping\Web\Controller\MercadoPagoController;
+use Perfushopping\Web\Controller\NaveController;
 use Perfushopping\Web\Controller\LegalController;
 use Perfushopping\Web\Controller\AffiliateController;
 use Perfushopping\Web\Controller\ApiSyncController;
@@ -105,6 +106,15 @@ $router->get('/pay/mp/failure', [MercadoPagoController::class, 'failure']);
 
 // Webhook
 $router->post('/mp/webhook', [MercadoPagoController::class, 'webhook']);
+
+// Payments Nave (minorista)
+$router->get('/pay/nave/start', [NaveController::class, 'start']);
+$router->get('/pay/nave/success', [NaveController::class, 'success']);
+$router->get('/pay/nave/pending', [NaveController::class, 'pending']);
+$router->get('/pay/nave/failure', [NaveController::class, 'failure']);
+
+// Webhook
+$router->post('/nave/webhook', [NaveController::class, 'webhook']);
 
 // Auth
 $router->get('/login', [AuthController::class, 'loginForm']);

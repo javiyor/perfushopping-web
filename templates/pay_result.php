@@ -3,6 +3,7 @@ use Perfushopping\Web\Support\Env;
 $mode = $mode ?? 'pending';
 $order = (string)($_GET['order'] ?? '');
 $transfer = (string)($_GET['mode'] ?? '') === 'transfer';
+$provider = (string)($provider ?? 'Mercado Pago');
 ?>
 
 <div class="page">
@@ -29,7 +30,7 @@ CBU: 3300000620000444439097
     <?php elseif ($mode === 'failure'): ?>
       <div class="notice danger">Pago rechazado. Podes intentar nuevamente.</div>
     <?php else: ?>
-      <div class="notice">Pago pendiente. Te vamos a confirmar cuando Mercado Pago lo apruebe.</div>
+      <div class="notice">Pago pendiente. Te vamos a confirmar cuando <?= htmlspecialchars($provider) ?> lo apruebe.</div>
     <?php endif; ?>
   <?php endif; ?>
 
