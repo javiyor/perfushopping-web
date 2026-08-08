@@ -47,6 +47,19 @@ final class CompraController
     {
         $auth = new AdminAuthService();
         $adminUser = $auth->requireSesion();
+
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
+            echo View::adminPage('admin/compras/import.php', [
+                'adminUser' => $adminUser,
+                'rows' => [],
+                'csrf' => Csrf::token(),
+                'flash' => $_SESSION['admin_flash'] ?? null,
+                'pageTitle' => 'Importar comprobantes de compra',
+            ]);
+            unset($_SESSION['admin_flash']);
+            return;
+        }
+
         Csrf::check($_POST['_csrf'] ?? null);
 
         $rows = $_SESSION['compra_import']['rows'] ?? null;

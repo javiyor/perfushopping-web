@@ -391,6 +391,7 @@ $router->post('/admin/capacitaciones/horarios/save', [AdminCapacitacionControlle
 // Admin - Facturas de compra
 $router->get('/admin/compras', [AdminCompraController::class, 'index']);
 $router->get('/admin/compras/importar', [AdminCompraController::class, 'importar']);
+$router->post('/admin/compras/importar', [AdminCompraController::class, 'importar']);
 $router->post('/admin/compras/importar/confirmar', [AdminCompraController::class, 'importConfirm']);
 $router->get('/admin/compras/nueva', [AdminCompraController::class, 'create']);
 $router->post('/admin/compras/qr', [AdminCompraController::class, 'qr']);
