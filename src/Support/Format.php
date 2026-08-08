@@ -51,4 +51,29 @@ final class Format
         // Plain filename stored in DB
         return '/upload/' . rawurlencode($v);
     }
+
+    /** URL absoluta de la app (sin barra final). Usa APP_URL si está configurado, si no HTTP_HOST. */
+    public static function baseUrl(): string
+    {
+        $app = trim((string)\Perfushopping\Web\Support\Env::get('APP_URL', ''));
+        if ($app !== '') {
+            return rtrim($app, '/');
+        }
+        $host = trim((string)($_SERVER['HTTP_HOST'] ?? ''));
+        if ($host === '') {
+            return '';
+        }
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        return $scheme . '://' . $host;
+    }
+
+    /** Convierte una URL relativa de upload en absoluta para usar en OG/redes. */
+    public static function absoluteUploadUrl(string $nameOrUrl): string
+    {
+        $u = self::uploadUrl($nameOrUrl);
+        if ($u === '' || str_starts_with($u, 'http://') || str_starts_with($u, 'https://')) {
+            return $u;
+        }
+        return self::baseUrl() . $u;
+    }
 }

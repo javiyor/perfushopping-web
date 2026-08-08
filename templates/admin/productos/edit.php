@@ -22,6 +22,21 @@ $price1Gross = number_format((float)($product['precio1'] ?? 0) * (1 + ($selected
 $mainImg = Format::uploadUrl((string)($product['imagen'] ?? ''));
 $formatDate = static fn(string $d): string => (trim($d) === '' || $d === '0000-00-00') ? '-' : $d;
 
+// Datos de compartir en redes
+$shareUrl = Format::baseUrl() . '/p/' . $selectedId;
+$shareTitle = trim((string)($product['produ'] ?? ''));
+$shareDesc = trim(preg_replace('/\s+/', ' ', strip_tags((string)($product['observ'] ?? ''))) ?? '');
+$shareDesc = mb_substr($shareDesc, 0, 180, 'UTF-8');
+$sharePriceGross = (float)($product['precio'] ?? 0) * (1 + ($selectedIva / 100));
+$sharePrice = '$' . number_format($sharePriceGross, 2, ',', '.');
+$shareLinks = [
+    'url' => $shareUrl,
+    'facebook' => 'https://www.facebook.com/sharer/sharer.php?u=' . rawurlencode($shareUrl),
+    'x' => 'https://twitter.com/intent/tweet?text=' . rawurlencode($shareTitle) . '&url=' . rawurlencode($shareUrl),
+    'whatsapp' => 'https://wa.me/?text=' . rawurlencode($shareTitle . "\n" . $shareUrl),
+    'text' => trim($shareTitle . "\n" . $shareDesc . "\n" . $shareUrl),
+];
+
 $selectedRubro = (int)($product['codrub'] ?? 0);
 $selectedSubrubro = (int)($product['codsub'] ?? 0);
 $selectedDepartamento = (int)($product['codepar'] ?? 0);
@@ -226,6 +241,47 @@ foreach ($proveedores as $prov) {
         </div>
     </div>
 </div>
+<div class="col-lg-6">
+    <div class="card shadow-sm h-100">
+        <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-share"></i> Compartir en redes</span>
+            <a class="btn btn-outline-secondary btn-sm" href="<?= htmlspecialchars($shareUrl) ?>" target="_blank"><i class="bi bi-box-arrow-up-right"></i> Ver público</a>
+        </div>
+        <div class="card-body">
+            <div class="d-flex gap-3 mb-3">
+                <?php if ($mainImg !== ''): ?>
+                    <img src="<?= htmlspecialchars($mainImg) ?>" alt="" style="width:110px;height:110px;object-fit:cover;border-radius:10px;flex-shrink:0" />
+                <?php else: ?>
+                    <div class="bg-light rounded d-flex align-items-center justify-content-center text-muted" style="width:110px;height:110px;flex-shrink:0">Sin imagen</div>
+                <?php endif; ?>
+                <div class="small">
+                    <div class="fw-bold"><?= htmlspecialchars($shareTitle) ?></div>
+                    <div class="text-muted"><?= htmlspecialchars($sharePrice) ?></div>
+                    <div class="text-muted" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden"><?= htmlspecialchars($shareDesc !== '' ? $shareDesc : 'Sin descripción') ?></div>
+                    <div class="text-muted small mt-1" style="word-break:break-all"><?= htmlspecialchars($shareUrl) ?></div>
+                </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2 mb-2">
+                <a class="btn btn-sm btn-outline-primary" href="<?= htmlspecialchars($shareLinks['facebook']) ?>" target="_blank" rel="noopener"><i class="bi bi-facebook"></i> Facebook</a>
+                <a class="btn btn-sm btn-outline-secondary" href="<?= htmlspecialchars($shareLinks['x']) ?>" target="_blank" rel="noopener"><i class="bi bi-twitter-x"></i> X</a>
+                <a class="btn btn-sm btn-outline-success" href="<?= htmlspecialchars($shareLinks['whatsapp']) ?>" target="_blank" rel="noopener"><i class="bi bi-whatsapp"></i> WhatsApp</a>
+                <button class="btn btn-sm btn-outline-danger" type="button" onclick="copyShareText()" title="Copia texto + link para pegar en TikTok, Instagram, etc."><i class="bi bi-tiktok"></i> TikTok (copiar)</button>
+                <button class="btn btn-sm btn-outline-secondary" type="button" onclick="copyShareLink()"><i class="bi bi-link-45deg"></i> Copiar link</button>
+            </div>
+
+            <div class="row g-2 align-items-end">
+                <div class="col-auto">
+                    <div class="text-muted small mb-1">QR del link de compra</div>
+                    <canvas id="shareQr" style="border:1px solid #eee;border-radius:8px;width:140px;height:140px"></canvas>
+                </div>
+                <div class="col small text-muted">
+                    <i class="bi bi-info-circle"></i> Escaneá el QR para abrir la ficha del producto en el teléfono, o usá los botones para compartir con foto y descripción.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 </div>
 
 <div class="card shadow-sm mt-2">
@@ -378,6 +434,46 @@ foreach ($proveedores as $prov) {
         </form>
     </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script>
+var SHARE_URL = <?= json_encode($shareUrl, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+var SHARE_TEXT = <?= json_encode($shareLinks['text'], JSON_UNESCAPED_UNICODE) ?>;
+function copyShareText() { copyToClipboard(SHARE_TEXT); }
+function copyShareLink() { copyToClipboard(SHARE_URL); }
+function copyToClipboard(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(function(){ flashCopied(); }, function(){ legacyCopy(text); });
+    } else {
+        legacyCopy(text);
+    }
+}
+function legacyCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); flashCopied(); } catch(e) {}
+    ta.remove();
+}
+function flashCopied() {
+    var btn = null;
+    if (window.event && window.event.target) {
+        btn = window.event.target.closest ? window.event.target.closest('button') : null;
+    }
+    if (!btn) return;
+    var label = btn.innerHTML;
+    btn.innerHTML = '<i class="bi bi-check-lg"></i> Copiado';
+    setTimeout(function(){ btn.innerHTML = label; }, 1500);
+}
+document.addEventListener('DOMContentLoaded', function() {
+    var qrCanvas = document.getElementById('shareQr');
+    if (qrCanvas && typeof QRCode !== 'undefined') {
+        QRCode.toCanvas(qrCanvas, SHARE_URL, { width: 280, margin: 1, color: { dark: '#1a1d23', light: '#ffffff' } }, function(err) {
+            if (err) console.error(err);
+        });
+    }
+});
+</script>
 
 <script>
 function ordenarSelect(sel) {

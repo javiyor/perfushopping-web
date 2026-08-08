@@ -65,6 +65,56 @@ if (!$isWholesale) {
         <div class="notice" style="white-space:pre-wrap"><?= htmlspecialchars((string)$p['observ']) ?></div>
       <?php endif; ?>
 
+      <?php if (!empty($share['url'])): ?>
+      <div class="share">
+        <span class="share-label">Compartir</span>
+        <button class="share-btn gold" type="button" onclick="shareProduct()" title="Compartir (abre el menú nativo del teléfono)"><i class="bi bi-share"></i></button>
+        <a class="share-btn" href="<?= htmlspecialchars($share['facebook']) ?>" target="_blank" rel="noopener" title="Compartir en Facebook"><i class="bi bi-facebook"></i></a>
+        <a class="share-btn" href="<?= htmlspecialchars($share['x']) ?>" target="_blank" rel="noopener" title="Compartir en X"><i class="bi bi-twitter-x"></i></a>
+        <a class="share-btn" href="<?= htmlspecialchars($share['whatsapp']) ?>" target="_blank" rel="noopener" title="Compartir en WhatsApp"><i class="bi bi-whatsapp"></i></a>
+        <a class="share-btn" href="<?= htmlspecialchars($share['telegram']) ?>" target="_blank" rel="noopener" title="Compartir en Telegram"><i class="bi bi-send"></i></a>
+        <button class="share-btn" type="button" id="shareCopyBtn" onclick="copyProductLink()" title="Copiar link + texto (pegá en TikTok, Instagram, etc.)"><i class="bi bi-link-45deg"></i></button>
+      </div>
+      <script>
+      var SHARE_PAYLOAD = <?= json_encode([
+          'url' => $share['url'],
+          'text' => $share['text'] . "\n" . $share['url'],
+          'native' => $share['native'],
+      ], JSON_UNESCAPED_UNICODE) ?>;
+      function shareProduct() {
+          if (navigator.share && SHARE_PAYLOAD.native) {
+              navigator.share(SHARE_PAYLOAD.native).catch(function(){});
+          } else {
+              copyProductLink();
+          }
+      }
+      function copyProductLink() {
+          var payload = SHARE_PAYLOAD.text;
+          if (navigator.clipboard && window.isSecureContext) {
+              navigator.clipboard.writeText(payload).then(flashCopy, function(){ legacyCopy(payload); });
+          } else {
+              legacyCopy(payload);
+          }
+      }
+      function legacyCopy(text) {
+          var ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          try { document.execCommand('copy'); flashCopy(); } catch(e) {}
+          ta.remove();
+      }
+      function flashCopy() {
+          var btn = document.getElementById('shareCopyBtn');
+          var old = btn.innerHTML;
+          btn.innerHTML = '<i class="bi bi-check-lg"></i>';
+          setTimeout(function(){ btn.innerHTML = old; }, 1500);
+      }
+      </script>
+      <?php endif; ?>
+
       <h3 style="margin:18px 0 10px">Variedades</h3>
       <div class="variants">
         <?php foreach ($variants as $v): ?>
