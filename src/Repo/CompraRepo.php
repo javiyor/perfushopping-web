@@ -42,7 +42,7 @@ final class CompraRepo
                    c1.nomcta1 AS cuenta_nombre,
                    c.nomcta AS cuenta_grupo,
                    (SELECT COUNT(*) FROM factura_compra_items i WHERE i.factura_compra_id = fc.id) AS items_count,
-                   au.name AS created_by_nombre
+                   au.nombre AS created_by_nombre
             FROM factura_compra fc
             LEFT JOIN proveedo pv ON pv.idprovee = fc.idprovee
             LEFT JOIN contable1 c1 ON c1.idcta1 = fc.idcta1
@@ -68,7 +68,7 @@ final class CompraRepo
                    c1.nomcta1 AS cuenta_nombre,
                    c.nomcta AS cuenta_grupo,
                    d.nomdepo AS deposito_nombre,
-                   au.name AS created_by_nombre
+                   au.nombre AS created_by_nombre
             FROM factura_compra fc
             LEFT JOIN proveedo pv ON pv.idprovee = fc.idprovee
             LEFT JOIN contable1 c1 ON c1.idcta1 = fc.idcta1
