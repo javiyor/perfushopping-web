@@ -223,6 +223,7 @@
             <a href="/admin/users"><i class="bi bi-person-gear"></i>Usuarios web<span class="badge-count green" id="badgeUsuariosNuevos" style="display:none">0</span></a>
 
             <div class="nav-section">Compras</div>
+            <a href="/admin/compras"><i class="bi bi-receipt"></i>Facturas compra</a>
             <a href="/admin/proveedores"><i class="bi bi-truck"></i>Proveedores</a>
             <a href="/admin/proveedores/ctacte"><i class="bi bi-currency-dollar"></i>Cta Cte Proveedores</a>
             <a href="/admin/ordenes-compra"><i class="bi bi-cart-plus"></i>Órdenes compra</a>

@@ -74,6 +74,7 @@ use Perfushopping\Web\Admin\BadgeController as AdminBadgeController;
 use Perfushopping\Web\Admin\SucursalController as AdminSucursalController;
 use Perfushopping\Web\Admin\EmpresaController as AdminEmpresaController;
 use Perfushopping\Web\Admin\NotaPedidoController as AdminNotaPedidoController;
+use Perfushopping\Web\Admin\CompraController as AdminCompraController;
 
 $router = new Router();
 
@@ -381,11 +382,24 @@ $router->post('/admin/withdrawals/approve', [AdminWithdrawalController::class, '
 $router->post('/admin/withdrawals/paid', [AdminWithdrawalController::class, 'paid']);
 $router->post('/admin/withdrawals/reject', [AdminWithdrawalController::class, 'reject']);
 
-// Admin: capacitaciones
+// Admin - Capacitaciones
 $router->get('/admin/capacitaciones', [AdminCapacitacionController::class, 'index']);
 $router->post('/admin/capacitaciones/status', [AdminCapacitacionController::class, 'status']);
 $router->get('/admin/capacitaciones/horarios', [AdminCapacitacionController::class, 'horarios']);
 $router->post('/admin/capacitaciones/horarios/save', [AdminCapacitacionController::class, 'horariosSave']);
+
+// Admin - Facturas de compra
+$router->get('/admin/compras', [AdminCompraController::class, 'index']);
+$router->get('/admin/compras/importar', [AdminCompraController::class, 'importar']);
+$router->post('/admin/compras/importar/confirmar', [AdminCompraController::class, 'importConfirm']);
+$router->get('/admin/compras/nueva', [AdminCompraController::class, 'create']);
+$router->post('/admin/compras/qr', [AdminCompraController::class, 'qr']);
+$router->get('/admin/compras/productos', [AdminCompraController::class, 'searchProducts']);
+$router->post('/admin/compras/guardar', [AdminCompraController::class, 'store']);
+$router->post('/admin/compras/cuenta', [AdminCompraController::class, 'setCuenta']);
+$router->post('/admin/compras/delete', [AdminCompraController::class, 'delete']);
+$router->get('/admin/compras/(?P<id>\d+)/editar', [AdminCompraController::class, 'edit']);
+$router->get('/admin/compras/(?P<id>\d+)', [AdminCompraController::class, 'show']);
 
 try {
     $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
