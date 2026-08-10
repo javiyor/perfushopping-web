@@ -17,93 +17,132 @@ $statusOptions = [
     'pending_transfer' => 'Pendiente transferencia',
     'transfer_reported' => 'Transferencia informada',
 ];
+$statusBadge = [
+    'pending_payment' => 'bg-warning text-dark',
+    'paid' => 'bg-success',
+    'preparing' => 'bg-primary',
+    'prepared' => 'bg-secondary',
+    'shipped' => 'bg-info text-dark',
+    'cancelled' => 'bg-danger',
+    'archived' => 'bg-dark',
+    'pending_transfer' => 'bg-warning text-dark',
+    'transfer_reported' => 'bg-info text-dark',
+];
 ?>
 
-<div class="page">
-  <div style="display:flex;gap:12px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap">
-    <div>
-      <h2 style="margin:0 0 8px">Pedidos web</h2>
-      <p style="margin:0;color:rgba(246,244,239,0.72)">Consulta los pedidos generados desde checkout, con cliente, estado, envio y detalle de items.</p>
+<div class="page-title">
+    <h2><i class="bi bi-cart"></i> Pedidos web</h2>
+    <p>Consulta los pedidos generados desde checkout, con cliente, estado, envio y detalle de items.</p>
+</div>
+
+<div class="card shadow-sm mb-3">
+    <div class="card-body py-3">
+        <form method="get" action="/admin/orders" class="row g-2">
+            <div class="col-md-5">
+                <input class="form-control" name="q" value="<?= htmlspecialchars($q) ?>" placeholder="Buscar por codigo, email, telefono, nombre o ciudad" />
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" name="status">
+                    <?php foreach ($statusOptions as $value => $label): ?>
+                        <option value="<?= htmlspecialchars($value) ?>" <?= $status === $value ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-md-4 d-flex gap-2">
+                <button class="btn btn-accent" type="submit"><i class="bi bi-search"></i> Buscar</button>
+                <?php if ($q !== '' || $status !== ''): ?>
+                    <a class="btn btn-outline-secondary" href="/admin/orders"><i class="bi bi-x-circle"></i> Limpiar</a>
+                <?php endif; ?>
+            </div>
+        </form>
     </div>
-    <a class="btn secondary" href="/admin">Volver al admin</a>
-  </div>
 </div>
 
-<div class="page" style="margin-top:14px">
-  <form method="get" action="/admin/orders" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-    <input name="q" value="<?= htmlspecialchars($q) ?>" placeholder="Buscar por codigo, email, telefono, nombre o ciudad" style="min-width:280px" />
-    <select name="status">
-      <?php foreach ($statusOptions as $value => $label): ?>
-        <option value="<?= htmlspecialchars($value) ?>" <?= $status === $value ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
-      <?php endforeach; ?>
-    </select>
-    <button class="btn" type="submit">Buscar</button>
-    <?php if ($q !== '' || $status !== ''): ?>
-      <a class="btn secondary" href="/admin/orders">Limpiar</a>
-    <?php endif; ?>
-  </form>
-</div>
-
-<div class="page" style="margin-top:14px">
-  <?php if (!$orders): ?>
-    <div class="notice">No se encontraron pedidos.</div>
-  <?php else: ?>
-    <div style="display:grid;gap:14px">
-      <?php foreach ($orders as $order): ?>
-        <?php $orderId = (int)($order['id'] ?? 0); ?>
-        <?php $detailItems = $itemsByOrder[$orderId] ?? []; ?>
-        <div style="border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:16px;background:rgba(255,255,255,0.02)">
-          <div style="display:flex;gap:12px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap">
-            <div>
-              <div style="font-weight:800;font-size:18px">Pedido <?= htmlspecialchars((string)($order['order_code'] ?? ('#' . $orderId))) ?></div>
-              <div class="meta">#<?= $orderId ?> · <?= htmlspecialchars((string)($order['customer_type'] ?? '-')) ?> · Estado: <?= htmlspecialchars((string)($order['status'] ?? '-')) ?> · Fecha: <?= htmlspecialchars((string)($order['created_at'] ?? '-')) ?></div>
-              <div class="meta">Cliente: <?= htmlspecialchars((string)($order['ship_name'] ?? '-')) ?> · <?= htmlspecialchars((string)($order['email'] ?? '-')) ?> · <?= htmlspecialchars((string)($order['phone'] ?? '-')) ?></div>
-              <div class="meta">Envio: <?= htmlspecialchars((string)($order['shipping_method'] ?? '-')) ?><?= !empty($order['shipping_detail']) ? ' · ' . htmlspecialchars((string)$order['shipping_detail']) : '' ?> · <?= htmlspecialchars((string)($order['ship_city'] ?? '-')) ?>, <?= htmlspecialchars((string)($order['ship_province_name'] ?? '-')) ?><?= !empty($order['ship_cod_lugar']) ? ' · Lugar #' . (int)$order['ship_cod_lugar'] : '' ?></div>
-              <div class="meta">Direccion: <?= htmlspecialchars((string)($order['ship_address'] ?? '-')) ?> (CP <?= htmlspecialchars((string)($order['ship_postal_code'] ?? '-')) ?>)</div>
-            </div>
-            <div style="min-width:220px;text-align:right">
-              <div><strong><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($order['total_cents'] ?? 0))) ?></strong></div>
-              <div class="meta">Subtotal: <?= htmlspecialchars(Format::moneyRoundedFromCents((int)($order['subtotal_net_cents'] ?? 0))) ?> · IVA: <?= htmlspecialchars(Format::moneyRoundedFromCents((int)($order['iva_cents'] ?? 0))) ?></div>
-              <div class="meta">Envio: <?= htmlspecialchars(Format::moneyRoundedFromCents((int)($order['shipping_cost_cents'] ?? 0))) ?> · Desc.: <?= htmlspecialchars(Format::moneyRoundedFromCents((int)($order['discount_cents'] ?? 0))) ?></div>
-              <div class="meta">Items: <?= (int)($order['items_count'] ?? 0) ?> · Unidades: <?= (int)($order['units_count'] ?? 0) ?></div>
-            </div>
-          </div>
-
-          <?php if ($detailItems): ?>
-            <div style="margin-top:12px;display:grid;gap:8px">
-              <?php foreach ($detailItems as $item): ?>
-                <div style="display:flex;gap:10px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,0.06);padding-top:8px">
-                  <div>
-                    <strong><?= htmlspecialchars((string)($item['product_name'] ?? '-')) ?></strong>
-                    <div class="meta">Variedad: <?= htmlspecialchars((string)($item['variant_name'] ?? '-')) ?> · ID producto: <?= (int)($item['idprodu'] ?? 0) ?> · ID gusto: <?= (int)($item['idcodgusto'] ?? 0) ?></div>
-                  </div>
-                  <div style="text-align:right">
-                    <div>Cant.: <?= (int)($item['qty'] ?? 0) ?></div>
-                    <div class="meta">Unit.: <?= htmlspecialchars(Format::moneyRoundedFromCents((int)($item['unit_net_cents'] ?? 0))) ?> · Linea: <?= htmlspecialchars(Format::moneyRoundedFromCents((int)($item['line_total_cents'] ?? 0))) ?></div>
-                  </div>
-                </div>
-              <?php endforeach; ?>
-            </div>
-          <?php endif; ?>
-
-          <?php $currentStatus = (string)($order['status'] ?? ''); ?>
-          <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-            <form method="post" action="/admin/order/status" style="display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap">
-              <input type="hidden" name="_csrf" value="<?= htmlspecialchars((string)$csrf) ?>" />
-              <input type="hidden" name="order_id" value="<?= $orderId ?>" />
-              <select name="status">
-                <?php foreach ($statusOptions as $value => $label): ?>
-                  <?php if ($value === '') continue; ?>
-                  <option value="<?= htmlspecialchars($value) ?>" <?= $currentStatus === $value ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+<?php if (!$orders): ?>
+    <div class="alert alert-info">No se encontraron pedidos.</div>
+<?php else: ?>
+<div class="card shadow-sm">
+    <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+        <span>Resultados</span>
+        <span class="badge bg-secondary"><?= count($orders) ?></span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-admin table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Pedido</th>
+                    <th>Fecha</th>
+                    <th>Cliente</th>
+                    <th>Envio</th>
+                    <th class="text-end">Total</th>
+                    <th>Estado</th>
+                    <th class="text-end">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($orders as $order): ?>
+                    <?php $orderId = (int)($order['id'] ?? 0); ?>
+                    <?php $detailItems = $itemsByOrder[$orderId] ?? []; ?>
+                    <?php $currentStatus = (string)($order['status'] ?? ''); ?>
+                    <tr>
+                        <td>
+                            <strong><?= htmlspecialchars((string)($order['order_code'] ?? ('#' . $orderId))) ?></strong>
+                            <div class="small text-muted">#<?= $orderId ?> · <?= htmlspecialchars((string)($order['customer_type'] ?? '-')) ?></div>
+                            <?php if ($detailItems): ?>
+                                <details class="mt-1">
+                                    <summary class="small text-primary" style="cursor:pointer">Items (<?= (int)($order['items_count'] ?? count($detailItems)) ?>)</summary>
+                                    <ul class="list-unstyled small mt-2 mb-1" style="max-width:340px">
+                                        <?php foreach ($detailItems as $item): ?>
+                                            <li class="border-top pt-1 mt-1">
+                                                <div class="fw-semibold"><?= htmlspecialchars((string)($item['product_name'] ?? '-')) ?></div>
+                                                <div class="text-muted"><?= htmlspecialchars((string)($item['variant_name'] ?? '-')) ?> · Cant. <?= (int)($item['qty'] ?? 0) ?> · <?= htmlspecialchars(Format::moneyRoundedFromCents((int)($item['line_total_cents'] ?? 0))) ?></div>
+                                            </li>
+                                        <?php endforeach; ?>
+                                    </ul>
+                                </details>
+                            <?php endif; ?>
+                        </td>
+                        <td class="text-nowrap">
+                            <div><?= htmlspecialchars((string)($order['created_at'] ?? '-')) ?></div>
+                            <div class="small text-muted">Items: <?= (int)($order['items_count'] ?? 0) ?> · Unid.: <?= (int)($order['units_count'] ?? 0) ?></div>
+                        </td>
+                        <td>
+                            <div class="fw-semibold"><?= htmlspecialchars((string)($order['ship_name'] ?? '-')) ?></div>
+                            <div class="small text-muted"><?= htmlspecialchars((string)($order['email'] ?? '-')) ?></div>
+                            <div class="small text-muted"><?= htmlspecialchars((string)($order['phone'] ?? '-')) ?></div>
+                        </td>
+                        <td>
+                            <div><?= htmlspecialchars((string)($order['shipping_method'] ?? '-')) ?></div>
+                            <div class="small text-muted"><?= htmlspecialchars((string)($order['ship_city'] ?? '-')) ?><?= !empty($order['ship_province_name']) ? ', ' . htmlspecialchars((string)$order['ship_province_name']) : '' ?></div>
+                            <?php if (!empty($order['shipping_detail'])): ?>
+                                <div class="small text-muted"><?= htmlspecialchars((string)$order['shipping_detail']) ?></div>
+                            <?php endif; ?>
+                        </td>
+                        <td class="text-end text-nowrap">
+                            <span class="fw-bold"><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($order['total_cents'] ?? 0))) ?></span>
+                            <div class="small text-muted">Subtotal: <?= htmlspecialchars(Format::moneyRoundedFromCents((int)($order['subtotal_net_cents'] ?? 0))) ?></div>
+                            <div class="small text-muted">Envio: <?= htmlspecialchars(Format::moneyRoundedFromCents((int)($order['shipping_cost_cents'] ?? 0))) ?></div>
+                        </td>
+                        <td>
+                            <span class="badge <?= $statusBadge[$currentStatus] ?? 'bg-secondary' ?>"><?= htmlspecialchars($statusOptions[$currentStatus] ?? $currentStatus) ?></span>
+                        </td>
+                        <td class="text-end">
+                            <form method="post" action="/admin/order/status" class="d-inline-flex gap-1">
+                                <input type="hidden" name="_csrf" value="<?= htmlspecialchars((string)$csrf) ?>" />
+                                <input type="hidden" name="order_id" value="<?= $orderId ?>" />
+                                <select class="form-select form-select-sm" name="status" style="max-width:170px">
+                                    <?php foreach ($statusOptions as $value => $label): ?>
+                                        <?php if ($value === '') continue; ?>
+                                        <option value="<?= htmlspecialchars($value) ?>" <?= $currentStatus === $value ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <button class="btn btn-accent btn-sm" type="submit"><i class="bi bi-check-lg"></i></button>
+                            </form>
+                        </td>
+                    </tr>
                 <?php endforeach; ?>
-              </select>
-              <button class="btn" type="submit">Cambiar estado</button>
-            </form>
-          </div>
-        </div>
-      <?php endforeach; ?>
+            </tbody>
+        </table>
     </div>
-  <?php endif; ?>
 </div>
-
-
+<?php endif; ?>
