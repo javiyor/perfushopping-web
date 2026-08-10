@@ -1,139 +1,9 @@
 <?php
 /** @var array $promos */
+/** @var array $shareByPromo */
 $promos = $promos ?? [];
+$shareByPromo = $shareByPromo ?? [];
 ?>
-<style>
-.promo-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 22px;
-    margin: 30px 0;
-}
-.promo-card {
-    position: relative;
-    background: var(--card);
-    border: 1px solid rgba(216,178,90,0.15);
-    border-radius: 18px;
-    padding: 24px 22px;
-    transition: transform .25s ease, box-shadow .3s ease, border-color .3s ease;
-    overflow: hidden;
-}
-.promo-card::before {
-    content: '';
-    position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: radial-gradient(circle at 30% 40%, rgba(216,178,90,0.06), transparent 60%);
-    opacity: 0;
-    transition: opacity .4s ease;
-    pointer-events: none;
-}
-.promo-card:hover {
-    transform: translateY(-6px);
-    box-shadow: 0 20px 50px rgba(216,178,90,0.12), 0 0 0 1px rgba(216,178,90,0.25);
-    border-color: var(--gold);
-}
-.promo-card:hover::before {
-    opacity: 1;
-}
-.promo-card .card-icon {
-    font-size: 38px;
-    margin-bottom: 10px;
-    display: inline-block;
-    filter: drop-shadow(0 0 8px rgba(216,178,90,0.35));
-}
-.promo-card .card-banco {
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--gold);
-    margin: 0 0 4px;
-}
-.promo-card .card-tipo {
-    display: inline-block;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: .04em;
-    padding: 2px 10px;
-    border-radius: 20px;
-    background: rgba(216,178,90,0.12);
-    color: var(--gold2);
-    margin-bottom: 12px;
-}
-.promo-card .card-descripcion {
-    font-size: 15px;
-    line-height: 1.5;
-    color: var(--text);
-    margin-bottom: 8px;
-}
-.promo-card .card-detalle {
-    font-size: 13px;
-    line-height: 1.5;
-    color: var(--muted);
-    margin-bottom: 14px;
-}
-.promo-card .card-img-wrap {
-    width: 100%;
-    height: 160px;
-    overflow: hidden;
-    border-radius: 12px;
-    margin-bottom: 14px;
-    background: rgba(216,178,90,0.04);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-.promo-card .card-img-wrap img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transition: transform .4s ease;
-}
-.promo-card:hover .card-img-wrap img {
-    transform: scale(1.04);
-}
-.promo-card .card-vigencia {
-    font-size: 12px;
-    color: var(--muted2);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    border-top: 1px solid rgba(216,178,90,0.1);
-    padding-top: 12px;
-}
-.promo-card .card-vigencia i {
-    font-size: 14px;
-}
-.promo-hero {
-    text-align: center;
-    padding: 40px 0 16px;
-}
-.promo-hero h1 {
-    font-family: Georgia, "Times New Roman", serif;
-    font-size: 32px;
-    font-weight: 400;
-    letter-spacing: .8px;
-    color: var(--gold);
-    margin: 0 0 8px;
-}
-.promo-hero p {
-    color: var(--muted);
-    font-size: 15px;
-    max-width: 520px;
-    margin: 0 auto;
-}
-.promo-empty {
-    text-align: center;
-    padding: 60px 20px;
-    color: var(--muted2);
-}
-@media (max-width: 600px) {
-    .promo-grid { grid-template-columns: 1fr; }
-    .promo-hero h1 { font-size: 24px; }
-}
-</style>
 
 <div class="promo-hero">
     <h1>Promociones Bancarias Vigentes</h1>
@@ -148,14 +18,16 @@ $promos = $promos ?? [];
 <?php else: ?>
     <div class="promo-grid">
         <?php foreach ($promos as $p):
+            $promoId = (int)($p['id'] ?? 0);
             $esCredito = (string)($p['tipo_tarjeta'] ?? '') === 'credito';
             $icono = $esCredito ? '💳' : '🏦';
             $tipoLabel = $esCredito ? 'Crédito' : 'Débito';
             $desde = (string)($p['fecha_desde'] ?? '');
             $hasta = (string)($p['fecha_hasta'] ?? '');
             $img = (string)($p['imagen'] ?? '');
+            $share = $shareByPromo[$promoId] ?? null;
         ?>
-            <div class="promo-card">
+            <div class="promo-card" id="promo-<?= $promoId ?>">
                 <?php if ($img !== ''): ?>
                     <div class="card-img-wrap">
                         <img src="/upload/<?= htmlspecialchars($img) ?>" alt="<?= htmlspecialchars((string)($p['banco'] ?? '')) ?>" loading="lazy" />
@@ -181,7 +53,60 @@ $promos = $promos ?? [];
                         <?php endif; ?>
                     </div>
                 <?php endif; ?>
+                <?php if ($share): ?>
+                    <div class="card-share">
+                        <button class="share-btn sm gold" type="button" onclick="sharePromo(<?= $promoId ?>)" title="Compartir (abre el menú nativo del teléfono)"><i class="bi bi-share"></i></button>
+                        <a class="share-btn sm" href="<?= htmlspecialchars((string)$share['facebook']) ?>" target="_blank" rel="noopener" title="Compartir en Facebook"><i class="bi bi-facebook"></i></a>
+                        <a class="share-btn sm" href="<?= htmlspecialchars((string)$share['x']) ?>" target="_blank" rel="noopener" title="Compartir en X"><i class="bi bi-twitter-x"></i></a>
+                        <a class="share-btn sm" href="<?= htmlspecialchars((string)$share['whatsapp']) ?>" target="_blank" rel="noopener" title="Compartir en WhatsApp"><i class="bi bi-whatsapp"></i></a>
+                        <a class="share-btn sm" href="<?= htmlspecialchars((string)$share['telegram']) ?>" target="_blank" rel="noopener" title="Compartir en Telegram"><i class="bi bi-send"></i></a>
+                        <button class="share-btn sm" type="button" data-copy="<?= $promoId ?>" onclick="copyPromoLink(<?= $promoId ?>)" title="Copiar link + texto (pegá en TikTok, Instagram, etc.)"><i class="bi bi-link-45deg"></i></button>
+                    </div>
+                <?php endif; ?>
             </div>
         <?php endforeach; ?>
     </div>
 <?php endif; ?>
+
+<script>
+var PROMO_SHARES = <?= json_encode(array_map(static function (array $s): array {
+    return [
+        'text' => (string)$s['text'] . "\n" . (string)$s['url'],
+        'native' => $s['native'],
+    ];
+}, $shareByPromo), JSON_UNESCAPED_UNICODE) ?>;
+function sharePromo(id) {
+    var p = PROMO_SHARES[id];
+    if (navigator.share && p && p.native) {
+        navigator.share(p.native).catch(function(){});
+    } else {
+        copyPromoLink(id);
+    }
+}
+function copyPromoLink(id) {
+    var p = PROMO_SHARES[id];
+    if (!p) return;
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(p.text).then(function(){ flashCopied(id); }, function(){ legacyCopyPromo(p.text, id); });
+    } else {
+        legacyCopyPromo(p.text, id);
+    }
+}
+function legacyCopyPromo(text, id) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); flashCopied(id); } catch(e) {}
+    ta.remove();
+}
+function flashCopied(id) {
+    var btn = document.querySelector('.promo-card .share-btn[data-copy="' + id + '"]');
+    if (!btn) return;
+    var old = btn.innerHTML;
+    btn.innerHTML = '<i class="bi bi-check-lg"></i>';
+    setTimeout(function(){ btn.innerHTML = old; }, 1500);
+}
+</script>

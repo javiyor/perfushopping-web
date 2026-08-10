@@ -146,6 +146,7 @@ $router->post('/eventos/capacitaciones/clientes', [DemoTechController::class, 'c
 // Mantener rutas viejas por compatibilidad
 $router->get('/eventos/demo-tecnica', [DemoTechController::class, 'index']);
 $router->get('/promociones', [PromoTarjetasController::class, 'index']);
+$router->get('/promociones/(?P<id>\d+)', [PromoTarjetasController::class, 'show']);
 $router->get('/eventos/demo-tecnica/profesionales', [DemoTechController::class, 'professionalsForm']);
 $router->post('/eventos/demo-tecnica/profesionales', [DemoTechController::class, 'professionalsSubmit']);
 $router->get('/eventos/demo-tecnica/clientes', [DemoTechController::class, 'clientsForm']);

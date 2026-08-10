@@ -34,6 +34,20 @@ final class PromoTarjetaRepo
         return $r ?: null;
     }
 
+    public function findPublicoById(int $id): ?array
+    {
+        $st = Db::pdo()->prepare("
+            SELECT * FROM promo_tarjetas
+            WHERE id = :id AND publicado = 1
+              AND (fecha_desde IS NULL OR fecha_desde <= CURDATE())
+              AND (fecha_hasta IS NULL OR fecha_hasta >= CURDATE())
+            LIMIT 1
+        ");
+        $st->execute([':id' => $id]);
+        $r = $st->fetch();
+        return $r ?: null;
+    }
+
     public function create(array $data, int $createdBy): int
     {
         $st = Db::pdo()->prepare('
