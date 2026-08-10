@@ -10,6 +10,18 @@ $inst = $inst ?? null;
 $creditBalance = (int)($creditBalance ?? 0);
 $correoCost = $correoCost ?? null;
 $cartTotalCents = (int)($cartTotalCents ?? 0);
+$naveAvailable = (bool)($naveAvailable ?? true);
+$mpAvailable = (bool)($mpAvailable ?? true);
+$paymentMethod = (string)($form['payment_method'] ?? '');
+if ($paymentMethod === 'nave' && !$naveAvailable) {
+    $paymentMethod = '';
+}
+if ($paymentMethod === 'mp' && !$mpAvailable) {
+    $paymentMethod = '';
+}
+if ($paymentMethod === '') {
+    $paymentMethod = $naveAvailable ? 'nave' : ($mpAvailable ? 'mp' : 'transfer');
+}
 ?>
 
 <div class="page">
@@ -61,26 +73,30 @@ $cartTotalCents = (int)($cartTotalCents ?? 0);
     <?php if (!$isWholesale): ?>
       <h3 style="margin:18px 0 10px">Metodo de pago</h3>
       <div class="variants" style="grid-template-columns:1fr 1fr">
+        <?php if ($naveAvailable): ?>
         <label class="variant" style="display:flex;justify-content:space-between;align-items:center;gap:12px">
           <span>
             <strong>Nave</strong>
             <span style="display:block;color:rgba(246,244,239,0.6);font-size:12px">Tarjeta Naranja, credito/debito, cuotas y dinero disponible</span>
           </span>
-          <input type="radio" name="payment_method" value="nave" <?= ((string)($form['payment_method'] ?? 'nave') === 'nave') ? 'checked' : '' ?> />
+          <input type="radio" name="payment_method" value="nave" <?= ($paymentMethod === 'nave') ? 'checked' : '' ?> />
         </label>
+        <?php endif; ?>
+        <?php if ($mpAvailable): ?>
         <label class="variant" style="display:flex;justify-content:space-between;align-items:center;gap:12px">
           <span>
             <strong>Mercado Pago</strong>
             <span style="display:block;color:rgba(246,244,239,0.6);font-size:12px">Tarjeta de credito/debito, cuotas y dinero disponible</span>
           </span>
-          <input type="radio" name="payment_method" value="mp" <?= ((string)($form['payment_method'] ?? '') === 'mp') ? 'checked' : '' ?> />
+          <input type="radio" name="payment_method" value="mp" <?= ($paymentMethod === 'mp') ? 'checked' : '' ?> />
         </label>
+        <?php endif; ?>
         <label class="variant" style="display:flex;justify-content:space-between;align-items:center;gap:12px">
           <span>
             <strong>Transferencia bancaria</strong>
             <span style="display:block;color:rgba(246,244,239,0.6);font-size:12px">Alias MP: <strong>perfushopping.mp</strong></span>
           </span>
-          <input type="radio" name="payment_method" value="transfer" <?= ((string)($form['payment_method'] ?? '') === 'transfer') ? 'checked' : '' ?> />
+          <input type="radio" name="payment_method" value="transfer" <?= ($paymentMethod === 'transfer') ? 'checked' : '' ?> />
         </label>
       </div>
     <?php endif; ?>

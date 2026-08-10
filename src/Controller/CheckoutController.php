@@ -12,9 +12,11 @@ use Perfushopping\Web\Repo\AffiliateLedgerRepo;
 use Perfushopping\Web\Service\AuthService;
 use Perfushopping\Web\Service\CartService;
 use Perfushopping\Web\Service\InstallmentsService;
+use Perfushopping\Web\Service\NaveService;
 use Perfushopping\Web\Service\PricingService;
 use Perfushopping\Web\Service\ShippingService;
 use Perfushopping\Web\Support\Csrf;
+use Perfushopping\Web\Support\Env;
 use Perfushopping\Web\Support\Format;
 use Perfushopping\Web\Support\Response;
 use Perfushopping\Web\Support\View;
@@ -101,6 +103,8 @@ final class CheckoutController
             'shippingOptions' => (new ShippingService())->deliveryLocalOptionsForDestination((string)(($_SESSION['checkout_form'] ?? [])['city'] ?? ''), (int)(($_SESSION['checkout_form'] ?? [])['province_codprov'] ?? 0)),
             'correoCost' => $correoCost,
             'cartTotalCents' => $totalCents,
+            'naveAvailable' => (new NaveService())->configured(),
+            'mpAvailable' => Env::get('MP_ACCESS_TOKEN', '') !== '',
             'flash' => $_SESSION['flash'] ?? null,
         ]);
         unset($_SESSION['flash']);
@@ -180,6 +184,12 @@ final class CheckoutController
         }
         if (!$isWholesale && $paymentMethod === 'mp' && $tarjetaId <= 0) {
             $errors[] = 'Selecciona tarjeta.';
+        }
+        if (!$isWholesale && $paymentMethod === 'nave' && !(new NaveService())->configured()) {
+            $errors[] = 'El pago con Nave no esta disponible por el momento. Elegi otro medio de pago.';
+        }
+        if (!$isWholesale && $paymentMethod === 'mp' && Env::get('MP_ACCESS_TOKEN', '') === '') {
+            $errors[] = 'El pago con Mercado Pago no esta disponible por el momento. Elegi otro medio de pago.';
         }
         if ($cuotas !== 3 && $cuotas !== 6) {
             $cuotas = 3;
