@@ -87,86 +87,18 @@ $statusOptions = [
           <?php endif; ?>
 
           <?php $currentStatus = (string)($order['status'] ?? ''); ?>
-          <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
-            <?php if ($currentStatus === 'pending_payment'): ?>
-              <form method="post" action="/admin/order/status" style="display:inline">
-                <input type="hidden" name="_csrf" value="<?= htmlspecialchars((string)$csrf) ?>" />
-                <input type="hidden" name="order_id" value="<?= $orderId ?>" />
-                <input type="hidden" name="status" value="paid" />
-                <button class="btn" type="submit">Marcar pagado</button>
-              </form>
-              <form method="post" action="/admin/order/status" style="display:inline">
-                <input type="hidden" name="_csrf" value="<?= htmlspecialchars((string)$csrf) ?>" />
-                <input type="hidden" name="order_id" value="<?= $orderId ?>" />
-                <input type="hidden" name="status" value="cancelled" />
-                <button class="btn danger" type="submit">Cancelar</button>
-              </form>
-            <?php elseif ($currentStatus === 'paid' || $currentStatus === 'pending_transfer'): ?>
-              <form method="post" action="/admin/order/status" style="display:inline">
-                <input type="hidden" name="_csrf" value="<?= htmlspecialchars((string)$csrf) ?>" />
-                <input type="hidden" name="order_id" value="<?= $orderId ?>" />
-                <input type="hidden" name="status" value="paid" />
-                <button class="btn" type="submit">Marcar pagado</button>
-              </form>
-              <form method="post" action="/admin/order/status" style="display:inline">
-                <input type="hidden" name="_csrf" value="<?= htmlspecialchars((string)$csrf) ?>" />
-                <input type="hidden" name="order_id" value="<?= $orderId ?>" />
-                <input type="hidden" name="status" value="preparing" />
-                <button class="btn" type="submit">Preparando</button>
-              </form>
-              <form method="post" action="/admin/order/status" style="display:inline">
-                <input type="hidden" name="_csrf" value="<?= htmlspecialchars((string)$csrf) ?>" />
-                <input type="hidden" name="order_id" value="<?= $orderId ?>" />
-                <input type="hidden" name="status" value="cancelled" />
-                <button class="btn danger" type="submit">Cancelar</button>
-              </form>
-            <?php elseif ($currentStatus === 'transfer_reported'): ?>
-              <form method="post" action="/admin/order/status" style="display:inline">
-                <input type="hidden" name="_csrf" value="<?= htmlspecialchars((string)$csrf) ?>" />
-                <input type="hidden" name="order_id" value="<?= $orderId ?>" />
-                <input type="hidden" name="status" value="paid" />
-                <button class="btn" type="submit">Marcar pagado</button>
-              </form>
-              <form method="post" action="/admin/order/status" style="display:inline">
-                <input type="hidden" name="_csrf" value="<?= htmlspecialchars((string)$csrf) ?>" />
-                <input type="hidden" name="order_id" value="<?= $orderId ?>" />
-                <input type="hidden" name="status" value="cancelled" />
-                <button class="btn danger" type="submit">Cancelar</button>
-              </form>
-            <?php elseif ($currentStatus === 'preparing'): ?>
-              <form method="post" action="/admin/order/status" style="display:inline">
-                <input type="hidden" name="_csrf" value="<?= htmlspecialchars((string)$csrf) ?>" />
-                <input type="hidden" name="order_id" value="<?= $orderId ?>" />
-                <input type="hidden" name="status" value="prepared" />
-                <button class="btn" type="submit">Preparado</button>
-              </form>
-              <form method="post" action="/admin/order/status" style="display:inline">
-                <input type="hidden" name="_csrf" value="<?= htmlspecialchars((string)$csrf) ?>" />
-                <input type="hidden" name="order_id" value="<?= $orderId ?>" />
-                <input type="hidden" name="status" value="cancelled" />
-                <button class="btn danger" type="submit">Cancelar</button>
-              </form>
-            <?php elseif ($currentStatus === 'prepared'): ?>
-              <form method="post" action="/admin/order/status" style="display:inline">
-                <input type="hidden" name="_csrf" value="<?= htmlspecialchars((string)$csrf) ?>" />
-                <input type="hidden" name="order_id" value="<?= $orderId ?>" />
-                <input type="hidden" name="status" value="shipped" />
-                <button class="btn" type="submit">Enviado</button>
-              </form>
-              <form method="post" action="/admin/order/status" style="display:inline">
-                <input type="hidden" name="_csrf" value="<?= htmlspecialchars((string)$csrf) ?>" />
-                <input type="hidden" name="order_id" value="<?= $orderId ?>" />
-                <input type="hidden" name="status" value="cancelled" />
-                <button class="btn danger" type="submit">Cancelar</button>
-              </form>
-            <?php elseif ($currentStatus === 'shipped' || $currentStatus === 'cancelled'): ?>
-              <form method="post" action="/admin/order/status" style="display:inline">
-                <input type="hidden" name="_csrf" value="<?= htmlspecialchars((string)$csrf) ?>" />
-                <input type="hidden" name="order_id" value="<?= $orderId ?>" />
-                <input type="hidden" name="status" value="archived" />
-                <button class="btn" type="submit">Archivar</button>
-              </form>
-            <?php endif; ?>
+          <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <form method="post" action="/admin/order/status" style="display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <input type="hidden" name="_csrf" value="<?= htmlspecialchars((string)$csrf) ?>" />
+              <input type="hidden" name="order_id" value="<?= $orderId ?>" />
+              <select name="status">
+                <?php foreach ($statusOptions as $value => $label): ?>
+                  <?php if ($value === '') continue; ?>
+                  <option value="<?= htmlspecialchars($value) ?>" <?= $currentStatus === $value ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+                <?php endforeach; ?>
+              </select>
+              <button class="btn" type="submit">Cambiar estado</button>
+            </form>
           </div>
         </div>
       <?php endforeach; ?>

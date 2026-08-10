@@ -89,21 +89,19 @@ final class WebOrderController
             Response::redirect('/admin/orders');
         }
 
-        $transitions = [
-            'pending_payment' => ['paid', 'cancelled'],
-            'paid' => ['preparing', 'cancelled'],
-            'pending_transfer' => ['paid', 'preparing', 'cancelled'],
-            'transfer_reported' => ['paid', 'cancelled'],
-            'preparing' => ['prepared', 'cancelled'],
-            'prepared' => ['shipped', 'cancelled'],
-            'shipped' => ['archived'],
-            'cancelled' => ['archived'],
-            'archived' => [],
+        $validStatuses = [
+            'pending_payment' => 'Pendiente de pago',
+            'paid' => 'Pagado',
+            'preparing' => 'Preparando',
+            'prepared' => 'Preparado',
+            'shipped' => 'Enviado',
+            'cancelled' => 'Cancelado',
+            'archived' => 'Archivado',
+            'pending_transfer' => 'Pendiente transferencia',
+            'transfer_reported' => 'Transferencia informada',
         ];
 
-        $currentStatus = (string)($order['status'] ?? '');
-        $allowed = $transitions[$currentStatus] ?? [];
-        if ($orderId <= 0 || !in_array($newStatus, $allowed, true)) {
+        if ($orderId <= 0 || !isset($validStatuses[$newStatus])) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Transicion invalida.'];
             Response::redirect('/admin/orders');
         }

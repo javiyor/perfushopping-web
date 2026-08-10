@@ -73,8 +73,8 @@ if (!$isWholesale) {
     <?php endif; ?>
 
     <?php if ($items): ?>
-      <a class="btn" href="/checkout" style="width:100%; margin-top:12px">Finalizar compra</a>
-      <a class="btn secondary" href="/pay/mp/start" style="width:100%; margin-top:10px">Pagar con Mercado Pago</a>
+      <a class="btn" href="/checkout" style="width:100%; margin-top:12px">Finalizar la compra</a>
+      <div class="notice" style="margin-top:10px">Al finalizar vas a elegir el medio de pago: Nave, Mercado Pago o transferencia.</div>
       <?php if ($isWholesale): ?>
         <div class="notice">Modo mayorista: el pago es solo por transferencia. Completa el checkout.</div>
       <?php endif; ?>
