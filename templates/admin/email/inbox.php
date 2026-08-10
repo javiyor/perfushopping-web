@@ -1,3 +1,6 @@
+<?php
+use Perfushopping\Web\Support\Env;
+?>
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
         <h4 class="fw-bold mb-1">Bandeja de entrada</h4>
