@@ -242,6 +242,21 @@ final class FacturaController
         $fecha = (string)($input['fecha'] ?? date('Y-m-d'));
         $descuento = max(0, (int)($input['descuento_cents'] ?? 0));
 
+        // Loyalty points redemption (1 punto = $1): reduce the payable total.
+        $puntosUsados = max(0, (int)($input['puntos_usados'] ?? 0));
+        $puntosUsadosCents = $puntosUsados * 100;
+        if ($puntosUsados > 0) {
+            $saldoPuntos = (new \Perfushopping\Web\Repo\PuntosRepo())->saldo($clienteErpId ?: 0);
+            if ($puntosUsados > $saldoPuntos) {
+                Response::json(['ok' => false, 'error' => 'El cliente no tiene suficientes puntos para canjear.'], 422);
+                return;
+            }
+            if ($puntosUsadosCents > ($subtotal + $ivaTotal - $descuento)) {
+                $puntosUsados = (int)floor(($subtotal + $ivaTotal - $descuento) / 100);
+                $puntosUsadosCents = $puntosUsados * 100;
+            }
+        }
+
         $id = $repo->create([
             'codigo' => $codigo,
             'tipo_comprobante' => $tipo,
@@ -260,13 +275,24 @@ final class FacturaController
             'subtotal_cents' => $subtotal,
             'iva_cents' => $ivaTotal,
             'descuento_cents' => $descuento,
-            'total_cents' => $subtotal + $ivaTotal - $descuento,
+            'puntos_cents' => $puntosUsadosCents,
+            'total_cents' => $subtotal + $ivaTotal - $descuento - $puntosUsadosCents,
             'estado' => 'emitida',
             'forma_pago' => $formaPago,
             'notas' => $notas,
             'created_by' => (int)$adminUser['id'],
             'vendedor_id' => $vendedorId,
         ], $items, $pagos);
+
+        // Loyalty points: register redemption and accrue the purchase.
+        $puntosService = new \Perfushopping\Web\Service\PuntosService();
+        if ($puntosUsados > 0 && $clienteErpId) {
+            $puntosService->usarEnFactura($clienteErpId, $puntosUsados, $id, (int)$adminUser['id']);
+        }
+        $factura = $repo->findById($id);
+        if ($factura) {
+            $puntosService->acreditarFactura($factura, $items);
+        }
 
         // Deduct stock from session deposit
         $depoId = $auth->getDepositoId();
@@ -428,6 +454,13 @@ final class FacturaController
                 'Anulación Factura ' . ($f['codigo'] ?? ''),
                 (int)$adminUser['id']
             );
+        }
+
+        // Reverse loyalty points if factura is anulated (accrual removed + redeemed points returned).
+        if ($estado === 'anulada' && $oldEstado !== 'anulada') {
+            $puntosService = new \Perfushopping\Web\Service\PuntosService();
+            $puntosService->revertirFactura($id);
+            $puntosService->revertirUsoFactura($id);
         }
 
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Estado actualizado a: ' . $estado];

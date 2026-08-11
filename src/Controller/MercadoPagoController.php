@@ -147,6 +147,13 @@ final class MercadoPagoController
             if ($orderPaid) {
                 (new AffiliateService())->maybeCreateCommissionForPaidOrder($orderPaid);
 
+                // Loyalty points: accrue on paid order
+                try {
+                    (new \Perfushopping\Web\Service\PuntosService())->acreditarOrder($orderPaid);
+                } catch (\Throwable $e) {
+                    error_log('Puntos acreditar error: ' . $e->getMessage());
+                }
+
                 // Create Correo Argentino order if shipping method is correo_argentino
                 if (($orderPaid['shipping_method'] ?? '') === 'correo_argentino') {
                     try {

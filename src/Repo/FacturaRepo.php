@@ -112,8 +112,8 @@ final class FacturaRepo
         $pdo->beginTransaction();
         try {
             $st = $pdo->prepare('
-                INSERT INTO facturas (codigo, tipo_comprobante, punto_venta, remito_id, presupuesto_id, cliente_id, idclien, cliente_nombre, cliente_cuit, cliente_direc, cliente_tele, cliente_mail, cliente_condicion_iva, fecha, subtotal_cents, iva_cents, descuento_cents, total_cents, estado, forma_pago, notas, created_by, vendedor_id, created_at, updated_at)
-                VALUES (:codigo, :tipo, :punto_venta, :remito_id, :presupuesto_id, :cliente_id, :idclien, :cliente_nombre, :cliente_cuit, :cliente_direc, :cliente_tele, :cliente_mail, :cliente_condicion_iva, :fecha, :subtotal, :iva, :descuento, :total, :estado, :forma_pago, :notas, :created_by, :vendedor_id, NOW(), NOW())
+                INSERT INTO facturas (codigo, tipo_comprobante, punto_venta, remito_id, presupuesto_id, cliente_id, idclien, cliente_nombre, cliente_cuit, cliente_direc, cliente_tele, cliente_mail, cliente_condicion_iva, fecha, subtotal_cents, iva_cents, descuento_cents, puntos_cents, total_cents, estado, forma_pago, notas, created_by, vendedor_id, created_at, updated_at)
+                VALUES (:codigo, :tipo, :punto_venta, :remito_id, :presupuesto_id, :cliente_id, :idclien, :cliente_nombre, :cliente_cuit, :cliente_direc, :cliente_tele, :cliente_mail, :cliente_condicion_iva, :fecha, :subtotal, :iva, :descuento, :puntos, :total, :estado, :forma_pago, :notas, :created_by, :vendedor_id, NOW(), NOW())
             ');
             $st->execute([
                 ':codigo' => $data['codigo'],
@@ -133,6 +133,7 @@ final class FacturaRepo
                 ':subtotal' => $data['subtotal_cents'],
                 ':iva' => $data['iva_cents'],
                 ':descuento' => $data['descuento_cents'] ?? 0,
+                ':puntos' => $data['puntos_cents'] ?? 0,
                 ':total' => $data['total_cents'],
                 ':estado' => $data['estado'] ?? 'emitida',
                 ':forma_pago' => $data['forma_pago'],

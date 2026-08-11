@@ -136,6 +136,10 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
         <?php if ($descuento > 0): ?>
         <div class="row" style="color:#dc3545"><span>Descuento:</span><span>-<?= htmlspecialchars(Format::moneyRoundedFromCents($descuento)) ?></span></div>
         <?php endif; ?>
+        <?php $puntosCents = (int)($factura['puntos_cents'] ?? 0); ?>
+        <?php if ($puntosCents > 0): ?>
+        <div class="row" style="color:#b8860b"><span>Canje puntos:</span><span>-<?= htmlspecialchars(Format::moneyRoundedFromCents($puntosCents)) ?> (<?= (int)($puntosCents / 100) ?> pts)</span></div>
+        <?php endif; ?>
         <div class="row total"><span>TOTAL:</span><span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($factura['total_cents'] ?? 0))) ?></span></div>
     </div>
 

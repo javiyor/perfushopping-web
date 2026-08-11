@@ -82,6 +82,18 @@ final class CheckoutController
             }
         }
 
+        $pointsBalance = 0;
+        if ($user && !$isWholesale) {
+            try {
+                $erp = (new \Perfushopping\Web\Repo\FacturaRepo())->findClienteErpByWebId((int)$user['id']);
+                if ($erp) {
+                    $pointsBalance = (new \Perfushopping\Web\Repo\PuntosRepo())->saldo((int)$erp['idclien']);
+                }
+            } catch (\Throwable $e) {
+                $pointsBalance = 0;
+            }
+        }
+
         // Compute Correo Argentino cost for selected province (if any)
         $selectedProv = (int)($form['province_codprov'] ?? 0);
         $correoCost = null;
@@ -98,6 +110,7 @@ final class CheckoutController
             'tarjetas' => $promoRepo->tarjetas(),
             'inst' => $inst,
             'creditBalance' => $creditBalance,
+            'pointsBalance' => $pointsBalance,
             'form' => $form,
             'selectedLugarId' => $selectedLugarId,
             'shippingOptions' => (new ShippingService())->deliveryLocalOptionsForDestination((string)(($_SESSION['checkout_form'] ?? [])['city'] ?? ''), (int)(($_SESSION['checkout_form'] ?? [])['province_codprov'] ?? 0)),
@@ -150,6 +163,7 @@ final class CheckoutController
         $tarjetaId = (int)($_POST['tarjeta_id'] ?? 0);
         $cuotas = (int)($_POST['cuotas'] ?? 3);
         $creditUseRaw = trim((string)($_POST['credit_use'] ?? ''));
+        $pointsUseRaw = trim((string)($_POST['points_use'] ?? ''));
         $shippingTime = trim((string)($_POST['shipping_time'] ?? ''));
 
         $form = [
@@ -167,6 +181,7 @@ final class CheckoutController
             'tarjeta_id' => $tarjetaId,
             'cuotas' => $cuotas,
             'credit_use' => $creditUseRaw,
+            'points_use' => $pointsUseRaw,
         ];
         $_SESSION['checkout_form'] = $form;
 
@@ -354,7 +369,26 @@ final class CheckoutController
         }
 
         $productsAfterCredit = $totalDisc - $creditApplied;
-        $totalFinal = $productsAfterCredit + (int)$shippingCost;
+
+        // Loyalty points (1 punto = $1). Applies after affiliate credit, capped to products balance.
+        $pointsAppliedCents = 0;
+        if (!$isWholesale && $user && $pointsUseRaw !== '' && (int)$pointsUseRaw > 0) {
+            $pointsRequested = max(0, (int)$pointsUseRaw);
+            $pointsMax = 0;
+            try {
+                $erp = (new \Perfushopping\Web\Repo\FacturaRepo())->findClienteErpByWebId((int)$user['id']);
+                if ($erp) {
+                    $pointsMax = (new \Perfushopping\Web\Repo\PuntosRepo())->saldo((int)$erp['idclien']);
+                }
+            } catch (\Throwable $e) {
+                $pointsMax = 0;
+            }
+            $pointsUse = max(0, min($pointsRequested, $pointsMax, (int)floor($productsAfterCredit / 100)));
+            $pointsAppliedCents = $pointsUse * 100;
+        }
+
+        $productsAfterPoints = $productsAfterCredit - $pointsAppliedCents;
+        $totalFinal = $productsAfterPoints + (int)$shippingCost;
         $totalForMp = $totalFinal;
         if (!$isWholesale && $cuotas === 6 && $recargoPercent > 0) {
             $totalForMp = (int)round($totalFinal * (1.0 + $recargoPercent / 100.0));
@@ -393,6 +427,27 @@ final class CheckoutController
                 (new AffiliateLedgerRepo())->addSpendOnOrder((int)$user['id'], $orderId, $creditApplied, 'Uso de credito en compra');
             } catch (\Throwable $e) {
                 // If ledger missing, ignore
+            }
+        }
+
+        // Auto-link web user to local clientes account (unified loyalty account) BEFORE registering points.
+        if ($user) {
+            try {
+                (new UserRepo())->linkClienteIdIfEmpty((int)$user['id'], $email, '');
+            } catch (\Throwable $e) {
+                error_log('Link cliente error: ' . $e->getMessage());
+            }
+        }
+
+        // Register loyalty points redemption (1 punto = $1)
+        if (!$isWholesale && $user && $pointsAppliedCents > 0) {
+            try {
+                $erp = (new \Perfushopping\Web\Repo\FacturaRepo())->findClienteErpByWebId((int)$user['id']);
+                if ($erp) {
+                    (new \Perfushopping\Web\Service\PuntosService())->usarEnOrder((int)$erp['idclien'], (int)($pointsAppliedCents / 100), $orderId);
+                }
+            } catch (\Throwable $e) {
+                error_log('Puntos usar error: ' . $e->getMessage());
             }
         }
 

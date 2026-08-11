@@ -105,7 +105,23 @@ final class WebOrderController
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Transicion invalida.'];
             Response::redirect('/admin/orders');
         }
+
+        $oldStatus = (string)($order['status'] ?? '');
         (new OrderRepo())->updateStatus($orderId, $newStatus);
+
+        $puntosService = new \Perfushopping\Web\Service\PuntosService();
+        if ($newStatus === 'paid' && $oldStatus !== 'paid') {
+            $orderPaid = (new OrderRepo())->find($orderId);
+            if ($orderPaid) {
+                $puntosService->acreditarOrder($orderPaid);
+            }
+        } elseif ($oldStatus === 'paid' && $newStatus !== 'paid') {
+            $puntosService->revertirOrder($orderId);
+        }
+        if ($newStatus === 'cancelled' && $oldStatus !== 'cancelled') {
+            $puntosService->revertirUsoOrder($orderId);
+        }
+
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Pedido #' . $orderId . ' actualizado a ' . $newStatus . '.'];
         Response::redirect($_SERVER['HTTP_REFERER'] ?? '/admin/orders');
     }

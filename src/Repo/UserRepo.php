@@ -166,6 +166,52 @@ final class UserRepo
         $st->execute([':s' => $status, ':c' => $clienteId, ':i' => $userId]);
     }
 
+    /**
+     * Auto-link a web user to the local clientes account (idclien) by email or CUIT
+     * so loyalty points resolve to the unified local customer account.
+     */
+    public function linkClienteIdIfEmpty(int $userId, string $email, string $cuit = ''): ?int
+    {
+        if ($userId <= 0) {
+            return null;
+        }
+        $st = Db::pdo()->prepare('SELECT cliente_id FROM web_users WHERE id = :i LIMIT 1');
+        $st->execute([':i' => $userId]);
+        $existing = (int)$st->fetchColumn();
+        if ($existing > 0) {
+            return $existing;
+        }
+
+        $idclien = null;
+        $email = strtolower(trim($email));
+        if ($email !== '') {
+            $st = Db::pdo()->prepare('SELECT idclien FROM clientes WHERE LOWER(mail) = :e AND idclien > 0 LIMIT 1');
+            $st->execute([':e' => $email]);
+            $v = $st->fetchColumn();
+            if ($v !== false && (int)$v > 0) {
+                $idclien = (int)$v;
+            }
+        }
+        if ($idclien === null) {
+            $cuit = preg_replace('/[^0-9]/', '', $cuit) ?? '';
+            if ($cuit !== '') {
+                $st = Db::pdo()->prepare('SELECT idclien FROM clientes WHERE REPLACE(REPLACE(cuit,"-","")," ","") = :c AND idclien > 0 LIMIT 1');
+                $st->execute([':c' => $cuit]);
+                $v = $st->fetchColumn();
+                if ($v !== false && (int)$v > 0) {
+                    $idclien = (int)$v;
+                }
+            }
+        }
+        if ($idclien === null) {
+            return null;
+        }
+
+        $st = Db::pdo()->prepare('UPDATE web_users SET cliente_id = :c WHERE id = :i LIMIT 1');
+        $st->execute([':c' => $idclien, ':i' => $userId]);
+        return $idclien;
+    }
+
     public function setCustomerCategory(int $userId, string $customerCategory): void
     {
         try {

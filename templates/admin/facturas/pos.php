@@ -243,6 +243,11 @@ $plazos = $plazos ?? [];
                     <span>Dto. %</span>
                     <span><input type="number" id="posDescuento" value="0" min="0" max="100" style="width:60px;text-align:right;font-size:14px;border:1px solid #ccc;border-radius:4px;padding:2px 4px" onchange="recalcTotals()" />%</span>
                 </div>
+                <div class="pt-row" id="posPuntosRow" style="display:none">
+                    <span>Puntos a canjear (1 pto = $1)</span>
+                    <span><input type="number" id="posPuntosUsar" value="0" min="0" step="1" style="width:80px;text-align:right;font-size:14px;border:1px solid #ccc;border-radius:4px;padding:2px 4px" onchange="recalcTotals()" /></span>
+                </div>
+                <div class="pt-row" id="posPuntosSaldo" style="display:none;font-size:12px;color:#6c757d"><span>Saldo disponible</span><span id="posPuntosSaldoVal">0</span></div>
                 <div class="pt-row pt-total"><span>TOTAL</span><span id="posTotal">$0</span></div>
             </div>
         </div>
@@ -577,13 +582,23 @@ function recalcTotals() {
     document.getElementById('posSubtotal').textContent = '$' + fmtPrice(isRI ? subtotal : total);
     document.getElementById('posIva').textContent = '$' + fmtPrice(iva);
     const totalConDto = total - descuento;
-    document.getElementById('posTotal').textContent = '$' + fmtPrice(totalConDto);
+
+    let puntosUsados = 0;
+    const puntosEl = document.getElementById('posPuntosUsar');
+    if (puntosEl && puntosEl.value && parseInt(puntosEl.value) > 0) {
+        const maxPuntos = Math.floor(totalConDto / 100);
+        puntosUsados = Math.min(parseInt(puntosEl.value), maxPuntos);
+        if (puntosUsados < parseInt(puntosEl.value)) puntosEl.value = puntosUsados;
+    }
+    const puntosCents = puntosUsados * 100;
+    const totalFinal = totalConDto - puntosCents;
+    document.getElementById('posTotal').textContent = '$' + fmtPrice(totalFinal);
 
     let pagado = 0;
     document.querySelectorAll('#pagosContainer .fp-monto').forEach(inp => {
         pagado += parseInt(parseFloat(inp.value) * 100) || 0;
     });
-    const vuelto = pagado > totalConDto ? pagado - totalConDto : 0;
+    const vuelto = pagado > totalFinal ? pagado - totalFinal : 0;
     document.getElementById('pagosTotal').textContent = '$' + fmtPrice(pagado);
     document.getElementById('vueltoDisplay').textContent = '$' + fmtPrice(vuelto);
 }
@@ -646,6 +661,35 @@ function selectCliente(c) {
     };
     document.getElementById('tipoComprobante').value = tipoMap[iva] || 'FACT-B';
     renderCart();
+
+    loadPuntosSaldo(c.idclien || 0);
+}
+
+function loadPuntosSaldo(idclien) {
+    const row = document.getElementById('posPuntosRow');
+    const saldoRow = document.getElementById('posPuntosSaldo');
+    const usar = document.getElementById('posPuntosUsar');
+    if (usar) usar.value = 0;
+    if (!idclien) {
+        row.style.display = 'none';
+        saldoRow.style.display = 'none';
+        renderCart();
+        return;
+    }
+    fetch('/admin/puntos/saldo?idclien=' + encodeURIComponent(idclien))
+        .then(r => r.json())
+        .then(data => {
+            const saldo = (data && data.saldo) ? parseInt(data.saldo) : 0;
+            document.getElementById('posPuntosSaldoVal').textContent = saldo.toLocaleString('es-AR');
+            row.style.display = saldo > 0 ? 'flex' : 'none';
+            saldoRow.style.display = saldo > 0 ? 'flex' : 'none';
+            renderCart();
+        })
+        .catch(() => {
+            row.style.display = 'none';
+            saldoRow.style.display = 'none';
+            renderCart();
+        });
 }
 
 function clearCliente() {
@@ -656,6 +700,7 @@ function clearCliente() {
     document.getElementById('clienteCondIva').value = 'consumidor_final';
     cliInput.value = '';
     cliSuggestions.innerHTML = '';
+    loadPuntosSaldo(0);
     renderCart();
 }
 
@@ -948,6 +993,7 @@ function submitFactura() {
         notas: notas,
         fecha: new Date().toISOString().slice(0,10),
         descuento_cents: descuentoCents,
+        puntos_usados: parseInt(document.getElementById('posPuntosUsar').value) || 0,
         cliente: {
             id: clienteId || null,
             idclien: clienteErpId || null,

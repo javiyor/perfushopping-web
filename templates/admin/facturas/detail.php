@@ -105,6 +105,13 @@ $discriminaIva = in_array($factura['tipo_comprobante'] ?? '', ['FACT-A']);
                             <span>-<?= htmlspecialchars(Format::moneyRoundedFromCents($descuento)) ?></span>
                         </div>
                         <?php endif; ?>
+                        <?php $puntosCents = (int)($factura['puntos_cents'] ?? 0); ?>
+                        <?php if ($puntosCents > 0): ?>
+                        <div class="d-flex justify-content-between small text-warning">
+                            <span>Canje de puntos:</span>
+                            <span>-<?= htmlspecialchars(Format::moneyRoundedFromCents($puntosCents)) ?> (<?= (int)($puntosCents / 100) ?> pts)</span>
+                        </div>
+                        <?php endif; ?>
                         <div class="d-flex justify-content-between fw-bold" style="font-size:20px">
                             <span>Total:</span>
                             <span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($factura['total_cents'] ?? 0))) ?></span>

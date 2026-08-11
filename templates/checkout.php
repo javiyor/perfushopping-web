@@ -111,6 +111,16 @@ if ($paymentMethod === '') {
       </div>
     <?php endif; ?>
 
+    <?php if (!$isWholesale && $user && $pointsBalance > 0): ?>
+      <div class="notice" style="margin-top:12px">
+        Tenes <strong><?= (int)$pointsBalance ?> puntos</strong> disponibles (1 punto = $1 de descuento).
+        <div style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <input style="max-width:220px" type="number" name="points_use" min="0" step="1" placeholder="Usar puntos" value="<?= htmlspecialchars((string)($form['points_use'] ?? '')) ?>" />
+          <span style="color:rgba(246,244,239,0.65);font-size:12px">Se descuentan del total de la compra.</span>
+        </div>
+      </div>
+    <?php endif; ?>
+
     <h3 style="margin:18px 0 10px">Metodo de envio</h3>
     <div class="variants" style="grid-template-columns:1fr">
       <div class="notice" id="local-delivery-note">Si la localidad es Reconquista o Avellaneda (Santa Fe), podes elegir delivery local. Para otras localidades, el envio es por Correo Argentino con costo segun provincia y descuentos por monto de compra.</div>

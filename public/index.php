@@ -75,6 +75,7 @@ use Perfushopping\Web\Admin\SucursalController as AdminSucursalController;
 use Perfushopping\Web\Admin\EmpresaController as AdminEmpresaController;
 use Perfushopping\Web\Admin\NotaPedidoController as AdminNotaPedidoController;
 use Perfushopping\Web\Admin\CompraController as AdminCompraController;
+use Perfushopping\Web\Admin\PuntosController as AdminPuntosController;
 
 $router = new Router();
 
@@ -258,6 +259,13 @@ $router->get('/admin/ctacte/(?P<id>\d+)', [AdminCtaCteController::class, 'show']
 $router->get('/admin/ctacte/ajuste/(?P<id>\d+)', [AdminCtaCteController::class, 'ajuste']);
 $router->post('/admin/ctacte/ajuste/guardar', [AdminCtaCteController::class, 'storeAjuste']);
 $router->get('/admin/ctacte/buscar-clientes', [AdminCtaCteController::class, 'searchClientes']);
+$router->get('/admin/puntos', [AdminPuntosController::class, 'index']);
+$router->get('/admin/puntos/saldo', [AdminPuntosController::class, 'saldo']);
+$router->get('/admin/puntos/(?P<id>\d+)', [AdminPuntosController::class, 'show']);
+$router->post('/admin/puntos/ajustar', [AdminPuntosController::class, 'ajustar']);
+$router->post('/admin/puntos/config', [AdminPuntosController::class, 'saveConfig']);
+$router->post('/admin/puntos/marcas', [AdminPuntosController::class, 'saveMarca']);
+$router->post('/admin/puntos/productos', [AdminPuntosController::class, 'saveProducto']);
 $router->get('/admin/sesion/iniciar', [AdminSesionController::class, 'iniciar']);
 $router->post('/admin/sesion/guardar', [AdminSesionController::class, 'guardar']);
 $router->post('/admin/sesion/cerrar', [AdminSesionController::class, 'cerrar']);

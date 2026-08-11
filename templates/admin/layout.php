@@ -221,6 +221,7 @@
             <div class="nav-section">Clientes</div>
             <a href="/admin/clientes"><i class="bi bi-people"></i>Clientes</a>
             <a href="/admin/users"><i class="bi bi-person-gear"></i>Usuarios web<span class="badge-count green" id="badgeUsuariosNuevos" style="display:none">0</span></a>
+            <a href="/admin/puntos"><i class="bi bi-stars"></i>Puntos</a>
 
             <div class="nav-section">Compras</div>
             <a href="/admin/compras"><i class="bi bi-receipt"></i>Facturas compra</a>
