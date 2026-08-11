@@ -30,10 +30,15 @@ try {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title><?= htmlspecialchars((string)($pageTitle ?? '')) ?><?= ($pageTitle ?? '') !== '' ? ' · ' : '' ?><?= $empresaNombre ?></title>
-    <link rel="icon" href="/assets/brand/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" href="<?= htmlspecialchars($empresaLogoUrl) ?>" sizes="any" />
     <?= $head ?? '' ?>
     <link rel="stylesheet" href="/assets/app.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+    <style>
+      .thumb::before {
+        background-image: url("<?= htmlspecialchars($empresaLogoUrl) ?>");
+      }
+    </style>
     <script defer src="/assets/app.js"></script>
   </head>
   <body>
