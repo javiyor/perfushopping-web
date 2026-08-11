@@ -12,6 +12,17 @@ $user = $user ?? null;
 $isWholesale = $isWholesale ?? false;
 $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
+
+$stats = new \Perfushopping\Web\Repo\WebStatsRepo();
+try {
+    $statsIdprodu = (isset($product) && is_array($product)) ? (int)($product['idprodu'] ?? 0) : 0;
+    $statsUserId = (is_array($user) && !empty($user['id'])) ? (int)$user['id'] : 0;
+    $stats->registrarVisita((string)($_SERVER['REQUEST_URI'] ?? ''), $statsIdprodu, $statsUserId, session_id(), (string)($_SERVER['REMOTE_ADDR'] ?? ''));
+    if ($statsIdprodu > 0) {
+        $stats->incrementarProducto($statsIdprodu);
+    }
+} catch (\Throwable $e) {
+}
 ?>
 <!doctype html>
 <html lang="es">

@@ -5,6 +5,7 @@ namespace Perfushopping\Web\Admin;
 
 use Perfushopping\Web\Infra\Db;
 use Perfushopping\Web\Repo\OrderRepo;
+use Perfushopping\Web\Repo\WebStatsRepo;
 use Perfushopping\Web\Service\AdminAuthService;
 use Perfushopping\Web\Service\AuthService;
 use Perfushopping\Web\Support\Csrf;
@@ -31,6 +32,17 @@ final class DashboardController
         $pendingOrders = (new OrderRepo())->adminList('', 'pending_payment', 5);
         $paidOrders = (new OrderRepo())->adminList('', 'paid', 5);
 
+        $webStats = new WebStatsRepo();
+        $abandonedCarts = [];
+        $topProducts = [];
+        try {
+            $abandonedCarts = (new OrderRepo())->findAbandonedCarts();
+            $topProducts = $webStats->topProductos(5, 30);
+        } catch (\Throwable $e) {
+            $abandonedCarts = [];
+            $topProducts = [];
+        }
+
         $stats = [];
         try {
             $st = $pdo->query("SELECT COUNT(*) FROM orders WHERE DATE(created_at) = CURDATE()");
@@ -50,6 +62,12 @@ final class DashboardController
 
             $st = $pdo->query("SELECT COUNT(*) FROM admin_users WHERE activo = 1");
             $stats['admins'] = (int)$st->fetchColumn();
+
+            $stats['visitas_hoy'] = $webStats->visitasHoy();
+            $stats['visitantes_hoy'] = $webStats->visitantesUnicosHoy();
+            $stats['visitas_7d'] = $webStats->visitasEnDias(7);
+            $stats['visitantes_7d'] = $webStats->visitantesUnicosEnDias(7);
+            $stats['abandoned'] = count($abandonedCarts);
         } catch (\Throwable $e) {
             $stats = [];
         }
@@ -59,6 +77,8 @@ final class DashboardController
             'stats' => $stats,
             'pendingOrders' => $pendingOrders,
             'paidOrders' => $paidOrders,
+            'abandonedCarts' => $abandonedCarts,
+            'topProducts' => $topProducts,
             'csrf' => Csrf::token(),
             'flash' => $_SESSION['admin_flash'] ?? null,
             'pageTitle' => 'Panel Principal',

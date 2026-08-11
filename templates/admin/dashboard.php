@@ -2,6 +2,8 @@
 $stats = $stats ?? [];
 $pendingOrders = $pendingOrders ?? [];
 $paidOrders = $paidOrders ?? [];
+$abandonedCarts = $abandonedCarts ?? [];
+$topProducts = $topProducts ?? [];
 $adminRol = $adminUser['rol'] ?? '';
 $isSuper = $adminRol === 'superadmin';
 ?>
@@ -48,6 +50,39 @@ $isSuper = $adminRol === 'superadmin';
         <div class="card-dashboard text-center">
             <div class="h3 fw-bold mb-0"><?= (int)($stats['admins'] ?? 0) ?></div>
             <div class="small text-muted">Admins activos</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card-dashboard text-center">
+            <div class="h3 fw-bold mb-0 text-success"><?= (int)($stats['visitas_hoy'] ?? 0) ?></div>
+            <div class="small text-muted">Visitas hoy</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card-dashboard text-center">
+            <div class="h3 fw-bold mb-0 text-success"><?= (int)($stats['visitantes_hoy'] ?? 0) ?></div>
+            <div class="small text-muted">Visitantes hoy</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card-dashboard text-center">
+            <div class="h3 fw-bold mb-0"><?= (int)($stats['visitas_7d'] ?? 0) ?></div>
+            <div class="small text-muted">Visitas 7 días</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card-dashboard text-center">
+            <div class="h3 fw-bold mb-0"><?= (int)($stats['visitantes_7d'] ?? 0) ?></div>
+            <div class="small text-muted">Visitantes 7 días</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card-dashboard text-center">
+            <div class="h3 fw-bold mb-0 text-danger"><?= (int)($stats['abandoned'] ?? 0) ?></div>
+            <div class="small text-muted">Carritos abandonados</div>
         </div>
     </div>
 </div>
@@ -137,6 +172,66 @@ $isSuper = $adminRol === 'superadmin';
                                     <div class="small text-muted"><?= htmlspecialchars(mb_substr((string)($o['email'] ?? ''), 0, 30)) ?></div>
                                 </div>
                                 <span class="badge bg-primary rounded-pill"><?= \Perfushopping\Web\Support\Format::moneyRoundedFromCents((int)($o['total_cents'] ?? 0)) ?></span>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mt-1">
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+                <span>Productos más vistos (30 días)</span>
+            </div>
+            <div class="card-body p-0">
+                <?php if (!$topProducts): ?>
+                    <div class="p-3 text-muted small">Aún no hay datos de visitas de productos.</div>
+                <?php else: ?>
+                    <ul class="list-group list-group-flush">
+                        <?php foreach ($topProducts as $tp): ?>
+                            <li class="list-group-item d-flex justify-content-between align-items-center py-2">
+                                <a href="/admin/productos/<?= (int)($tp['idprodu'] ?? 0) ?>" class="fw-semibold text-decoration-none text-truncate" style="max-width:75%"><?= htmlspecialchars((string)($tp['produ'] ?? '')) ?></a>
+                                <span class="badge bg-success rounded-pill"><?= (int)($tp['vistas'] ?? 0) ?> visitas</span>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+                <span>Carritos abandonados con contacto</span>
+                <span class="badge bg-danger"><?= count($abandonedCarts) ?></span>
+            </div>
+            <div class="card-body p-0">
+                <?php if (!$abandonedCarts): ?>
+                    <div class="p-3 text-muted small">No hay carritos abandonados recientes.</div>
+                <?php else: ?>
+                    <ul class="list-group list-group-flush">
+                        <?php foreach ($abandonedCarts as $o): ?>
+                            <li class="list-group-item py-2">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <a href="/admin/orders?q=<?= urlencode((string)($o['order_code'] ?? '')) ?>" class="fw-semibold text-decoration-none"><?= htmlspecialchars((string)($o['order_code'] ?? '#' . $o['id'])) ?></a>
+                                    <span class="badge bg-warning rounded-pill"><?= \Perfushopping\Web\Support\Format::moneyRoundedFromCents((int)($o['total_cents'] ?? 0)) ?></span>
+                                </div>
+                                <div class="small text-muted"><?= htmlspecialchars((string)($o['ship_name'] ?? '')) ?></div>
+                                <div class="small">
+                                    <?php $abEmail = trim((string)($o['email'] ?? '')); ?>
+                                    <?php $abPhone = trim((string)($o['phone'] ?? '')); ?>
+                                    <?php if ($abEmail !== ''): ?>
+                                        <a class="me-2" href="mailto:<?= htmlspecialchars($abEmail) ?>"><i class="bi bi-envelope"></i> <?= htmlspecialchars(mb_substr($abEmail, 0, 30)) ?></a>
+                                    <?php endif; ?>
+                                    <?php if ($abPhone !== ''): ?>
+                                        <a href="https://wa.me/<?= rawurlencode(preg_replace('/\D/', '', $abPhone)) ?>" target="_blank" rel="noopener"><i class="bi bi-whatsapp"></i> <?= htmlspecialchars($abPhone) ?></a>
+                                    <?php endif; ?>
+                                </div>
                             </li>
                         <?php endforeach; ?>
                     </ul>
