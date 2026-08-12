@@ -443,7 +443,7 @@ function startWithConfig(config){
     const input = document.getElementById('qrInput');
     return _html5QrCode.start(
         config,
-        { fps: 10, qrbox: { min: 200, max: 420 } },
+        { fps: 10, qrbox: { min: 250, max: 460 } },
         function(decoded){
             if (input){ input.value = decoded; }
             stopScanner();
@@ -460,19 +460,17 @@ function startScanner(){
     showScanError('');
 
     loadHtml5QrLib(function(){
-        Html5Qrcode.getCameras().then(function(cameras){
-            let cfg;
-            const back = cameras.find(function(c){ return /back|rear|environment/i.test(c.label || ''); });
-            if (back){ cfg = back.id; }
-            else if (cameras.length > 0){ cfg = cameras[0].id; }
-            else { cfg = { facingMode: 'environment' }; }
-            return startWithConfig(cfg);
-        }).catch(function(){
-            if (_html5QrCode){ try{ _html5QrCode.clear(); }catch(x){} _html5QrCode = null; }
-            return startWithConfig({ facingMode: 'environment' });
-        }).catch(function(e){
-            showScanError('No se pudo iniciar la cámara: ' + (e && e.message ? e.message : e));
-        });
+        if (_html5QrCode){ try{ _html5QrCode.clear(); }catch(x){} _html5QrCode = null; }
+        // Prefer the rear camera. Ideal (not exact) allows fallback on laptop/cam-less devices.
+        startWithConfig({ facingMode: { ideal: 'environment' } })
+            .catch(function(){
+                if (_html5QrCode){ try{ _html5QrCode.clear(); }catch(x){} _html5QrCode = null; }
+                // Fallback to the front camera.
+                return startWithConfig({ facingMode: 'user' });
+            })
+            .catch(function(e){
+                showScanError('No se pudo iniciar la cámara: ' + (e && e.message ? e.message : e));
+            });
     });
 }
 
