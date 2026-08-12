@@ -418,7 +418,7 @@ let _html5QrCode = null;
 function loadHtml5QrLib(cb){
     if (typeof Html5Qrcode !== 'undefined'){ cb(); return; }
     const s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/minified/html5-qrcode.min.js';
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js';
     s.onload = cb;
     s.onerror = function(){ showScanError('No se pudo cargar el lector de QR.'); };
     document.head.appendChild(s);
