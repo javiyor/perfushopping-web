@@ -32,13 +32,19 @@ $idcta1Sel = (int)($compra['idcta1'] ?? 0);
 <div class="card shadow-sm mb-3">
     <div class="card-header bg-white fw-semibold"><i class="bi bi-qr-code"></i> Cargar desde QR de ARCA</div>
     <div class="card-body">
-        <form method="post" action="/admin/compras/qr" class="row g-2">
+        <form method="post" action="/admin/compras/qr" class="row g-2" id="qrForm">
             <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrfToken) ?>" />
             <div class="col-lg-9">
-                <input class="form-control form-control-sm" name="qr" placeholder="Pegá el texto del QR del comprobante (https://www.afip.gob.ar/fe/qr/?p=1&v=...)" />
+                <input class="form-control form-control-sm" name="qr" id="qrInput" placeholder="Pegá el texto del QR del comprobante (https://www.afip.gob.ar/fe/qr/?p=1&v=...)" />
             </div>
-            <div class="col-lg-3">
+            <div class="col-lg-3 d-flex gap-2">
                 <button class="btn btn-accent btn-sm w-100" type="submit"><i class="bi bi-magic"></i> Completar datos</button>
+                <button class="btn btn-outline-secondary btn-sm w-100" type="button" id="btnScanQr"><i class="bi bi-camera-video"></i> Escanear</button>
+            </div>
+            <div class="col-12" id="qrScannerArea" style="display:none;">
+                <div id="qrReader" style="width:100%; max-width:520px"></div>
+                <div id="qrScanError" class="text-danger small mt-2" style="display:none"></div>
+                <div class="text-muted small mt-1"><i class="bi bi-info-circle"></i> Apuntá la cámara al código QR del comprobante. Al escanearlo, los datos se cargan automáticamente.</div>
             </div>
         </form>
     </div>
@@ -404,3 +410,86 @@ document.addEventListener('change', function(e) {
 
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 </script>
+
+<?php if (!$isEdit): ?>
+<script>
+let _html5QrCode = null;
+
+function loadHtml5QrLib(cb){
+    if (typeof Html5Qrcode !== 'undefined'){ cb(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/minified/html5-qrcode.min.js';
+    s.onload = cb;
+    s.onerror = function(){ showScanError('No se pudo cargar el lector de QR.'); };
+    document.head.appendChild(s);
+}
+
+function showScanError(msg){
+    const e = document.getElementById('qrScanError');
+    if (e){ e.textContent = msg || ''; e.style.display = msg ? 'block' : 'none'; }
+}
+
+function stopScanner(){
+    if (_html5QrCode){
+        _html5QrCode.stop().then(function(){ try{ _html5QrCode.clear(); }catch(x){} }).catch(function(){});
+        _html5QrCode = null;
+    }
+    const area = document.getElementById('qrScannerArea');
+    if (area) area.style.display = 'none';
+}
+
+function startWithConfig(config){
+    _html5QrCode = new Html5Qrcode('qrReader');
+    const input = document.getElementById('qrInput');
+    return _html5QrCode.start(
+        config,
+        { fps: 10, qrbox: { min: 200, max: 420 } },
+        function(decoded){
+            if (input){ input.value = decoded; }
+            stopScanner();
+            const form = document.getElementById('qrForm');
+            if (form){ form.submit(); }
+        },
+        function(){ /* onFrameError: silenciado */ }
+    );
+}
+
+function startScanner(){
+    const area = document.getElementById('qrScannerArea');
+    if (area) area.style.display = 'block';
+    showScanError('');
+
+    loadHtml5QrLib(function(){
+        Html5Qrcode.getCameras().then(function(cameras){
+            let cfg;
+            const back = cameras.find(function(c){ return /back|rear|environment/i.test(c.label || ''); });
+            if (back){ cfg = back.id; }
+            else if (cameras.length > 0){ cfg = cameras[0].id; }
+            else { cfg = { facingMode: 'environment' }; }
+            return startWithConfig(cfg);
+        }).catch(function(){
+            if (_html5QrCode){ try{ _html5QrCode.clear(); }catch(x){} _html5QrCode = null; }
+            return startWithConfig({ facingMode: 'environment' });
+        }).catch(function(e){
+            showScanError('No se pudo iniciar la cámara: ' + (e && e.message ? e.message : e));
+        });
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+    const btn = document.getElementById('btnScanQr');
+    if (btn){
+        btn.addEventListener('click', function(e){
+            e.preventDefault();
+            startScanner();
+        });
+        btn.addEventListener('keydown', function(e){
+            if (e.key === 'Enter' || e.keyCode === 13){
+                e.preventDefault();
+                startScanner();
+            }
+        });
+    }
+});
+</script>
+<?php endif; ?>
