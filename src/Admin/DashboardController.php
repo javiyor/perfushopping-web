@@ -62,15 +62,27 @@ final class DashboardController
 
             $st = $pdo->query("SELECT COUNT(*) FROM admin_users WHERE activo = 1");
             $stats['admins'] = (int)$st->fetchColumn();
-
-            $stats['visitas_hoy'] = $webStats->visitasHoy();
-            $stats['visitantes_hoy'] = $webStats->visitantesUnicosHoy();
-            $stats['visitas_7d'] = $webStats->visitasEnDias(7);
-            $stats['visitantes_7d'] = $webStats->visitantesUnicosEnDias(7);
-            $stats['abandoned'] = count($abandonedCarts);
         } catch (\Throwable $e) {
             $stats = [];
         }
+
+        $webStatsBlock = [];
+        try {
+            $webStatsBlock['visitas_hoy'] = $webStats->visitasHoy();
+            $webStatsBlock['visitantes_hoy'] = $webStats->visitantesUnicosHoy();
+            $webStatsBlock['visitas_7d'] = $webStats->visitasEnDias(7);
+            $webStatsBlock['visitantes_7d'] = $webStats->visitantesUnicosEnDias(7);
+            $webStatsBlock['abandoned'] = count($abandonedCarts);
+        } catch (\Throwable $e) {
+            $webStatsBlock = [
+                'visitas_hoy' => 0,
+                'visitantes_hoy' => 0,
+                'visitas_7d' => 0,
+                'visitantes_7d' => 0,
+                'abandoned' => 0,
+            ];
+        }
+        $stats = array_merge($stats, $webStatsBlock);
 
         echo View::adminPage('admin/dashboard.php', [
             'adminUser' => $adminUser,

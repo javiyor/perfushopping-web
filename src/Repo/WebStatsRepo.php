@@ -7,6 +7,26 @@ use Perfushopping\Web\Infra\Db;
 
 final class WebStatsRepo
 {
+    private ?bool $tablesReady = null;
+
+    /** True si las tablas de estadisticas existen (evita que falten rompan el dashboard). */
+    private function tablesReady(): bool
+    {
+        if ($this->tablesReady !== null) {
+            return $this->tablesReady;
+        }
+        try {
+            $pdo = Db::pdo();
+            $st = $pdo->query("SHOW TABLES LIKE 'web_visitas'");
+            $hasWeb = $st->fetchColumn() !== false;
+            $st = $pdo->query("SHOW TABLES LIKE 'producto_visitas'");
+            $hasProd = $st->fetchColumn() !== false;
+            return $this->tablesReady = ($hasWeb && $hasProd);
+        } catch (\Throwable $e) {
+            return $this->tablesReady = false;
+        }
+    }
+
     /** Log a page visit. Returns false if the request should be ignored (bot/health/etc). */
     public function registrarVisita(string $url, ?int $idprodu, ?int $userId, string $sessionKey, string $ip): bool
     {
@@ -30,7 +50,7 @@ final class WebStatsRepo
 
     public function incrementarProducto(int $idprodu): void
     {
-        if ($idprodu <= 0) {
+        if ($idprodu <= 0 || !$this->tablesReady()) {
             return;
         }
         $st = Db::pdo()->prepare('
@@ -43,12 +63,18 @@ final class WebStatsRepo
 
     public function visitasHoy(): int
     {
+        if (!$this->tablesReady()) {
+            return 0;
+        }
         $st = Db::pdo()->query("SELECT COUNT(*) FROM web_visitas WHERE DATE(created_at) = CURDATE()");
         return (int)$st->fetchColumn();
     }
 
     public function visitasEnDias(int $dias): int
     {
+        if (!$this->tablesReady()) {
+            return 0;
+        }
         $dias = max(1, (int)$dias);
         $st = Db::pdo()->prepare('SELECT COUNT(*) FROM web_visitas WHERE created_at >= DATE_SUB(NOW(), INTERVAL :d DAY)');
         $st->execute([':d' => $dias]);
@@ -57,12 +83,18 @@ final class WebStatsRepo
 
     public function visitantesUnicosHoy(): int
     {
+        if (!$this->tablesReady()) {
+            return 0;
+        }
         $st = Db::pdo()->query("SELECT COUNT(DISTINCT session_key) FROM web_visitas WHERE DATE(created_at) = CURDATE() AND session_key IS NOT NULL");
         return (int)$st->fetchColumn();
     }
 
     public function visitantesUnicosEnDias(int $dias): int
     {
+        if (!$this->tablesReady()) {
+            return 0;
+        }
         $dias = max(1, (int)$dias);
         $st = Db::pdo()->prepare('SELECT COUNT(DISTINCT session_key) FROM web_visitas WHERE created_at >= DATE_SUB(NOW(), INTERVAL :d DAY) AND session_key IS NOT NULL');
         $st->execute([':d' => $dias]);
@@ -72,6 +104,9 @@ final class WebStatsRepo
     /** @return array<int, array<string,mixed>> */
     public function topProductos(int $limit = 5, int $dias = 30): array
     {
+        if (!$this->tablesReady()) {
+            return [];
+        }
         $limit = max(1, min(20, (int)$limit));
         $dias = max(1, (int)$dias);
         $st = Db::pdo()->prepare("
