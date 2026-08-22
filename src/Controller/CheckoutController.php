@@ -184,9 +184,10 @@ final class CheckoutController
         $_SESSION['checkout_form'] = $form;
 
         $errors = [];
-        foreach (['name','email','phone','address','city','postal_code'] as $f) {
+        $labels = ['name' => 'nombre', 'email' => 'email', 'phone' => 'teléfono', 'address' => 'dirección', 'city' => 'ciudad', 'postal_code' => 'código postal'];
+        foreach ($labels as $f => $label) {
             if (($form[$f] ?? '') === '') {
-                $errors[] = 'Completa ' . $f . '.';
+                $errors[] = 'Completa ' . $label . '.';
             }
         }
         if ($prov <= 0) {
