@@ -49,35 +49,16 @@ if ($paymentMethod === '') {
       </select>
       <input name="postal_code" id="checkout-postal-code" placeholder="Codigo postal" value="<?= htmlspecialchars((string)($form['postal_code'] ?? '')) ?>" />
       <input type="hidden" name="city" id="checkout-city" value="<?= htmlspecialchars((string)($form['city'] ?? '')) ?>" />
-      <?php if (!$isWholesale): ?>
-        <select name="tarjeta_id" id="checkout-tarjeta">
-          <option value="0">Tarjeta (para promos)</option>
-          <?php foreach ($tarjetas as $t): ?>
-            <option value="<?= (int)$t['idtarje'] ?>" <?= ((int)$t['idtarje'] === (int)($form['tarjeta_id'] ?? 0)) ? 'selected' : '' ?>><?= htmlspecialchars((string)$t['nomtar']) ?></option>
-          <?php endforeach; ?>
-        </select>
-        <select name="cuotas" id="checkout-cuotas">
-          <option value="3" <?= ((int)($form['cuotas'] ?? 3) === 3) ? 'selected' : '' ?>>3 cuotas sin interes</option>
-          <?php if ($inst): ?>
-              <option value="6" <?= ((int)($form['cuotas'] ?? 3) === 6) ? 'selected' : '' ?>><?= htmlspecialchars((string)($inst['promo']['descrip'] ?? 'Cuotas')) ?>: <?= (int)$inst['cuotas'] ?>x <?= htmlspecialchars(\Perfushopping\Web\Support\Format::moneyRoundedFromCents((int)$inst['cuota_cents'])) ?></option>
-          <?php else: ?>
-            <option value="6" <?= ((int)($form['cuotas'] ?? 3) === 6) ? 'selected' : '' ?>>Cuotas con Mercado Pago</option>
-          <?php endif; ?>
-        </select>
-      <?php else: ?>
-        <input value="Transferencia" disabled />
-        <input value="Sin promos" disabled />
-      <?php endif; ?>
     </div>
 
     <?php if (!$isWholesale): ?>
       <h3 style="margin:18px 0 10px">Metodo de pago</h3>
-      <div class="variants" style="grid-template-columns:1fr 1fr">
+      <div class="variants" style="grid-template-columns:1fr">
         <?php if ($naveAvailable): ?>
         <label class="variant" style="display:flex;justify-content:space-between;align-items:center;gap:12px">
           <span>
             <strong>Tarjetas de crédito, débito</strong>
-            <span style="display:block;color:rgba(246,244,239,0.6);font-size:12px">Visa, Mastercard, Naranja y otras — cuotas y débito</span>
+            <span style="display:block;color:rgba(246,244,239,0.6);font-size:12px">Visa, Mastercard, Naranja y otras — cuotas y débito (checkout seguro)</span>
           </span>
           <input type="radio" name="payment_method" value="nave" <?= ($paymentMethod === 'nave') ? 'checked' : '' ?> />
         </label>
@@ -86,10 +67,22 @@ if ($paymentMethod === '') {
         <label class="variant" style="display:flex;justify-content:space-between;align-items:center;gap:12px">
           <span>
             <strong>Mercado Pago</strong>
-            <span style="display:block;color:rgba(246,244,239,0.6);font-size:12px">Tarjeta de credito/debito, cuotas y dinero disponible</span>
+            <span style="display:block;color:rgba(246,244,239,0.6);font-size:12px">Tarjeta, cuotas y dinero en cuenta</span>
           </span>
           <input type="radio" name="payment_method" value="mp" <?= ($paymentMethod === 'mp') ? 'checked' : '' ?> />
         </label>
+        <div id="mp-cuotas-wrap" style="margin: -8px 0 8px 0; padding-left:4px; <?= ($paymentMethod === 'mp') ? '' : 'display:none' ?>">
+          <select name="cuotas" id="checkout-cuotas" class="form-select" style="max-width:320px">
+            <option value="3" <?= ((int)($form['cuotas'] ?? 3) === 3) ? 'selected' : '' ?>>3 cuotas sin interés</option>
+            <?php if ($inst): ?>
+                <option value="6" <?= ((int)($form['cuotas'] ?? 3) === 6) ? 'selected' : '' ?>><?= htmlspecialchars((string)($inst['promo']['descrip'] ?? 'Cuotas')) ?>: <?= (int)$inst['cuotas'] ?>x <?= htmlspecialchars(\Perfushopping\Web\Support\Format::moneyRoundedFromCents((int)$inst['cuota_cents'])) ?></option>
+            <?php else: ?>
+              <option value="6" <?= ((int)($form['cuotas'] ?? 3) === 6) ? 'selected' : '' ?>>6 cuotas con Mercado Pago</option>
+            <?php endif; ?>
+          </select>
+        </div>
+        <?php else: ?>
+        <input type="hidden" name="cuotas" value="3" />
         <?php endif; ?>
         <label class="variant" style="display:flex;justify-content:space-between;align-items:center;gap:12px">
           <span>
@@ -239,15 +232,13 @@ if ($paymentMethod === '') {
   var localAvellaneda = document.getElementById('local-options-avellaneda')
   var localNote = document.getElementById('local-delivery-note')
   var paymentRadios = document.querySelectorAll('input[name="payment_method"]')
-  var tarjetaSelect = document.getElementById('checkout-tarjeta')
-  var cuotasSelect = document.getElementById('checkout-cuotas')
+  var cuotasWrap = document.getElementById('mp-cuotas-wrap')
   if (!province || !place || !postal || !city) return
 
   function togglePaymentFields() {
     var selected = document.querySelector('input[name="payment_method"]:checked')
     var isMp = selected && selected.value === 'mp'
-    if (tarjetaSelect) tarjetaSelect.style.display = isMp ? '' : 'none'
-    if (cuotasSelect) cuotasSelect.style.display = isMp ? '' : 'none'
+    if (cuotasWrap) cuotasWrap.style.display = isMp ? '' : 'none'
   }
   paymentRadios && paymentRadios.forEach(function (r) { r.addEventListener('change', togglePaymentFields) })
   togglePaymentFields()

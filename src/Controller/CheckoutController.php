@@ -160,7 +160,6 @@ final class CheckoutController
         }
         $shippingChoice = trim((string)($_POST['shipping_choice'] ?? ''));
         $paymentMethod = trim((string)($_POST['payment_method'] ?? ''));
-        $tarjetaId = (int)($_POST['tarjeta_id'] ?? 0);
         $cuotas = (int)($_POST['cuotas'] ?? 3);
         $creditUseRaw = trim((string)($_POST['credit_use'] ?? ''));
         $pointsUseRaw = trim((string)($_POST['points_use'] ?? ''));
@@ -178,7 +177,6 @@ final class CheckoutController
             'shipping_choice' => $shippingChoice,
             'shipping_time' => $shippingTime,
             'payment_method' => $paymentMethod,
-            'tarjeta_id' => $tarjetaId,
             'cuotas' => $cuotas,
             'credit_use' => $creditUseRaw,
             'points_use' => $pointsUseRaw,
@@ -197,9 +195,7 @@ final class CheckoutController
         if ($codLugar <= 0) {
             $errors[] = 'Selecciona localidad.';
         }
-        if (!$isWholesale && $paymentMethod === 'mp' && $tarjetaId <= 0) {
-            $errors[] = 'Selecciona tarjeta.';
-        }
+
         if (!$isWholesale && $paymentMethod === 'nave' && !(new NaveService())->configured()) {
             $errors[] = 'El pago con Nave no esta disponible por el momento. Elegi otro medio de pago.';
         }
@@ -262,6 +258,8 @@ final class CheckoutController
         // Promotions apply only to retail MP payments
         $discountPercent = 0.0;
         $recargoPercent = 0.0;
+        // tarjeta_id removido del checkout: promos por tarjeta ya no aplican aquí
+        $tarjetaId = 0;
         if (!$isWholesale && $paymentMethod === 'mp') {
             $weekday = (int)date('w') + 1; // 1=domingo
             $promo = (new PromoRepo())->bestPromoForTarjeta($tarjetaId, $weekday);
