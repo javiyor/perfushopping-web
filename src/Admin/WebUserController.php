@@ -100,6 +100,18 @@ final class WebUserController
         }
 
         $repo->adminUpdate($userId, $email, $name, $phone, $role, $wholesaleStatus, $customerCategory);
+
+        $newPassword = (string)($_POST['new_password'] ?? '');
+        if ($newPassword !== '') {
+            if (strlen($newPassword) < 8) {
+                $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Datos guardados, pero la clave debe tener al menos 8 caracteres (no se cambió).'];
+                Response::redirect('/admin/users' . ($q !== '' ? '?q=' . urlencode($q) : ''));
+            }
+            $repo->adminResetPassword($userId, password_hash($newPassword, PASSWORD_DEFAULT));
+            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Usuario y clave actualizados.'];
+            Response::redirect('/admin/users' . ($q !== '' ? '?q=' . urlencode($q) : ''));
+        }
+
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Usuario actualizado.'];
         Response::redirect('/admin/users' . ($q !== '' ? '?q=' . urlencode($q) : ''));
     }

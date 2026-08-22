@@ -95,6 +95,10 @@ $customerCategories = $customerCategories ?? [];
                   <?php endforeach; ?>
                 </select>
               </div>
+              <div>
+                <label>Nueva clave (opcional)</label>
+                <input name="new_password" type="password" placeholder="Dejar vacío para no cambiar (mín. 8)" minlength="8" />
+              </div>
             </div>
             <div>
               <button class="btn secondary" type="submit">Guardar cambios</button>
@@ -105,10 +109,10 @@ $customerCategories = $customerCategories ?? [];
             <input type="hidden" name="user_id" value="<?= (int)($row['id'] ?? 0) ?>" />
             <input type="hidden" name="q" value="<?= htmlspecialchars($q) ?>" />
             <div>
-              <label>Blanquear / nueva clave</label>
-              <input name="new_password" type="password" placeholder="Minimo 8 caracteres" minlength="8" required />
+              <label>Blanquear / nueva clave (solo clave)</label>
+              <input name="new_password" type="password" placeholder="Mínimo 8 caracteres" minlength="8" required />
             </div>
-            <button class="btn secondary" type="submit">Guardar clave</button>
+            <button class="btn secondary" type="submit">Guardar solo clave</button>
           </form>
         </div>
       <?php endforeach; ?>
