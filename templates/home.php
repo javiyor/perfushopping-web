@@ -43,7 +43,11 @@ foreach ([1, 2, 3] as $bi) {
       Direcciones: <?= $empresaDir ?><br />
       Instagram: <a href="https://www.instagram.com/perfushopping" target="_blank" rel="noopener" style="text-decoration:underline">@perfushopping</a>
     </div>
-    <h3 style="margin:10px 0 0;color:var(--gold);font-family:Georgia, 'Times New Roman', serif;letter-spacing:0.7px">Novedades</h3>
+    <?php
+    $portadaTitles = ['auto'=>'Novedades','rubro'=>'Selección por rubro','marca'=>'Selección por marca','ultimos'=>'Últimos ingresos','manual'=>'Destacados'];
+    $portadaLabel = $portadaTitles[(string)($portadaInfo['modo'] ?? 'auto')] ?? 'Novedades';
+    ?>
+    <h3 style="margin:10px 0 0;color:var(--gold);font-family:Georgia, 'Times New Roman', serif;letter-spacing:0.7px"><?= htmlspecialchars($portadaLabel) ?></h3>
   <?php else: ?>
     <h3 style="margin:0;color:var(--gold);font-family:Georgia, 'Times New Roman', serif;letter-spacing:0.7px">Catalogo</h3>
     <div style="margin-top:10px;color:rgba(246,244,239,0.72);line-height:1.55">

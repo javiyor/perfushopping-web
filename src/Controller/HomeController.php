@@ -13,11 +13,21 @@ final class HomeController
     public function index(array $params): void
     {
         $meta = new MetaRepo();
-        $products = (new ProductRepo())->list([
-            'q' => $_GET['q'] ?? '',
-            'codrub' => $_GET['codrub'] ?? 0,
-            'codsub' => $_GET['codsub'] ?? 0,
-        ]);
+        $q = trim((string)($_GET['q'] ?? ''));
+        $codrub = (int)($_GET['codrub'] ?? 0);
+        $codsub = (int)($_GET['codsub'] ?? 0);
+        $isFiltered = ($q !== '' || $codrub > 0 || $codsub > 0);
+
+        if ($isFiltered) {
+            $products = (new ProductRepo())->list(['q' => $q, 'codrub' => $codrub, 'codsub' => $codsub]);
+            $portadaInfo = null;
+        } else {
+            $portadaRepo = new \Perfushopping\Web\Repo\PortadaRepo();
+            $cfg = $portadaRepo->getConfig();
+            $products = (new ProductRepo())->portada($cfg);
+            $portadaInfo = $cfg;
+        }
+
         $auth = new AuthService();
         $user = $auth->user();
 
@@ -27,6 +37,7 @@ final class HomeController
             'marcas' => $meta->marcas(),
             'user' => $user,
             'isWholesale' => $auth->isWholesaleApproved($user),
+            'portadaInfo' => $portadaInfo,
         ]);
     }
 }

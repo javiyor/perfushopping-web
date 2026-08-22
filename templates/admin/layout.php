@@ -211,6 +211,7 @@
             <a href="/admin/reportes"><i class="bi bi-graph-up"></i>Reportes</a>
 
             <div class="nav-section">Productos</div>
+            <a href="/admin/portada"><i class="bi bi-easel"></i>Portada</a>
             <a href="/admin/productos"><i class="bi bi-box-seam"></i>Productos</a>
             <a href="/admin/productos/importar"><i class="bi bi-upload"></i>Importar</a>
             <a href="/admin/departamentos"><i class="bi bi-tags"></i>Departamentos</a>

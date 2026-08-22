@@ -76,6 +76,7 @@ use Perfushopping\Web\Admin\EmpresaController as AdminEmpresaController;
 use Perfushopping\Web\Admin\NotaPedidoController as AdminNotaPedidoController;
 use Perfushopping\Web\Admin\CompraController as AdminCompraController;
 use Perfushopping\Web\Admin\PuntosController as AdminPuntosController;
+use Perfushopping\Web\Admin\PortadaController as AdminPortadaController;
 
 $router = new Router();
 
@@ -396,6 +397,16 @@ $router->get('/admin/capacitaciones', [AdminCapacitacionController::class, 'inde
 $router->post('/admin/capacitaciones/status', [AdminCapacitacionController::class, 'status']);
 $router->get('/admin/capacitaciones/horarios', [AdminCapacitacionController::class, 'horarios']);
 $router->post('/admin/capacitaciones/horarios/save', [AdminCapacitacionController::class, 'horariosSave']);
+
+// Admin - Portada
+$router->get('/admin/portada', [AdminPortadaController::class, 'index']);
+$router->post('/admin/portada/guardar', [AdminPortadaController::class, 'save']);
+$router->post('/admin/portada/manual/agregar', [AdminPortadaController::class, 'addManual']);
+$router->post('/admin/portada/manual/agregar-varios', [AdminPortadaController::class, 'addManyManual']);
+$router->post('/admin/portada/manual/quitar', [AdminPortadaController::class, 'removeManual']);
+$router->post('/admin/portada/manual/vaciar', [AdminPortadaController::class, 'clearManual']);
+$router->post('/admin/portada/manual/orden', [AdminPortadaController::class, 'reorderManual']);
+$router->get('/admin/portada/buscar', [AdminPortadaController::class, 'searchJson']);
 
 // Admin - Facturas de compra
 $router->get('/admin/compras', [AdminCompraController::class, 'index']);

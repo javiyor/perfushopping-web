@@ -63,6 +63,101 @@ final class ProductRepo
         return $st->fetchAll();
     }
 
+    /**
+     * Productos para la portada segun configuracion del admin.
+     * Respeta enweb=1 y rubros excluidos; ignora filtro de fecompra salvo modo auto.
+     * @return array<int, array<string,mixed>>
+     */
+    public function portada(?array $config = null): array
+    {
+        $pdo = Db::pdo();
+        $repo = new PortadaRepo();
+        $cfg = $config ?? $repo->getConfig();
+        $modo = (string)($cfg['modo'] ?? 'auto');
+        $excluded = implode(',', array_map('intval', self::EXCLUDED_CODRUBS));
+
+        // Base where siempre aplicado
+        $baseWhere = "p.enweb = 1 AND p.codrub NOT IN (" . $excluded . ") AND LOWER(p.produ) NOT LIKE :tester";
+        $baseParams = [':tester' => '%tester%'];
+
+        // Manual: respeta orden elegido
+        if ($modo === 'manual') {
+            $sql = "
+                SELECT p.idprodu, p.produ, p.precio, p.precio1, p.imagen, r.nomrub, s.nomsub, i.tiva,
+                       (SELECT COUNT(*) FROM gustos g WHERE g.idprodu=p.idprodu AND g.discont=0) AS variants_count
+                FROM portada_productos pp
+                INNER JOIN producto p ON p.idprodu = pp.idprodu
+                LEFT JOIN rubros r ON r.codrub = p.codrub
+                LEFT JOIN subrubro s ON s.codsub = p.codsub
+                LEFT JOIN ivaprodu i ON i.codivaprodu = p.iva
+                WHERE " . $baseWhere . "
+                ORDER BY pp.orden ASC, pp.id ASC
+                LIMIT 80
+            ";
+            try {
+                $st = $pdo->prepare($sql);
+                $st->execute($baseParams);
+                $rows = $st->fetchAll();
+                if ($rows) return $rows;
+            } catch (\Throwable $e) {}
+            // fallback a auto si no hay seleccionados
+        }
+
+        if ($modo === 'rubro' && (int)($cfg['codrub'] ?? 0) > 0) {
+            $sql = "
+                SELECT p.idprodu, p.produ, p.precio, p.precio1, p.imagen, r.nomrub, s.nomsub, i.tiva,
+                       (SELECT COUNT(*) FROM gustos g WHERE g.idprodu=p.idprodu AND g.discont=0) AS variants_count
+                FROM producto p
+                LEFT JOIN rubros r ON r.codrub = p.codrub
+                LEFT JOIN subrubro s ON s.codsub = p.codsub
+                LEFT JOIN ivaprodu i ON i.codivaprodu = p.iva
+                WHERE " . $baseWhere . " AND p.codrub = :codrub
+                ORDER BY p.produ ASC
+                LIMIT 80
+            ";
+            $st = $pdo->prepare($sql);
+            $st->execute(array_merge($baseParams, [':codrub' => (int)$cfg['codrub']]));
+            return $st->fetchAll();
+        }
+
+        if ($modo === 'marca' && (int)($cfg['codsub'] ?? 0) > 0) {
+            $sql = "
+                SELECT p.idprodu, p.produ, p.precio, p.precio1, p.imagen, r.nomrub, s.nomsub, i.tiva,
+                       (SELECT COUNT(*) FROM gustos g WHERE g.idprodu=p.idprodu AND g.discont=0) AS variants_count
+                FROM producto p
+                LEFT JOIN rubros r ON r.codrub = p.codrub
+                LEFT JOIN subrubro s ON s.codsub = p.codsub
+                LEFT JOIN ivaprodu i ON i.codivaprodu = p.iva
+                WHERE " . $baseWhere . " AND p.codsub = :codsub
+                ORDER BY p.produ ASC
+                LIMIT 80
+            ";
+            $st = $pdo->prepare($sql);
+            $st->execute(array_merge($baseParams, [':codsub' => (int)$cfg['codsub']]));
+            return $st->fetchAll();
+        }
+
+        if ($modo === 'ultimos') {
+            $sql = "
+                SELECT p.idprodu, p.produ, p.precio, p.precio1, p.imagen, r.nomrub, s.nomsub, i.tiva,
+                       (SELECT COUNT(*) FROM gustos g WHERE g.idprodu=p.idprodu AND g.discont=0) AS variants_count
+                FROM producto p
+                LEFT JOIN rubros r ON r.codrub = p.codrub
+                LEFT JOIN subrubro s ON s.codsub = p.codsub
+                LEFT JOIN ivaprodu i ON i.codivaprodu = p.iva
+                WHERE " . $baseWhere . "
+                ORDER BY p.idprodu DESC
+                LIMIT 100
+            ";
+            $st = $pdo->prepare($sql);
+            $st->execute($baseParams);
+            return $st->fetchAll();
+        }
+
+        // auto: comportamiento actual (novedades = fecompra 6 meses)
+        return $this->list(['q' => '', 'codrub' => 0, 'codsub' => 0]);
+    }
+
     /** @return array<string,mixed>|null */
     public function find(int $idprodu): ?array
     {
