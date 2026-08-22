@@ -76,8 +76,8 @@ if ($paymentMethod === '') {
         <?php if ($naveAvailable): ?>
         <label class="variant" style="display:flex;justify-content:space-between;align-items:center;gap:12px">
           <span>
-            <strong>Nave</strong>
-            <span style="display:block;color:rgba(246,244,239,0.6);font-size:12px">Tarjeta Naranja, credito/debito, cuotas y dinero disponible</span>
+            <strong>Tarjetas de crédito, débito</strong>
+            <span style="display:block;color:rgba(246,244,239,0.6);font-size:12px">Visa, Mastercard, Naranja y otras — cuotas y débito</span>
           </span>
           <input type="radio" name="payment_method" value="nave" <?= ($paymentMethod === 'nave') ? 'checked' : '' ?> />
         </label>
