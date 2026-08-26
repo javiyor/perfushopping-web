@@ -48,6 +48,12 @@ final class DashboardController
             $st = $pdo->query("SELECT COUNT(*) FROM orders WHERE DATE(created_at) = CURDATE()");
             $stats['orders_today'] = (int)$st->fetchColumn();
 
+            $st = $pdo->query("SELECT COUNT(*) FROM orders WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)");
+            $stats['orders_7d'] = (int)$st->fetchColumn();
+
+            $st = $pdo->query("SELECT COUNT(*) FROM orders WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)");
+            $stats['orders_30d'] = (int)$st->fetchColumn();
+
             $st = $pdo->query("SELECT COUNT(*) FROM orders WHERE status='pending_payment'");
             $stats['pending_payment'] = (int)$st->fetchColumn();
 
@@ -69,15 +75,11 @@ final class DashboardController
         $webStatsBlock = [];
         try {
             $webStatsBlock['visitas_hoy'] = $webStats->visitasHoy();
-            $webStatsBlock['visitantes_hoy'] = $webStats->visitantesUnicosHoy();
-            $webStatsBlock['visitas_7d'] = $webStats->visitasEnDias(7);
             $webStatsBlock['visitantes_7d'] = $webStats->visitantesUnicosEnDias(7);
             $webStatsBlock['abandoned'] = count($abandonedCarts);
         } catch (\Throwable $e) {
             $webStatsBlock = [
                 'visitas_hoy' => 0,
-                'visitantes_hoy' => 0,
-                'visitas_7d' => 0,
                 'visitantes_7d' => 0,
                 'abandoned' => 0,
             ];

@@ -15,11 +15,24 @@ $isSuper = $adminRol === 'superadmin';
     </div>
 </div>
 
+<h6 class="text-uppercase text-muted fw-semibold mb-2">Pedidos</h6>
 <div class="row g-3 mb-4">
     <div class="col-6 col-md-4 col-lg-2">
         <div class="card-dashboard text-center">
             <div class="h3 fw-bold mb-0"><?= (int)($stats['orders_today'] ?? 0) ?></div>
             <div class="small text-muted">Pedidos hoy</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card-dashboard text-center">
+            <div class="h3 fw-bold mb-0"><?= (int)($stats['orders_7d'] ?? 0) ?></div>
+            <div class="small text-muted">Pedidos ult. 7 dias</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card-dashboard text-center">
+            <div class="h3 fw-bold mb-0"><?= (int)($stats['orders_30d'] ?? 0) ?></div>
+            <div class="small text-muted">Pedidos ult. 30 dias</div>
         </div>
     </div>
     <div class="col-6 col-md-4 col-lg-2">
@@ -40,6 +53,10 @@ $isSuper = $adminRol === 'superadmin';
             <div class="small text-muted">Transf. pend.</div>
         </div>
     </div>
+</div>
+
+<h6 class="text-uppercase text-muted fw-semibold mb-2">Usuarios y sistema</h6>
+<div class="row g-3 mb-4">
     <div class="col-6 col-md-4 col-lg-2">
         <div class="card-dashboard text-center">
             <div class="h3 fw-bold mb-0 text-success"><?= (int)($stats['users_today'] ?? 0) ?></div>
@@ -52,8 +69,15 @@ $isSuper = $adminRol === 'superadmin';
             <div class="small text-muted">Admins activos</div>
         </div>
     </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card-dashboard text-center">
+            <div class="h3 fw-bold mb-0 text-danger"><?= (int)($stats['abandoned'] ?? 0) ?></div>
+            <div class="small text-muted">Carritos abandonados</div>
+        </div>
+    </div>
 </div>
 
+<h6 class="text-uppercase text-muted fw-semibold mb-2">Web</h6>
 <div class="row g-3 mb-4">
     <div class="col-6 col-md-4 col-lg-2">
         <div class="card-dashboard text-center">
@@ -63,26 +87,8 @@ $isSuper = $adminRol === 'superadmin';
     </div>
     <div class="col-6 col-md-4 col-lg-2">
         <div class="card-dashboard text-center">
-            <div class="h3 fw-bold mb-0 text-success"><?= (int)($stats['visitantes_hoy'] ?? 0) ?></div>
-            <div class="small text-muted">Visitantes hoy</div>
-        </div>
-    </div>
-    <div class="col-6 col-md-4 col-lg-2">
-        <div class="card-dashboard text-center">
-            <div class="h3 fw-bold mb-0"><?= (int)($stats['visitas_7d'] ?? 0) ?></div>
-            <div class="small text-muted">Visitas 7 días</div>
-        </div>
-    </div>
-    <div class="col-6 col-md-4 col-lg-2">
-        <div class="card-dashboard text-center">
             <div class="h3 fw-bold mb-0"><?= (int)($stats['visitantes_7d'] ?? 0) ?></div>
-            <div class="small text-muted">Visitantes 7 días</div>
-        </div>
-    </div>
-    <div class="col-6 col-md-4 col-lg-2">
-        <div class="card-dashboard text-center">
-            <div class="h3 fw-bold mb-0 text-danger"><?= (int)($stats['abandoned'] ?? 0) ?></div>
-            <div class="small text-muted">Carritos abandonados</div>
+            <div class="small text-muted">Visitantes 7 dias</div>
         </div>
     </div>
 </div>
