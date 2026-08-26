@@ -6,116 +6,145 @@ $q = (string)($q ?? '');
 $customerCategories = $customerCategories ?? [];
 ?>
 
-<div class="page">
-  <div style="display:flex;gap:12px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap">
-    <div>
-      <h2 style="margin:0 0 8px">Usuarios / roles</h2>
-      <p style="margin:0;color:rgba(246,244,239,0.72)">Busca usuarios y cambia si acceden como cliente o admin.</p>
-    </div>
-    <a class="btn secondary" href="/admin">Volver al admin</a>
+<div class="d-flex gap-3 justify-content-between align-items-start flex-wrap mb-3">
+  <div>
+    <h2 class="fw-bold mb-1">Usuarios / Roles</h2>
+    <p class="text-muted mb-0">Buscá usuarios, editá datos y gestioná accesos.</p>
+  </div>
+  <a class="btn btn-outline-secondary btn-sm" href="/admin"><i class="bi bi-arrow-left"></i> Volver al admin</a>
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <form method="get" action="/admin/users" class="row g-2 align-items-center">
+      <div class="col-12 col-md-8 col-lg-6">
+        <input class="form-control" name="q" value="<?= htmlspecialchars($q) ?>" placeholder="Buscar por email, nombre o teléfono" />
+      </div>
+      <div class="col-auto d-flex gap-2">
+        <button class="btn btn-accent" type="submit"><i class="bi bi-search"></i> Buscar</button>
+        <?php if ($q !== ''): ?>
+          <a class="btn btn-outline-secondary" href="/admin/users">Limpiar</a>
+        <?php endif; ?>
+      </div>
+    </form>
   </div>
 </div>
 
-<div class="page" style="margin-top:14px">
-  <form method="get" action="/admin/users" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-    <input name="q" value="<?= htmlspecialchars($q) ?>" placeholder="Buscar por email, nombre o telefono" style="min-width:280px" />
-    <button class="btn" type="submit">Buscar</button>
-    <?php if ($q !== ''): ?>
-      <a class="btn secondary" href="/admin/users">Limpiar</a>
-    <?php endif; ?>
-  </form>
-</div>
-
-<div class="page" style="margin-top:14px">
-  <div style="display:grid;gap:10px">
-    <?php if (!$list): ?>
-      <div class="notice">No se encontraron usuarios.</div>
-    <?php else: ?>
-      <?php foreach ($list as $row): ?>
-        <?php $isBlocked = !empty($row['disabled_at']); ?>
-        <div style="display:grid;gap:12px;border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:14px<?= $isBlocked ? ';opacity:0.8' : '' ?>">
-          <div style="display:flex;gap:10px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap">
+<?php if (!$list): ?>
+  <div class="card shadow-sm">
+    <div class="card-body text-muted">No se encontraron usuarios.</div>
+  </div>
+<?php else: ?>
+  <div class="d-grid gap-3">
+    <?php foreach ($list as $row): ?>
+      <?php $isBlocked = !empty($row['disabled_at']); ?>
+      <div class="card shadow-sm <?= $isBlocked ? 'border-warning' : '' ?>">
+        <div class="card-body">
+          <div class="d-flex gap-2 justify-content-between align-items-start flex-wrap mb-3">
             <div>
-              <div style="font-weight:800"><?= htmlspecialchars((string)($row['name'] ?? 'Sin nombre')) ?><?= $isBlocked ? ' · Bloqueado' : '' ?></div>
-              <div class="meta">#<?= (int)($row['id'] ?? 0) ?> · Mayorista: <?= htmlspecialchars((string)($row['wholesale_status'] ?? '-')) ?> · Categoria: <?= htmlspecialchars((string)($customerCategories[($row['customer_category'] ?? 'none')] ?? 'Sin categoria')) ?> · Alta: <?= htmlspecialchars((string)($row['created_at'] ?? '-')) ?> · Ultimo login: <?= htmlspecialchars((string)($row['last_login_at'] ?? '-')) ?></div>
+              <div class="fw-bold fs-5">
+                <?= htmlspecialchars((string)($row['name'] ?? 'Sin nombre')) ?>
+                <?php if ($isBlocked): ?>
+                  <span class="badge bg-warning text-dark ms-1">Bloqueado</span>
+                <?php endif; ?>
+              </div>
+              <div class="small text-muted">
+                #<?= (int)($row['id'] ?? 0) ?> ·
+                Mayorista: <?= htmlspecialchars((string)($row['wholesale_status'] ?? '-')) ?> ·
+                Categoría: <?= htmlspecialchars((string)($customerCategories[($row['customer_category'] ?? 'none')] ?? 'Sin categoría')) ?> ·
+                Alta: <?= htmlspecialchars((string)($row['created_at'] ?? '-')) ?> ·
+                Último login: <?= htmlspecialchars((string)($row['last_login_at'] ?? '-')) ?>
+              </div>
             </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <div class="d-flex gap-2 flex-wrap">
               <form method="post" action="/admin/users/block">
                 <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>" />
                 <input type="hidden" name="user_id" value="<?= (int)($row['id'] ?? 0) ?>" />
                 <input type="hidden" name="q" value="<?= htmlspecialchars($q) ?>" />
-                <button class="btn secondary" type="submit"><?= $isBlocked ? 'Desbloquear' : 'Bloquear' ?></button>
+                <button class="btn btn-sm <?= $isBlocked ? 'btn-success' : 'btn-warning' ?>" type="submit">
+                  <i class="bi <?= $isBlocked ? 'bi-unlock' : 'bi-lock' ?>"></i> <?= $isBlocked ? 'Desbloquear' : 'Bloquear' ?>
+                </button>
               </form>
-              <form method="post" action="/admin/users/delete" onsubmit="return confirm('Eliminar este usuario? Esta accion puede fallar si tiene pedidos u otros registros relacionados.');">
+              <form method="post" action="/admin/users/delete" onsubmit="return confirm('Eliminar este usuario? Esta acción puede fallar si tiene pedidos u otros registros relacionados.');">
                 <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>" />
                 <input type="hidden" name="user_id" value="<?= (int)($row['id'] ?? 0) ?>" />
                 <input type="hidden" name="q" value="<?= htmlspecialchars($q) ?>" />
-                <button class="btn secondary" type="submit">Eliminar</button>
+                <button class="btn btn-sm btn-danger" type="submit"><i class="bi bi-trash"></i> Eliminar</button>
               </form>
             </div>
           </div>
-          <form method="post" action="/admin/users/save" style="display:grid;gap:12px">
+
+          <form method="post" action="/admin/users/save" class="mb-3">
             <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>" />
             <input type="hidden" name="user_id" value="<?= (int)($row['id'] ?? 0) ?>" />
             <input type="hidden" name="q" value="<?= htmlspecialchars($q) ?>" />
-            <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">
-              <div>
-                <label>Nombre</label>
-                <input name="name" value="<?= htmlspecialchars((string)($row['name'] ?? '')) ?>" required />
+
+            <div class="row g-2">
+              <div class="col-12 col-md-6 col-lg-4">
+                <label class="form-label small fw-semibold mb-1">Nombre</label>
+                <input class="form-control form-control-sm" name="name" value="<?= htmlspecialchars((string)($row['name'] ?? '')) ?>" required />
               </div>
-              <div>
-                <label>Email</label>
-                <input name="email" value="<?= htmlspecialchars((string)($row['email'] ?? '')) ?>" required />
+              <div class="col-12 col-md-6 col-lg-4">
+                <label class="form-label small fw-semibold mb-1">Email</label>
+                <input class="form-control form-control-sm" name="email" value="<?= htmlspecialchars((string)($row['email'] ?? '')) ?>" required />
               </div>
-              <div>
-                <label>Telefono</label>
-                <input name="phone" value="<?= htmlspecialchars((string)($row['phone'] ?? '')) ?>" />
+              <div class="col-12 col-md-6 col-lg-4">
+                <label class="form-label small fw-semibold mb-1">Teléfono</label>
+                <input class="form-control form-control-sm" name="phone" value="<?= htmlspecialchars((string)($row['phone'] ?? '')) ?>" />
               </div>
-              <div>
-                <label>Rol</label>
-                <select name="role">
+
+              <div class="col-12 col-md-6 col-lg-4">
+                <label class="form-label small fw-semibold mb-1">Rol</label>
+                <select class="form-select form-select-sm" name="role">
                   <option value="customer" <?= (($row['role'] ?? '') === 'customer') ? 'selected' : '' ?>>Cliente</option>
                   <option value="admin" <?= (($row['role'] ?? '') === 'admin') ? 'selected' : '' ?>>Admin</option>
                 </select>
               </div>
-              <div>
-                <label>Estado mayorista</label>
-                <select name="wholesale_status">
+              <div class="col-12 col-md-6 col-lg-4">
+                <label class="form-label small fw-semibold mb-1">Estado mayorista</label>
+                <select class="form-select form-select-sm" name="wholesale_status">
                   <option value="none" <?= (($row['wholesale_status'] ?? '') === 'none') ? 'selected' : '' ?>>Sin solicitud</option>
                   <option value="pending" <?= (($row['wholesale_status'] ?? '') === 'pending') ? 'selected' : '' ?>>Pendiente</option>
                   <option value="approved" <?= (($row['wholesale_status'] ?? '') === 'approved') ? 'selected' : '' ?>>Aprobado</option>
                   <option value="rejected" <?= (($row['wholesale_status'] ?? '') === 'rejected') ? 'selected' : '' ?>>Rechazado</option>
                 </select>
               </div>
-              <div>
-                <label>Categoria cliente</label>
-                <select name="customer_category">
+              <div class="col-12 col-md-6 col-lg-4">
+                <label class="form-label small fw-semibold mb-1">Categoría cliente</label>
+                <select class="form-select form-select-sm" name="customer_category">
                   <?php foreach ($customerCategories as $value => $label): ?>
                     <option value="<?= htmlspecialchars((string)$value) ?>" <?= (($row['customer_category'] ?? 'none') === $value) ? 'selected' : '' ?>><?= htmlspecialchars((string)$label) ?></option>
                   <?php endforeach; ?>
                 </select>
               </div>
-              <div>
-                <label>Nueva clave (opcional)</label>
-                <input name="new_password" type="password" placeholder="Dejar vacío para no cambiar (mín. 8)" minlength="8" />
+
+              <div class="col-12 col-md-8 col-lg-6">
+                <label class="form-label small fw-semibold mb-1">Nueva clave (opcional)</label>
+                <input class="form-control form-control-sm" name="new_password" type="password" placeholder="Dejar vacío para no cambiar (mín. 8)" minlength="8" />
               </div>
             </div>
-            <div>
-              <button class="btn secondary" type="submit">Guardar cambios</button>
+
+            <div class="mt-3 d-flex gap-2">
+              <button class="btn btn-accent" type="submit"><i class="bi bi-check2-circle"></i> Guardar cambios</button>
             </div>
           </form>
-          <form method="post" action="/admin/users/password" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:end">
-            <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>" />
-            <input type="hidden" name="user_id" value="<?= (int)($row['id'] ?? 0) ?>" />
-            <input type="hidden" name="q" value="<?= htmlspecialchars($q) ?>" />
-            <div>
-              <label>Blanquear / nueva clave (solo clave)</label>
-              <input name="new_password" type="password" placeholder="Mínimo 8 caracteres" minlength="8" required />
-            </div>
-            <button class="btn secondary" type="submit">Guardar solo clave</button>
-          </form>
+
+          <div class="p-2 rounded border bg-light-subtle">
+            <form method="post" action="/admin/users/password" class="row g-2 align-items-end">
+              <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>" />
+              <input type="hidden" name="user_id" value="<?= (int)($row['id'] ?? 0) ?>" />
+              <input type="hidden" name="q" value="<?= htmlspecialchars($q) ?>" />
+              <div class="col-12 col-md-8 col-lg-6">
+                <label class="form-label small fw-semibold mb-1">Blanquear / nueva clave (solo clave)</label>
+                <input class="form-control form-control-sm" name="new_password" type="password" placeholder="Mínimo 8 caracteres" minlength="8" required />
+              </div>
+              <div class="col-auto">
+                <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-key"></i> Guardar solo clave</button>
+              </div>
+            </form>
+          </div>
         </div>
-      <?php endforeach; ?>
-    <?php endif; ?>
+      </div>
+    <?php endforeach; ?>
   </div>
-</div>
+<?php endif; ?>
