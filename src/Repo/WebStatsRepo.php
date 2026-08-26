@@ -7,23 +7,34 @@ use Perfushopping\Web\Infra\Db;
 
 final class WebStatsRepo
 {
-    private ?bool $tablesReady = null;
+    private ?bool $hasWebVisitasTable = null;
+    private ?bool $hasProductoVisitasTable = null;
 
-    /** True si las tablas de estadisticas existen (evita que falten rompan el dashboard). */
-    private function tablesReady(): bool
+    private function hasWebVisitasTable(): bool
     {
-        if ($this->tablesReady !== null) {
-            return $this->tablesReady;
+        if ($this->hasWebVisitasTable !== null) {
+            return $this->hasWebVisitasTable;
         }
         try {
             $pdo = Db::pdo();
             $st = $pdo->query("SHOW TABLES LIKE 'web_visitas'");
-            $hasWeb = $st->fetchColumn() !== false;
-            $st = $pdo->query("SHOW TABLES LIKE 'producto_visitas'");
-            $hasProd = $st->fetchColumn() !== false;
-            return $this->tablesReady = ($hasWeb && $hasProd);
+            return $this->hasWebVisitasTable = ($st->fetchColumn() !== false);
         } catch (\Throwable $e) {
-            return $this->tablesReady = false;
+            return $this->hasWebVisitasTable = false;
+        }
+    }
+
+    private function hasProductoVisitasTable(): bool
+    {
+        if ($this->hasProductoVisitasTable !== null) {
+            return $this->hasProductoVisitasTable;
+        }
+        try {
+            $pdo = Db::pdo();
+            $st = $pdo->query("SHOW TABLES LIKE 'producto_visitas'");
+            return $this->hasProductoVisitasTable = ($st->fetchColumn() !== false);
+        } catch (\Throwable $e) {
+            return $this->hasProductoVisitasTable = false;
         }
     }
 
@@ -31,6 +42,9 @@ final class WebStatsRepo
     public function registrarVisita(string $url, ?int $idprodu, ?int $userId, string $sessionKey, string $ip): bool
     {
         if ($url === '' || $this->esBot()) {
+            return false;
+        }
+        if (!$this->hasWebVisitasTable()) {
             return false;
         }
         $pdo = Db::pdo();
@@ -50,7 +64,7 @@ final class WebStatsRepo
 
     public function incrementarProducto(int $idprodu): void
     {
-        if ($idprodu <= 0 || !$this->tablesReady()) {
+        if ($idprodu <= 0 || !$this->hasProductoVisitasTable()) {
             return;
         }
         $st = Db::pdo()->prepare('
@@ -63,7 +77,7 @@ final class WebStatsRepo
 
     public function visitasHoy(): int
     {
-        if (!$this->tablesReady()) {
+        if (!$this->hasWebVisitasTable()) {
             return 0;
         }
         $st = Db::pdo()->query("SELECT COUNT(*) FROM web_visitas WHERE DATE(created_at) = CURDATE()");
@@ -72,7 +86,7 @@ final class WebStatsRepo
 
     public function visitasEnDias(int $dias): int
     {
-        if (!$this->tablesReady()) {
+        if (!$this->hasWebVisitasTable()) {
             return 0;
         }
         $dias = max(1, (int)$dias);
@@ -83,7 +97,7 @@ final class WebStatsRepo
 
     public function visitantesUnicosHoy(): int
     {
-        if (!$this->tablesReady()) {
+        if (!$this->hasWebVisitasTable()) {
             return 0;
         }
         $st = Db::pdo()->query("SELECT COUNT(DISTINCT session_key) FROM web_visitas WHERE DATE(created_at) = CURDATE() AND session_key IS NOT NULL");
@@ -92,7 +106,7 @@ final class WebStatsRepo
 
     public function visitantesUnicosEnDias(int $dias): int
     {
-        if (!$this->tablesReady()) {
+        if (!$this->hasWebVisitasTable()) {
             return 0;
         }
         $dias = max(1, (int)$dias);
@@ -104,7 +118,7 @@ final class WebStatsRepo
     /** @return array<int, array<string,mixed>> */
     public function topProductos(int $limit = 5, int $dias = 30): array
     {
-        if (!$this->tablesReady()) {
+        if (!$this->hasProductoVisitasTable()) {
             return [];
         }
         $limit = max(1, min(20, (int)$limit));
