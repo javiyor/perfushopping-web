@@ -352,22 +352,25 @@ XML;
         $caeVto = $dom->getElementsByTagName('CAEFchVto')->item(0)?->textContent ?? '';
         $obs = '';
 
-        // Get observations if any
-        $obsNodes = $dom->getElementsByTagName('Obs');
+        // Collect observations and errors returned by ARCA
         $obsList = [];
-        foreach ($obsNodes as $obsNode) {
-            $code = $obsNode->getElementsByTagName('Code')->item(0)?->textContent ?? '';
-            $msg = $obsNode->getElementsByTagName('Msg')->item(0)?->textContent ?? '';
-            if ($code || $msg) {
-                $obsList[] = "{$code}: {$msg}";
+        foreach (['Obs', 'Err'] as $nodeName) {
+            $nodes = $dom->getElementsByTagName($nodeName);
+            foreach ($nodes as $node) {
+                $code = trim((string)($node->getElementsByTagName('Code')->item(0)?->textContent ?? ''));
+                $msg = trim((string)($node->getElementsByTagName('Msg')->item(0)?->textContent ?? ''));
+                if ($code !== '' || $msg !== '') {
+                    $obsList[] = trim(($code !== '' ? $code . ': ' : '') . $msg);
+                }
             }
         }
         if ($obsList) {
-            $obs = implode(' | ', $obsList);
-            // If rejected, throw with details
-            if ($resultado === 'R') {
-                throw new \RuntimeException('AFIP: comprobante rechazado. ' . $obs);
-            }
+            $obs = implode(' | ', array_values(array_unique($obsList)));
+        }
+
+        if ($resultado === 'R') {
+            $motivo = $obs !== '' ? $obs : 'ARCA no devolvio detalle del rechazo.';
+            throw new \RuntimeException('ARCA: comprobante rechazado. ' . $motivo);
         }
 
         // If no CAE and no result, get error info

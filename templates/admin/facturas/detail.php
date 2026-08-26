@@ -222,12 +222,14 @@ $discriminaIva = in_array($factura['tipo_comprobante'] ?? '', ['FACT-A']);
         </div>
         <?php endif; ?>
 
-        <?php if ($arcaComprobante || ($factura['cae'] ?? '')): ?>
+        <?php if ($arcaComprobante || ($factura['cae'] ?? '') || ($factura['arca_obs'] ?? '')): ?>
+        <?php $arcaResultado = (string)($arcaComprobante['resultado'] ?? $factura['resultado_arca'] ?? 'A'); ?>
+        <?php $arcaObservaciones = (string)($arcaComprobante['observaciones'] ?? $factura['arca_obs'] ?? ''); ?>
         <div class="card shadow-sm mb-3">
             <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
                 <span><i class="bi bi-cloud-check"></i> ARCA</span>
-                <span class="badge bg-<?= (($arcaComprobante['resultado'] ?? 'A') === 'A') ? 'success' : 'danger' ?>">
-                    <?= (($arcaComprobante['resultado'] ?? 'A') === 'A') ? 'Aprobado' : 'Rechazado' ?>
+                <span class="badge bg-<?= ($arcaResultado === 'A') ? 'success' : 'danger' ?>">
+                    <?= ($arcaResultado === 'A') ? 'Aprobado' : 'Rechazado' ?>
                 </span>
             </div>
             <div class="card-body">
@@ -238,9 +240,12 @@ $discriminaIva = in_array($factura['tipo_comprobante'] ?? '', ['FACT-A']);
                     <dt class="col-sm-5">Vto. CAE</dt>
                     <dd class="col-sm-7"><?= htmlspecialchars($factura['cae_vto']) ?></dd>
                     <?php endif; ?>
-                    <?php if ($arcaComprobante && ($arcaComprobante['observaciones'] ?? '')): ?>
+                    <?php if ($arcaObservaciones !== ''): ?>
                     <dt class="col-sm-12" style="margin-top:6px">Obs.</dt>
-                    <dd class="col-sm-12 text-muted" style="font-size:11px"><?= nl2br(htmlspecialchars((string)$arcaComprobante['observaciones'])) ?></dd>
+                    <dd class="col-sm-12 text-muted" style="font-size:11px"><?= nl2br(htmlspecialchars($arcaObservaciones)) ?></dd>
+                    <?php elseif ($arcaResultado === 'R'): ?>
+                    <dt class="col-sm-12" style="margin-top:6px">Obs.</dt>
+                    <dd class="col-sm-12 text-muted" style="font-size:11px">ARCA no devolvió detalle del rechazo.</dd>
                     <?php endif; ?>
                 </dl>
                 <?php if ($qrUrl ?? null): ?>

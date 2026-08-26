@@ -373,17 +373,14 @@ final class FacturaController
         $items = $repo->items($id);
         $pagos = $repo->pagos($id);
 
-        $arcaComprobante = null;
+        $arcaComprobante = (new \Perfushopping\Web\Repo\ArcaRepo())->getComprobante($id);
         $qrUrl = null;
-        if ($factura['cae'] ?? null) {
-            $arcaComprobante = (new \Perfushopping\Web\Repo\ArcaRepo())->getComprobante($id);
-            if ($arcaComprobante && ($arcaComprobante['codigo_emision'] ?? null)) {
-                try {
-                    $wsfe = new \Perfushopping\Web\Service\AfipWsfe();
-                    $qrUrl = $wsfe->getUrlQr($factura, (int)$arcaComprobante['codigo_emision'], $factura['cae']);
-                } catch (\Throwable $e) {
-                    error_log('QR error: ' . $e->getMessage());
-                }
+        if (($factura['cae'] ?? null) && $arcaComprobante && ($arcaComprobante['codigo_emision'] ?? null)) {
+            try {
+                $wsfe = new \Perfushopping\Web\Service\AfipWsfe();
+                $qrUrl = $wsfe->getUrlQr($factura, (int)$arcaComprobante['codigo_emision'], $factura['cae']);
+            } catch (\Throwable $e) {
+                error_log('QR error: ' . $e->getMessage());
             }
         }
 
