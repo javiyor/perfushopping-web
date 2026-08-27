@@ -104,6 +104,26 @@ XML;
             throw new \RuntimeException('AFIP: archivos de certificado no encontrados.');
         }
 
+        if (!is_readable($cert) || !is_readable($key)) {
+            unlink($xmlFile);
+            throw new \RuntimeException('AFIP: certificado o clave sin permisos de lectura.');
+        }
+
+        $certContent = (string)@file_get_contents($cert);
+        if ($certContent === '' || !openssl_x509_read($certContent)) {
+            unlink($xmlFile);
+            throw new \RuntimeException('AFIP: certificado invalido o en formato incorrecto. ' . $this->opensslErrors());
+        }
+
+        $keyRes = @openssl_pkey_get_private('file://' . $key);
+        if ($keyRes === false) {
+            unlink($xmlFile);
+            throw new \RuntimeException('AFIP: clave privada invalida, protegida con passphrase o con formato incorrecto. ' . $this->opensslErrors());
+        }
+        if (is_object($keyRes)) {
+            openssl_free_key($keyRes);
+        }
+
         $ok = openssl_pkcs7_sign(
             $xmlFile,
             $tmpSigned,
@@ -116,7 +136,7 @@ XML;
         unlink($xmlFile);
 
         if (!$ok) {
-            throw new \RuntimeException('AFIP: error al firmar el ticket.');
+            throw new \RuntimeException('AFIP: error al firmar el ticket. ' . $this->opensslErrors());
         }
 
         $signed = file_get_contents($tmpSigned);
@@ -133,6 +153,15 @@ XML;
         }
 
         return $cms;
+    }
+
+    private function opensslErrors(): string
+    {
+        $errors = [];
+        while ($err = openssl_error_string()) {
+            $errors[] = $err;
+        }
+        return $errors ? ('Detalle OpenSSL: ' . implode(' | ', $errors)) : 'Detalle OpenSSL no disponible.';
     }
 
     private function callWsaa(string $cms): string
