@@ -198,6 +198,7 @@
 
             <div class="nav-section">Ventas</div>
             <a href="/admin/orders"><i class="bi bi-cart"></i>Pedidos<span class="badge-count green" id="badgePedidosNuevos" style="display:none">0</span><span class="badge-count red" id="badgePedidosAbandonados" style="display:none">0</span></a>
+            <a href="/admin/mensajes"><i class="bi bi-chat-dots"></i>Mensajes</a>
             <a href="/admin/prepare"><i class="bi bi-box"></i>Preparar</a>
             <a href="/admin/presupuestos"><i class="bi bi-file-text"></i>Presupuestos</a>
             <a href="/admin/remitos"><i class="bi bi-receipt"></i>Remitos</a>

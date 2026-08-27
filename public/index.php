@@ -34,6 +34,7 @@ use Perfushopping\Web\Controller\ApiUploadController;
 use Perfushopping\Web\Controller\ApiSyncTablesController;
 use Perfushopping\Web\Controller\DemoTechController;
 use Perfushopping\Web\Controller\PromoTarjetasController as PromoTarjetasController;
+use Perfushopping\Web\Controller\MetaWebhookController;
 use Perfushopping\Web\Controller\AdminProductController;
 use Perfushopping\Web\Admin\AuthController as AdminAuthController;
 use Perfushopping\Web\Admin\DashboardController as AdminDashboardController;
@@ -77,6 +78,7 @@ use Perfushopping\Web\Admin\NotaPedidoController as AdminNotaPedidoController;
 use Perfushopping\Web\Admin\CompraController as AdminCompraController;
 use Perfushopping\Web\Admin\PuntosController as AdminPuntosController;
 use Perfushopping\Web\Admin\PortadaController as AdminPortadaController;
+use Perfushopping\Web\Admin\SocialInboxController as AdminSocialInboxController;
 
 $router = new Router();
 
@@ -109,6 +111,8 @@ $router->get('/pay/mp/failure', [MercadoPagoController::class, 'failure']);
 
 // Webhook
 $router->post('/mp/webhook', [MercadoPagoController::class, 'webhook']);
+$router->get('/webhooks/meta', [MetaWebhookController::class, 'verify']);
+$router->post('/webhooks/meta', [MetaWebhookController::class, 'receive']);
 
 // Payments Nave (minorista)
 $router->get('/pay/nave/start', [NaveController::class, 'start']);
@@ -347,6 +351,14 @@ $router->post('/admin/empresa/logo/eliminar', [AdminEmpresaController::class, 'r
 // Admin - Email (IMAP)
 $router->get('/admin/email', [AdminEmailController::class, 'inbox']);
 $router->get('/admin/email/(?P<uid>\d+)', [AdminEmailController::class, 'view']);
+
+// Admin - Mensajes de redes
+$router->get('/admin/mensajes', [AdminSocialInboxController::class, 'index']);
+$router->post('/admin/mensajes/tomar', [AdminSocialInboxController::class, 'take']);
+$router->post('/admin/mensajes/liberar', [AdminSocialInboxController::class, 'release']);
+$router->post('/admin/mensajes/cerrar', [AdminSocialInboxController::class, 'close']);
+$router->post('/admin/mensajes/reabrir', [AdminSocialInboxController::class, 'reopen']);
+$router->post('/admin/mensajes/nota', [AdminSocialInboxController::class, 'note']);
 
 // Admin - Órdenes de pago a proveedores
 $router->get('/admin/ordenes-pago', [AdminOrdenPagoController::class, 'index']);
