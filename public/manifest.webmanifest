@@ -1,0 +1,21 @@
+{
+  "name": "Perfushopping Admin",
+  "short_name": "PF Admin",
+  "id": "/admin",
+  "start_url": "/admin",
+  "scope": "/admin",
+  "display": "standalone",
+  "background_color": "#121418",
+  "theme_color": "#121418",
+  "description": "Panel de administracion de Perfushopping",
+  "icons": [
+    {
+      "src": "/assets/brand/logo-header.png",
+      "type": "image/png"
+    },
+    {
+      "src": "/assets/brand/favicon.ico",
+      "type": "image/x-icon"
+    }
+  ]
+}

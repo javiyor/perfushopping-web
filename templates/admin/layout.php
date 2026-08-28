@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Admin - <?= $empresaNombre ?></title>
     <link rel="icon" href="/assets/brand/favicon.ico" sizes="any" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#121418" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="PF Admin" />
+    <link rel="apple-touch-icon" href="/assets/brand/logo-header.png" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
     <style>
@@ -269,6 +275,12 @@
                     <?php endif; ?>
                     <span><?= htmlspecialchars($adminUser['nombre'] ?? '') ?></span>
                     <span class="admin-badge <?= $adminRolBadge ?>"><?= htmlspecialchars($adminRolLabel) ?></span>
+                    <button class="btn btn-sm btn-outline-info" id="btnInstallApp" type="button" style="display:none" title="Instalar app">
+                        <i class="bi bi-phone"></i>
+                    </button>
+                    <button class="btn btn-sm btn-warning" id="btnUpdateApp" type="button" style="display:none" title="Actualizar app">
+                        <i class="bi bi-arrow-repeat"></i>
+                    </button>
                     <form method="post" action="/admin/logout" style="margin:0">
                         <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\Perfushopping\Web\Support\Csrf::token()) ?>" />
                         <button class="btn btn-sm btn-outline-light" type="submit"><i class="bi bi-box-arrow-right"></i></button>
@@ -329,6 +341,76 @@
         } catch(e) {}
     }
     document.addEventListener('DOMContentLoaded', function() { fetchBadges(); setInterval(fetchBadges, 30000); });
+    </script>
+    <script>
+    (function() {
+        if (!('serviceWorker' in navigator)) return;
+
+        var installBtn = document.getElementById('btnInstallApp');
+        var updateBtn = document.getElementById('btnUpdateApp');
+        var deferredPrompt = null;
+        var waitingWorker = null;
+
+        function showUpdate(reg) {
+            if (reg && reg.waiting) {
+                waitingWorker = reg.waiting;
+            }
+            if (updateBtn && waitingWorker) {
+                updateBtn.style.display = '';
+            }
+        }
+
+        navigator.serviceWorker.register('/admin-sw.js', { scope: '/admin/', updateViaCache: 'none' }).then(function(reg) {
+            if (reg.waiting) {
+                showUpdate(reg);
+            }
+
+            reg.addEventListener('updatefound', function() {
+                var newWorker = reg.installing;
+                if (!newWorker) return;
+                newWorker.addEventListener('statechange', function() {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        waitingWorker = newWorker;
+                        if (updateBtn) updateBtn.style.display = '';
+                    }
+                });
+            });
+
+            setInterval(function() {
+                reg.update();
+            }, 60000);
+        }).catch(function() {});
+
+        if (updateBtn) {
+            updateBtn.addEventListener('click', function() {
+                if (waitingWorker) {
+                    waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+                }
+            });
+        }
+
+        navigator.serviceWorker.addEventListener('controllerchange', function() {
+            window.location.reload();
+        });
+
+        window.addEventListener('beforeinstallprompt', function(e) {
+            e.preventDefault();
+            deferredPrompt = e;
+            if (installBtn) installBtn.style.display = '';
+        });
+
+        if (installBtn) {
+            installBtn.addEventListener('click', async function() {
+                if (!deferredPrompt) return;
+                deferredPrompt.prompt();
+                try {
+                    await deferredPrompt.userChoice;
+                } catch (e) {}
+                deferredPrompt = null;
+                installBtn.style.display = 'none';
+            });
+        }
+    })();
     </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
