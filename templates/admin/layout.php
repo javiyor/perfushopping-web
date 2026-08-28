@@ -344,12 +344,17 @@
     </script>
     <script>
     (function() {
-        if (!('serviceWorker' in navigator)) return;
-
         var installBtn = document.getElementById('btnInstallApp');
         var updateBtn = document.getElementById('btnUpdateApp');
         var deferredPrompt = null;
         var waitingWorker = null;
+        var isIos = /iphone|ipad|ipod/i.test(window.navigator.userAgent || '');
+        var isStandaloneIos = window.navigator.standalone === true;
+
+        if (installBtn && isIos && !isStandaloneIos) {
+            installBtn.style.display = '';
+            installBtn.title = 'Instalar app';
+        }
 
         function showUpdate(reg) {
             if (reg && reg.waiting) {
@@ -360,26 +365,32 @@
             }
         }
 
-        navigator.serviceWorker.register('/admin-sw.js', { scope: '/admin/', updateViaCache: 'none' }).then(function(reg) {
-            if (reg.waiting) {
-                showUpdate(reg);
-            }
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/admin-sw.js', { scope: '/admin/', updateViaCache: 'none' }).then(function(reg) {
+                if (reg.waiting) {
+                    showUpdate(reg);
+                }
 
-            reg.addEventListener('updatefound', function() {
-                var newWorker = reg.installing;
-                if (!newWorker) return;
-                newWorker.addEventListener('statechange', function() {
-                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                        waitingWorker = newWorker;
-                        if (updateBtn) updateBtn.style.display = '';
-                    }
+                reg.addEventListener('updatefound', function() {
+                    var newWorker = reg.installing;
+                    if (!newWorker) return;
+                    newWorker.addEventListener('statechange', function() {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            waitingWorker = newWorker;
+                            if (updateBtn) updateBtn.style.display = '';
+                        }
+                    });
                 });
-            });
 
-            setInterval(function() {
-                reg.update();
-            }, 60000);
-        }).catch(function() {});
+                setInterval(function() {
+                    reg.update();
+                }, 60000);
+            }).catch(function() {});
+
+            navigator.serviceWorker.addEventListener('controllerchange', function() {
+                window.location.reload();
+            });
+        }
 
         if (updateBtn) {
             updateBtn.addEventListener('click', function() {
@@ -389,10 +400,6 @@
             });
         }
 
-        navigator.serviceWorker.addEventListener('controllerchange', function() {
-            window.location.reload();
-        });
-
         window.addEventListener('beforeinstallprompt', function(e) {
             e.preventDefault();
             deferredPrompt = e;
@@ -401,7 +408,12 @@
 
         if (installBtn) {
             installBtn.addEventListener('click', async function() {
-                if (!deferredPrompt) return;
+                if (!deferredPrompt) {
+                    if (isIos && !isStandaloneIos) {
+                        alert('Para instalar en iPhone/iPad: toca Compartir y luego "Agregar a pantalla de inicio".');
+                    }
+                    return;
+                }
                 deferredPrompt.prompt();
                 try {
                     await deferredPrompt.userChoice;
