@@ -10,7 +10,7 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="PF Admin" />
-    <link rel="apple-touch-icon" href="/assets/brand/logo-header.png" />
+    <link rel="apple-touch-icon" href="/assets/brand/pwa-icon-192.png" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
     <style>
@@ -411,6 +411,8 @@
                 if (!deferredPrompt) {
                     if (isIos && !isStandaloneIos) {
                         alert('Para instalar en iPhone/iPad: toca Compartir y luego "Agregar a pantalla de inicio".');
+                    } else {
+                        alert('Si no aparece la instalacion automatica, usa el menu del navegador y toca "Instalar app" o "Agregar a pantalla de inicio".');
                     }
                     return;
                 }
