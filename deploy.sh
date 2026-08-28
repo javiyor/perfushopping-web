@@ -7,6 +7,8 @@ git pull origin master
 echo "=== Copiando webroot ==="
 cp public/*.php ../public_html/
 cp public/.htaccess ../public_html/
+cp public/manifest.webmanifest ../public_html/
+cp public/admin-sw.js ../public_html/
 
 echo "=== Copiando assets (uno a uno, sin anidar) ==="
 mkdir -p ../public_html/assets
