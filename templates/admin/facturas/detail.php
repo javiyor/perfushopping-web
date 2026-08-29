@@ -38,6 +38,11 @@ $discriminaIva = in_array($factura['tipo_comprobante'] ?? '', ['FACT-A']);
         <?= htmlspecialchars($factura['estado'] ?? 'pendiente') ?>
     </span>
     <span class="badge bg-info fs-6"><?= htmlspecialchars($formaPagoLabels[$factura['forma_pago'] ?? ''] ?? $factura['forma_pago'] ?? '') ?></span>
+    <?php if (($factura['entrega_tipo'] ?? 'local') === 'envio'): ?>
+        <span class="badge bg-warning text-dark fs-6">Envío: <?= htmlspecialchars($factura['transporte'] ?? '') ?> — <?= htmlspecialchars($factura['envio_estado'] ?? 'pendiente') ?></span>
+    <?php else: ?>
+        <span class="badge bg-dark fs-6">Retiro en local</span>
+    <?php endif; ?>
 </div>
 
 <div class="row g-3">
@@ -136,6 +141,13 @@ $discriminaIva = in_array($factura['tipo_comprobante'] ?? '', ['FACT-A']);
                         <button class="btn btn-outline-info btn-sm" onclick="enviarEmail(<?= (int)($factura['id'] ?? 0) ?>)">
                             <i class="bi bi-envelope"></i> Enviar email
                         </button>
+                    <?php endif; ?>
+                    <?php if (($factura['entrega_tipo'] ?? 'local') === 'envio' && in_array($factura['envio_estado'] ?? '', ['pendiente','en_transito'], true)): ?>
+                        <form method="post" action="/admin/envios/entregar" style="display:inline" onsubmit="return confirm('¿Confirmar entrega y cobro?')">
+                            <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                            <input type="hidden" name="id" value="<?= (int)($factura['id'] ?? 0) ?>" />
+                            <button class="btn btn-accent btn-sm" type="submit"><i class="bi bi-truck"></i> Marcar entregado</button>
+                        </form>
                     <?php endif; ?>
                     <?php if (($factura['estado'] ?? '') !== 'anulada'): ?>
                         <form method="post" action="/admin/facturas/estado" style="display:inline">

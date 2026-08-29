@@ -188,6 +188,19 @@ final class FacturaController
 
         $formaPago = $pagos[0]['forma_pago'] ?? 'efectivo';
 
+        $entrega = $input['entrega'] ?? [];
+        $entregaTipo = in_array($entrega['tipo'] ?? 'local', ['local','envio'], true) ? $entrega['tipo'] : 'local';
+        $transporte = null;
+        $envioEstado = null;
+        $envioDireccion = null;
+        $envioObs = null;
+        if ($entregaTipo === 'envio') {
+            $transporte = in_array($entrega['transporte'] ?? '', ['propio','delivery','correo_argentino'], true) ? $entrega['transporte'] : 'propio';
+            $envioEstado = 'pendiente';
+            $envioDireccion = trim((string)($entrega['direccion'] ?? ''));
+            $envioObs = trim((string)($entrega['observacion'] ?? ''));
+        }
+
         $repo = new FacturaRepo();
 
         if (\Perfushopping\Web\Support\Env::isDemo() && $repo->countActivas() >= 20) {
@@ -279,6 +292,11 @@ final class FacturaController
             'total_cents' => $subtotal + $ivaTotal - $descuento - $puntosUsadosCents,
             'estado' => 'emitida',
             'forma_pago' => $formaPago,
+            'entrega_tipo' => $entregaTipo,
+            'transporte' => $transporte,
+            'envio_estado' => $envioEstado,
+            'envio_direccion' => $envioDireccion,
+            'envio_observacion' => $envioObs,
             'notas' => $notas,
             'created_by' => (int)$adminUser['id'],
             'vendedor_id' => $vendedorId,

@@ -78,6 +78,7 @@ use Perfushopping\Web\Admin\NotaPedidoController as AdminNotaPedidoController;
 use Perfushopping\Web\Admin\CompraController as AdminCompraController;
 use Perfushopping\Web\Admin\PuntosController as AdminPuntosController;
 use Perfushopping\Web\Admin\PortadaController as AdminPortadaController;
+use Perfushopping\Web\Admin\EnvioController as AdminEnvioController;
 use Perfushopping\Web\Admin\SocialInboxController as AdminSocialInboxController;
 
 $router = new Router();
@@ -249,6 +250,9 @@ $router->get('/admin/facturas/buscar-remitos', [AdminFacturaController::class, '
 $router->get('/admin/facturas/buscar-presupuestos', [AdminFacturaController::class, 'searchPresupuestos']);
 $router->get('/admin/facturas/imprimir/(?P<id>\d+)', [AdminFacturaController::class, 'print']);
 $router->post('/admin/facturas/(?P<id>\d+)/enviar-email', [AdminFacturaController::class, 'sendEmail']);
+$router->get('/admin/envios', [AdminEnvioController::class, 'index']);
+$router->post('/admin/envios/entregar', [AdminEnvioController::class, 'entregar']);
+$router->post('/admin/envios/cancelar', [AdminEnvioController::class, 'cancelar']);
 $router->get('/admin/recibos', [AdminReciboController::class, 'create']);
 $router->get('/admin/recibos/comprobantes', [AdminReciboController::class, 'index']);
 $router->get('/admin/recibos/nuevo', [AdminReciboController::class, 'create']);

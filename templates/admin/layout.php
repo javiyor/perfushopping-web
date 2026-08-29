@@ -210,6 +210,7 @@
             <a href="/admin/presupuestos"><i class="bi bi-file-text"></i>Presupuestos</a>
             <a href="/admin/remitos"><i class="bi bi-receipt"></i>Remitos</a>
             <a href="/admin/facturas"><i class="bi bi-receipt-cutoff"></i>Facturación</a>
+            <a href="/admin/envios"><i class="bi bi-truck"></i>Envíos<span class="badge-count red" id="badgeEnviosPendientes" style="display:none">0</span></a>
             <a href="/admin/recibos"><i class="bi bi-wallet2"></i>Recibos</a>
             <a href="/admin/ctacte"><i class="bi bi-currency-dollar"></i>Ctas. ctes.</a>
             <a href="/admin/caja"><i class="bi bi-cash-stack"></i>Caja</a>
@@ -366,6 +367,12 @@
             var sa = document.getElementById('badgeStockAjustes');
             if (d.stock_ajustes_pendientes > 0) { sa.textContent = d.stock_ajustes_pendientes; sa.style.display = ''; }
             else { sa.style.display = 'none'; }
+
+            var ev = document.getElementById('badgeEnviosPendientes');
+            if (ev) {
+                if (d.envios_pendientes > 0) { ev.textContent = d.envios_pendientes; ev.style.display = ''; }
+                else { ev.style.display = 'none'; }
+            }
 
             if (isSuperadmin) {
                 var current = Number(d.stock_ajustes_pendientes || 0);

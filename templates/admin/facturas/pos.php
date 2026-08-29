@@ -255,6 +255,41 @@ $plazos = $plazos ?? [];
 
     <div class="pos-right">
         <div class="card shadow-sm mb-3">
+            <div class="card-header bg-white fw-semibold">Entrega</div>
+            <div class="card-body">
+                <div class="d-flex gap-2 mb-2">
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="entrega_tipo" id="entregaLocal" value="local" checked onchange="onEntregaChange()">
+                        <label class="form-check-label small fw-semibold" for="entregaLocal">Retiro en local</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="entrega_tipo" id="entregaEnvio" value="envio" onchange="onEntregaChange()">
+                        <label class="form-check-label small fw-semibold" for="entregaEnvio">Envío</label>
+                    </div>
+                </div>
+                <div id="envioFields" style="display:none">
+                    <div class="mb-2">
+                        <label class="form-label small">Transporte</label>
+                        <select class="form-select form-select-sm" id="transporteSelect">
+                            <option value="propio">Transporte propio</option>
+                            <option value="delivery">Delivery</option>
+                            <option value="correo_argentino">Correo Argentino</option>
+                        </select>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">Domicilio de entrega</label>
+                        <input class="form-control form-control-sm" id="envioDireccion" placeholder="Calle, altura, localidad" />
+                    </div>
+                    <div class="mb-1">
+                        <label class="form-label small">Obs. envío</label>
+                        <input class="form-control form-control-sm" id="envioObs" placeholder="Horario, referencia..." />
+                    </div>
+                    <div class="alert alert-info py-1 px-2 small mt-2" id="envioCajaHint"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-3">
             <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
                 <span><i class="bi bi-cash-stack"></i> Formas de pago</span>
                 <button class="btn btn-sm btn-outline-primary" type="button" onclick="addPagoLine()"><i class="bi bi-plus-lg"></i> Agregar</button>
@@ -880,6 +915,7 @@ function removePagoLine(btn) {
 }
 
 function onPagoFormaChange(sel) {
+    setTimeout(updateEnvioCajaHint, 50);
     const line = sel.closest('.pago-line');
     const extra = line.querySelector('.fp-extra');
     const forma = sel.value;
@@ -915,6 +951,37 @@ function onPagoFormaChange(sel) {
 }
 
 addPagoLine('efectivo');
+
+function onEntregaChange() {
+    const tipo = document.querySelector('input[name="entrega_tipo"]:checked').value;
+    const box = document.getElementById('envioFields');
+    box.style.display = tipo === 'envio' ? '' : 'none';
+    updateEnvioCajaHint();
+}
+function updateEnvioCajaHint() {
+    const tipo = document.querySelector('input[name="entrega_tipo"]:checked')?.value || 'local';
+    const hint = document.getElementById('envioCajaHint');
+    if (!hint) return;
+    if (tipo === 'local') { hint.style.display='none'; return; }
+    hint.style.display='';
+    // check pagos to decide message
+    let hasEfectivo = false, hasTransfer = false;
+    document.querySelectorAll('#pagosContainer .fp-forma').forEach(sel => {
+        if (sel.value === 'efectivo') hasEfectivo = true;
+        if (['transferencia','mercadopago','tarjeta_credito','tarjeta_debito'].includes(sel.value)) hasTransfer = true;
+    });
+    if (hasEfectivo && !hasTransfer) {
+        hint.textContent = 'Envío con efectivo: quedará pendiente en Envíos hasta cobrar al entregar. No impacta caja aún.';
+        hint.className = 'alert alert-warning py-1 px-2 small mt-2';
+    } else if (hasTransfer) {
+        hint.textContent = 'Envío con transferencia/link: impacta en caja inmediatamente.';
+        hint.className = 'alert alert-success py-1 px-2 small mt-2';
+    } else {
+        hint.textContent = 'Seleccioná forma de pago. Efectivo contra entrega queda pendiente.';
+        hint.className = 'alert alert-info py-1 px-2 small mt-2';
+    }
+}
+document.addEventListener('DOMContentLoaded', onEntregaChange);
 
 // ── Submit ──
 function submitFactura() {
@@ -983,10 +1050,17 @@ function submitFactura() {
 
     const presupuestoId = parseInt(document.getElementById('presupuestoId').value) || 0;
     const vendedorEl = document.getElementById('vendedorId');
+    const entregaTipo = document.querySelector('input[name="entrega_tipo"]:checked')?.value || 'local';
     const payload = {
         _csrf: document.getElementById('csrfToken').value,
         tipo_comprobante: tipo,
         forma_pago: pagos[0].forma_pago,
+        entrega: {
+            tipo: entregaTipo,
+            transporte: document.getElementById('transporteSelect')?.value || null,
+            direccion: document.getElementById('envioDireccion')?.value || '',
+            observacion: document.getElementById('envioObs')?.value || '',
+        },
         remito_id: remitoId,
         presupuesto_id: presupuestoId,
         vendedor_id: vendedorEl ? parseInt(vendedorEl.value) || null : null,

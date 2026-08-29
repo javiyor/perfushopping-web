@@ -19,12 +19,14 @@ final class BadgeController
         $orderRepo = new OrderRepo();
         $userRepo = new UserRepo();
         $stockRepo = new StockRepo();
+        $facturaRepo = new \Perfushopping\Web\Repo\FacturaRepo();
 
         Response::json([
             'pedidos_nuevos' => $orderRepo->countPendingPayment(),
             'pedidos_abandonados' => $orderRepo->countAbandoned(),
             'usuarios_nuevos' => $userRepo->countNewToday(),
             'stock_ajustes_pendientes' => (($adminUser['rol'] ?? '') === 'superadmin') ? $stockRepo->countSolicitudesAjustePendientes() : 0,
+            'envios_pendientes' => $facturaRepo->countEnviosPendientes(),
         ]);
     }
 }

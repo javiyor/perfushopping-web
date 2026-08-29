@@ -97,8 +97,28 @@ final class CajaRepo
         return $st->fetch() ?: ['total_ingresos' => 0, 'total_egresos' => 0];
     }
 
+    private function facturasTieneEntrega(): bool
+    {
+        static $has = null;
+        if ($has !== null) return $has;
+        try {
+            $cols = Db::pdo()->query('SHOW COLUMNS FROM facturas')->fetchAll();
+            $fields = array_column($cols, 'Field');
+            $has = in_array('entrega_tipo', $fields, true);
+        } catch (\Throwable $e) { $has = false; }
+        return $has;
+    }
+
+    private function efectivoNoCajaWhere(): string
+    {
+        if (!$this->facturasTieneEntrega()) return '';
+        // efectivo contra entrega pendiente NO cuenta en caja
+        return " AND NOT (f.entrega_tipo='envio' AND f.envio_estado IN ('pendiente','en_transito') AND fp.forma_pago='efectivo') ";
+    }
+
     public function totalVentasEfectivo(string $fecha, int $puntoVenta): int
     {
+        $extra = $this->efectivoNoCajaWhere();
         $st = Db::pdo()->prepare("
             SELECT COALESCE(SUM(fp.monto_cents), 0)
             FROM factura_pagos fp
@@ -107,6 +127,7 @@ final class CajaRepo
               AND f.fecha = :fec
               AND f.punto_venta = :pv
               AND fp.forma_pago = 'efectivo'
+              {$extra}
         ");
         $st->execute([':fec' => $fecha, ':pv' => $puntoVenta]);
         return (int)$st->fetchColumn();
@@ -237,11 +258,13 @@ final class CajaRepo
     public function ventasPorPuntoVenta(string $fecha): array
     {
         try {
+            $extraEfectivo = $this->facturasTieneEntrega() ? " AND NOT (f.entrega_tipo='envio' AND f.envio_estado IN ('pendiente','en_transito') AND fp.forma_pago='efectivo')" : "";
+            // For total_efectivo we exclude pendiente efectivo envios; others count normally
             $st = Db::pdo()->prepare("
                 SELECT f.punto_venta, COALESCE(s.nomsuc, CONCAT('Punto ', f.punto_venta)) AS sucursal_nombre,
-                       COALESCE(SUM(CASE WHEN fp.forma_pago = 'efectivo' THEN fp.monto_cents ELSE 0 END), 0) AS total_efectivo,
+                       COALESCE(SUM(CASE WHEN fp.forma_pago = 'efectivo' {$extraEfectivo} THEN fp.monto_cents ELSE 0 END), 0) AS total_efectivo,
                        COALESCE(SUM(CASE WHEN fp.forma_pago IN ('transferencia','mercadopago','debito','credito') THEN fp.monto_cents ELSE 0 END), 0) AS total_transferencia,
-                       COALESCE(SUM(fp.monto_cents), 0) AS total
+                       COALESCE(SUM(CASE WHEN fp.forma_pago='efectivo' {$extraEfectivo} THEN fp.monto_cents WHEN fp.forma_pago IN ('transferencia','mercadopago','debito','credito') THEN fp.monto_cents ELSE 0 END), 0) AS total
                 FROM facturas f
                 INNER JOIN factura_pagos fp ON fp.factura_id = f.id
                 LEFT JOIN sucursales s ON s.id = f.punto_venta
