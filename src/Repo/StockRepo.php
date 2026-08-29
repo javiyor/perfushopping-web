@@ -260,46 +260,15 @@ final class StockRepo
             return false;
         }
 
-        $depoHasta = $iddepohasta > 0 ? $this->depositoById($iddepohasta) : null;
-        if (!$depoHasta) {
-            return (int)($depoDesde['marca'] ?? 0) !== 2;
-        }
-
         $desdeMarca = (int)($depoDesde['marca'] ?? 0);
-        $hastaMarca = (int)($depoHasta['marca'] ?? 0);
+        $depoHasta = $iddepohasta > 0 ? $this->depositoById($iddepohasta) : null;
+        $hastaMarca = $depoHasta ? (int)($depoHasta['marca'] ?? 0) : null;
 
-        if ($this->esDepositoVentaMarca2($depoDesde) && $hastaMarca !== 2) {
-            return true;
-        }
-
-        if ($hastaMarca === 2) {
-            return false;
-        }
-
-        return $desdeMarca !== 2;
-    }
-
-    private function esDepositoVentaMarca2(array $depo): bool
-    {
-        if ((int)($depo['marca'] ?? 0) !== 2) {
-            return false;
-        }
-        $name = $this->normalizarNombreDeposito((string)($depo['nomdepo'] ?? ''));
-        $permitidos = [
-            'irigoyen',
-            'alvear',
-            '9 de julio 1610',
-            '9 de julio',
-        ];
-        return in_array($name, $permitidos, true);
-    }
-
-    private function normalizarNombreDeposito(string $name): string
-    {
-        $name = trim(mb_strtolower($name));
-        $name = str_replace(['á', 'é', 'í', 'ó', 'ú', 'ü', 'ñ'], ['a', 'e', 'i', 'o', 'u', 'u', 'n'], $name);
-        $name = preg_replace('/\s+/', ' ', $name) ?: $name;
-        return $name;
+        // Regla operativa:
+        // - De marca 2 a marca 2: no pide autorizacion.
+        // - De cualquier marca a marca 2: no pide autorizacion.
+        // - De marca 2 a cualquier marca distinta de 2 (o egreso sin destino): pide autorizacion.
+        return $desdeMarca === 2 && $hastaMarca !== 2;
     }
 
     public function crearSolicitudAjuste(

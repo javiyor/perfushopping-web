@@ -141,13 +141,9 @@ $esSuperadmin = $esSuperadmin ?? false;
                             <?php
                                 $status = (string)($s['status'] ?? 'pendiente');
                                 $statusClass = $status === 'aprobada' ? 'success' : ($status === 'rechazada' ? 'danger' : ($status === 'procesando' ? 'warning' : 'secondary'));
-                                $depoDesdeNombre = mb_strtolower(trim((string)($s['depo_desde_nombre'] ?? '')));
-                                $depoDesdeNombre = str_replace(['á', 'é', 'í', 'ó', 'ú', 'ü', 'ñ'], ['a', 'e', 'i', 'o', 'u', 'u', 'n'], $depoDesdeNombre);
-                                $esDepositoPolitica = in_array($depoDesdeNombre, ['irigoyen', 'alvear', '9 de julio 1610', '9 de julio'], true);
                                 $warningPolitica = $status === 'pendiente'
                                     && (int)($s['depo_desde_marca'] ?? 0) === 2
-                                    && (int)($s['depo_hasta_marca'] ?? 0) !== 2
-                                    && $esDepositoPolitica;
+                                    && (int)($s['depo_hasta_marca'] ?? 0) !== 2;
                             ?>
                             <div class="list-group-item">
                                 <div class="d-flex justify-content-between align-items-center mb-1">
@@ -180,7 +176,7 @@ $esSuperadmin = $esSuperadmin ?? false;
                     <li>Si solo querés <strong>ingresar</strong> stock, dejá "Desde" vacío</li>
                     <li>Si solo querés <strong>egresar</strong> stock, dejá "Hasta" vacío</li>
                     <li>Para <strong>transferir</strong> entre depósitos, completá ambos</li>
-                    <li>Si el egreso sale de <strong>Irigoyen, Alvear o 9 de Julio 1610</strong> hacia un depósito con marca distinta de 2 y no sos superadmin, se enviará a autorización</li>
+                    <li>Si el movimiento sale de un depósito con <strong>marca 2</strong> hacia un depósito con marca distinta de 2 (o egreso sin destino) y no sos superadmin, se enviará a autorización</li>
                     <li>Si el producto tiene variantes, podés ajustar una específica o dejar "Todas" para ajustar el producto base</li>
                     <li>El motivo es obligatorio para mantener trazabilidad</li>
                 </ul>
