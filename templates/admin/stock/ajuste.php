@@ -49,7 +49,7 @@ $esSuperadmin = $esSuperadmin ?? false;
                     </div>
 
                     <div class="row g-2 mb-3">
-                        <div class="col-md-5">
+                        <div class="col-md-6">
                             <label class="form-label small fw-semibold">Depósito desde <span class="text-muted">(resta)</span></label>
                             <select class="form-select form-select-sm" name="iddepodesde">
                                 <option value="">Ninguno (solo ingreso)</option>
@@ -58,7 +58,7 @@ $esSuperadmin = $esSuperadmin ?? false;
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-5">
+                        <div class="col-md-6">
                             <label class="form-label small fw-semibold">Depósito hasta <span class="text-muted">(suma)</span></label>
                             <select class="form-select form-select-sm" name="iddepohasta">
                                 <option value="">Ninguno (solo egreso)</option>
@@ -66,10 +66,6 @@ $esSuperadmin = $esSuperadmin ?? false;
                                     <option value="<?= (int)$d['iddepo'] ?>"><?= htmlspecialchars($d['nomdepo'] ?? '') ?></option>
                                 <?php endforeach; ?>
                             </select>
-                        </div>
-                        <div class="col-md-2">
-                            <label class="form-label small fw-semibold">Cantidad</label>
-                            <input class="form-control form-control-sm" type="number" name="cantidad" required min="1" step="1" placeholder="Ej: 10" />
                         </div>
                     </div>
 
