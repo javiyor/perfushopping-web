@@ -156,6 +156,8 @@ final class StockController
 
         $repo = new StockRepo();
         $depositos = $repo->depositos();
+        $solicitudesPendientes = $repo->solicitudesAjustePendientes(40);
+        $misSolicitudes = $repo->solicitudesAjustePorSolicitante((int)$adminUser['id'], 20);
 
         $productoId = (int)($params['id'] ?? 0);
         $producto = null;
@@ -172,6 +174,8 @@ final class StockController
             'depositos' => $depositos,
             'producto' => $producto,
             'variantes' => $variantes,
+            'solicitudesPendientes' => $solicitudesPendientes,
+            'misSolicitudes' => $misSolicitudes,
             'csrf' => Csrf::token(),
             'pageTitle' => 'Ajuste de stock',
         ]);
@@ -197,6 +201,21 @@ final class StockController
 
         try {
             $repo = new StockRepo();
+            if ($repo->requiereAutorizacionAjuste($iddepodesde, (string)($adminUser['rol'] ?? ''))) {
+                $solicitudId = $repo->crearSolicitudAjuste(
+                    $idprodu,
+                    $idcodgusto,
+                    $iddepodesde,
+                    $iddepohasta,
+                    $cantidad,
+                    $motivo,
+                    (int)$adminUser['id'],
+                    (string)($adminUser['nombre'] ?? '')
+                );
+                $_SESSION['admin_flash'] = ['type' => 'info', 'text' => 'Ajuste enviado a autorización (#' . $solicitudId . ').'];
+                Response::redirect('/admin/stock/ajuste');
+            }
+
             $repo->registrarAjuste($idprodu, $idcodgusto, $iddepodesde, $iddepohasta, $cantidad, $motivo, (int)$adminUser['id']);
             $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Ajuste de stock registrado correctamente.'];
         } catch (\Throwable $e) {
@@ -204,6 +223,52 @@ final class StockController
         }
 
         Response::redirect('/admin/stock/' . $idprodu);
+    }
+
+    public function aprobarSolicitudAjuste(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requireSesion();
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $solicitudId = (int)($_POST['solicitud_id'] ?? 0);
+        if ($solicitudId <= 0) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Solicitud inválida.'];
+            Response::redirect('/admin/stock/ajuste');
+        }
+
+        try {
+            (new StockRepo())->aprobarSolicitudAjuste($solicitudId, (int)$adminUser['id'], (string)($adminUser['nombre'] ?? ''));
+            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Solicitud aprobada y ajuste aplicado.'];
+        } catch (\Throwable $e) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se pudo aprobar: ' . $e->getMessage()];
+        }
+        Response::redirect('/admin/stock/ajuste');
+    }
+
+    public function rechazarSolicitudAjuste(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requireSesion();
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $solicitudId = (int)($_POST['solicitud_id'] ?? 0);
+        $nota = trim((string)($_POST['nota_rechazo'] ?? ''));
+        if ($solicitudId <= 0) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Solicitud inválida.'];
+            Response::redirect('/admin/stock/ajuste');
+        }
+        if ($nota === '') {
+            $nota = 'Rechazado por administración.';
+        }
+
+        try {
+            (new StockRepo())->rechazarSolicitudAjuste($solicitudId, (int)$adminUser['id'], (string)($adminUser['nombre'] ?? ''), $nota);
+            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Solicitud rechazada.'];
+        } catch (\Throwable $e) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se pudo rechazar: ' . $e->getMessage()];
+        }
+        Response::redirect('/admin/stock/ajuste');
     }
 
     public function recalcular(array $params): void

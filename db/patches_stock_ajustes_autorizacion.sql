@@ -1,0 +1,23 @@
+CREATE TABLE IF NOT EXISTS stock_ajuste_autorizaciones (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  idprodu INT UNSIGNED NOT NULL,
+  idcodgusto INT UNSIGNED DEFAULT NULL,
+  iddepodesde INT UNSIGNED DEFAULT NULL,
+  iddepohasta INT UNSIGNED DEFAULT NULL,
+  cantidad INT UNSIGNED NOT NULL,
+  motivo TEXT NOT NULL,
+  requested_by INT UNSIGNED NOT NULL,
+  requested_by_nombre VARCHAR(120) DEFAULT NULL,
+  status ENUM('pendiente','procesando','aprobada','rechazada') NOT NULL DEFAULT 'pendiente',
+  decided_by INT UNSIGNED DEFAULT NULL,
+  decided_by_nombre VARCHAR(120) DEFAULT NULL,
+  decided_at DATETIME DEFAULT NULL,
+  rejection_note VARCHAR(255) DEFAULT NULL,
+  stockcab_id INT UNSIGNED DEFAULT NULL,
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME NOT NULL,
+  KEY idx_stock_aj_aut_status (status),
+  KEY idx_stock_aj_aut_created (created_at),
+  KEY idx_stock_aj_aut_requested_by (requested_by),
+  KEY idx_stock_aj_aut_producto (idprodu)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

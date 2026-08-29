@@ -2,6 +2,8 @@
 $depositos = $depositos ?? [];
 $producto = $producto ?? null;
 $variantes = $variantes ?? [];
+$solicitudesPendientes = $solicitudesPendientes ?? [];
+$misSolicitudes = $misSolicitudes ?? [];
 ?>
 <nav aria-label="breadcrumb" class="mb-3">
     <ol class="breadcrumb">
@@ -79,6 +81,76 @@ $variantes = $variantes ?? [];
     </div>
 
     <div class="col-lg-4">
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+                <span>Autorizaciones pendientes</span>
+                <span class="badge bg-danger"><?= count($solicitudesPendientes) ?></span>
+            </div>
+            <div class="card-body small p-0">
+                <?php if (!$solicitudesPendientes): ?>
+                    <div class="p-3 text-muted">No hay solicitudes pendientes.</div>
+                <?php else: ?>
+                    <div class="list-group list-group-flush">
+                        <?php foreach ($solicitudesPendientes as $s): ?>
+                            <div class="list-group-item">
+                                <div class="fw-semibold mb-1"><?= htmlspecialchars((string)($s['produ'] ?? 'Producto')) ?></div>
+                                <?php if (($s['nomgusto'] ?? '') !== ''): ?>
+                                    <div class="text-muted">Variante: <?= htmlspecialchars((string)$s['nomgusto']) ?></div>
+                                <?php endif; ?>
+                                <div>Desde: <strong><?= htmlspecialchars((string)($s['depo_desde_nombre'] ?? 'Ninguno')) ?></strong></div>
+                                <div>Hasta: <strong><?= htmlspecialchars((string)($s['depo_hasta_nombre'] ?? 'Ninguno')) ?></strong></div>
+                                <div>Cantidad: <strong><?= (int)($s['cantidad'] ?? 0) ?></strong></div>
+                                <div class="text-muted">Motivo: <?= htmlspecialchars((string)($s['motivo'] ?? '')) ?></div>
+                                <div class="text-muted">Solicitó: <?= htmlspecialchars((string)($s['requested_by_nombre'] ?? '')) ?> · <?= htmlspecialchars((string)($s['created_at'] ?? '')) ?></div>
+                                <div class="d-flex gap-2 mt-2">
+                                    <form method="post" action="/admin/stock/ajuste/aprobar" onsubmit="return confirm('Aprobar esta solicitud de ajuste?')">
+                                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                                        <input type="hidden" name="solicitud_id" value="<?= (int)$s['id'] ?>" />
+                                        <button class="btn btn-sm btn-accent" type="submit"><i class="bi bi-check-lg"></i> Aprobar</button>
+                                    </form>
+                                    <form method="post" action="/admin/stock/ajuste/rechazar" onsubmit="return confirm('Rechazar esta solicitud?')">
+                                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                                        <input type="hidden" name="solicitud_id" value="<?= (int)$s['id'] ?>" />
+                                        <input class="form-control form-control-sm" type="text" name="nota_rechazo" placeholder="Motivo rechazo" style="max-width:150px" />
+                                        <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-x-lg"></i></button>
+                                    </form>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-white fw-semibold">Mis solicitudes recientes</div>
+            <div class="card-body small p-0">
+                <?php if (!$misSolicitudes): ?>
+                    <div class="p-3 text-muted">Todavía no tenés solicitudes.</div>
+                <?php else: ?>
+                    <div class="list-group list-group-flush">
+                        <?php foreach ($misSolicitudes as $s): ?>
+                            <?php
+                                $status = (string)($s['status'] ?? 'pendiente');
+                                $statusClass = $status === 'aprobada' ? 'success' : ($status === 'rechazada' ? 'danger' : ($status === 'procesando' ? 'warning' : 'secondary'));
+                            ?>
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <div class="fw-semibold text-truncate" style="max-width:70%"><?= htmlspecialchars((string)($s['produ'] ?? 'Producto')) ?></div>
+                                    <span class="badge bg-<?= $statusClass ?>"><?= htmlspecialchars($status) ?></span>
+                                </div>
+                                <div><?= (int)($s['cantidad'] ?? 0) ?> u. · <?= htmlspecialchars((string)($s['depo_desde_nombre'] ?? 'Ninguno')) ?> -> <?= htmlspecialchars((string)($s['depo_hasta_nombre'] ?? 'Ninguno')) ?></div>
+                                <div class="text-muted"><?= htmlspecialchars((string)($s['created_at'] ?? '')) ?></div>
+                                <?php if (($s['rejection_note'] ?? '') !== ''): ?>
+                                    <div class="text-danger">Rechazo: <?= htmlspecialchars((string)$s['rejection_note']) ?></div>
+                                <?php endif; ?>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
         <div class="card shadow-sm">
             <div class="card-header bg-white fw-semibold">Instrucciones</div>
             <div class="card-body small">
@@ -90,6 +162,7 @@ $variantes = $variantes ?? [];
                     <li>Si solo querés <strong>ingresar</strong> stock, dejá "Desde" vacío</li>
                     <li>Si solo querés <strong>egresar</strong> stock, dejá "Hasta" vacío</li>
                     <li>Para <strong>transferir</strong> entre depósitos, completá ambos</li>
+                    <li>Si el egreso sale de un depósito con <strong>marca distinta de 2</strong> y no sos superadmin, se enviará a autorización</li>
                     <li>Si el producto tiene variantes, podés ajustar una específica o dejar "Todas" para ajustar el producto base</li>
                     <li>El motivo es obligatorio para mantener trazabilidad</li>
                 </ul>

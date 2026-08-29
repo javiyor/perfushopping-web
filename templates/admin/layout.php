@@ -224,7 +224,7 @@
             <a href="/admin/productos/importar"><i class="bi bi-upload"></i>Importar</a>
             <a href="/admin/departamentos"><i class="bi bi-tags"></i>Departamentos</a>
             <a href="/admin/stock"><i class="bi bi-boxes"></i>Stock</a>
-            <a href="/admin/stock/ajuste"><i class="bi bi-pencil-square"></i>Ajuste stock</a>
+            <a href="/admin/stock/ajuste"><i class="bi bi-sliders"></i>Ajustes stock<span class="badge-count red" id="badgeStockAjustes" style="display:none">0</span></a>
             <a href="/admin/stock/grilla"><i class="bi bi-grid-3x3-gap"></i>Grilla reposición</a>
 
             <div class="nav-section">Clientes</div>
@@ -339,6 +339,10 @@
             var un = document.getElementById('badgeUsuariosNuevos');
             if (d.usuarios_nuevos > 0) { un.textContent = d.usuarios_nuevos; un.style.display = ''; }
             else { un.style.display = 'none'; }
+
+            var sa = document.getElementById('badgeStockAjustes');
+            if (d.stock_ajustes_pendientes > 0) { sa.textContent = d.stock_ajustes_pendientes; sa.style.display = ''; }
+            else { sa.style.display = 'none'; }
         } catch(e) {}
     }
     document.addEventListener('DOMContentLoaded', function() { fetchBadges(); setInterval(fetchBadges, 30000); });

@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Perfushopping\Web\Admin;
 
 use Perfushopping\Web\Repo\OrderRepo;
+use Perfushopping\Web\Repo\StockRepo;
 use Perfushopping\Web\Repo\UserRepo;
 use Perfushopping\Web\Service\AdminAuthService;
 use Perfushopping\Web\Support\Response;
@@ -17,11 +18,13 @@ final class BadgeController
 
         $orderRepo = new OrderRepo();
         $userRepo = new UserRepo();
+        $stockRepo = new StockRepo();
 
         Response::json([
             'pedidos_nuevos' => $orderRepo->countPendingPayment(),
             'pedidos_abandonados' => $orderRepo->countAbandoned(),
             'usuarios_nuevos' => $userRepo->countNewToday(),
+            'stock_ajustes_pendientes' => $stockRepo->countSolicitudesAjustePendientes(),
         ]);
     }
 }

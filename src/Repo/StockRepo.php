@@ -7,6 +7,39 @@ use Perfushopping\Web\Infra\Db;
 
 final class StockRepo
 {
+    private static bool $ajustesAuthTableReady = false;
+
+    private function ensureAjustesAuthTable(): void
+    {
+        if (self::$ajustesAuthTableReady) {
+            return;
+        }
+        Db::pdo()->exec("CREATE TABLE IF NOT EXISTS stock_ajuste_autorizaciones (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            idprodu INT UNSIGNED NOT NULL,
+            idcodgusto INT UNSIGNED DEFAULT NULL,
+            iddepodesde INT UNSIGNED DEFAULT NULL,
+            iddepohasta INT UNSIGNED DEFAULT NULL,
+            cantidad INT UNSIGNED NOT NULL,
+            motivo TEXT NOT NULL,
+            requested_by INT UNSIGNED NOT NULL,
+            requested_by_nombre VARCHAR(120) DEFAULT NULL,
+            status ENUM('pendiente','procesando','aprobada','rechazada') NOT NULL DEFAULT 'pendiente',
+            decided_by INT UNSIGNED DEFAULT NULL,
+            decided_by_nombre VARCHAR(120) DEFAULT NULL,
+            decided_at DATETIME DEFAULT NULL,
+            rejection_note VARCHAR(255) DEFAULT NULL,
+            stockcab_id INT UNSIGNED DEFAULT NULL,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            KEY idx_stock_aj_aut_status (status),
+            KEY idx_stock_aj_aut_created (created_at),
+            KEY idx_stock_aj_aut_requested_by (requested_by),
+            KEY idx_stock_aj_aut_producto (idprodu)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        self::$ajustesAuthTableReady = true;
+    }
+
     public function listarStock(string $q = '', int $codepar = 0, string $stockFilter = '', int $codrub = 0, int $codsub = 0, string $codprove = '', int $limit = 80, ?int $iddepo = null, string $desde = '', string $hasta = '', int $page = 1): array
     {
         $limit = max(1, min(200, $limit));
@@ -206,6 +239,173 @@ final class StockRepo
     {
         $st = Db::pdo()->query('SELECT iddepo, nomdepo, marca FROM deposito ORDER BY nomdepo ASC');
         return $st->fetchAll();
+    }
+
+    public function depositoById(int $iddepo): ?array
+    {
+        $st = Db::pdo()->prepare('SELECT iddepo, nomdepo, marca FROM deposito WHERE iddepo = :id LIMIT 1');
+        $st->execute([':id' => $iddepo]);
+        $row = $st->fetch();
+        return is_array($row) ? $row : null;
+    }
+
+    public function requiereAutorizacionAjuste(int $iddepodesde, string $rolUsuario): bool
+    {
+        if ($rolUsuario === 'superadmin' || $iddepodesde <= 0) {
+            return false;
+        }
+        $depo = $this->depositoById($iddepodesde);
+        if (!$depo) {
+            return false;
+        }
+        return (int)($depo['marca'] ?? 0) !== 2;
+    }
+
+    public function crearSolicitudAjuste(
+        int $idprodu,
+        ?int $idcodgusto,
+        int $iddepodesde,
+        int $iddepohasta,
+        int $cantidad,
+        string $motivo,
+        int $requestedBy,
+        string $requestedByNombre
+    ): int {
+        $this->ensureAjustesAuthTable();
+        $st = Db::pdo()->prepare('INSERT INTO stock_ajuste_autorizaciones
+            (idprodu, idcodgusto, iddepodesde, iddepohasta, cantidad, motivo, requested_by, requested_by_nombre, status, created_at, updated_at)
+            VALUES (:p, :g, :dd, :dh, :c, :m, :rb, :rn, :s, NOW(), NOW())');
+        $st->execute([
+            ':p' => $idprodu,
+            ':g' => $idcodgusto ?: null,
+            ':dd' => $iddepodesde > 0 ? $iddepodesde : null,
+            ':dh' => $iddepohasta > 0 ? $iddepohasta : null,
+            ':c' => max(1, $cantidad),
+            ':m' => $motivo,
+            ':rb' => $requestedBy,
+            ':rn' => mb_substr($requestedByNombre, 0, 120),
+            ':s' => 'pendiente',
+        ]);
+        return (int)Db::pdo()->lastInsertId();
+    }
+
+    public function countSolicitudesAjustePendientes(): int
+    {
+        $this->ensureAjustesAuthTable();
+        $st = Db::pdo()->query("SELECT COUNT(*) FROM stock_ajuste_autorizaciones WHERE status = 'pendiente'");
+        return (int)$st->fetchColumn();
+    }
+
+    public function solicitudesAjustePendientes(int $limit = 50): array
+    {
+        $this->ensureAjustesAuthTable();
+        $limit = max(1, min(200, $limit));
+        $sql = "
+            SELECT a.*,
+                   p.produ,
+                   g.nomgusto,
+                   dd.nomdepo AS depo_desde_nombre,
+                   dh.nomdepo AS depo_hasta_nombre
+            FROM stock_ajuste_autorizaciones a
+            INNER JOIN producto p ON p.idprodu = a.idprodu
+            LEFT JOIN gustos g ON g.idcodgusto = a.idcodgusto
+            LEFT JOIN deposito dd ON dd.iddepo = a.iddepodesde
+            LEFT JOIN deposito dh ON dh.iddepo = a.iddepohasta
+            WHERE a.status = 'pendiente'
+            ORDER BY a.created_at ASC
+            LIMIT {$limit}
+        ";
+        $st = Db::pdo()->query($sql);
+        return $st->fetchAll();
+    }
+
+    public function solicitudesAjustePorSolicitante(int $adminUserId, int $limit = 50): array
+    {
+        $this->ensureAjustesAuthTable();
+        $limit = max(1, min(200, $limit));
+        $sql = "
+            SELECT a.*,
+                   p.produ,
+                   g.nomgusto,
+                   dd.nomdepo AS depo_desde_nombre,
+                   dh.nomdepo AS depo_hasta_nombre
+            FROM stock_ajuste_autorizaciones a
+            INNER JOIN producto p ON p.idprodu = a.idprodu
+            LEFT JOIN gustos g ON g.idcodgusto = a.idcodgusto
+            LEFT JOIN deposito dd ON dd.iddepo = a.iddepodesde
+            LEFT JOIN deposito dh ON dh.iddepo = a.iddepohasta
+            WHERE a.requested_by = :uid
+            ORDER BY a.id DESC
+            LIMIT {$limit}
+        ";
+        $st = Db::pdo()->prepare($sql);
+        $st->execute([':uid' => $adminUserId]);
+        return $st->fetchAll();
+    }
+
+    public function aprobarSolicitudAjuste(int $solicitudId, int $adminId, string $adminNombre): int
+    {
+        $this->ensureAjustesAuthTable();
+
+        $claim = Db::pdo()->prepare("UPDATE stock_ajuste_autorizaciones
+            SET status = 'procesando', decided_by = :ab, decided_by_nombre = :an, decided_at = NOW(), updated_at = NOW()
+            WHERE id = :id AND status = 'pendiente' LIMIT 1");
+        $claim->execute([
+            ':ab' => $adminId,
+            ':an' => mb_substr($adminNombre, 0, 120),
+            ':id' => $solicitudId,
+        ]);
+        if ($claim->rowCount() <= 0) {
+            throw new \RuntimeException('La solicitud ya fue procesada por otro usuario.');
+        }
+
+        $st = Db::pdo()->prepare('SELECT * FROM stock_ajuste_autorizaciones WHERE id = :id LIMIT 1');
+        $st->execute([':id' => $solicitudId]);
+        $row = $st->fetch();
+        if (!$row) {
+            throw new \RuntimeException('Solicitud no encontrada.');
+        }
+
+        try {
+            $cabId = $this->registrarAjuste(
+                (int)$row['idprodu'],
+                !empty($row['idcodgusto']) ? (int)$row['idcodgusto'] : null,
+                (int)($row['iddepodesde'] ?? 0),
+                (int)($row['iddepohasta'] ?? 0),
+                (int)$row['cantidad'],
+                (string)$row['motivo'],
+                (int)$row['requested_by'],
+                'ajuste_autorizado'
+            );
+            $ok = Db::pdo()->prepare("UPDATE stock_ajuste_autorizaciones
+                SET status = 'aprobada', stockcab_id = :cab, updated_at = NOW()
+                WHERE id = :id AND status = 'procesando' LIMIT 1");
+            $ok->execute([':cab' => $cabId, ':id' => $solicitudId]);
+            return $cabId;
+        } catch (\Throwable $e) {
+            $rollback = Db::pdo()->prepare("UPDATE stock_ajuste_autorizaciones
+                SET status = 'pendiente', decided_by = NULL, decided_by_nombre = NULL, decided_at = NULL, updated_at = NOW()
+                WHERE id = :id AND status = 'procesando' LIMIT 1");
+            $rollback->execute([':id' => $solicitudId]);
+            throw $e;
+        }
+    }
+
+    public function rechazarSolicitudAjuste(int $solicitudId, int $adminId, string $adminNombre, string $nota): void
+    {
+        $this->ensureAjustesAuthTable();
+        $st = Db::pdo()->prepare("UPDATE stock_ajuste_autorizaciones
+            SET status = 'rechazada', decided_by = :ab, decided_by_nombre = :an, decided_at = NOW(), rejection_note = :n, updated_at = NOW()
+            WHERE id = :id AND status = 'pendiente' LIMIT 1");
+        $st->execute([
+            ':ab' => $adminId,
+            ':an' => mb_substr($adminNombre, 0, 120),
+            ':n' => mb_substr($nota, 0, 255),
+            ':id' => $solicitudId,
+        ]);
+        if ($st->rowCount() <= 0) {
+            throw new \RuntimeException('La solicitud ya no está pendiente.');
+        }
     }
 
     public function grillaDepositos(): array
