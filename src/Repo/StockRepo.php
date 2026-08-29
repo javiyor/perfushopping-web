@@ -249,11 +249,19 @@ final class StockRepo
         return is_array($row) ? $row : null;
     }
 
-    public function requiereAutorizacionAjuste(int $iddepodesde, string $rolUsuario): bool
+    public function requiereAutorizacionAjuste(int $iddepodesde, int $iddepohasta, string $rolUsuario): bool
     {
         if ($rolUsuario === 'superadmin' || $iddepodesde <= 0) {
             return false;
         }
+
+        if ($iddepohasta > 0) {
+            $depoHasta = $this->depositoById($iddepohasta);
+            if ($depoHasta && (int)($depoHasta['marca'] ?? 0) === 2) {
+                return false;
+            }
+        }
+
         $depo = $this->depositoById($iddepodesde);
         if (!$depo) {
             return false;
@@ -349,10 +357,11 @@ final class StockRepo
 
         $claim = Db::pdo()->prepare("UPDATE stock_ajuste_autorizaciones
             SET status = 'procesando', decided_by = :ab, decided_by_nombre = :an, decided_at = NOW(), updated_at = NOW()
-            WHERE id = :id AND status = 'pendiente' LIMIT 1");
+            WHERE id = :id AND status = 'pendiente' AND requested_by <> :ab2 LIMIT 1");
         $claim->execute([
             ':ab' => $adminId,
             ':an' => mb_substr($adminNombre, 0, 120),
+            ':ab2' => $adminId,
             ':id' => $solicitudId,
         ]);
         if ($claim->rowCount() <= 0) {
@@ -396,11 +405,12 @@ final class StockRepo
         $this->ensureAjustesAuthTable();
         $st = Db::pdo()->prepare("UPDATE stock_ajuste_autorizaciones
             SET status = 'rechazada', decided_by = :ab, decided_by_nombre = :an, decided_at = NOW(), rejection_note = :n, updated_at = NOW()
-            WHERE id = :id AND status = 'pendiente' LIMIT 1");
+            WHERE id = :id AND status = 'pendiente' AND requested_by <> :ab2 LIMIT 1");
         $st->execute([
             ':ab' => $adminId,
             ':an' => mb_substr($adminNombre, 0, 120),
             ':n' => mb_substr($nota, 0, 255),
+            ':ab2' => $adminId,
             ':id' => $solicitudId,
         ]);
         if ($st->rowCount() <= 0) {

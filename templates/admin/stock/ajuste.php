@@ -2,6 +2,7 @@
 $depositos = $depositos ?? [];
 $producto = $producto ?? null;
 $variantes = $variantes ?? [];
+$initialAjusteItems = $initialAjusteItems ?? [];
 $solicitudesPendientes = $solicitudesPendientes ?? [];
 $misSolicitudes = $misSolicitudes ?? [];
 ?>
@@ -21,26 +22,29 @@ $misSolicitudes = $misSolicitudes ?? [];
                     <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
 
                     <div class="mb-3">
-                        <label class="form-label small fw-semibold">Producto</label>
+                        <label class="form-label small fw-semibold">Agregar productos al movimiento</label>
                         <div class="input-group">
-                            <input class="form-control form-control-sm" id="productoSearch" placeholder="Buscar producto por nombre o código..." autocomplete="off" />
-                            <input type="hidden" name="idprodu" id="idprodu" value="<?= $producto ? (int)$producto['idprodu'] : '0' ?>" />
-                            <button class="btn btn-outline-secondary btn-sm" type="button" id="clearProducto"><i class="bi bi-x-lg"></i></button>
+                            <input class="form-control form-control-sm" id="productoSearch" placeholder="Buscar por nombre o código y tocar para agregar" autocomplete="off" />
+                            <button class="btn btn-outline-secondary btn-sm" type="button" id="clearProductoSearch"><i class="bi bi-x-lg"></i></button>
                         </div>
                         <div id="productoResults" class="list-group mt-1" style="display:none;position:absolute;z-index:1050;max-height:300px;overflow-y:auto"></div>
-                        <div id="productoSelected" class="mt-1 <?= $producto ? '' : 'd-none' ?>">
-                            <span class="badge bg-info fs-6" id="productoLabel"><?= $producto ? htmlspecialchars($producto['produ'] ?? '') : '' ?></span>
-                        </div>
                     </div>
 
-                    <div class="mb-3" id="varianteGroup" style="<?= $variantes ? '' : 'display:none' ?>">
-                        <label class="form-label small fw-semibold">Variante <span class="text-muted">(opcional)</span></label>
-                        <select class="form-select form-select-sm" name="idcodgusto" id="varianteSelect">
-                            <option value="0">Todas (producto base)</option>
-                            <?php foreach ($variantes as $v): ?>
-                                <option value="<?= (int)$v['idcodgusto'] ?>"><?= htmlspecialchars($v['nomgusto'] ?? '') ?></option>
-                            <?php endforeach; ?>
-                        </select>
+                    <div class="mb-3">
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle">
+                                <thead>
+                                    <tr>
+                                        <th style="min-width:220px">Producto</th>
+                                        <th style="min-width:180px">Variante</th>
+                                        <th style="width:110px">Cantidad</th>
+                                        <th style="width:70px"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="itemsBody"></tbody>
+                            </table>
+                        </div>
+                        <div class="small text-muted" id="itemsHelp">Podés cargar todos los productos que necesites en un solo movimiento.</div>
                     </div>
 
                     <div class="row g-2 mb-3">
@@ -92,6 +96,7 @@ $misSolicitudes = $misSolicitudes ?? [];
                 <?php else: ?>
                     <div class="list-group list-group-flush">
                         <?php foreach ($solicitudesPendientes as $s): ?>
+                            <?php $esPropia = (int)($s['requested_by'] ?? 0) === (int)($adminUser['id'] ?? 0); ?>
                             <div class="list-group-item">
                                 <div class="fw-semibold mb-1"><?= htmlspecialchars((string)($s['produ'] ?? 'Producto')) ?></div>
                                 <?php if (($s['nomgusto'] ?? '') !== ''): ?>
@@ -102,19 +107,23 @@ $misSolicitudes = $misSolicitudes ?? [];
                                 <div>Cantidad: <strong><?= (int)($s['cantidad'] ?? 0) ?></strong></div>
                                 <div class="text-muted">Motivo: <?= htmlspecialchars((string)($s['motivo'] ?? '')) ?></div>
                                 <div class="text-muted">Solicitó: <?= htmlspecialchars((string)($s['requested_by_nombre'] ?? '')) ?> · <?= htmlspecialchars((string)($s['created_at'] ?? '')) ?></div>
-                                <div class="d-flex gap-2 mt-2">
-                                    <form method="post" action="/admin/stock/ajuste/aprobar" onsubmit="return confirm('Aprobar esta solicitud de ajuste?')">
-                                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
-                                        <input type="hidden" name="solicitud_id" value="<?= (int)$s['id'] ?>" />
-                                        <button class="btn btn-sm btn-accent" type="submit"><i class="bi bi-check-lg"></i> Aprobar</button>
-                                    </form>
-                                    <form method="post" action="/admin/stock/ajuste/rechazar" onsubmit="return confirm('Rechazar esta solicitud?')">
-                                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
-                                        <input type="hidden" name="solicitud_id" value="<?= (int)$s['id'] ?>" />
-                                        <input class="form-control form-control-sm" type="text" name="nota_rechazo" placeholder="Motivo rechazo" style="max-width:150px" />
-                                        <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-x-lg"></i></button>
-                                    </form>
-                                </div>
+                                <?php if ($esPropia): ?>
+                                    <div class="mt-2 text-warning">No podés autorizar tu propia solicitud.</div>
+                                <?php else: ?>
+                                    <div class="d-flex gap-2 mt-2">
+                                        <form method="post" action="/admin/stock/ajuste/aprobar" onsubmit="return confirm('Aprobar esta solicitud de ajuste?')">
+                                            <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                                            <input type="hidden" name="solicitud_id" value="<?= (int)$s['id'] ?>" />
+                                            <button class="btn btn-sm btn-accent" type="submit"><i class="bi bi-check-lg"></i> Aprobar</button>
+                                        </form>
+                                        <form method="post" action="/admin/stock/ajuste/rechazar" onsubmit="return confirm('Rechazar esta solicitud?')">
+                                            <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                                            <input type="hidden" name="solicitud_id" value="<?= (int)$s['id'] ?>" />
+                                            <input class="form-control form-control-sm" type="text" name="nota_rechazo" placeholder="Motivo rechazo" style="max-width:150px" />
+                                            <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-x-lg"></i></button>
+                                        </form>
+                                    </div>
+                                <?php endif; ?>
                             </div>
                         <?php endforeach; ?>
                     </div>
@@ -162,7 +171,7 @@ $misSolicitudes = $misSolicitudes ?? [];
                     <li>Si solo querés <strong>ingresar</strong> stock, dejá "Desde" vacío</li>
                     <li>Si solo querés <strong>egresar</strong> stock, dejá "Hasta" vacío</li>
                     <li>Para <strong>transferir</strong> entre depósitos, completá ambos</li>
-                    <li>Si el egreso sale de un depósito con <strong>marca distinta de 2</strong> y no sos superadmin, se enviará a autorización</li>
+                    <li>Si el egreso sale de un depósito con <strong>marca distinta de 2</strong>, no sos superadmin y el destino no es marca 2, se enviará a autorización</li>
                     <li>Si el producto tiene variantes, podés ajustar una específica o dejar "Todas" para ajustar el producto base</li>
                     <li>El motivo es obligatorio para mantener trazabilidad</li>
                 </ul>
@@ -174,47 +183,50 @@ $misSolicitudes = $misSolicitudes ?? [];
 </div>
 
 <script>
-let selectedProduct = <?= $producto ? json_encode(['idprodu' => (int)$producto['idprodu'], 'produ' => $producto['produ'], 'stocact' => (int)($producto['stocact'] ?? 0)]) : 'null' ?>;
-let currentVariants = <?= json_encode($variantes) ?>;
+const initialItems = <?= json_encode($initialAjusteItems, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
 
 const searchInput = document.getElementById('productoSearch');
 const resultsDiv = document.getElementById('productoResults');
-const idproduInput = document.getElementById('idprodu');
-const selectedDiv = document.getElementById('productoSelected');
-const productoLabel = document.getElementById('productoLabel');
-const clearBtn = document.getElementById('clearProducto');
-const varianteGroup = document.getElementById('varianteGroup');
-const varianteSelect = document.getElementById('varianteSelect');
-function updateVariants(variants) {
-    currentVariants = variants || [];
-    varianteSelect.innerHTML = '<option value="0">Todas (producto base)</option>';
-    variants.forEach(v => {
-        varianteSelect.innerHTML += '<option value="' + v.idcodgusto + '">' + escHtml(v.nomgusto) + '</option>';
+const clearBtn = document.getElementById('clearProductoSearch');
+const itemsBody = document.getElementById('itemsBody');
+const ajusteForm = document.getElementById('ajusteForm');
+
+function buildVariantOptions(variants) {
+    let html = '<option value="0">Todas (producto base)</option>';
+    (variants || []).forEach(v => {
+        html += '<option value="' + (v.idcodgusto || 0) + '">' + escHtml(v.nomgusto || '') + '</option>';
     });
-    varianteGroup.style.display = variants.length ? '' : 'none';
+    return html;
 }
 
-function selectProduct(p) {
-    selectedProduct = p;
-    idproduInput.value = p.idprodu;
-    productoLabel.textContent = p.produ;
-    selectedDiv.classList.remove('d-none');
-    searchInput.value = '';
-    resultsDiv.style.display = 'none';
+function addItemRow(product) {
+    const tr = document.createElement('tr');
+    tr.dataset.productId = String(product.idprodu || 0);
 
-    // fetch variants
-    fetch('/admin/stock/ajuste/variantes?id=' + p.idprodu)
-        .then(r => r.json())
-        .then(variants => updateVariants(variants))
-        .catch(() => updateVariants([]));
-}
+    const code = (product.codprodu || '').trim();
+    const price = parseFloat(product.precio || 0);
+    const variants = Array.isArray(product.variants) ? product.variants : [];
 
-function clearProducto() {
-    selectedProduct = null;
-    idproduInput.value = '0';
-    selectedDiv.classList.add('d-none');
-    productoLabel.textContent = '';
-    updateVariants([]);
+    tr.innerHTML =
+        '<td>' +
+            '<input type="hidden" name="idprodu[]" value="' + (product.idprodu || 0) + '" />' +
+            '<div class="fw-semibold">' + escHtml(product.produ || '') + '</div>' +
+            '<div class="small text-muted">' + escHtml(code) + ' · Stock: ' + (product.stocact ?? 0) + ' · $' + (isNaN(price) ? '0,00' : price.toLocaleString('es-AR', {minimumFractionDigits:2})) + '</div>' +
+        '</td>' +
+        '<td>' +
+            '<select class="form-select form-select-sm" name="idcodgusto[]">' + buildVariantOptions(variants) + '</select>' +
+        '</td>' +
+        '<td>' +
+            '<input class="form-control form-control-sm" type="number" name="cantidad[]" min="1" step="1" value="1" required />' +
+        '</td>' +
+        '<td class="text-end">' +
+            '<button class="btn btn-sm btn-outline-danger" type="button"><i class="bi bi-trash"></i></button>' +
+        '</td>';
+
+    tr.querySelector('button').addEventListener('click', function() {
+        tr.remove();
+    });
+    itemsBody.appendChild(tr);
 }
 
 function escHtml(s) {
@@ -250,7 +262,9 @@ searchInput.addEventListener('input', function() {
                         item.innerHTML = html;
                         item.addEventListener('click', function(e) {
                             e.preventDefault();
-                            selectProduct(p);
+                            addItemRow(p);
+                            searchInput.value = '';
+                            resultsDiv.style.display = 'none';
                         });
                         resultsDiv.appendChild(item);
                     });
@@ -266,9 +280,20 @@ document.addEventListener('click', function(e) {
     }
 });
 
-clearBtn.addEventListener('click', clearProducto);
+clearBtn.addEventListener('click', function() {
+    searchInput.value = '';
+    resultsDiv.style.display = 'none';
+    searchInput.focus();
+});
 
-if (selectedProduct) {
-    searchInput.placeholder = selectedProduct.produ + ' (cambiar)';
+ajusteForm.addEventListener('submit', function(e) {
+    if (!itemsBody.querySelector('tr')) {
+        e.preventDefault();
+        alert('Agregá al menos un producto al movimiento.');
+    }
+});
+
+if (Array.isArray(initialItems) && initialItems.length) {
+    initialItems.forEach(addItemRow);
 }
 </script>

@@ -162,10 +162,19 @@ final class StockController
         $productoId = (int)($params['id'] ?? 0);
         $producto = null;
         $variantes = [];
+        $initialAjusteItems = [];
         if ($productoId > 0) {
             $producto = $repo->productoDetalle($productoId);
             if ($producto) {
                 $variantes = $repo->variantesPorProducto($productoId);
+                $initialAjusteItems[] = [
+                    'idprodu' => (int)$producto['idprodu'],
+                    'produ' => (string)($producto['produ'] ?? ''),
+                    'codprodu' => (string)($producto['codprodu'] ?? ''),
+                    'precio' => (float)($producto['precio'] ?? 0),
+                    'stocact' => (int)($producto['stocact'] ?? 0),
+                    'variants' => $variantes,
+                ];
             }
         }
 
@@ -174,6 +183,7 @@ final class StockController
             'depositos' => $depositos,
             'producto' => $producto,
             'variantes' => $variantes,
+            'initialAjusteItems' => $initialAjusteItems,
             'solicitudesPendientes' => $solicitudesPendientes,
             'misSolicitudes' => $misSolicitudes,
             'csrf' => Csrf::token(),
@@ -187,42 +197,81 @@ final class StockController
         $adminUser = $auth->requireSesion();
         Csrf::check($_POST['_csrf'] ?? null);
 
-        $idprodu = (int)($_POST['idprodu'] ?? 0);
-        $idcodgusto = (int)($_POST['idcodgusto'] ?? 0) ?: null;
         $iddepodesde = (int)($_POST['iddepodesde'] ?? 0);
         $iddepohasta = (int)($_POST['iddepohasta'] ?? 0);
-        $cantidad = (int)($_POST['cantidad'] ?? 0);
         $motivo = trim((string)($_POST['motivo'] ?? ''));
 
-        if ($idprodu <= 0 || $cantidad <= 0 || $motivo === '' || ($iddepodesde <= 0 && $iddepohasta <= 0)) {
+        $idproduRaw = $_POST['idprodu'] ?? [];
+        $idcodgustoRaw = $_POST['idcodgusto'] ?? [];
+        $cantidadRaw = $_POST['cantidad'] ?? [];
+
+        $idproduList = is_array($idproduRaw) ? $idproduRaw : [$idproduRaw];
+        $idcodgustoList = is_array($idcodgustoRaw) ? $idcodgustoRaw : [$idcodgustoRaw];
+        $cantidadList = is_array($cantidadRaw) ? $cantidadRaw : [$cantidadRaw];
+
+        $items = [];
+        $max = max(count($idproduList), count($cantidadList), count($idcodgustoList));
+        for ($i = 0; $i < $max; $i++) {
+            $idprodu = (int)($idproduList[$i] ?? 0);
+            $cantidad = (int)($cantidadList[$i] ?? 0);
+            $idcodgusto = (int)($idcodgustoList[$i] ?? 0);
+            if ($idprodu <= 0 || $cantidad <= 0) {
+                continue;
+            }
+            $items[] = [
+                'idprodu' => $idprodu,
+                'idcodgusto' => $idcodgusto > 0 ? $idcodgusto : null,
+                'cantidad' => $cantidad,
+            ];
+        }
+
+        if (!$items || $motivo === '' || ($iddepodesde <= 0 && $iddepohasta <= 0)) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Completá todos los campos requeridos.'];
             Response::redirect('/admin/stock/ajuste');
         }
 
         try {
             $repo = new StockRepo();
-            if ($repo->requiereAutorizacionAjuste($iddepodesde, (string)($adminUser['rol'] ?? ''))) {
-                $solicitudId = $repo->crearSolicitudAjuste(
-                    $idprodu,
-                    $idcodgusto,
-                    $iddepodesde,
-                    $iddepohasta,
-                    $cantidad,
-                    $motivo,
-                    (int)$adminUser['id'],
-                    (string)($adminUser['nombre'] ?? '')
-                );
-                $_SESSION['admin_flash'] = ['type' => 'info', 'text' => 'Ajuste enviado a autorización (#' . $solicitudId . ').'];
+            $requiereAuth = $repo->requiereAutorizacionAjuste($iddepodesde, $iddepohasta, (string)($adminUser['rol'] ?? ''));
+
+            if ($requiereAuth) {
+                $solicitudes = 0;
+                foreach ($items as $it) {
+                    $repo->crearSolicitudAjuste(
+                        (int)$it['idprodu'],
+                        $it['idcodgusto'] !== null ? (int)$it['idcodgusto'] : null,
+                        $iddepodesde,
+                        $iddepohasta,
+                        (int)$it['cantidad'],
+                        $motivo,
+                        (int)$adminUser['id'],
+                        (string)($adminUser['nombre'] ?? '')
+                    );
+                    $solicitudes++;
+                }
+                $_SESSION['admin_flash'] = ['type' => 'info', 'text' => 'Se enviaron ' . $solicitudes . ' solicitud(es) de autorización.'];
                 Response::redirect('/admin/stock/ajuste');
             }
 
-            $repo->registrarAjuste($idprodu, $idcodgusto, $iddepodesde, $iddepohasta, $cantidad, $motivo, (int)$adminUser['id']);
-            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Ajuste de stock registrado correctamente.'];
+            $aplicados = 0;
+            foreach ($items as $it) {
+                $repo->registrarAjuste(
+                    (int)$it['idprodu'],
+                    $it['idcodgusto'] !== null ? (int)$it['idcodgusto'] : null,
+                    $iddepodesde,
+                    $iddepohasta,
+                    (int)$it['cantidad'],
+                    $motivo,
+                    (int)$adminUser['id']
+                );
+                $aplicados++;
+            }
+            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Ajuste de stock registrado. Productos procesados: ' . $aplicados . '.'];
         } catch (\Throwable $e) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Error al registrar ajuste: ' . $e->getMessage()];
         }
 
-        Response::redirect('/admin/stock/' . $idprodu);
+        Response::redirect('/admin/stock/ajuste');
     }
 
     public function aprobarSolicitudAjuste(array $params): void
