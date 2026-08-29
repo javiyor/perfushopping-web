@@ -1,15 +1,27 @@
-const CACHE_NAME = 'pf-admin-v1';
+const CACHE_NAME = 'pf-admin-v2';
 const PRECACHE_URLS = [
-  '/admin',
+  '/admin/',
   '/assets/app.css',
   '/assets/app.js',
   '/assets/brand/logo-header.png',
+  '/assets/brand/pwa-icon-192.png',
+  '/assets/brand/pwa-icon-512.png',
   '/manifest.webmanifest'
 ];
 
+function offlineHtmlResponse() {
+  return new Response(
+    '<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sin conexión</title><body style="font-family:system-ui;padding:20px"><h3>Sin conexión</h3><p>No hay internet y este contenido no está en caché. Volvé a intentar cuando tengas señal.</p></body></html>',
+    {
+      status: 503,
+      headers: { 'Content-Type': 'text/html; charset=UTF-8' }
+    }
+  );
+}
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS))
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS)).catch(() => Promise.resolve())
   );
 });
 
@@ -43,11 +55,13 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(req)
         .then((resp) => {
-          const copy = resp.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+          if (resp && resp.ok) {
+            const copy = resp.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+          }
           return resp;
         })
-        .catch(() => caches.match(req).then((hit) => hit || caches.match('/admin')))
+        .catch(() => caches.match(req).then((hit) => hit || caches.match('/admin/') || offlineHtmlResponse()))
     );
     return;
   }
@@ -57,11 +71,13 @@ self.addEventListener('fetch', (event) => {
       caches.match(req).then((hit) => {
         const networkFetch = fetch(req)
           .then((resp) => {
-            const copy = resp.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+            if (resp && resp.ok) {
+              const copy = resp.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+            }
             return resp;
           })
-          .catch(() => hit);
+          .catch(() => hit || new Response('', { status: 503, statusText: 'offline' }));
         return hit || networkFetch;
       })
     );
