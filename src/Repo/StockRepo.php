@@ -345,7 +345,9 @@ final class StockRepo
             SELECT a.*,
                    p.produ,
                    g.nomgusto,
+                   dd.marca AS depo_desde_marca,
                    dd.nomdepo AS depo_desde_nombre,
+                   dh.marca AS depo_hasta_marca,
                    dh.nomdepo AS depo_hasta_nombre
             FROM stock_ajuste_autorizaciones a
             INNER JOIN producto p ON p.idprodu = a.idprodu
@@ -368,7 +370,9 @@ final class StockRepo
             SELECT a.*,
                    p.produ,
                    g.nomgusto,
+                   dd.marca AS depo_desde_marca,
                    dd.nomdepo AS depo_desde_nombre,
+                   dh.marca AS depo_hasta_marca,
                    dh.nomdepo AS depo_hasta_nombre
             FROM stock_ajuste_autorizaciones a
             INNER JOIN producto p ON p.idprodu = a.idprodu

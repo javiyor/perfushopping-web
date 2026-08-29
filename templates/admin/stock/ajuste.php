@@ -145,12 +145,22 @@ $esSuperadmin = $esSuperadmin ?? false;
                             <?php
                                 $status = (string)($s['status'] ?? 'pendiente');
                                 $statusClass = $status === 'aprobada' ? 'success' : ($status === 'rechazada' ? 'danger' : ($status === 'procesando' ? 'warning' : 'secondary'));
+                                $depoDesdeNombre = mb_strtolower(trim((string)($s['depo_desde_nombre'] ?? '')));
+                                $depoDesdeNombre = str_replace(['á', 'é', 'í', 'ó', 'ú', 'ü', 'ñ'], ['a', 'e', 'i', 'o', 'u', 'u', 'n'], $depoDesdeNombre);
+                                $esDepositoPolitica = in_array($depoDesdeNombre, ['irigoyen', 'alvear', '9 de julio 1610', '9 de julio'], true);
+                                $warningPolitica = $status === 'pendiente'
+                                    && (int)($s['depo_desde_marca'] ?? 0) === 2
+                                    && (int)($s['depo_hasta_marca'] ?? 0) !== 2
+                                    && $esDepositoPolitica;
                             ?>
                             <div class="list-group-item">
                                 <div class="d-flex justify-content-between align-items-center mb-1">
                                     <div class="fw-semibold text-truncate" style="max-width:70%"><?= htmlspecialchars((string)($s['produ'] ?? 'Producto')) ?></div>
                                     <span class="badge bg-<?= $statusClass ?>"><?= htmlspecialchars($status) ?></span>
                                 </div>
+                                <?php if ($warningPolitica): ?>
+                                    <div class="mb-1"><span class="badge bg-warning text-dark">Pendiente por politica de deposito</span></div>
+                                <?php endif; ?>
                                 <div><?= (int)($s['cantidad'] ?? 0) ?> u. · <?= htmlspecialchars((string)($s['depo_desde_nombre'] ?? 'Ninguno')) ?> -> <?= htmlspecialchars((string)($s['depo_hasta_nombre'] ?? 'Ninguno')) ?></div>
                                 <div class="text-muted"><?= htmlspecialchars((string)($s['created_at'] ?? '')) ?></div>
                                 <?php if (($s['rejection_note'] ?? '') !== ''): ?>
