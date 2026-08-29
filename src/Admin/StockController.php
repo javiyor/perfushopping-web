@@ -279,8 +279,13 @@ final class StockController
     public function aprobarSolicitudAjuste(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireRol('superadmin');
+        $adminUser = $auth->requireSesion();
         Csrf::check($_POST['_csrf'] ?? null);
+
+        if ((string)($adminUser['rol'] ?? '') !== 'superadmin') {
+            $_SESSION['admin_flash'] = ['type' => 'info', 'text' => 'La solicitud quedó pendiente. Solo un superadmin puede autorizarla.'];
+            Response::redirect('/admin/stock/ajuste');
+        }
 
         $solicitudId = (int)($_POST['solicitud_id'] ?? 0);
         if ($solicitudId <= 0) {
@@ -302,6 +307,11 @@ final class StockController
         $auth = new AdminAuthService();
         $adminUser = $auth->requireSesion();
         Csrf::check($_POST['_csrf'] ?? null);
+
+        if ((string)($adminUser['rol'] ?? '') !== 'superadmin') {
+            $_SESSION['admin_flash'] = ['type' => 'info', 'text' => 'La solicitud quedó pendiente. Solo un superadmin puede rechazarla.'];
+            Response::redirect('/admin/stock/ajuste');
+        }
 
         $solicitudId = (int)($_POST['solicitud_id'] ?? 0);
         $nota = trim((string)($_POST['nota_rechazo'] ?? ''));
