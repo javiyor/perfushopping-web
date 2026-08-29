@@ -196,7 +196,7 @@ final class StockController
     public function storeAjuste(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireRol('superadmin');
+        $adminUser = $auth->requireSesion();
         Csrf::check($_POST['_csrf'] ?? null);
 
         $iddepodesde = (int)($_POST['iddepodesde'] ?? 0);
