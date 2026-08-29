@@ -121,11 +121,14 @@ final class AdminAuthService
             && isset($_SESSION['admin_turno']);
     }
 
-    public function iniciarSesion(int $sucursalId, string $turno, array $vendedores): void
+    public function iniciarSesion(int $sucursalId, string $turno, array $vendedores, ?int $puntoVenta = null): void
     {
         $_SESSION['admin_sucursal_id'] = $sucursalId;
         $_SESSION['admin_turno'] = $turno;
         $_SESSION['admin_vendedores'] = $vendedores;
+        if ($puntoVenta !== null && $puntoVenta > 0) {
+            $_SESSION['admin_punto_venta'] = $puntoVenta;
+        }
     }
 
     public function cerrarSesion(): void
@@ -133,6 +136,7 @@ final class AdminAuthService
         unset($_SESSION['admin_sucursal_id']);
         unset($_SESSION['admin_turno']);
         unset($_SESSION['admin_vendedores']);
+        unset($_SESSION['admin_punto_venta']);
     }
 
     public function getSucursalId(): int

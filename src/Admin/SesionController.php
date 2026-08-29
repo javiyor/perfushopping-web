@@ -23,12 +23,27 @@ final class SesionController
         }
 
         $sucursales = (new SucursalRepo())->listarActivas();
+        $sucursalRepo = new SucursalRepo();
+        $puntosVentaMap = $sucursalRepo->puntosVentaPorSucursal();
         $vendedores = (new SucursalRepo())->vendedoresDisponibles();
 
         $sucursalTrabajoId = (int)($adminUser['sucursal_trabajo_id'] ?? 0);
         if (($adminUser['rol'] ?? '') !== 'superadmin' && $sucursalTrabajoId > 0) {
             $sucursales = array_values(array_filter($sucursales, static fn (array $s): bool => (int)($s['id'] ?? 0) === $sucursalTrabajoId));
         }
+
+        foreach ($sucursales as &$s) {
+            $sid = (int)($s['id'] ?? 0);
+            $pvs = $puntosVentaMap[$sid] ?? [];
+            if (!$pvs) {
+                $legacy = (int)($s['punto_venta'] ?? 0);
+                if ($legacy > 0) {
+                    $pvs = [$legacy];
+                }
+            }
+            $s['puntos_venta'] = $pvs;
+        }
+        unset($s);
 
         $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
         $isMobile = preg_match('/Mobile|Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i', $ua) === 1;
@@ -42,6 +57,7 @@ final class SesionController
             'adminUser' => $adminUser,
             'sucursales' => $sucursales,
             'vendedores' => $vendedores,
+            'puntosVentaMap' => $puntosVentaMap,
             'isMobile' => $isMobile,
             'lastVendedores' => $lastVendedores,
             'csrf' => Csrf::token(),
@@ -56,6 +72,7 @@ final class SesionController
         Csrf::check($_POST['_csrf'] ?? null);
 
         $sucursalId = (int)($_POST['sucursal_id'] ?? 0);
+        $puntoVenta = (int)($_POST['punto_venta'] ?? 0);
         $turno = (string)($_POST['turno'] ?? '');
         $vendedores = array_map('intval', (array)($_POST['vendedores'] ?? []));
 
@@ -76,7 +93,17 @@ final class SesionController
             Response::redirect('/admin/sesion/iniciar');
         }
 
-        $auth->iniciarSesion($sucursalId, $turno, $vendedores);
+        $puntosSucursal = (new SucursalRepo())->puntosVentaDeSucursal($sucursalId);
+        if (!$puntosSucursal) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'La sucursal no tiene puntos de venta configurados.'];
+            Response::redirect('/admin/sesion/iniciar');
+        }
+        if ($puntoVenta <= 0 || !in_array($puntoVenta, $puntosSucursal, true)) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Seleccioná un punto de venta válido para la sucursal.'];
+            Response::redirect('/admin/sesion/iniciar');
+        }
+
+        $auth->iniciarSesion($sucursalId, $turno, $vendedores, $puntoVenta);
 
         $_SESSION['last_vendedores'] = $vendedores;
 

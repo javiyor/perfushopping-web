@@ -14,7 +14,7 @@
                     <th>Teléfono</th>
                     <th>Email</th>
                     <th>Núm. Suc.</th>
-                    <th>Pto. Venta</th>
+                    <th>Ptos. Venta</th>
                     <th>Depósito</th>
                     <th>Activo</th>
                     <th style="width:80px"></th>
@@ -29,7 +29,7 @@
                     <td class="small"><?= htmlspecialchars((string)($s['telefono'] ?? '')) ?></td>
                     <td class="small"><?= htmlspecialchars((string)($s['email'] ?? '')) ?></td>
                     <td><?= htmlspecialchars((string)($s['numsuc'] ?? '')) ?></td>
-                    <td><?= (int)($s['punto_venta'] ?? 0) ?></td>
+                    <td><?= htmlspecialchars((string)($s['puntos_venta_csv'] ?? ($s['punto_venta'] ?? ''))) ?></td>
                     <td>
                         <?php
                         $depoId = (int)($s['iddepo'] ?? 0);
@@ -98,8 +98,9 @@
                         <input type="text" name="numsuc" id="inputNumsuc" class="form-control" />
                     </div>
                     <div class="col">
-                        <label class="form-label">Punto de venta</label>
-                        <input type="number" name="punto_venta" id="inputPuntoVenta" class="form-control" value="1" />
+                        <label class="form-label">Puntos de venta</label>
+                        <input type="text" name="puntos_venta" id="inputPuntosVenta" class="form-control" value="1" placeholder="Ej: 1, 3, 7" required />
+                        <small class="text-muted">Podés cargar uno o varios, separados por coma. Deben ser únicos entre sucursales.</small>
                     </div>
                 </div>
                 <div class="mb-3">
@@ -133,7 +134,7 @@ const sucursales = <?= json_encode(array_map(function($s) {
         'telefono' => $s['telefono'] ?? '',
         'email' => $s['email'] ?? '',
         'numsuc' => $s['numsuc'] ?? '',
-        'punto_venta' => (int)($s['punto_venta'] ?? 0),
+        'puntos_venta_csv' => (string)($s['puntos_venta_csv'] ?? ($s['punto_venta'] ?? '')),
         'iddepo' => (int)($s['iddepo'] ?? 0),
         'activo' => !empty($s['activo']),
     ];
@@ -147,7 +148,7 @@ function abrirModal(id) {
     document.getElementById('inputTelefono').value = '';
     document.getElementById('inputEmail').value = '';
     document.getElementById('inputNumsuc').value = '';
-    document.getElementById('inputPuntoVenta').value = '1';
+    document.getElementById('inputPuntosVenta').value = '1';
     document.getElementById('inputIddepo').value = '';
     document.getElementById('inputActivo').checked = true;
     document.getElementById('modalTitle').textContent = 'Nueva sucursal';
@@ -161,7 +162,7 @@ function abrirModal(id) {
             document.getElementById('inputTelefono').value = s.telefono;
             document.getElementById('inputEmail').value = s.email;
             document.getElementById('inputNumsuc').value = s.numsuc;
-            document.getElementById('inputPuntoVenta').value = s.punto_venta;
+            document.getElementById('inputPuntosVenta').value = s.puntos_venta_csv || '1';
             document.getElementById('inputIddepo').value = s.iddepo || '';
             document.getElementById('inputActivo').checked = s.activo;
             document.getElementById('modalTitle').textContent = 'Editar sucursal';

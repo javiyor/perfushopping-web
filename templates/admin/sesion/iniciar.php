@@ -4,6 +4,7 @@ $vendedores = $vendedores ?? [];
 $csrfToken = $csrf ?? '';
 $isMobile = $isMobile ?? false;
 $lastVendedores = $lastVendedores ?? [];
+$puntosVentaMap = $puntosVentaMap ?? [];
 ?>
 <div class="row justify-content-center" style="margin-top:max(20px, 5vh)">
     <div class="col-md-7 col-lg-6">
@@ -19,11 +20,18 @@ $lastVendedores = $lastVendedores ?? [];
 
                     <div class="mb-4">
                         <label class="form-label fw-semibold">Sucursal</label>
-                        <select class="form-select" name="sucursal_id" id="selSucursal" required>
+                        <select class="form-select" name="sucursal_id" id="selSucursal" required onchange="syncPuntosVenta()">
                             <option value="">— Seleccionar —</option>
                             <?php foreach ($sucursales as $s): ?>
                                 <option value="<?= (int)$s['id'] ?>"><?= htmlspecialchars($s['nomsuc'] ?? 'Sucursal #' . $s['numsuc']) ?></option>
                             <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">Punto de venta (ARCA)</label>
+                        <select class="form-select" name="punto_venta" id="selPuntoVenta" required>
+                            <option value="">— Seleccionar sucursal primero —</option>
                         </select>
                     </div>
 
@@ -83,6 +91,28 @@ $lastVendedores = $lastVendedores ?? [];
 </div>
 
 <script>
+const sucursalPuntos = <?= json_encode($puntosVentaMap, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+
+function syncPuntosVenta() {
+    var selSucursal = document.getElementById('selSucursal');
+    var selPunto = document.getElementById('selPuntoVenta');
+    var sid = String(selSucursal.value || '');
+    var puntos = sucursalPuntos[sid] || [];
+    selPunto.innerHTML = '';
+    if (!puntos.length) {
+        selPunto.innerHTML = '<option value="">Sin puntos configurados</option>';
+        selPunto.value = '';
+        return;
+    }
+    puntos.forEach(function(pv, idx) {
+        var opt = document.createElement('option');
+        opt.value = String(pv);
+        opt.textContent = 'Punto ' + pv;
+        if (idx === 0) opt.selected = true;
+        selPunto.appendChild(opt);
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     var hour = new Date().getHours();
     if (hour < 14) {
@@ -94,5 +124,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (sel.options.length > 1) {
         sel.selectedIndex = 1;
     }
+    syncPuntosVenta();
 });
 </script>
