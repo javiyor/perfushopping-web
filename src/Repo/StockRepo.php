@@ -255,18 +255,51 @@ final class StockRepo
             return false;
         }
 
-        if ($iddepohasta > 0) {
-            $depoHasta = $this->depositoById($iddepohasta);
-            if ($depoHasta && (int)($depoHasta['marca'] ?? 0) === 2) {
-                return false;
-            }
-        }
-
-        $depo = $this->depositoById($iddepodesde);
-        if (!$depo) {
+        $depoDesde = $this->depositoById($iddepodesde);
+        if (!$depoDesde) {
             return false;
         }
-        return (int)($depo['marca'] ?? 0) !== 2;
+
+        $depoHasta = $iddepohasta > 0 ? $this->depositoById($iddepohasta) : null;
+        if (!$depoHasta) {
+            return (int)($depoDesde['marca'] ?? 0) !== 2;
+        }
+
+        $desdeMarca = (int)($depoDesde['marca'] ?? 0);
+        $hastaMarca = (int)($depoHasta['marca'] ?? 0);
+
+        if ($this->esDepositoVentaMarca2($depoDesde) && $hastaMarca !== 2) {
+            return true;
+        }
+
+        if ($hastaMarca === 2) {
+            return false;
+        }
+
+        return $desdeMarca !== 2;
+    }
+
+    private function esDepositoVentaMarca2(array $depo): bool
+    {
+        if ((int)($depo['marca'] ?? 0) !== 2) {
+            return false;
+        }
+        $name = $this->normalizarNombreDeposito((string)($depo['nomdepo'] ?? ''));
+        $permitidos = [
+            'irigoyen',
+            'alvear',
+            '9 de julio 1610',
+            '9 de julio',
+        ];
+        return in_array($name, $permitidos, true);
+    }
+
+    private function normalizarNombreDeposito(string $name): string
+    {
+        $name = trim(mb_strtolower($name));
+        $name = str_replace(['á', 'é', 'í', 'ó', 'ú', 'ü', 'ñ'], ['a', 'e', 'i', 'o', 'u', 'u', 'n'], $name);
+        $name = preg_replace('/\s+/', ' ', $name) ?: $name;
+        return $name;
     }
 
     public function crearSolicitudAjuste(

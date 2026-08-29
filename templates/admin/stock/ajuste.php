@@ -5,6 +5,7 @@ $variantes = $variantes ?? [];
 $initialAjusteItems = $initialAjusteItems ?? [];
 $solicitudesPendientes = $solicitudesPendientes ?? [];
 $misSolicitudes = $misSolicitudes ?? [];
+$esSuperadmin = $esSuperadmin ?? false;
 ?>
 <nav aria-label="breadcrumb" class="mb-3">
     <ol class="breadcrumb">
@@ -85,6 +86,7 @@ $misSolicitudes = $misSolicitudes ?? [];
     </div>
 
     <div class="col-lg-4">
+        <?php if ($esSuperadmin): ?>
         <div class="card shadow-sm mb-3">
             <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
                 <span>Autorizaciones pendientes</span>
@@ -130,6 +132,7 @@ $misSolicitudes = $misSolicitudes ?? [];
                 <?php endif; ?>
             </div>
         </div>
+        <?php endif; ?>
 
         <div class="card shadow-sm mb-3">
             <div class="card-header bg-white fw-semibold">Mis solicitudes recientes</div>
@@ -171,7 +174,7 @@ $misSolicitudes = $misSolicitudes ?? [];
                     <li>Si solo querés <strong>ingresar</strong> stock, dejá "Desde" vacío</li>
                     <li>Si solo querés <strong>egresar</strong> stock, dejá "Hasta" vacío</li>
                     <li>Para <strong>transferir</strong> entre depósitos, completá ambos</li>
-                    <li>Si el egreso sale de un depósito con <strong>marca distinta de 2</strong>, no sos superadmin y el destino no es marca 2, se enviará a autorización</li>
+                    <li>Si el egreso sale de <strong>Irigoyen, Alvear o 9 de Julio 1610</strong> hacia un depósito con marca distinta de 2 y no sos superadmin, se enviará a autorización</li>
                     <li>Si el producto tiene variantes, podés ajustar una específica o dejar "Todas" para ajustar el producto base</li>
                     <li>El motivo es obligatorio para mantener trazabilidad</li>
                 </ul>

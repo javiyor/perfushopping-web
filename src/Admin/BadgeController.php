@@ -14,7 +14,7 @@ final class BadgeController
     public function badges(array $params): void
     {
         $auth = new AdminAuthService();
-        $auth->requireLogin();
+        $adminUser = $auth->requireLogin();
 
         $orderRepo = new OrderRepo();
         $userRepo = new UserRepo();
@@ -24,7 +24,7 @@ final class BadgeController
             'pedidos_nuevos' => $orderRepo->countPendingPayment(),
             'pedidos_abandonados' => $orderRepo->countAbandoned(),
             'usuarios_nuevos' => $userRepo->countNewToday(),
-            'stock_ajustes_pendientes' => $stockRepo->countSolicitudesAjustePendientes(),
+            'stock_ajustes_pendientes' => (($adminUser['rol'] ?? '') === 'superadmin') ? $stockRepo->countSolicitudesAjustePendientes() : 0,
         ]);
     }
 }

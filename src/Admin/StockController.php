@@ -156,7 +156,8 @@ final class StockController
 
         $repo = new StockRepo();
         $depositos = $repo->depositos();
-        $solicitudesPendientes = $repo->solicitudesAjustePendientes(40);
+        $esSuperadmin = (string)($adminUser['rol'] ?? '') === 'superadmin';
+        $solicitudesPendientes = $esSuperadmin ? $repo->solicitudesAjustePendientes(40) : [];
         $misSolicitudes = $repo->solicitudesAjustePorSolicitante((int)$adminUser['id'], 20);
 
         $productoId = (int)($params['id'] ?? 0);
@@ -186,6 +187,7 @@ final class StockController
             'initialAjusteItems' => $initialAjusteItems,
             'solicitudesPendientes' => $solicitudesPendientes,
             'misSolicitudes' => $misSolicitudes,
+            'esSuperadmin' => $esSuperadmin,
             'csrf' => Csrf::token(),
             'pageTitle' => 'Ajuste de stock',
         ]);
@@ -194,7 +196,7 @@ final class StockController
     public function storeAjuste(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requireRol('superadmin');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $iddepodesde = (int)($_POST['iddepodesde'] ?? 0);
@@ -277,7 +279,7 @@ final class StockController
     public function aprobarSolicitudAjuste(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requireRol('superadmin');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $solicitudId = (int)($_POST['solicitud_id'] ?? 0);
