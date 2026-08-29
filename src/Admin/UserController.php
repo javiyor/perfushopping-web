@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Perfushopping\Web\Admin;
 
 use Perfushopping\Web\Repo\AdminUserRepo;
+use Perfushopping\Web\Repo\SucursalRepo;
 use Perfushopping\Web\Service\AdminAuthService;
 use Perfushopping\Web\Support\Csrf;
 use Perfushopping\Web\Support\Response;
@@ -17,6 +18,7 @@ final class UserController
         $adminUser = $auth->requireRol('superadmin', 'administracion');
 
         $list = (new AdminUserRepo())->findAll();
+        $sucursales = (new SucursalRepo())->listarActivas();
 
         echo View::adminPage('admin/usuarios/list.php', [
             'adminUser' => $adminUser,
@@ -26,6 +28,7 @@ final class UserController
             'pageTitle' => 'Usuarios admin',
             'permOptions' => AdminUserRepo::permissionOptions(),
             'rolPermisos' => $auth->getPermisosDelRol(''),
+            'sucursales' => $sucursales,
         ]);
         unset($_SESSION['admin_flash']);
     }
@@ -41,6 +44,7 @@ final class UserController
         $nombre = trim((string)($_POST['nombre'] ?? ''));
         $email = trim((string)($_POST['email'] ?? ''));
         $rol = trim((string)($_POST['rol'] ?? 'ventas'));
+        $sucursalTrabajoId = (int)($_POST['sucursal_trabajo_id'] ?? 0);
         $activo = isset($_POST['activo']) ? 1 : 0;
         $password = (string)($_POST['password'] ?? '');
 
@@ -59,6 +63,15 @@ final class UserController
             Response::redirect('/admin/usuarios');
         }
 
+        if ($rol !== 'superadmin') {
+            if ($sucursalTrabajoId <= 0 || !(new SucursalRepo())->findById($sucursalTrabajoId)) {
+                $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Seleccioná la sucursal de trabajo para este usuario.'];
+                Response::redirect('/admin/usuarios');
+            }
+        } else {
+            $sucursalTrabajoId = 0;
+        }
+
         $repo = new AdminUserRepo();
 
         if ($id > 0) {
@@ -71,7 +84,7 @@ final class UserController
                 $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No podes desactivarte a vos mismo.'];
                 Response::redirect('/admin/usuarios');
             }
-            $repo->update($id, $nombre, $email, $rol, $activo, $permisos);
+            $repo->update($id, $nombre, $email, $rol, $sucursalTrabajoId > 0 ? $sucursalTrabajoId : null, $activo, $permisos);
             if ($password !== '' && strlen($password) >= 6) {
                 $repo->updatePassword($id, password_hash($password, PASSWORD_DEFAULT));
             }
@@ -83,7 +96,7 @@ final class UserController
                 Response::redirect('/admin/usuarios');
             }
             $hash = $password !== '' ? password_hash($password, PASSWORD_DEFAULT) : password_hash(bin2hex(random_bytes(8)), PASSWORD_DEFAULT);
-            $repo->create($username, $hash, $nombre, $email, $rol, $permisos);
+            $repo->create($username, $hash, $nombre, $email, $rol, $sucursalTrabajoId > 0 ? $sucursalTrabajoId : null, $permisos);
             $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Usuario admin creado.'];
         }
 

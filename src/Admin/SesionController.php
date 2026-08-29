@@ -25,6 +25,11 @@ final class SesionController
         $sucursales = (new SucursalRepo())->listarActivas();
         $vendedores = (new SucursalRepo())->vendedoresDisponibles();
 
+        $sucursalTrabajoId = (int)($adminUser['sucursal_trabajo_id'] ?? 0);
+        if (($adminUser['rol'] ?? '') !== 'superadmin' && $sucursalTrabajoId > 0) {
+            $sucursales = array_values(array_filter($sucursales, static fn (array $s): bool => (int)($s['id'] ?? 0) === $sucursalTrabajoId));
+        }
+
         $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
         $isMobile = preg_match('/Mobile|Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i', $ua) === 1;
 
@@ -56,6 +61,12 @@ final class SesionController
 
         if ($sucursalId <= 0 || !in_array($turno, ['manana', 'tarde'], true)) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Seleccioná sucursal y turno.'];
+            Response::redirect('/admin/sesion/iniciar');
+        }
+
+        $sucursalTrabajoId = (int)($adminUser['sucursal_trabajo_id'] ?? 0);
+        if (($adminUser['rol'] ?? '') !== 'superadmin' && $sucursalTrabajoId > 0 && $sucursalTrabajoId !== $sucursalId) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Solo podés iniciar turno en tu sucursal asignada.'];
             Response::redirect('/admin/sesion/iniciar');
         }
 

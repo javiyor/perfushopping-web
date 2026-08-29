@@ -4,8 +4,17 @@ use Perfushopping\Web\Repo\AdminUserRepo;
 $list = $list ?? [];
 $rolOptions = AdminUserRepo::rolOptions();
 $permOptions = $permOptions ?? [];
+$sucursales = $sucursales ?? [];
 $adminRol = $adminUser['rol'] ?? '';
 $isSuper = $adminRol === 'superadmin';
+
+$sucursalesMap = [];
+foreach ($sucursales as $s) {
+    $sid = (int)($s['id'] ?? 0);
+    if ($sid > 0) {
+        $sucursalesMap[$sid] = (string)($s['nomsuc'] ?? ('Sucursal #' . $sid));
+    }
+}
 
 $rolPermisosMap = [];
 $auth = new \Perfushopping\Web\Service\AdminAuthService();
@@ -35,6 +44,7 @@ foreach (array_keys($rolOptions) as $r) {
                     <th>Usuario</th>
                     <th>Nombre</th>
                     <th>Email</th>
+                    <th>Sucursal</th>
                     <th>Rol</th>
                     <th>Permisos</th>
                     <th>Activo</th>
@@ -46,7 +56,7 @@ foreach (array_keys($rolOptions) as $r) {
             </thead>
             <tbody>
                 <?php if (!$list): ?>
-                    <tr><td colspan="<?= $isSuper ? 9 : 8 ?>" class="text-muted text-center">Sin usuarios.</td></tr>
+                    <tr><td colspan="<?= $isSuper ? 10 : 9 ?>" class="text-muted text-center">Sin usuarios.</td></tr>
                 <?php else: ?>
                     <?php foreach ($list as $u):
                         $uPerms = [];
@@ -60,6 +70,13 @@ foreach (array_keys($rolOptions) as $r) {
                         <td><strong><?= htmlspecialchars((string)($u['username'] ?? '')) ?></strong></td>
                         <td><?= htmlspecialchars((string)($u['nombre'] ?? '')) ?></td>
                         <td><?= htmlspecialchars((string)($u['email'] ?? '-')) ?></td>
+                        <td>
+                            <?php if (($u['rol'] ?? '') === 'superadmin'): ?>
+                                <span class="badge bg-dark">Todas</span>
+                            <?php else: ?>
+                                <?= htmlspecialchars($sucursalesMap[(int)($u['sucursal_trabajo_id'] ?? 0)] ?? 'Sin asignar') ?>
+                            <?php endif; ?>
+                        </td>
                         <td>
                             <span class="admin-badge badge-<?= htmlspecialchars((string)($u['rol'] ?? '')) ?>"><?= htmlspecialchars($rolOptions[$u['rol'] ?? ''] ?? $u['rol'] ?? '') ?></span>
                         </td>
@@ -136,6 +153,16 @@ foreach (array_keys($rolOptions) as $r) {
                                 </select>
                             </div>
                             <div class="mb-2">
+                                <label class="form-label small">Sucursal de trabajo</label>
+                                <select class="form-select form-select-sm" name="sucursal_trabajo_id" id="userSucursalTrabajo">
+                                    <option value="0">— Seleccionar —</option>
+                                    <?php foreach ($sucursales as $s): ?>
+                                        <option value="<?= (int)($s['id'] ?? 0) ?>"><?= htmlspecialchars((string)($s['nomsuc'] ?? '')) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <small class="text-muted">Superadmin: acceso a todas las sucursales.</small>
+                            </div>
+                            <div class="mb-2">
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" name="activo" id="userActivo" checked />
                                     <label class="form-check-label small">Activo</label>
@@ -175,6 +202,7 @@ var rolPermisosMap = <?= json_encode($rolPermisosMap, JSON_UNESCAPED_UNICODE) ?>
 function applyPermisosPorRol() {
     var rol = document.getElementById('userRol').value;
     var defaults = rolPermisosMap[rol] || [];
+    var selSucursal = document.getElementById('userSucursalTrabajo');
     document.querySelectorAll('.perm-check').forEach(function(cb) {
         var permKey = cb.name.replace('perm_', '');
         if (rol === 'superadmin') {
@@ -185,6 +213,15 @@ function applyPermisosPorRol() {
             cb.checked = defaults.indexOf(permKey) !== -1;
         }
     });
+
+    if (selSucursal) {
+        if (rol === 'superadmin') {
+            selSucursal.value = '0';
+            selSucursal.disabled = true;
+        } else {
+            selSucursal.disabled = false;
+        }
+    }
 }
 
 function resetForm() {
@@ -197,6 +234,7 @@ function resetForm() {
     document.getElementById('userActivo').checked = true;
     document.getElementById('userPassword').value = '';
     document.getElementById('userUsername').readOnly = false;
+    document.getElementById('userSucursalTrabajo').value = '0';
     document.querySelectorAll('.perm-check').forEach(function(cb) { cb.disabled = false; });
     applyPermisosPorRol();
 }
@@ -210,6 +248,7 @@ function editUser(u) {
     document.getElementById('userActivo').checked = u.activo == 1;
     document.getElementById('userPassword').value = '';
     document.getElementById('userUsername').readOnly = true;
+    document.getElementById('userSucursalTrabajo').value = String(u.sucursal_trabajo_id || 0);
     var userPerms = u.permisos ? (JSON.parse(u.permisos) || []) : [];
     document.querySelectorAll('.perm-check').forEach(function(cb) {
         var permKey = cb.name.replace('perm_', '');
