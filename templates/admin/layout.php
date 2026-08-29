@@ -322,6 +322,29 @@
     });
     </script>
     <script>
+    var isSuperadmin = <?= json_encode(($adminRol ?? '') === 'superadmin') ?>;
+    var prevStockAjustesPendientes = null;
+
+    function playStockAlertTone() {
+        try {
+            var Ctx = window.AudioContext || window.webkitAudioContext;
+            if (!Ctx) return;
+            var ctx = new Ctx();
+            var osc = ctx.createOscillator();
+            var gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = 980;
+            gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.28);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.30);
+            setTimeout(function() { ctx.close(); }, 350);
+        } catch (e) {}
+    }
+
     async function fetchBadges() {
         try {
             var r = await fetch('/admin/badges');
@@ -343,6 +366,14 @@
             var sa = document.getElementById('badgeStockAjustes');
             if (d.stock_ajustes_pendientes > 0) { sa.textContent = d.stock_ajustes_pendientes; sa.style.display = ''; }
             else { sa.style.display = 'none'; }
+
+            if (isSuperadmin) {
+                var current = Number(d.stock_ajustes_pendientes || 0);
+                if (prevStockAjustesPendientes !== null && current > prevStockAjustesPendientes) {
+                    playStockAlertTone();
+                }
+                prevStockAjustesPendientes = current;
+            }
         } catch(e) {}
     }
     document.addEventListener('DOMContentLoaded', function() { fetchBadges(); setInterval(fetchBadges, 30000); });
