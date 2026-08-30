@@ -118,34 +118,44 @@ final class CajaRepo
 
     public function totalVentasEfectivo(string $fecha, int $puntoVenta): int
     {
-        $extra = $this->efectivoNoCajaWhere();
-        $st = Db::pdo()->prepare("
-            SELECT COALESCE(SUM(fp.monto_cents), 0)
-            FROM factura_pagos fp
-            INNER JOIN facturas f ON f.id = fp.factura_id
-            WHERE f.estado = 'emitida'
-              AND f.fecha = :fec
-              AND f.punto_venta = :pv
-              AND fp.forma_pago = 'efectivo'
-              {$extra}
-        ");
-        $st->execute([':fec' => $fecha, ':pv' => $puntoVenta]);
-        return (int)$st->fetchColumn();
+        try {
+            $extra = $this->efectivoNoCajaWhere();
+            $st = Db::pdo()->prepare("
+                SELECT COALESCE(SUM(fp.monto_cents), 0)
+                FROM factura_pagos fp
+                INNER JOIN facturas f ON f.id = fp.factura_id
+                WHERE f.estado = 'emitida'
+                  AND f.fecha = :fec
+                  AND f.punto_venta = :pv
+                  AND fp.forma_pago = 'efectivo'
+                  {$extra}
+            ");
+            $st->execute([':fec' => $fecha, ':pv' => $puntoVenta]);
+            return (int)$st->fetchColumn();
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::totalVentasEfectivo error: '.$e->getMessage());
+            return 0;
+        }
     }
 
     public function totalVentasTransferencia(string $fecha, int $puntoVenta): int
     {
-        $st = Db::pdo()->prepare("
-            SELECT COALESCE(SUM(fp.monto_cents), 0)
-            FROM factura_pagos fp
-            INNER JOIN facturas f ON f.id = fp.factura_id
-            WHERE f.estado = 'emitida'
-              AND f.fecha = :fec
-              AND f.punto_venta = :pv
-              AND fp.forma_pago IN ('transferencia', 'mercadopago', 'debito', 'credito')
-        ");
-        $st->execute([':fec' => $fecha, ':pv' => $puntoVenta]);
-        return (int)$st->fetchColumn();
+        try {
+            $st = Db::pdo()->prepare("
+                SELECT COALESCE(SUM(fp.monto_cents), 0)
+                FROM factura_pagos fp
+                INNER JOIN facturas f ON f.id = fp.factura_id
+                WHERE f.estado = 'emitida'
+                  AND f.fecha = :fec
+                  AND f.punto_venta = :pv
+                  AND fp.forma_pago IN ('transferencia', 'mercadopago', 'debito', 'credito')
+            ");
+            $st->execute([':fec' => $fecha, ':pv' => $puntoVenta]);
+            return (int)$st->fetchColumn();
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::totalVentasTransferencia error: '.$e->getMessage());
+            return 0;
+        }
     }
 
     public function totalRecibos(string $fecha, int $puntoVenta): int
