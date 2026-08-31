@@ -165,7 +165,9 @@ let clientesCache = {};
 let itemCounter = 1;
 
 document.addEventListener('DOMContentLoaded', function() {
-    addProductRow(); // Start with one row
+    // inicializar fila estática que ya está en el HTML
+    document.querySelectorAll('.item-row').forEach(function(r){ setupRow(r); });
+    if (document.querySelectorAll('.item-row').length === 0) addProductRow();
 });
 
 function addProductRow(data) {

@@ -136,26 +136,27 @@ final class PresupuestoRepo
     /** Busca productos para agregar como items */
     public function searchProducts(string $q, int $limit = 20): array
     {
-        $limit = max(1, min(50, $limit));
-        $q = trim($q);
-        if ($q === '') {
-            return [];
-        }
+        try {
+            $limit = max(1, min(50, $limit));
+            $q = trim($q);
+            if ($q === '') {
+                return [];
+            }
 
-        $pdo = Db::pdo();
-        $params = [':like' => '%' . $q . '%'];
+            $pdo = Db::pdo();
+            $params = [':like' => '%' . $q . '%'];
 
-        // Search producto by name/code
-        $sql = '
-            SELECT p.idprodu, p.codprodu, p.produ, p.precio, p.precio1, p.codprodup, p.enweb, i.tiva
-            FROM producto p
-            LEFT JOIN ivaprodu i ON i.codivaprodu = p.iva
-            WHERE p.produ LIKE :like OR p.codprodu LIKE :like OR p.codprodup LIKE :like
-            ORDER BY p.produ ASC
-            LIMIT ' . $limit;
-        $st = $pdo->prepare($sql);
-        $st->execute($params);
-        $products = $st->fetchAll();
+            // Search producto by name/code
+            $sql = '
+                SELECT p.idprodu, p.codprodu, p.produ, p.precio, p.precio1, p.codprodup, p.enweb, i.tiva
+                FROM producto p
+                LEFT JOIN ivaprodu i ON i.codivaprodu = p.iva
+                WHERE p.produ LIKE :like OR p.codprodu LIKE :like OR p.codprodup LIKE :like
+                ORDER BY p.produ ASC
+                LIMIT ' . $limit;
+            $st = $pdo->prepare($sql);
+            $st->execute($params);
+            $products = $st->fetchAll();
 
         // Also search by barcode in gustos
         $matchedV = null;
@@ -220,7 +221,11 @@ final class PresupuestoRepo
             }
         }
 
-        return $products;
+            return $products;
+        } catch (\Throwable $e) {
+            error_log('PresupuestoRepo::searchProducts error: '.$e->getMessage());
+            return [];
+        }
     }
 
     public function findClienteWeb(string $q, int $limit = 10): array
