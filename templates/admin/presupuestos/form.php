@@ -53,12 +53,12 @@ $csrfToken = $csrf ?? '';
                                     <input type="hidden" name="idcodgusto[]" class="idcodgusto" />
                                 </td>
                                 <td><input class="form-control form-control-sm qty-input" name="cantidad[]" type="number" value="1" min="1" /></td>
-                                <td>
-                                    <div class="input-group input-group-sm">
-                                        <span class="input-group-text">$</span>
-                                        <input class="form-control precio-input" name="precio[]" type="number" value="0" min="0" step="1" />
-                                    </div>
-                                </td>
+        <td>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">$</span>
+                                <input class="form-control precio-input" name="precio[]" type="number" value="0" min="0" step="0.01" />
+                            </div>
+                        </td>
                                 <td><input class="form-control form-control-sm iva-input" name="iva_rate[]" type="number" value="21" step="0.01" readonly style="background:#f8f9fa" /></td>
                                 <td class="text-end line-total">$0</td>
                                 <td><button class="btn btn-sm btn-outline-danger" type="button" onclick="removeRow(this)"><i class="bi bi-x"></i></button></td>
@@ -190,7 +190,7 @@ function addProductRow(data) {
         <td>
             <div class="input-group input-group-sm">
                 <span class="input-group-text">$</span>
-                <input class="form-control precio-input" name="precio[]" type="number" value="${data ? (data.unit_price_cents || 0) : 0}" min="0" step="1" />
+                <input class="form-control precio-input" name="precio[]" type="number" value="${data ? ((data.unit_price_cents||0)/100).toFixed(2) : '0.00'}" min="0" step="0.01" />
             </div>
         </td>
         <td><input class="form-control form-control-sm iva-input" name="iva_rate[]" type="number" value="21" step="0.01" readonly style="background:#f8f9fa" /></td>
@@ -258,7 +258,7 @@ function searchProducts(q, suggestionsContainer, row) {
                 const precioNet = p.precio ? Math.round(parseFloat(p.precio) * 100) : 0;
                 const iva = parseFloat(p.tiva) || 0;
                 const precioDisplay = iva > 0 ? precioNet + Math.round(precioNet * iva / 100) : precioNet;
-                div.innerHTML = '<strong>' + esc(p.produ) + '</strong> <span class="text-muted">(' + esc(p.codprodu) + ') $' + precioDisplay.toLocaleString('es-AR') + (iva > 0 ? ' c/IVA' : '') + '</span>';
+                div.innerHTML = '<strong>' + esc(p.produ) + '</strong> <span class="text-muted">(' + esc(p.codprodu) + ') $' + (precioDisplay/100).toLocaleString('es-AR', {minimumFractionDigits:2}) + (iva > 0 ? ' c/IVA' : '') + '</span>';
                 div.addEventListener('mousedown', function(e) {
                     e.preventDefault();
                     selectProduct(p, row, suggestionsContainer);
@@ -277,7 +277,7 @@ function selectProduct(p, row, suggestionsContainer) {
     row.querySelector('.iva-input').value = ivaRate;
 
     const precioCents = p.precio ? Math.round(parseFloat(p.precio) * 100) : 0;
-    row.querySelector('.precio-input').value = precioCents;
+    row.querySelector('.precio-input').value = (precioCents/100).toFixed(2);
 
     const variedadSelect = row.querySelector('.variedad-select');
     variedadSelect.innerHTML = '<option value="">—</option>';
@@ -313,18 +313,20 @@ function selectProduct(p, row, suggestionsContainer) {
     recalcTotals();
 }
 
+function fmtCents(c){ return (c/100).toLocaleString('es-AR', {minimumFractionDigits:2}); }
+function getPrecioCents(row){ const v=parseFloat(row.querySelector('.precio-input').value); return isNaN(v)?0:Math.round(v*100); }
 function recalcLine(row) {
-    const precio = parseInt(row.querySelector('.precio-input').value) || 0;
+    const precio = getPrecioCents(row);
     const qty = parseInt(row.querySelector('.qty-input').value) || 1;
     const total = precio * qty;
-    row.querySelector('.line-total').textContent = '$' + total.toLocaleString('es-AR');
+    row.querySelector('.line-total').textContent = '$' + fmtCents(total);
     recalcTotals();
 }
 
 function recalcTotals() {
     let subtotal = 0, iva = 0, total = 0;
     document.querySelectorAll('.item-row').forEach(row => {
-        const precio = parseInt(row.querySelector('.precio-input').value) || 0;
+        const precio = getPrecioCents(row);
         const qty = parseInt(row.querySelector('.qty-input').value) || 1;
         const tasa = parseFloat(row.querySelector('.iva-input').value) || 0;
         const lineNet = precio * qty;
@@ -333,9 +335,9 @@ function recalcTotals() {
         iva += lineIva;
         total += lineNet + lineIva;
     });
-    document.getElementById('subtotalDisplay').textContent = '$' + subtotal.toLocaleString('es-AR');
-    document.getElementById('ivaDisplay').textContent = '$' + iva.toLocaleString('es-AR');
-    document.getElementById('totalDisplay').textContent = '$' + total.toLocaleString('es-AR');
+    document.getElementById('subtotalDisplay').textContent = '$' + fmtCents(subtotal);
+    document.getElementById('ivaDisplay').textContent = '$' + fmtCents(iva);
+    document.getElementById('totalDisplay').textContent = '$' + fmtCents(total);
 }
 
 function removeRow(btn) {

@@ -88,7 +88,13 @@ final class PresupuestoController
         foreach ($productos as $idx => $prodName) {
             if (trim((string)$prodName) === '') continue;
             $qty = max(1, (int)($cantidades[$idx] ?? 1));
-            $unitPrice = max(0, (int)($precios[$idx] ?? 0));
+            $rawPrecio = $precios[$idx] ?? 0;
+            $rawStr = (string)$rawPrecio;
+            if (strpos($rawStr, '.') !== false || strpos($rawStr, ',') !== false) {
+                $unitPrice = (int)round((float)str_replace(',', '.', $rawStr) * 100);
+            } else {
+                $unitPrice = max(0, (int)$rawPrecio);
+            }
             $ivaRate = (float)($ivas[$idx] ?? 0);
             $lineNet = $qty * $unitPrice;
             $lineIva = $ivaRate > 0 ? (int)round($lineNet * $ivaRate / 100) : 0;
