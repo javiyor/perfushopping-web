@@ -36,11 +36,12 @@ if (!$presupuesto):
                     </thead>
                     <tbody>
                         <?php foreach ($items as $it): ?>
+                            <?php $unitNet=(int)($it['unit_price_cents'] ?? 0); $ivaRate=(float)($it['iva_rate'] ?? 0); $unitGross=$ivaRate>0 ? $unitNet + (int)round($unitNet*$ivaRate/100) : $unitNet; ?>
                             <tr>
                                 <td><?= htmlspecialchars((string)($it['producto'] ?? '')) ?></td>
                                 <td><?= htmlspecialchars((string)($it['variedad'] ?? '')) ?: '<span class="text-muted">—</span>' ?></td>
                                 <td class="text-center"><?= (int)($it['qty'] ?? 0) ?></td>
-                                <td class="text-end"><?= htmlspecialchars(Format::moneyFromCents((int)($it['unit_price_cents'] ?? 0))) ?></td>
+                                <td class="text-end"><?= htmlspecialchars(Format::moneyFromCents($unitGross)) ?> <small class="text-muted">(<?= htmlspecialchars(Format::moneyFromCents($unitNet)) ?> s/IVA)</small></td>
                                 <td class="text-end fw-bold"><?= htmlspecialchars(Format::moneyFromCents((int)($it['total_cents'] ?? 0))) ?></td>
                             </tr>
                         <?php endforeach; ?>
