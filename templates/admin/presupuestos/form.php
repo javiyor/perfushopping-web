@@ -255,8 +255,10 @@ function searchProducts(q, suggestionsContainer, row) {
             data.forEach(p => {
                 const div = document.createElement('div');
                 div.className = 'suggestion-item';
-                const precio = p.precio ? Math.round(p.precio * 100) : 0;
-                div.innerHTML = '<strong>' + esc(p.produ) + '</strong> <span class="text-muted">(' + esc(p.codprodu) + ') $' + precio + '</span>';
+                const precioNet = p.precio ? Math.round(parseFloat(p.precio) * 100) : 0;
+                const iva = parseFloat(p.tiva) || 0;
+                const precioDisplay = iva > 0 ? precioNet + Math.round(precioNet * iva / 100) : precioNet;
+                div.innerHTML = '<strong>' + esc(p.produ) + '</strong> <span class="text-muted">(' + esc(p.codprodu) + ') $' + precioDisplay.toLocaleString('es-AR') + (iva > 0 ? ' c/IVA' : '') + '</span>';
                 div.addEventListener('mousedown', function(e) {
                     e.preventDefault();
                     selectProduct(p, row, suggestionsContainer);
