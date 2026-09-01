@@ -22,7 +22,7 @@ final class ImportController
 
     public function form(array $params): void
     {
-        $adminUser = $this->auth->requireSesion();
+        $adminUser = $this->auth->requirePermiso('productos');
 
         $preview = $_SESSION['import_preview'] ?? null;
         $stats = $_SESSION['import_stats'] ?? null;
@@ -41,7 +41,7 @@ final class ImportController
 
     public function preview(array $params): void
     {
-        $this->auth->requireSesion();
+        $this->auth->requirePermiso('productos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         if (!isset($_FILES['csv_file']) || $_FILES['csv_file']['error'] !== UPLOAD_ERR_OK) {
@@ -153,7 +153,7 @@ final class ImportController
 
     public function confirm(array $params): void
     {
-        $this->auth->requireSesion();
+        $this->auth->requirePermiso('productos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $preview = $_SESSION['import_preview'] ?? null;

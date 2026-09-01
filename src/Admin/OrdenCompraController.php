@@ -16,7 +16,7 @@ final class OrdenCompraController
     public function index(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('compras');
 
         $q = trim((string)($_GET['q'] ?? ''));
         $estado = trim((string)($_GET['estado'] ?? ''));
@@ -35,7 +35,7 @@ final class OrdenCompraController
     public function create(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('compras');
 
         echo View::adminPage('admin/ordenes-compra/form.php', [
             'adminUser' => $adminUser,
@@ -49,7 +49,7 @@ final class OrdenCompraController
     public function store(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('compras');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $proveedorNombre = trim((string)($_POST['proveedor_nombre'] ?? ''));
@@ -119,7 +119,7 @@ final class OrdenCompraController
     public function show(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('compras');
 
         $id = (int)($params['id'] ?? 0);
         $repo = new OrdenCompraRepo();
@@ -142,7 +142,7 @@ final class OrdenCompraController
     public function estado(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('compras');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $id = (int)($_POST['id'] ?? 0);
@@ -168,7 +168,7 @@ final class OrdenCompraController
     public function delete(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('compras');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $id = (int)($_POST['id'] ?? 0);
@@ -182,7 +182,7 @@ final class OrdenCompraController
     public function searchProducts(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('compras');
 
         $q = trim((string)($_GET['q'] ?? ''));
         $results = (new OrdenCompraRepo())->searchProducts($q);
@@ -193,7 +193,7 @@ final class OrdenCompraController
     public function searchProveedores(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('compras');
 
         $q = trim((string)($_GET['q'] ?? ''));
         $results = (new OrdenCompraRepo())->findProveedores($q);
@@ -204,7 +204,7 @@ final class OrdenCompraController
     public function guardarRecepcion(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('compras');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $id = (int)($_POST['id'] ?? 0);
@@ -294,7 +294,7 @@ final class OrdenCompraController
     public function fletes(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('compras');
 
         $q = trim((string)($_GET['q'] ?? ''));
         $proveedor = trim((string)($_GET['proveedor'] ?? ''));
@@ -319,7 +319,7 @@ final class OrdenCompraController
     public function descargarComprobante(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('compras');
 
         $id = (int)($params['id'] ?? 0);
         $orden = (new OrdenCompraRepo())->findById($id);

@@ -15,7 +15,7 @@ final class EmpleadoController
     public function index(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('usuarios_admin');
 
         $repo = new EmpleadoRepo();
         $empleados = $repo->listConfig();
@@ -31,7 +31,7 @@ final class EmpleadoController
     public function edit(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('usuarios_admin');
 
         $id = (int)($params['id'] ?? 0);
         $repo = new EmpleadoRepo();
@@ -56,7 +56,7 @@ final class EmpleadoController
     public function save(array $params): void
     {
         $auth = new AdminAuthService();
-        $auth->requireSesion();
+        $auth->requirePermiso('usuarios_admin');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $adminUserId = (int)($_POST['admin_user_id'] ?? 0);
@@ -77,7 +77,7 @@ final class EmpleadoController
     public function saveComision(array $params): void
     {
         $auth = new AdminAuthService();
-        $auth->requireSesion();
+        $auth->requirePermiso('usuarios_admin');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $adminUserId = (int)($_POST['admin_user_id'] ?? 0);
@@ -96,7 +96,7 @@ final class EmpleadoController
     public function deleteComision(array $params): void
     {
         $auth = new AdminAuthService();
-        $auth->requireSesion();
+        $auth->requirePermiso('usuarios_admin');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $adminUserId = (int)($_POST['admin_user_id'] ?? 0);
@@ -114,7 +114,7 @@ final class EmpleadoController
     public function horas(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('usuarios_admin');
 
         $repo = new EmpleadoRepo();
         $vendedores = $repo->listVendedoresDisponibles();
@@ -147,7 +147,7 @@ final class EmpleadoController
     public function horasStore(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('usuarios_admin');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $adminUserId = (int)($_POST['admin_user_id'] ?? 0);
@@ -169,7 +169,7 @@ final class EmpleadoController
     public function liquidar(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('usuarios_admin');
 
         $repo = new EmpleadoRepo();
         $vendedores = $repo->listVendedoresDisponibles();
@@ -207,7 +207,7 @@ final class EmpleadoController
     public function liquidarStore(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('usuarios_admin');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $vendedorId = (int)($_POST['vendedor_id'] ?? 0);
@@ -233,7 +233,7 @@ final class EmpleadoController
     public function liquidaciones(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('usuarios_admin');
 
         $periodo = trim((string)($_GET['periodo'] ?? ''));
         $list = (new EmpleadoRepo())->listLiquidaciones($periodo);
@@ -250,7 +250,7 @@ final class EmpleadoController
     public function liquidacionPagada(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('usuarios_admin');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $id = (int)($_POST['id'] ?? 0);
@@ -264,7 +264,7 @@ final class EmpleadoController
     public function liquidacionAnular(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('usuarios_admin');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $id = (int)($_POST['id'] ?? 0);

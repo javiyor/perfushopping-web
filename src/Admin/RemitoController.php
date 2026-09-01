@@ -18,7 +18,7 @@ final class RemitoController
     public function index(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('remitos');
 
         $q = trim((string)($_GET['q'] ?? ''));
         $tipo = trim((string)($_GET['tipo'] ?? ''));
@@ -41,7 +41,7 @@ final class RemitoController
     public function create(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('remitos');
 
         $tipoDefault = (string)($_GET['tipo'] ?? 'salida');
         if (!in_array($tipoDefault, ['salida', 'entrada'], true)) {
@@ -75,7 +75,7 @@ final class RemitoController
     public function store(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('remitos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $tipo = (string)($_POST['tipo'] ?? 'salida');
@@ -167,7 +167,7 @@ final class RemitoController
     public function show(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('remitos');
 
         $id = (int)($params['id'] ?? 0);
         $repo = new RemitoRepo();
@@ -192,7 +192,7 @@ final class RemitoController
     public function estado(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('remitos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $id = (int)($_POST['id'] ?? 0);
@@ -241,7 +241,7 @@ final class RemitoController
     public function delete(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('remitos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $id = (int)($_POST['id'] ?? 0);
@@ -257,7 +257,7 @@ final class RemitoController
     public function searchProducts(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('remitos');
 
         $q = trim((string)($_GET['q'] ?? ''));
         $results = (new RemitoRepo())->searchProducts($q);
@@ -268,7 +268,7 @@ final class RemitoController
     public function searchClientes(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('remitos');
 
         $q = trim((string)($_GET['q'] ?? ''));
         $repo = new RemitoRepo();
@@ -307,7 +307,7 @@ final class RemitoController
     public function searchPresupuestos(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('remitos');
 
         $q = trim((string)($_GET['q'] ?? ''));
         $results = (new RemitoRepo())->findPresupuestosDisponibles($q);
@@ -318,7 +318,7 @@ final class RemitoController
     public function searchProveedores(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('remitos');
 
         $q = trim((string)($_GET['q'] ?? ''));
         $results = (new RemitoRepo())->findProveedores($q);

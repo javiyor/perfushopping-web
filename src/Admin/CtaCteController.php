@@ -18,7 +18,7 @@ final class CtaCteController
     public function index(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('cta_cte');
 
         $q = trim((string)($_GET['q'] ?? ''));
         $list = (new CtaCteRepo())->listarConSaldo($q);
@@ -35,7 +35,7 @@ final class CtaCteController
     public function show(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('cta_cte');
 
         $clienteId = (int)($params['id'] ?? 0);
         if ($clienteId <= 0) {
@@ -70,7 +70,7 @@ final class CtaCteController
     public function ajuste(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('cta_cte');
 
         $clienteId = (int)($params['id'] ?? 0);
         if ($clienteId <= 0) {
@@ -88,7 +88,7 @@ final class CtaCteController
     public function storeAjuste(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('cta_cte');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $clienteId = (int)($_POST['cliente_id'] ?? 0);
@@ -120,7 +120,7 @@ final class CtaCteController
     public function searchClientes(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('cta_cte');
 
         $q = trim((string)($_GET['q'] ?? ''));
         $st = Db::pdo()->prepare('

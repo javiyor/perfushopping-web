@@ -14,7 +14,7 @@ final class ProveedorCtaCteController
     public function index(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('compras');
 
         $q = trim((string)($_GET['q'] ?? ''));
         $list = (new CtaCteProveedorRepo())->listarConSaldo($q);
@@ -36,7 +36,7 @@ final class ProveedorCtaCteController
     public function movimientos(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('compras');
 
         $proveedorId = isset($params['id']) ? (int)$params['id'] : null;
         $q = trim((string)($_GET['q'] ?? ''));

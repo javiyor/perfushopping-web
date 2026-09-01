@@ -18,7 +18,7 @@ final class CustomerController
     public function index(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('clientes');
 
         $q = trim((string)($_GET['q'] ?? ''));
         $list = (new CustomerRepo())->search($q);
@@ -37,7 +37,7 @@ final class CustomerController
     public function detail(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('clientes');
 
         $id = (int)($params['id'] ?? 0);
         $repo = new CustomerRepo();
@@ -82,7 +82,7 @@ final class CustomerController
     public function addNota(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('clientes');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $userId = (int)($_POST['user_id'] ?? 0);
@@ -101,7 +101,7 @@ final class CustomerController
     public function buscarArca(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('clientes');
 
         $q = trim((string)($_GET['q'] ?? ''));
         if ($q === '') {
@@ -144,7 +144,7 @@ final class CustomerController
     public function crearDesdeArca(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('clientes');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $cuit = trim((string)($_POST['cuit'] ?? ''));

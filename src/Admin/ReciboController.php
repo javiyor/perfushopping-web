@@ -18,7 +18,7 @@ final class ReciboController
     public function index(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('recibos');
 
         $q = trim((string)($_GET['q'] ?? ''));
         $estado = trim((string)($_GET['estado'] ?? ''));
@@ -37,7 +37,7 @@ final class ReciboController
     public function create(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('recibos');
 
         echo View::adminPage('admin/recibos/form.php', [
             'adminUser' => $adminUser,
@@ -49,7 +49,7 @@ final class ReciboController
     public function store(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('recibos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $clienteNombre = trim((string)($_POST['cliente_nombre'] ?? ''));
@@ -176,7 +176,7 @@ final class ReciboController
     public function show(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('recibos');
 
         $id = (int)($params['id'] ?? 0);
         $repo = new ReciboRepo();
@@ -199,7 +199,7 @@ final class ReciboController
     public function estado(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('recibos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $id = (int)($_POST['id'] ?? 0);
@@ -245,7 +245,7 @@ final class ReciboController
     public function delete(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('recibos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $id = (int)($_POST['id'] ?? 0);
@@ -259,7 +259,7 @@ final class ReciboController
     public function searchClientes(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('recibos');
 
         $q = trim((string)($_GET['q'] ?? ''));
         $repo = new ReciboRepo();
@@ -289,7 +289,7 @@ final class ReciboController
     public function searchFacturas(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('recibos');
 
         $clienteId = (int)($_GET['cliente_id'] ?? 0);
         if ($clienteId <= 0) {
@@ -304,7 +304,7 @@ final class ReciboController
     public function print(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('recibos');
 
         $id = (int)($params['id'] ?? 0);
         $formato = (string)($_GET['formato'] ?? '80mm');

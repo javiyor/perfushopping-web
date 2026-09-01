@@ -17,7 +17,7 @@ final class OrdenPagoController
     public function index(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('pagos_proveedores');
 
         $q = trim((string)($_GET['q'] ?? ''));
         $estado = trim((string)($_GET['estado'] ?? ''));
@@ -36,7 +36,7 @@ final class OrdenPagoController
     public function create(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('pagos_proveedores');
 
         $bancos = (new BancoCuentaRepo())->findAll();
 
@@ -53,7 +53,7 @@ final class OrdenPagoController
     public function store(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('pagos_proveedores');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $proveedorNombre = trim((string)($_POST['proveedor_nombre'] ?? ''));
@@ -148,7 +148,7 @@ final class OrdenPagoController
     public function show(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('pagos_proveedores');
 
         $id = (int)($params['id'] ?? 0);
         $repo = new OrdenPagoRepo();
@@ -171,7 +171,7 @@ final class OrdenPagoController
     public function estado(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('pagos_proveedores');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $id = (int)($_POST['id'] ?? 0);
@@ -196,7 +196,7 @@ final class OrdenPagoController
     public function delete(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('pagos_proveedores');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $id = (int)($_POST['id'] ?? 0);
@@ -209,7 +209,7 @@ final class OrdenPagoController
     public function searchProveedores(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('pagos_proveedores');
 
         $q = trim((string)($_GET['q'] ?? ''));
         $results = (new OrdenPagoRepo())->findProveedores($q);
@@ -219,7 +219,7 @@ final class OrdenPagoController
     public function deudaProveedor(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('pagos_proveedores');
 
         $proveedorId = (int)($_GET['proveedor_id'] ?? 0);
         $proveedorNombre = trim((string)($_GET['proveedor_nombre'] ?? ''));

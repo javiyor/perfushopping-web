@@ -15,7 +15,7 @@ final class EnvioController
     public function index(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('facturacion');
         $repo = new FacturaRepo();
         $estado = trim((string)($_GET['estado'] ?? ''));
         if (!in_array($estado, ['pendiente','en_transito','entregado','cancelado'], true)) $estado = '';
@@ -36,7 +36,7 @@ final class EnvioController
     public function entregar(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('facturacion');
         Csrf::check($_POST['_csrf'] ?? null);
         $id = (int)($_POST['id'] ?? 0);
         if ($id <= 0) { Response::redirect('/admin/envios'); }
@@ -76,7 +76,7 @@ final class EnvioController
     public function cancelar(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('facturacion');
         Csrf::check($_POST['_csrf'] ?? null);
         $id = (int)($_POST['id'] ?? 0);
         (new FacturaRepo())->marcarEnvioEstado($id, 'cancelado');

@@ -65,7 +65,7 @@ final class EmailController
     public function inbox(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('estadisticas');
 
         $imapExtension = function_exists('imap_open');
         $emails = [];
@@ -112,7 +112,7 @@ final class EmailController
     public function view(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('estadisticas');
 
         $uid = (int)($params['uid'] ?? 0);
         if ($uid <= 0) {

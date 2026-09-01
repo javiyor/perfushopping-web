@@ -22,7 +22,7 @@ final class PriceUpdateController
 
     public function index(array $params): void
     {
-        $adminUser = $this->auth->requireSesion();
+        $adminUser = $this->auth->requirePermiso('productos');
 
         $q = trim((string)($_GET['q'] ?? ''));
         $codsub = (int)($_GET['codsub'] ?? 0);
@@ -61,7 +61,7 @@ final class PriceUpdateController
 
     public function apply(array $params): void
     {
-        $this->auth->requireSesion();
+        $this->auth->requirePermiso('productos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $percentage = (float)str_replace(',', '.', trim((string)($_POST['porcentaje'] ?? '0')));

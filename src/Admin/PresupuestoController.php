@@ -17,7 +17,7 @@ final class PresupuestoController
     public function index(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('presupuestos');
 
         $q = trim((string)($_GET['q'] ?? ''));
         $estado = trim((string)($_GET['estado'] ?? ''));
@@ -38,7 +38,7 @@ final class PresupuestoController
     public function create(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('presupuestos');
 
         $repo = new PresupuestoRepo();
         $codigo = $repo->nextCodigo();
@@ -58,7 +58,7 @@ final class PresupuestoController
     public function store(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('presupuestos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $repo = new PresupuestoRepo();
@@ -139,7 +139,7 @@ final class PresupuestoController
     public function show(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('presupuestos');
 
         $id = (int)($params['id'] ?? 0);
         $repo = new PresupuestoRepo();
@@ -164,7 +164,7 @@ final class PresupuestoController
     public function estado(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('presupuestos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $id = (int)($_POST['id'] ?? 0);
@@ -190,7 +190,7 @@ final class PresupuestoController
     public function delete(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('presupuestos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $id = (int)($_POST['id'] ?? 0);
@@ -206,7 +206,7 @@ final class PresupuestoController
     public function searchProducts(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('presupuestos');
 
         $q = trim((string)($_GET['q'] ?? ''));
         $results = (new PresupuestoRepo())->searchProducts($q);
@@ -217,7 +217,7 @@ final class PresupuestoController
     public function searchClientes(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('presupuestos');
 
         $q = trim((string)($_GET['q'] ?? ''));
         $repo = new PresupuestoRepo();

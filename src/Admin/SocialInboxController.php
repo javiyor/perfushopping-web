@@ -14,7 +14,7 @@ final class SocialInboxController
     public function index(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('clientes');
 
         $tab = (string)($_GET['tab'] ?? 'unassigned');
         if (!in_array($tab, ['unassigned', 'mine', 'closed'], true)) {
@@ -57,7 +57,7 @@ final class SocialInboxController
 
     public function take(array $params): void
     {
-        $adminUser = (new AdminAuthService())->requireSesion();
+        $adminUser = (new AdminAuthService())->requirePermiso('clientes');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $conversationId = (int)($_POST['conversation_id'] ?? 0);
@@ -75,7 +75,7 @@ final class SocialInboxController
 
     public function release(array $params): void
     {
-        (new AdminAuthService())->requireSesion();
+        (new AdminAuthService())->requirePermiso('clientes');
         Csrf::check($_POST['_csrf'] ?? null);
         $conversationId = (int)($_POST['conversation_id'] ?? 0);
         if ($conversationId > 0) {
@@ -87,7 +87,7 @@ final class SocialInboxController
 
     public function close(array $params): void
     {
-        (new AdminAuthService())->requireSesion();
+        (new AdminAuthService())->requirePermiso('clientes');
         Csrf::check($_POST['_csrf'] ?? null);
         $conversationId = (int)($_POST['conversation_id'] ?? 0);
         if ($conversationId > 0) {
@@ -99,7 +99,7 @@ final class SocialInboxController
 
     public function reopen(array $params): void
     {
-        (new AdminAuthService())->requireSesion();
+        (new AdminAuthService())->requirePermiso('clientes');
         Csrf::check($_POST['_csrf'] ?? null);
         $conversationId = (int)($_POST['conversation_id'] ?? 0);
         if ($conversationId > 0) {
@@ -111,7 +111,7 @@ final class SocialInboxController
 
     public function note(array $params): void
     {
-        $adminUser = (new AdminAuthService())->requireSesion();
+        $adminUser = (new AdminAuthService())->requirePermiso('clientes');
         Csrf::check($_POST['_csrf'] ?? null);
         $conversationId = (int)($_POST['conversation_id'] ?? 0);
         $note = trim((string)($_POST['note'] ?? ''));

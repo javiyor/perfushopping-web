@@ -14,7 +14,7 @@ final class ChequeController
     public function index(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('cheques');
 
         $tipo = trim((string)($_GET['tipo'] ?? ''));
         $estado = trim((string)($_GET['estado'] ?? ''));
@@ -35,7 +35,7 @@ final class ChequeController
     public function show(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('cheques');
 
         $id = (int)($params['id'] ?? 0);
         $repo = new ChequeRepo();
@@ -58,7 +58,7 @@ final class ChequeController
     public function emitirForm(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('cheques');
 
         $bancos = (new \Perfushopping\Web\Repo\BancoCuentaRepo())->findAll();
 
@@ -73,7 +73,7 @@ final class ChequeController
     public function emitirStore(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('cheques');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $montoCents = (int)($_POST['monto_cents'] ?? 0);
@@ -112,7 +112,7 @@ final class ChequeController
     public function estado(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('cheques');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $id = (int)($_POST['id'] ?? 0);

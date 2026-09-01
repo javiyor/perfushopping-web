@@ -11,7 +11,7 @@ final class PrintConfigController
     public function index(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('caja_movimientos');
 
         echo View::adminPage('admin/impresion/config.php', [
             'adminUser' => $adminUser,

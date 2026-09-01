@@ -14,7 +14,7 @@ final class PromoTarjetaController
     public function index(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('productos');
 
         $list = (new PromoTarjetaRepo())->findAll();
 
@@ -31,7 +31,7 @@ final class PromoTarjetaController
     public function save(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('productos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $id = (int)($_POST['id'] ?? 0);
@@ -126,7 +126,7 @@ final class PromoTarjetaController
     public function deleteImage(array $params): void
     {
         $auth = new AdminAuthService();
-        $auth->requireSesion();
+        $auth->requirePermiso('productos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $id = (int)($_POST['id'] ?? 0);
@@ -151,7 +151,7 @@ final class PromoTarjetaController
     public function delete(array $params): void
     {
         $auth = new AdminAuthService();
-        $auth->requireSesion();
+        $auth->requirePermiso('productos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $id = (int)($_POST['id'] ?? 0);

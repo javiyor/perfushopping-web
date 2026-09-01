@@ -14,7 +14,7 @@ final class StockController
     public function index(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('productos');
 
         $repo = new StockRepo();
         $q = trim((string)($_GET['q'] ?? ''));
@@ -66,7 +66,7 @@ final class StockController
     public function exportarExcel(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('productos');
 
         $repo = new StockRepo();
         $q = trim((string)($_GET['q'] ?? ''));
@@ -119,7 +119,7 @@ final class StockController
     public function show(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('productos');
 
         $id = (int)($params['id'] ?? 0);
         $repo = new StockRepo();
@@ -152,7 +152,7 @@ final class StockController
     public function ajuste(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('productos');
 
         $repo = new StockRepo();
         $depositos = $repo->depositos();
@@ -196,7 +196,7 @@ final class StockController
     public function storeAjuste(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('productos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $iddepodesde = (int)($_POST['iddepodesde'] ?? 0);
@@ -279,7 +279,7 @@ final class StockController
     public function aprobarSolicitudAjuste(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('productos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         if ((string)($adminUser['rol'] ?? '') !== 'superadmin') {
@@ -305,7 +305,7 @@ final class StockController
     public function rechazarSolicitudAjuste(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('productos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         if ((string)($adminUser['rol'] ?? '') !== 'superadmin') {
@@ -350,7 +350,7 @@ final class StockController
     public function searchAjusteProductos(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('productos');
 
         $q = trim((string)($_GET['q'] ?? ''));
         if ($q === '') {
@@ -371,7 +371,7 @@ final class StockController
     public function ajusteVariantes(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('productos');
 
         $id = (int)($_GET['id'] ?? 0);
         if ($id <= 0) { Response::json([]); return; }
@@ -383,7 +383,7 @@ final class StockController
     public function toggleDiscont(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('productos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $idcodgusto = (int)($_POST['idcodgusto'] ?? 0);

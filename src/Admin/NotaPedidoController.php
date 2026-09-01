@@ -14,7 +14,7 @@ final class NotaPedidoController
     public function create(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('compras');
 
         echo View::adminPage('admin/stock/nota-pedido.php', [
             'adminUser' => $adminUser,
@@ -26,7 +26,7 @@ final class NotaPedidoController
     public function store(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('compras');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $productosJson = trim((string)($_POST['productos'] ?? ''));
@@ -77,7 +77,7 @@ final class NotaPedidoController
     public function show(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('compras');
 
         $id = (int)($params['id'] ?? 0);
         $repo = new NotaPedidoRepo();
@@ -99,7 +99,7 @@ final class NotaPedidoController
     public function searchProveedores(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('compras');
 
         $q = trim((string)($_GET['q'] ?? ''));
         $results = (new NotaPedidoRepo())->searchProveedores($q);

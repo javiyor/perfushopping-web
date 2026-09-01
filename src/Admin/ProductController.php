@@ -26,7 +26,7 @@ final class ProductController
 
     public function create(array $params): void
     {
-        $adminUser = $this->auth->requireSesion();
+        $adminUser = $this->auth->requirePermiso('productos');
 
         $rubros = $this->repo->allRubros();
         $subrubros = $this->repo->allSubrubros();
@@ -51,7 +51,7 @@ final class ProductController
 
     public function store(array $params): void
     {
-        $this->auth->requireSesion();
+        $this->auth->requirePermiso('productos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         if (\Perfushopping\Web\Support\Env::isDemo() && $this->repo->countProductos() >= 20) {
@@ -112,7 +112,7 @@ final class ProductController
 
     public function index(array $params): void
     {
-        $adminUser = $this->auth->requireSesion();
+        $adminUser = $this->auth->requirePermiso('productos');
         $q = trim((string)($_GET['q'] ?? ''));
         $codsub = (int)($_GET['codsub'] ?? 0);
         $codrub = (int)($_GET['codrub'] ?? 0);
@@ -155,7 +155,7 @@ final class ProductController
 
     public function show(array $params): void
     {
-        $adminUser = $this->auth->requireSesion();
+        $adminUser = $this->auth->requirePermiso('productos');
         $id = (int)($params['id'] ?? 0);
 
         $product = $this->repo->find($id);
@@ -193,7 +193,7 @@ final class ProductController
 
     public function crearCatalogo(array $params): void
     {
-        $this->auth->requireSesion();
+        $this->auth->requirePermiso('productos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $type = trim((string)($_POST['type'] ?? ''));
@@ -243,7 +243,7 @@ final class ProductController
 
     public function save(array $params): void
     {
-        $this->auth->requireSesion();
+        $this->auth->requirePermiso('productos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $idprodu = (int)($_POST['idprodu'] ?? 0);
@@ -280,7 +280,7 @@ final class ProductController
 
     public function saveDescription(array $params): void
     {
-        $this->auth->requireSesion();
+        $this->auth->requirePermiso('productos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $idprodu = (int)($_POST['idprodu'] ?? 0);
@@ -298,7 +298,7 @@ final class ProductController
 
     public function uploadMainImage(array $params): void
     {
-        $this->auth->requireSesion();
+        $this->auth->requirePermiso('productos');
         Csrf::check($_POST['_csrf'] ?? null);
         $idprodu = (int)($_POST['idprodu'] ?? 0);
 
@@ -328,7 +328,7 @@ final class ProductController
 
     public function clearMainImage(array $params): void
     {
-        $this->auth->requireSesion();
+        $this->auth->requirePermiso('productos');
         Csrf::check($_POST['_csrf'] ?? null);
         $idprodu = (int)($_POST['idprodu'] ?? 0);
 
@@ -344,7 +344,7 @@ final class ProductController
 
     public function saveVariantLogistics(array $params): void
     {
-        $this->auth->requireSesion();
+        $this->auth->requirePermiso('productos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $idprodu = (int)($_POST['idprodu'] ?? 0);
@@ -368,7 +368,7 @@ final class ProductController
 
     public function uploadVariantImages(array $params): void
     {
-        $this->auth->requireSesion();
+        $this->auth->requirePermiso('productos');
         Csrf::check($_POST['_csrf'] ?? null);
         $idprodu = (int)($_POST['idprodu'] ?? 0);
         $idcodgusto = (int)($_POST['idcodgusto'] ?? 0);
@@ -405,7 +405,7 @@ final class ProductController
 
     public function deleteVariantImage(array $params): void
     {
-        $this->auth->requireSesion();
+        $this->auth->requirePermiso('productos');
         Csrf::check($_POST['_csrf'] ?? null);
         $idprodu = (int)($_POST['idprodu'] ?? 0);
         $idcodgusto = (int)($_POST['idcodgusto'] ?? 0);
@@ -421,7 +421,7 @@ final class ProductController
 
     public function describe(array $params): void
     {
-        $this->auth->requireSesion();
+        $this->auth->requirePermiso('productos');
         Csrf::check($_POST['_csrf'] ?? null);
         $idprodu = (int)($_POST['idprodu'] ?? 0);
 
@@ -441,7 +441,7 @@ final class ProductController
 
     public function delete(array $params): void
     {
-        $this->auth->requireSesion();
+        $this->auth->requirePermiso('productos');
         Csrf::check($_POST['_csrf'] ?? null);
         $idprodu = (int)($_POST['idprodu'] ?? 0);
         if ($idprodu <= 0) {
@@ -455,7 +455,7 @@ final class ProductController
 
     public function saveBarcode(array $params): void
     {
-        $this->auth->requireSesion();
+        $this->auth->requirePermiso('productos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $idprodu = (int)($_POST['idprodu'] ?? 0);
@@ -473,7 +473,7 @@ final class ProductController
 
     public function printLabels(array $params): void
     {
-        $this->auth->requireSesion();
+        $this->auth->requirePermiso('productos');
         $id = (int)($params['id'] ?? 0);
 
         $product = $this->repo->find($id);
@@ -499,7 +499,7 @@ final class ProductController
 
     public function createVariant(array $params): void
     {
-        $this->auth->requireSesion();
+        $this->auth->requirePermiso('productos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $idprodu = (int)($_POST['idprodu'] ?? 0);
@@ -537,7 +537,7 @@ final class ProductController
 
     public function deleteVariant(array $params): void
     {
-        $this->auth->requireSesion();
+        $this->auth->requirePermiso('productos');
         Csrf::check($_POST['_csrf'] ?? null);
         $idprodu = (int)($_POST['idprodu'] ?? 0);
         $idcodgusto = (int)($_POST['idcodgusto'] ?? 0);

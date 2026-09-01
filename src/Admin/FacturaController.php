@@ -20,7 +20,7 @@ final class FacturaController
     public function index(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('facturacion');
 
         $q = trim((string)($_GET['q'] ?? ''));
         $estado = trim((string)($_GET['estado'] ?? ''));
@@ -39,7 +39,7 @@ final class FacturaController
     public function pos(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('facturacion');
 
         $repo = new FacturaRepo();
         $remitoId = (int)($_GET['remito_id'] ?? 0);
@@ -86,7 +86,7 @@ final class FacturaController
     public function store(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('facturacion');
 
         $input = json_decode(file_get_contents('php://input'), true);
         Csrf::check($input['_csrf'] ?? null);
@@ -379,7 +379,7 @@ final class FacturaController
     public function show(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('facturacion');
 
         $id = (int)($params['id'] ?? 0);
         $repo = new FacturaRepo();
@@ -417,7 +417,7 @@ final class FacturaController
     public function estado(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('facturacion');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $id = (int)($_POST['id'] ?? 0);
@@ -485,7 +485,7 @@ final class FacturaController
     public function delete(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('facturacion');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $id = (int)($_POST['id'] ?? 0);
@@ -513,7 +513,7 @@ final class FacturaController
     public function searchProducts(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('facturacion');
 
         $q = trim((string)($_GET['q'] ?? ''));
         $iddepo = null;
@@ -530,7 +530,7 @@ final class FacturaController
     public function crearCliente(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('facturacion');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $razon = trim((string)($_POST['razon'] ?? ''));
@@ -559,7 +559,7 @@ final class FacturaController
 
     public function searchClientes(array $params): void
     {        $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('facturacion');
 
         $q = trim((string)($_GET['q'] ?? ''));
         $repo = new FacturaRepo();
@@ -598,7 +598,7 @@ final class FacturaController
     public function searchRemitos(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('facturacion');
 
         $q = trim((string)($_GET['q'] ?? ''));
         $results = (new FacturaRepo())->findRemitosDisponibles($q);
@@ -609,7 +609,7 @@ final class FacturaController
     public function searchPresupuestos(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('facturacion');
 
         $q = trim((string)($_GET['q'] ?? ''));
         $results = (new FacturaRepo())->findPresupuestosDisponibles($q);
@@ -620,7 +620,7 @@ final class FacturaController
     public function print(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('facturacion');
 
         $id = (int)($params['id'] ?? 0);
         $formato = (string)($_GET['formato'] ?? '80mm');
@@ -663,7 +663,7 @@ final class FacturaController
     public function sendEmail(array $params): void
     {
         $auth = new AdminAuthService();
-        $auth->requireSesion();
+        $auth->requirePermiso('facturacion');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $id = (int)($params['id'] ?? 0);

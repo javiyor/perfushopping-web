@@ -16,7 +16,7 @@ final class PortadaController
     public function index(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('productos');
 
         $repo = new PortadaRepo();
         $config = $repo->getConfig();
@@ -49,7 +49,7 @@ final class PortadaController
     public function save(array $params): void
     {
         $auth = new AdminAuthService();
-        $auth->requireSesion();
+        $auth->requirePermiso('productos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $modo = trim((string)($_POST['modo'] ?? 'auto'));
@@ -65,7 +65,7 @@ final class PortadaController
     public function addManual(array $params): void
     {
         $auth = new AdminAuthService();
-        $auth->requireSesion();
+        $auth->requirePermiso('productos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $idprodu = (int)($_POST['idprodu'] ?? 0);
@@ -81,7 +81,7 @@ final class PortadaController
     public function addManyManual(array $params): void
     {
         $auth = new AdminAuthService();
-        $auth->requireSesion();
+        $auth->requirePermiso('productos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $ids = $_POST['idprodu'] ?? [];
@@ -98,7 +98,7 @@ final class PortadaController
     public function removeManual(array $params): void
     {
         $auth = new AdminAuthService();
-        $auth->requireSesion();
+        $auth->requirePermiso('productos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $idprodu = (int)($_POST['idprodu'] ?? 0);
@@ -112,7 +112,7 @@ final class PortadaController
     public function clearManual(array $params): void
     {
         $auth = new AdminAuthService();
-        $auth->requireSesion();
+        $auth->requirePermiso('productos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         (new PortadaRepo())->clearManual();
@@ -123,7 +123,7 @@ final class PortadaController
     public function reorderManual(array $params): void
     {
         $auth = new AdminAuthService();
-        $auth->requireSesion();
+        $auth->requirePermiso('productos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $order = $_POST['orden'] ?? '';
@@ -145,7 +145,7 @@ final class PortadaController
     public function searchJson(array $params): void
     {
         $auth = new AdminAuthService();
-        $auth->requireSesion();
+        $auth->requirePermiso('productos');
         $q = trim((string)($_GET['q'] ?? ''));
         if ($q === '') {
             Response::json(['items' => []], 200);

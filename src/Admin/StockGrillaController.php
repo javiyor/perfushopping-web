@@ -16,7 +16,7 @@ final class StockGrillaController
     public function index(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('productos');
 
         $repo = new StockRepo();
         $rubros = $repo->grillaRubros();
@@ -53,7 +53,7 @@ final class StockGrillaController
     public function generarOC(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('productos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $productos = $_POST['productos'] ?? [];
@@ -163,7 +163,7 @@ final class StockGrillaController
     public function exportarPDF(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('productos');
 
         $id = (int)($params['id'] ?? 0);
         $ocRepo = new OrdenCompraRepo();
@@ -183,7 +183,7 @@ final class StockGrillaController
     public function exportarExcel(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('productos');
 
         $id = (int)($params['id'] ?? 0);
         $ocRepo = new OrdenCompraRepo();

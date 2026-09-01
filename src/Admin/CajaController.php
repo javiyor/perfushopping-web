@@ -14,7 +14,7 @@ final class CajaController
     public function index(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('caja_movimientos');
 
         $repo = new CajaRepo();
         $sucursalId = $auth->getSucursalId();
@@ -63,7 +63,7 @@ final class CajaController
     public function abrirForm(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('caja_movimientos');
 
         $repo = new CajaRepo();
         $sucursalId = $auth->getSucursalId();
@@ -86,7 +86,7 @@ final class CajaController
     public function abrirStore(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('caja_movimientos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $montoInicial = (int)($_POST['monto_inicial_cents'] ?? 0);
@@ -132,7 +132,7 @@ final class CajaController
     public function movimientos(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('caja_movimientos');
 
         $repo = new CajaRepo();
         $sucursalId = $auth->getSucursalId();
@@ -160,7 +160,7 @@ final class CajaController
     public function storeMovimiento(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('caja_movimientos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $tipo = (string)($_POST['tipo'] ?? '');
@@ -199,7 +199,7 @@ final class CajaController
     public function general(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('caja_movimientos');
 
         $tipo = trim((string)($_GET['tipo'] ?? ''));
         $desde = trim((string)($_GET['desde'] ?? ''));
@@ -228,7 +228,7 @@ final class CajaController
     public function storeGeneralMovimiento(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('caja_movimientos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $tipo = (string)($_POST['tipo'] ?? '');
@@ -250,7 +250,7 @@ final class CajaController
     public function controlarMovimiento(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('caja_movimientos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $id = (int)($_POST['id'] ?? 0);
@@ -273,7 +273,7 @@ final class CajaController
     public function arqueoForm(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('caja_movimientos');
 
         $repo = new CajaRepo();
         $sucursalId = $auth->getSucursalId();
@@ -304,7 +304,7 @@ final class CajaController
     public function storeArqueo(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('caja_movimientos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $totalCents = (int)($_POST['total_cents'] ?? 0);
@@ -333,7 +333,7 @@ final class CajaController
     public function cierreForm(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('caja_movimientos');
 
         $repo = new CajaRepo();
         $sucursalId = $auth->getSucursalId();
@@ -370,7 +370,7 @@ final class CajaController
     public function cierreStore(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('caja_movimientos');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $montoCierre = (int)($_POST['monto_cierre_cents'] ?? 0);

@@ -60,10 +60,25 @@ final class AdminAuthService
         $u = $this->requireSesion();
         $rol = (string)($u['rol'] ?? '');
         if ($rol !== 'superadmin' && !in_array($rol, $roles, true)) {
-            Response::html(View::render('errors/403.php', ['message' => 'No tenes permisos para acceder a esta seccion.']), 403);
-            exit;
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No tenés permisos para acceder a esta sección.'];
+            Response::redirect('/admin');
         }
         return $u;
+    }
+
+    public function requirePermiso(string ...$permisos): array
+    {
+        $u = $this->requireSesion();
+        if (($u['rol'] ?? '') === 'superadmin') {
+            return $u;
+        }
+        foreach ($permisos as $p) {
+            if ($this->checkPermiso($p)) {
+                return $u;
+            }
+        }
+        $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No tenés permisos para acceder a esta sección.'];
+        Response::redirect('/admin');
     }
 
     public function checkPermiso(string $permiso): bool

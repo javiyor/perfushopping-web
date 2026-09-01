@@ -15,7 +15,7 @@ final class ArcaController
     public function index(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('arca');
 
         $repo = new ArcaRepo();
         $config = $repo->getAllConfig();
@@ -36,7 +36,7 @@ final class ArcaController
     public function config(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('arca');
 
         $repo = new ArcaRepo();
         $config = $repo->getAllConfig();
@@ -52,7 +52,7 @@ final class ArcaController
     public function configSave(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('arca');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $repo = new ArcaRepo();
@@ -69,7 +69,7 @@ final class ArcaController
     public function testConnection(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('arca');
 
         try {
             $wsaa = new AfipWsaa();
@@ -85,7 +85,7 @@ final class ArcaController
     public function reenviar(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('arca');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $facturaId = (int)($_POST['factura_id'] ?? 0);
@@ -130,7 +130,7 @@ final class ArcaController
     public function generarCsr(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('arca');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $repo = new ArcaRepo();
@@ -187,7 +187,7 @@ final class ArcaController
     public function cargarCertificado(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('arca');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $repo = new ArcaRepo();

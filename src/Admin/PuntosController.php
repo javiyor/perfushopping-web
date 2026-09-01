@@ -15,7 +15,7 @@ final class PuntosController
     public function index(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('clientes');
 
         $q = trim((string)($_GET['q'] ?? ''));
         $repo = new PuntosRepo();
@@ -36,7 +36,7 @@ final class PuntosController
     public function show(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('clientes');
 
         $idclien = (int)($params['id'] ?? 0);
         if ($idclien <= 0) {
@@ -68,7 +68,7 @@ final class PuntosController
     public function ajustar(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('clientes');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $idclien = (int)($_POST['idclien'] ?? 0);
@@ -92,7 +92,7 @@ final class PuntosController
     public function saveConfig(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('clientes');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $pct = max(0.0, (float)str_replace(',', '.', (string)($_POST['general_pct'] ?? '1')));
@@ -106,7 +106,7 @@ final class PuntosController
     public function saveMarca(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('clientes');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $codsub = (int)($_POST['codsub'] ?? 0);
@@ -127,7 +127,7 @@ final class PuntosController
     public function saveProducto(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('clientes');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $idprodu = (int)($_POST['idprodu'] ?? 0);
@@ -148,7 +148,7 @@ final class PuntosController
     public function saldo(array $params): void
     {
         $auth = new AdminAuthService();
-        $auth->requireSesion();
+        $auth->requirePermiso('clientes');
 
         $idclien = (int)($_GET['idclien'] ?? 0);
         Response::json(['saldo' => (new PuntosRepo())->saldo($idclien)]);

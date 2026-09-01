@@ -18,7 +18,7 @@ final class CompraController
     public function index(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('compras');
 
         $list = (new CompraRepo())->findAll([
             'q' => trim((string)($_GET['q'] ?? '')),
@@ -46,7 +46,7 @@ final class CompraController
     public function importar(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('compras');
 
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
             echo View::adminPage('admin/compras/import.php', [
@@ -121,7 +121,7 @@ final class CompraController
     public function importConfirm(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('compras');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $rows = $_SESSION['compra_import']['rows'] ?? null;
@@ -183,7 +183,7 @@ final class CompraController
     public function qr(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('compras');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $text = trim((string)($_POST['qr'] ?? ''));
@@ -216,7 +216,7 @@ final class CompraController
     public function create(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('compras');
 
         $prefill = $_SESSION['compra_prefill'] ?? [];
         unset($_SESSION['compra_prefill']);
@@ -234,7 +234,7 @@ final class CompraController
     public function edit(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('compras');
 
         $id = (int)($params['id'] ?? 0);
         $repo = new CompraRepo();
@@ -250,7 +250,7 @@ final class CompraController
     public function show(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('compras');
 
         $id = (int)($params['id'] ?? 0);
         $repo = new CompraRepo();
@@ -274,7 +274,7 @@ final class CompraController
     public function store(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('compras');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $repo = new CompraRepo();
@@ -348,7 +348,7 @@ final class CompraController
     public function setCuenta(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('compras');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $idcta1 = (int)($_POST['idcta1'] ?? 0);
@@ -374,7 +374,7 @@ final class CompraController
     public function delete(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('compras');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $id = (int)($_POST['id'] ?? 0);
@@ -388,7 +388,7 @@ final class CompraController
     public function searchProducts(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireSesion();
+        $adminUser = $auth->requirePermiso('compras');
 
         $q = trim((string)($_GET['q'] ?? ''));
         $prod = (new StockRepo())->searchProducts($q, 15);
