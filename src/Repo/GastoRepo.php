@@ -139,26 +139,41 @@ final class GastoRepo
         ];
         foreach ($map as $key => $col) {
             if (!$this->hasGastosColumn($col)) {
-                // columnas obligatorias mínimas: si no existe ni desc ni importe, igual intentar con fecha
-                if (in_array($col, ['fecha'], true)) {
-                    // siempre intentar fecha si existe
-                } else if ($col === $descCol || $col === $importeCol) {
-                    // estas son las columnas mapeadas dinámicamente, deben existir por definición
-                } else {
-                    continue;
-                }
-                if (!$this->hasGastosColumn($col)) continue;
+                continue;
             }
             $cols[] = "`$col`";
             $placeholders[] = ':'.$key;
             $params[':'.$key] = $values[$key];
         }
-        // Siempre añadir timestamps
-        $cols[] = 'created_at'; $placeholders[] = 'NOW()';
-        $cols[] = 'updated_at'; $placeholders[] = 'NOW()';
+        // Timestamps solo si existen
+        if ($this->hasGastosColumn('created_at')) { $cols[] = 'created_at'; $placeholders[] = 'NOW()'; }
+        elseif ($this->hasGastosColumn('created')) { $cols[] = 'created'; $placeholders[] = 'NOW()'; }
+        if ($this->hasGastosColumn('updated_at')) { $cols[] = 'updated_at'; $placeholders[] = 'NOW()'; }
+        elseif ($this->hasGastosColumn('updated')) { $cols[] = 'updated'; $placeholders[] = 'NOW()'; }
+        elseif ($this->hasGastosColumn('fecha_alta')) { $cols[] = 'fecha_alta'; $placeholders[] = 'NOW()'; }
         $sql = 'INSERT INTO gastos ('.implode(', ', $cols).') VALUES ('.implode(', ', $placeholders).')';
-        $st = Db::pdo()->prepare($sql);
-        $st->execute($params);
+        try {
+            $st = Db::pdo()->prepare($sql);
+            $st->execute($params);
+        } catch (\Throwable $e) {
+            // Fallback sin timestamps si falló por columna
+            if (str_contains($e->getMessage(), 'created_at') || str_contains($e->getMessage(), 'updated_at')) {
+                $cols2 = array_filter($cols, fn($c) => !in_array(trim($c, '`'), ['created_at','updated_at','created','updated','fecha_alta'], true));
+                $ph2 = [];
+                $params2 = [];
+                foreach ($cols2 as $i => $c) {
+                    $ph2[] = $placeholders[$i];
+                    $k = array_keys($params)[$i] ?? null;
+                    if ($k && isset($params[$k])) $params2[$k] = $params[$k];
+                }
+                // reconstruir sin timestamps
+                $sql2 = 'INSERT INTO gastos ('.implode(', ', $cols2).') VALUES ('.implode(', ', $ph2).')';
+                $st2 = Db::pdo()->prepare($sql2);
+                $st2->execute($params2);
+                return (int)Db::pdo()->lastInsertId();
+            }
+            throw $e;
+        }
         return (int)Db::pdo()->lastInsertId();
     }
 
