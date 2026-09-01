@@ -36,9 +36,27 @@ final class GastoRepo
         return 'importe_cents';
     }
     private function hasIdcta1(): bool { return $this->hasGastosColumn('idcta1'); }
+    private function pkColumn(): string
+    {
+        $cols = $this->gastosColumns();
+        try {
+            $rows = Db::pdo()->query('SHOW COLUMNS FROM gastos')->fetchAll();
+            foreach ($rows as $r) {
+                if (($r['Key'] ?? '') === 'PRI') return $r['Field'];
+            }
+            foreach ($rows as $r) {
+                if (str_contains($r['Extra'] ?? '', 'auto_increment')) return $r['Field'];
+            }
+        } catch (\Throwable $e) {}
+        foreach (['id','id_gasto','idgasto','id_gastos'] as $c) {
+            if (in_array($c, $cols, true)) return $c;
+        }
+        return $cols[0] ?? 'id';
+    }
 
     public function findAll(array $f = []): array
     {
+        $pk = $this->pkColumn();
         $hasFecha = $this->hasGastosColumn('fecha');
         $hasCreatedBy = $this->hasGastosColumn('created_by');
         $hasIdcta1 = $this->hasGastosColumn('idcta1');
@@ -71,29 +89,44 @@ final class GastoRepo
         $joinCheque = $hasCheque ? ' LEFT JOIN cheques ch ON ch.id = g.cheque_id' : '';
         $selectCreated = $hasCreatedBy ? 'au.nombre AS created_by_nombre' : 'NULL AS created_by_nombre';
         $joinCreated = $hasCreatedBy ? ' LEFT JOIN admin_users au ON au.id = g.created_by' : '';
-        $orderBy = $hasFecha ? 'g.fecha DESC, g.id DESC' : 'g.id DESC';
+        $orderBy = $hasFecha ? "g.fecha DESC, g.`$pk` DESC" : "g.`$pk` DESC";
 
-        $sql = "SELECT g.*, $selectCuenta $selectBanco $selectCheque $selectCreated FROM gastos g$joinCuenta$joinBanco$joinCheque$joinCreated";
+        $sql = "SELECT g.*, g.`$pk` AS id, $selectCuenta $selectBanco $selectCheque $selectCreated FROM gastos g$joinCuenta$joinBanco$joinCheque$joinCreated";
         if ($where) $sql .= ' WHERE ' . implode(' AND ', $where);
         $sql .= " ORDER BY $orderBy LIMIT 500";
         try {
             $st = Db::pdo()->prepare($sql);
             $st->execute($params);
-            return $st->fetchAll();
+            $rows = $st->fetchAll();
+            foreach ($rows as &$r) { if (!isset($r['id']) && isset($r[$pk])) $r['id'] = $r[$pk]; }
+            return $rows;
         } catch (\Throwable $e) {
             error_log('GastoRepo::findAll fallback: '.$e->getMessage());
             try {
-                $st2 = Db::pdo()->query('SELECT * FROM gastos ORDER BY id DESC LIMIT 500');
-                return $st2->fetchAll();
+                $sql2 = "SELECT * FROM gastos ORDER BY `$pk` DESC LIMIT 500";
+                $st2 = Db::pdo()->query($sql2);
+                $rows2 = $st2->fetchAll();
+                foreach ($rows2 as &$r) { if (!isset($r['id']) && isset($r[$pk])) $r['id'] = $r[$pk]; }
+                return $rows2;
             } catch (\Throwable $e2) {
                 error_log('GastoRepo::findAll fallback2: '.$e2->getMessage());
-                return [];
+                try {
+                    $st3 = Db::pdo()->query('SELECT * FROM gastos LIMIT 500');
+                    $rows3 = $st3->fetchAll();
+                    $pk3 = $this->pkColumn();
+                    foreach ($rows3 as &$r) { if (!isset($r['id']) && isset($r[$pk3])) $r['id'] = $r[$pk3]; }
+                    return $rows3;
+                } catch (\Throwable $e3) {
+                    error_log('GastoRepo::findAll fallback3: '.$e3->getMessage());
+                    return [];
+                }
             }
         }
     }
 
     public function findById(int $id): ?array
     {
+        $pk = $this->pkColumn();
         $hasIdcta1 = $this->hasGastosColumn('idcta1');
         $hasBanco = $this->hasGastosColumn('banco_cuenta_id');
         $hasCheque = $this->hasGastosColumn('cheque_id');
@@ -106,10 +139,19 @@ final class GastoRepo
         $joinCheque = $hasCheque ? ' LEFT JOIN cheques ch ON ch.id=g.cheque_id' : '';
         $selectCreated = $hasCreatedBy ? 'au.nombre AS created_by_nombre' : 'NULL AS created_by_nombre';
         $joinCreated = $hasCreatedBy ? ' LEFT JOIN admin_users au ON au.id=g.created_by' : '';
-        $sql = "SELECT g.*, $selectCuenta $selectBanco $selectCheque $selectCreated FROM gastos g$joinCuenta$joinBanco$joinCheque$joinCreated WHERE g.id=:id LIMIT 1";
-        $st = Db::pdo()->prepare($sql);
-        $st->execute([':id'=>$id]);
-        return $st->fetch() ?: null;
+        $sql = "SELECT g.*, g.`$pk` AS id, $selectCuenta $selectBanco $selectCheque $selectCreated FROM gastos g$joinCuenta$joinBanco$joinCheque$joinCreated WHERE g.`$pk`=:id LIMIT 1";
+        try {
+            $st = Db::pdo()->prepare($sql);
+            $st->execute([':id'=>$id]);
+            return $st->fetch() ?: null;
+        } catch (\Throwable $e) {
+            error_log('GastoRepo::findById fallback: '.$e->getMessage());
+            $st2 = Db::pdo()->prepare("SELECT * FROM gastos WHERE `$pk`=:id LIMIT 1");
+            $st2->execute([':id'=>$id]);
+            $row = $st2->fetch() ?: null;
+            if ($row && !isset($row['id']) && isset($row[$pk])) $row['id'] = $row[$pk];
+            return $row;
+        }
     }
 
     public function create(array $data): int
