@@ -63,18 +63,17 @@ final class GastoRepo
         $hasta = trim((string)($f['hasta'] ?? ''));
         if ($hasta !== '' && $hasFecha) { $where[] = 'g.fecha <= :hasta'; $params[':hasta'] = $hasta; }
 
-        // SELECT y JOIN dinámicos según columnas existentes
         $selectCuenta = $hasIdcta1 ? 'c1.nomcta1 AS cuenta_nombre, c.nomcta AS cuenta_grupo,' : 'NULL AS cuenta_nombre, NULL AS cuenta_grupo,';
         $joinCuenta = $hasIdcta1 ? ' LEFT JOIN contable1 c1 ON c1.idcta1 = g.idcta1 LEFT JOIN contable c ON c.idcta = c1.idcta' : '';
         $selectBanco = $hasBanco ? 'bc.banco AS banco_nombre,' : 'NULL AS banco_nombre,';
         $joinBanco = $hasBanco ? ' LEFT JOIN banco_cuentas bc ON bc.id = g.banco_cuenta_id' : '';
         $selectCheque = $hasCheque ? 'ch.numero_cheque, ch.banco_emisor,' : 'NULL AS numero_cheque, NULL AS banco_emisor,';
         $joinCheque = $hasCheque ? ' LEFT JOIN cheques ch ON ch.id = g.cheque_id' : '';
-        $joinCreatedBy = $hasCreatedBy ? ' LEFT JOIN admin_users au ON au.id = g.created_by' : '';
-        $selectCreatedBy = $hasCreatedBy ? 'au.nombre AS created_by_nombre' : 'NULL AS created_by_nombre';
+        $selectCreated = $hasCreatedBy ? 'au.nombre AS created_by_nombre' : 'NULL AS created_by_nombre';
+        $joinCreated = $hasCreatedBy ? ' LEFT JOIN admin_users au ON au.id = g.created_by' : '';
         $orderBy = $hasFecha ? 'g.fecha DESC, g.id DESC' : 'g.id DESC';
 
-        $sql = "SELECT g.*, $selectCuenta $selectBanco $selectCheque $selectCreatedBy FROM gastos g$joinCuenta$joinBanco$joinCheque$joinCreatedBy";
+        $sql = "SELECT g.*, $selectCuenta $selectBanco $selectCheque $selectCreated FROM gastos g$joinCuenta$joinBanco$joinCheque$joinCreated";
         if ($where) $sql .= ' WHERE ' . implode(' AND ', $where);
         $sql .= " ORDER BY $orderBy LIMIT 500";
         try {
@@ -84,9 +83,7 @@ final class GastoRepo
         } catch (\Throwable $e) {
             error_log('GastoRepo::findAll fallback: '.$e->getMessage());
             try {
-                // Fallback mínimo sin joins que puedan fallar
-                $sql2 = 'SELECT * FROM gastos ORDER BY id DESC LIMIT 500';
-                $st2 = Db::pdo()->query($sql2);
+                $st2 = Db::pdo()->query('SELECT * FROM gastos ORDER BY id DESC LIMIT 500');
                 return $st2->fetchAll();
             } catch (\Throwable $e2) {
                 error_log('GastoRepo::findAll fallback2: '.$e2->getMessage());
@@ -100,13 +97,16 @@ final class GastoRepo
         $hasIdcta1 = $this->hasGastosColumn('idcta1');
         $hasBanco = $this->hasGastosColumn('banco_cuenta_id');
         $hasCheque = $this->hasGastosColumn('cheque_id');
+        $hasCreatedBy = $this->hasGastosColumn('created_by');
         $selectCuenta = $hasIdcta1 ? 'c1.nomcta1 AS cuenta_nombre, c.nomcta AS cuenta_grupo,' : 'NULL AS cuenta_nombre, NULL AS cuenta_grupo,';
         $joinCuenta = $hasIdcta1 ? ' LEFT JOIN contable1 c1 ON c1.idcta1=g.idcta1 LEFT JOIN contable c ON c.idcta=c1.idcta' : '';
         $selectBanco = $hasBanco ? 'bc.banco AS banco_nombre,' : 'NULL AS banco_nombre,';
         $joinBanco = $hasBanco ? ' LEFT JOIN banco_cuentas bc ON bc.id=g.banco_cuenta_id' : '';
         $selectCheque = $hasCheque ? 'ch.numero_cheque, ch.banco_emisor,' : 'NULL AS numero_cheque, NULL AS banco_emisor,';
         $joinCheque = $hasCheque ? ' LEFT JOIN cheques ch ON ch.id=g.cheque_id' : '';
-        $sql = "SELECT g.*, $selectCuenta $selectBanco $selectCheque au.nombre AS created_by_nombre FROM gastos g$joinCuenta$joinBanco$joinCheque LEFT JOIN admin_users au ON au.id=g.created_by WHERE g.id=:id LIMIT 1";
+        $selectCreated = $hasCreatedBy ? 'au.nombre AS created_by_nombre' : 'NULL AS created_by_nombre';
+        $joinCreated = $hasCreatedBy ? ' LEFT JOIN admin_users au ON au.id=g.created_by' : '';
+        $sql = "SELECT g.*, $selectCuenta $selectBanco $selectCheque $selectCreated FROM gastos g$joinCuenta$joinBanco$joinCheque$joinCreated WHERE g.id=:id LIMIT 1";
         $st = Db::pdo()->prepare($sql);
         $st->execute([':id'=>$id]);
         return $st->fetch() ?: null;
@@ -114,12 +114,11 @@ final class GastoRepo
 
     public function create(array $data): int
     {
-        // Construir INSERT dinámico según columnas que existen
+        $descCol = $this->descColumn();
+        $importeCol = $this->importeColumn();
         $cols = [];
         $placeholders = [];
         $params = [];
-        $descCol = $this->descColumn();
-        $importeCol = $this->importeColumn();
         $map = [
             'fecha' => 'fecha',
             'idcta1' => 'idcta1',
@@ -147,42 +146,22 @@ final class GastoRepo
             'created_by' => $data['created_by'] ?: null,
         ];
         foreach ($map as $key => $col) {
-            if (!$this->hasGastosColumn($col)) {
-                continue;
-            }
+            if (!$this->hasGastosColumn($col)) continue;
             $cols[] = "`$col`";
             $placeholders[] = ':'.$key;
             $params[':'.$key] = $values[$key];
         }
-        // Timestamps solo si existen
         if ($this->hasGastosColumn('created_at')) { $cols[] = 'created_at'; $placeholders[] = 'NOW()'; }
         elseif ($this->hasGastosColumn('created')) { $cols[] = 'created'; $placeholders[] = 'NOW()'; }
         if ($this->hasGastosColumn('updated_at')) { $cols[] = 'updated_at'; $placeholders[] = 'NOW()'; }
         elseif ($this->hasGastosColumn('updated')) { $cols[] = 'updated'; $placeholders[] = 'NOW()'; }
         elseif ($this->hasGastosColumn('fecha_alta')) { $cols[] = 'fecha_alta'; $placeholders[] = 'NOW()'; }
-        $sql = 'INSERT INTO gastos ('.implode(', ', $cols).') VALUES ('.implode(', ', $placeholders).')';
-        try {
-            $st = Db::pdo()->prepare($sql);
-            $st->execute($params);
-        } catch (\Throwable $e) {
-            // Fallback sin timestamps si falló por columna
-            if (str_contains($e->getMessage(), 'created_at') || str_contains($e->getMessage(), 'updated_at')) {
-                $cols2 = array_filter($cols, fn($c) => !in_array(trim($c, '`'), ['created_at','updated_at','created','updated','fecha_alta'], true));
-                $ph2 = [];
-                $params2 = [];
-                foreach ($cols2 as $i => $c) {
-                    $ph2[] = $placeholders[$i];
-                    $k = array_keys($params)[$i] ?? null;
-                    if ($k && isset($params[$k])) $params2[$k] = $params[$k];
-                }
-                // reconstruir sin timestamps
-                $sql2 = 'INSERT INTO gastos ('.implode(', ', $cols2).') VALUES ('.implode(', ', $ph2).')';
-                $st2 = Db::pdo()->prepare($sql2);
-                $st2->execute($params2);
-                return (int)Db::pdo()->lastInsertId();
-            }
-            throw $e;
+        if (!$cols) {
+            throw new \RuntimeException('Tabla gastos sin columnas compatibles');
         }
+        $sql = 'INSERT INTO gastos ('.implode(', ', $cols).') VALUES ('.implode(', ', $placeholders).')';
+        $st = Db::pdo()->prepare($sql);
+        $st->execute($params);
         return (int)Db::pdo()->lastInsertId();
     }
 
