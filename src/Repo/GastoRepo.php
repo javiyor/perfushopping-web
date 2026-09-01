@@ -7,16 +7,33 @@ use Perfushopping\Web\Infra\Db;
 
 final class GastoRepo
 {
+    private function gastosColumns(): array
+    {
+        static $cols = null;
+        if ($cols !== null) return $cols;
+        try {
+            $rows = Db::pdo()->query('SHOW COLUMNS FROM gastos')->fetchAll();
+            $cols = array_column($rows, 'Field');
+        } catch (\Throwable $e) { $cols = []; }
+        return $cols;
+    }
     private function hasGastosColumn(string $col): bool
     {
-        static $cache = [];
-        if (array_key_exists($col, $cache)) return $cache[$col];
-        try {
-            $cols = Db::pdo()->query('SHOW COLUMNS FROM gastos')->fetchAll();
-            $fields = array_column($cols, 'Field');
-            $cache[$col] = in_array($col, $fields, true);
-        } catch (\Throwable $e) { $cache[$col] = false; }
-        return $cache[$col];
+        return in_array($col, $this->gastosColumns(), true);
+    }
+    private function descColumn(): string
+    {
+        foreach (['descripcion','concepto','detalle','observacion','descripcion_gasto','nombre'] as $c) {
+            if ($this->hasGastosColumn($c)) return $c;
+        }
+        return 'descripcion';
+    }
+    private function importeColumn(): string
+    {
+        foreach (['importe_cents','monto_cents','importe','monto','total_cents'] as $c) {
+            if ($this->hasGastosColumn($c)) return $c;
+        }
+        return 'importe_cents';
     }
     private function hasIdcta1(): bool { return $this->hasGastosColumn('idcta1'); }
 
@@ -28,11 +45,12 @@ final class GastoRepo
         $hasIdcta1 = $this->hasGastosColumn('idcta1');
         $hasBanco = $this->hasGastosColumn('banco_cuenta_id');
         $hasCheque = $this->hasGastosColumn('cheque_id');
+        $descCol = $this->descColumn();
         if ($q !== '') {
             if ($hasIdcta1) {
-                $where[] = '(g.descripcion LIKE :q OR c1.nomcta1 LIKE :q)';
+                $where[] = "(g.`$descCol` LIKE :q OR c1.nomcta1 LIKE :q)";
             } else {
-                $where[] = 'g.descripcion LIKE :q';
+                $where[] = "g.`$descCol` LIKE :q";
             }
             $params[':q'] = '%' . $q . '%';
         }
@@ -91,11 +109,13 @@ final class GastoRepo
         $cols = [];
         $placeholders = [];
         $params = [];
+        $descCol = $this->descColumn();
+        $importeCol = $this->importeColumn();
         $map = [
             'fecha' => 'fecha',
             'idcta1' => 'idcta1',
-            'descripcion' => 'descripcion',
-            'importe_cents' => 'importe_cents',
+            'desc' => $descCol,
+            'importe' => $importeCol,
             'forma_pago' => 'forma_pago',
             'caja_destino' => 'caja_destino',
             'banco_cuenta_id' => 'banco_cuenta_id',
@@ -107,8 +127,8 @@ final class GastoRepo
         $values = [
             'fecha' => $data['fecha'],
             'idcta1' => $data['idcta1'] ?? null,
-            'descripcion' => trim((string)$data['descripcion']),
-            'importe_cents' => (int)($data['importe_cents'] ?? 0),
+            'desc' => trim((string)$data['descripcion']),
+            'importe' => (int)($data['importe_cents'] ?? 0),
             'forma_pago' => $data['forma_pago'],
             'caja_destino' => $data['caja_destino'] ?? 'general',
             'banco_cuenta_id' => $data['banco_cuenta_id'] ?: null,
@@ -118,10 +138,18 @@ final class GastoRepo
             'created_by' => $data['created_by'] ?: null,
         ];
         foreach ($map as $key => $col) {
-            if (!$this->hasGastosColumn($col) && $col !== 'fecha' && $col !== 'descripcion' && $col !== 'importe_cents') {
-                continue;
+            if (!$this->hasGastosColumn($col)) {
+                // columnas obligatorias mínimas: si no existe ni desc ni importe, igual intentar con fecha
+                if (in_array($col, ['fecha'], true)) {
+                    // siempre intentar fecha si existe
+                } else if ($col === $descCol || $col === $importeCol) {
+                    // estas son las columnas mapeadas dinámicamente, deben existir por definición
+                } else {
+                    continue;
+                }
+                if (!$this->hasGastosColumn($col)) continue;
             }
-            $cols[] = $col;
+            $cols[] = "`$col`";
             $placeholders[] = ':'.$key;
             $params[':'.$key] = $values[$key];
         }

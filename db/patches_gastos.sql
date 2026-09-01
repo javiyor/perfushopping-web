@@ -21,6 +21,8 @@ CREATE TABLE IF NOT EXISTS gastos (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Parche para instalaciones donde la tabla gastos ya existía sin columnas nuevas (ejecuta y ignora si ya existe)
+-- Si tu tabla gastos tiene columna 'concepto' en lugar de 'descripcion', este patch la normaliza:
+ALTER TABLE gastos ADD COLUMN descripcion VARCHAR(255) NOT NULL AFTER fecha;
 ALTER TABLE gastos ADD COLUMN idcta1 INT UNSIGNED DEFAULT NULL AFTER fecha;
 ALTER TABLE gastos ADD COLUMN importe_cents INT NOT NULL DEFAULT 0 AFTER descripcion;
 ALTER TABLE gastos ADD COLUMN forma_pago ENUM('efectivo','transferencia','cheque') NOT NULL DEFAULT 'efectivo' AFTER importe_cents;
