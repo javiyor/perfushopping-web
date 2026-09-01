@@ -17,11 +17,12 @@ CREATE TABLE IF NOT EXISTS gastos (
   KEY idx_gastos_fecha (fecha),
   KEY idx_gastos_cuenta (idcta1),
   KEY idx_gastos_banco (banco_cuenta_id),
-  KEY idx_gastos_cheque (cheque_id),
-  CONSTRAINT fk_gastos_cuenta FOREIGN KEY (idcta1) REFERENCES contable1(idcta1) ON DELETE SET NULL,
-  CONSTRAINT fk_gastos_banco FOREIGN KEY (banco_cuenta_id) REFERENCES banco_cuentas(id) ON DELETE SET NULL,
-  CONSTRAINT fk_gastos_cheque FOREIGN KEY (cheque_id) REFERENCES cheques(id) ON DELETE SET NULL
+  KEY idx_gastos_cheque (cheque_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Parche para instalaciones donde la tabla gastos ya existía sin idcta1
+ALTER TABLE gastos ADD COLUMN idcta1 INT UNSIGNED DEFAULT NULL AFTER fecha;
+ALTER TABLE gastos ADD KEY idx_gastos_cuenta (idcta1);
 
 -- Movimientos bancarios (para transferencias, cheques y depósitos de efectivo)
 CREATE TABLE IF NOT EXISTS banco_movimientos (
