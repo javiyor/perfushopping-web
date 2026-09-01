@@ -7,10 +7,11 @@
     <div class="card-body">
         <form class="row g-2" method="get" action="/admin/gastos">
             <div class="col-md-4"><input class="form-control form-control-sm" name="q" value="<?= htmlspecialchars($_GET['q'] ?? '') ?>" placeholder="Buscar por descripción o cuenta" /></div>
-            <div class="col-md-3"><input class="form-control form-control-sm" type="date" name="desde" value="<?= htmlspecialchars($_GET['desde'] ?? '') ?>" /></div>
-            <div class="col-md-3"><input class="form-control form-control-sm" type="date" name="hasta" value="<?= htmlspecialchars($_GET['hasta'] ?? '') ?>" /></div>
-            <div class="col-md-2"><button class="btn btn-sm btn-outline-secondary w-100" type="submit">Filtrar</button></div>
+            <div class="col-md-3"><input class="form-control form-control-sm" type="date" name="desde" value="<?= htmlspecialchars($desde ?? $_GET['desde'] ?? $today ?? date('Y-m-d')) ?>" /></div>
+            <div class="col-md-3"><input class="form-control form-control-sm" type="date" name="hasta" value="<?= htmlspecialchars($hasta ?? $_GET['hasta'] ?? $today ?? date('Y-m-d')) ?>" /></div>
+            <div class="col-md-2 d-flex gap-1"><button class="btn btn-sm btn-outline-secondary flex-fill" type="submit">Filtrar</button><a class="btn btn-sm btn-outline-secondary" href="/admin/gastos" title="Ver todos"><i class="bi bi-x-lg"></i></a></div>
         </form>
+        <?php if (!empty($desde) && !empty($hasta) && $desde === $hasta): ?><div class="small text-muted mt-1">Mostrando gastos del día <?= htmlspecialchars($desde) ?> — <a href="/admin/gastos">Ver todos</a></div><?php endif; ?>
     </div>
 </div>
 

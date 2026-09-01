@@ -21,12 +21,27 @@ final class GastoController
         $auth = new AdminAuthService();
         $adminUser = $auth->requirePermiso('compras');
         $repo = new GastoRepo();
-        $list = $repo->findAll(['q'=>trim((string)($_GET['q'] ?? '')), 'desde'=>trim((string)($_GET['desde'] ?? '')), 'hasta'=>trim((string)($_GET['hasta'] ?? ''))]);
+        $desde = trim((string)($_GET['desde'] ?? ''));
+        $hasta = trim((string)($_GET['hasta'] ?? ''));
+        $hasFiltro = isset($_GET['desde']) || isset($_GET['hasta']) || isset($_GET['q']);
+        if (!$hasFiltro) {
+            $desde = date('Y-m-d');
+            $hasta = date('Y-m-d');
+        } elseif ($desde === '' && $hasta !== '') {
+            $desde = $hasta;
+        } elseif ($hasta === '' && $desde !== '') {
+            $hasta = $desde;
+        }
+        $list = $repo->findAll(['q'=>trim((string)($_GET['q'] ?? '')), 'desde'=>$desde, 'hasta'=>$hasta]);
+        $today = date('Y-m-d');
         echo View::adminPage('admin/gastos/list.php', [
             'adminUser'=>$adminUser,
             'list'=>$list,
             'cuentas'=>$repo->cuentas(),
             'bancos'=>(new BancoCuentaRepo())->findAll(),
+            'desde'=>$desde,
+            'hasta'=>$hasta,
+            'today'=>$today,
             'csrf'=>Csrf::token(),
             'pageTitle'=>'Gastos varios',
         ]);
