@@ -124,7 +124,23 @@ final class ChequeController
             Response::redirect('/admin/cheques');
         }
 
+        $prevEstado = $cheque['estado'] ?? '';
         $repo->updateEstado($id, $estado);
+
+        // Generar movimiento bancario automático para acreditación/débito
+        try {
+            $bancoCuentaId = (int)($cheque['banco_cuenta_id'] ?? 0);
+            $monto = (int)($cheque['monto_cents'] ?? 0);
+            $bm = new \Perfushopping\Web\Repo\BancoMovimientoRepo();
+            if ($bancoCuentaId && $monto > 0) {
+                if ($cheque['tipo'] === 'tercero' && in_array($estado, ['acreditado','cobrado','depositado'], true) && $prevEstado !== $estado) {
+                    $bm->create($bancoCuentaId, 'credito', 'cheque', $id, 'Acreditación cheque #' . ($cheque['numero_cheque'] ?? $id), $monto, date('Y-m-d'), (int)$adminUser['id']);
+                }
+                if ($cheque['tipo'] === 'propio' && in_array($estado, ['debitado','cobrado','compensado'], true) && $prevEstado !== $estado) {
+                    $bm->create($bancoCuentaId, 'debito', 'cheque', $id, 'Débito cheque #' . ($cheque['numero_cheque'] ?? $id), $monto, date('Y-m-d'), (int)$adminUser['id']);
+                }
+            }
+        } catch (\Throwable $e) { error_log('BancoMov cheque: '.$e->getMessage()); }
 
         $observaciones = trim((string)($_POST['observaciones'] ?? ''));
         if ($observaciones === '') {

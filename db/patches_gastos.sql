@@ -1,0 +1,42 @@
+-- Gastos varios (cuenta contable similar a factura_compra)
+CREATE TABLE IF NOT EXISTS gastos (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  fecha DATE NOT NULL,
+  idcta1 INT UNSIGNED DEFAULT NULL,
+  descripcion VARCHAR(255) NOT NULL,
+  importe_cents INT NOT NULL DEFAULT 0,
+  forma_pago ENUM('efectivo','transferencia','cheque') NOT NULL DEFAULT 'efectivo',
+  caja_destino ENUM('chica','general') NOT NULL DEFAULT 'general',
+  banco_cuenta_id INT UNSIGNED DEFAULT NULL,
+  cheque_id INT UNSIGNED DEFAULT NULL,
+  sucursal_id INT UNSIGNED DEFAULT NULL,
+  punto_venta INT UNSIGNED DEFAULT NULL,
+  created_by INT UNSIGNED DEFAULT NULL,
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME NOT NULL,
+  KEY idx_gastos_fecha (fecha),
+  KEY idx_gastos_cuenta (idcta1),
+  KEY idx_gastos_banco (banco_cuenta_id),
+  KEY idx_gastos_cheque (cheque_id),
+  CONSTRAINT fk_gastos_cuenta FOREIGN KEY (idcta1) REFERENCES contable1(idcta1) ON DELETE SET NULL,
+  CONSTRAINT fk_gastos_banco FOREIGN KEY (banco_cuenta_id) REFERENCES banco_cuentas(id) ON DELETE SET NULL,
+  CONSTRAINT fk_gastos_cheque FOREIGN KEY (cheque_id) REFERENCES cheques(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Movimientos bancarios (para transferencias, cheques y depósitos de efectivo)
+CREATE TABLE IF NOT EXISTS banco_movimientos (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  banco_cuenta_id INT UNSIGNED NOT NULL,
+  tipo ENUM('credito','debito') NOT NULL,
+  origen VARCHAR(30) DEFAULT NULL,
+  origen_id INT UNSIGNED DEFAULT NULL,
+  concepto VARCHAR(255) NOT NULL,
+  monto_cents INT NOT NULL DEFAULT 0,
+  fecha DATE NOT NULL,
+  created_by INT UNSIGNED DEFAULT NULL,
+  created_at DATETIME NOT NULL,
+  KEY idx_bm_cuenta (banco_cuenta_id),
+  KEY idx_bm_origen (origen, origen_id),
+  KEY idx_bm_fecha (fecha),
+  CONSTRAINT fk_bm_cuenta FOREIGN KEY (banco_cuenta_id) REFERENCES banco_cuentas(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

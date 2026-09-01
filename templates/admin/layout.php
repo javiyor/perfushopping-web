@@ -242,6 +242,8 @@
             <?php if ($can('compras')): ?><a href="/admin/nota-pedido/nueva" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Crear notas de pedido internas"><i class="bi bi-file-text"></i>Nota pedido</a><?php endif; ?>
             <?php if ($can('pagos_proveedores')): ?><a href="/admin/ordenes-pago" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Órdenes de pago a proveedores"><i class="bi bi-credit-card"></i>Órdenes pago</a><?php endif; ?>
             <?php if ($can('compras')): ?><a href="/admin/ordenes-compra/fletes" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Gestión de fletes de compras"><i class="bi bi-truck"></i>Fletes</a><?php endif; ?>
+            <?php if ($can('compras') || $can('caja_movimientos')): ?><a href="/admin/gastos" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Gastos varios con cuenta contable"><i class="bi bi-cash-coin"></i>Gastos</a><?php endif; ?>
+            <?php if ($can('caja_movimientos')): ?><a href="/admin/caja/depositar" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Depositar efectivo en banco"><i class="bi bi-bank"></i>Depósito banco</a><?php endif; ?>
 
             <?php $hasAdmin = $can('usuarios_admin') || $can('pagos') || $can('cheques') || $can('estadisticas') || $can('arca'); if ($hasAdmin): ?><div class="nav-section">Administración</div><?php endif; ?>
             <?php if ($can('usuarios_admin')): ?><a href="/admin/usuarios" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Usuarios del panel admin y permisos"><i class="bi bi-shield-lock"></i>Admins</a><?php endif; ?>

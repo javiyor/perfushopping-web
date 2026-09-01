@@ -80,6 +80,7 @@ use Perfushopping\Web\Admin\PuntosController as AdminPuntosController;
 use Perfushopping\Web\Admin\PortadaController as AdminPortadaController;
 use Perfushopping\Web\Admin\EnvioController as AdminEnvioController;
 use Perfushopping\Web\Admin\SocialInboxController as AdminSocialInboxController;
+use Perfushopping\Web\Admin\GastoController as AdminGastoController;
 
 $router = new Router();
 
@@ -358,13 +359,19 @@ $router->post('/admin/empresa/logo/eliminar', [AdminEmpresaController::class, 'r
 $router->get('/admin/email', [AdminEmailController::class, 'inbox']);
 $router->get('/admin/email/(?P<uid>\d+)', [AdminEmailController::class, 'view']);
 
-// Admin - Mensajes de redes
+ // Admin - Mensajes de redes
 $router->get('/admin/mensajes', [AdminSocialInboxController::class, 'index']);
 $router->post('/admin/mensajes/tomar', [AdminSocialInboxController::class, 'take']);
 $router->post('/admin/mensajes/liberar', [AdminSocialInboxController::class, 'release']);
 $router->post('/admin/mensajes/cerrar', [AdminSocialInboxController::class, 'close']);
 $router->post('/admin/mensajes/reabrir', [AdminSocialInboxController::class, 'reopen']);
 $router->post('/admin/mensajes/nota', [AdminSocialInboxController::class, 'note']);
+
+ // Admin - Gastos varios
+$router->get('/admin/gastos', [AdminGastoController::class, 'index']);
+$router->post('/admin/gastos/guardar', [AdminGastoController::class, 'store']);
+$router->get('/admin/caja/depositar', [AdminGastoController::class, 'depositarForm']);
+$router->post('/admin/caja/depositar', [AdminGastoController::class, 'depositarStore']);
 
 // Admin - Órdenes de pago a proveedores
 $router->get('/admin/ordenes-pago', [AdminOrdenPagoController::class, 'index']);
