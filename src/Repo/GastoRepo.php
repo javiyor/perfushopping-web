@@ -39,14 +39,18 @@ final class GastoRepo
 
     public function findAll(array $f = []): array
     {
-        $params = [];
-        $where = [];
-        $q = trim((string)($f['q'] ?? ''));
+        $hasFecha = $this->hasGastosColumn('fecha');
+        $hasCreatedBy = $this->hasGastosColumn('created_by');
         $hasIdcta1 = $this->hasGastosColumn('idcta1');
         $hasBanco = $this->hasGastosColumn('banco_cuenta_id');
         $hasCheque = $this->hasGastosColumn('cheque_id');
         $descCol = $this->descColumn();
-        if ($q !== '') {
+        $hasDesc = $this->hasGastosColumn($descCol);
+
+        $params = [];
+        $where = [];
+        $q = trim((string)($f['q'] ?? ''));
+        if ($q !== '' && $hasDesc) {
             if ($hasIdcta1) {
                 $where[] = "(g.`$descCol` LIKE :q OR c1.nomcta1 LIKE :q)";
             } else {
@@ -55,9 +59,9 @@ final class GastoRepo
             $params[':q'] = '%' . $q . '%';
         }
         $desde = trim((string)($f['desde'] ?? ''));
-        if ($desde !== '') { $where[] = 'g.fecha >= :desde'; $params[':desde'] = $desde; }
+        if ($desde !== '' && $hasFecha) { $where[] = 'g.fecha >= :desde'; $params[':desde'] = $desde; }
         $hasta = trim((string)($f['hasta'] ?? ''));
-        if ($hasta !== '') { $where[] = 'g.fecha <= :hasta'; $params[':hasta'] = $hasta; }
+        if ($hasta !== '' && $hasFecha) { $where[] = 'g.fecha <= :hasta'; $params[':hasta'] = $hasta; }
 
         // SELECT y JOIN dinámicos según columnas existentes
         $selectCuenta = $hasIdcta1 ? 'c1.nomcta1 AS cuenta_nombre, c.nomcta AS cuenta_grupo,' : 'NULL AS cuenta_nombre, NULL AS cuenta_grupo,';
@@ -65,10 +69,14 @@ final class GastoRepo
         $selectBanco = $hasBanco ? 'bc.banco AS banco_nombre,' : 'NULL AS banco_nombre,';
         $joinBanco = $hasBanco ? ' LEFT JOIN banco_cuentas bc ON bc.id = g.banco_cuenta_id' : '';
         $selectCheque = $hasCheque ? 'ch.numero_cheque, ch.banco_emisor,' : 'NULL AS numero_cheque, NULL AS banco_emisor,';
+        $joinCheque = $hasCheque ? ' LEFT JOIN cheques ch ON ch.id = g.cheque_id' : '';
+        $joinCreatedBy = $hasCreatedBy ? ' LEFT JOIN admin_users au ON au.id = g.created_by' : '';
+        $selectCreatedBy = $hasCreatedBy ? 'au.nombre AS created_by_nombre' : 'NULL AS created_by_nombre';
+        $orderBy = $hasFecha ? 'g.fecha DESC, g.id DESC' : 'g.id DESC';
 
-        $sql = "SELECT g.*, $selectCuenta $selectBanco $selectCheque au.nombre AS created_by_nombre FROM gastos g$joinCuenta$joinBanco" . ($hasCheque ? ' LEFT JOIN cheques ch ON ch.id = g.cheque_id' : '') . " LEFT JOIN admin_users au ON au.id = g.created_by";
+        $sql = "SELECT g.*, $selectCuenta $selectBanco $selectCheque $selectCreatedBy FROM gastos g$joinCuenta$joinBanco$joinCheque$joinCreatedBy";
         if ($where) $sql .= ' WHERE ' . implode(' AND ', $where);
-        $sql .= ' ORDER BY g.fecha DESC, g.id DESC LIMIT 500';
+        $sql .= " ORDER BY $orderBy LIMIT 500";
         try {
             $st = Db::pdo()->prepare($sql);
             $st->execute($params);
@@ -76,8 +84,9 @@ final class GastoRepo
         } catch (\Throwable $e) {
             error_log('GastoRepo::findAll fallback: '.$e->getMessage());
             try {
-                $st2 = Db::pdo()->prepare('SELECT g.*, au.nombre AS created_by_nombre FROM gastos g LEFT JOIN admin_users au ON au.id=g.created_by ORDER BY g.fecha DESC, g.id DESC LIMIT 500');
-                $st2->execute([]);
+                // Fallback mínimo sin joins que puedan fallar
+                $sql2 = 'SELECT * FROM gastos ORDER BY id DESC LIMIT 500';
+                $st2 = Db::pdo()->query($sql2);
                 return $st2->fetchAll();
             } catch (\Throwable $e2) {
                 error_log('GastoRepo::findAll fallback2: '.$e2->getMessage());

@@ -22,19 +22,18 @@ CREATE TABLE IF NOT EXISTS gastos (
 
 -- Parche para instalaciones donde la tabla gastos ya existía sin columnas nuevas (ejecuta y ignora si ya existe)
 -- Si tu tabla gastos tiene columna 'concepto' en lugar de 'descripcion', este patch la normaliza:
-ALTER TABLE gastos ADD COLUMN descripcion VARCHAR(255) NOT NULL AFTER fecha;
-ALTER TABLE gastos ADD COLUMN idcta1 INT UNSIGNED DEFAULT NULL AFTER fecha;
-ALTER TABLE gastos ADD COLUMN importe_cents INT NOT NULL DEFAULT 0 AFTER descripcion;
-ALTER TABLE gastos ADD COLUMN forma_pago ENUM('efectivo','transferencia','cheque') NOT NULL DEFAULT 'efectivo' AFTER importe_cents;
-ALTER TABLE gastos ADD COLUMN caja_destino ENUM('chica','general') NOT NULL DEFAULT 'general' AFTER forma_pago;
-ALTER TABLE gastos ADD COLUMN banco_cuenta_id INT UNSIGNED DEFAULT NULL AFTER caja_destino;
-ALTER TABLE gastos ADD COLUMN cheque_id INT UNSIGNED DEFAULT NULL AFTER banco_cuenta_id;
-ALTER TABLE gastos ADD COLUMN sucursal_id INT UNSIGNED DEFAULT NULL AFTER cheque_id;
-ALTER TABLE gastos ADD COLUMN punto_venta INT UNSIGNED DEFAULT NULL AFTER sucursal_id;
-ALTER TABLE gastos ADD COLUMN created_by INT UNSIGNED DEFAULT NULL AFTER punto_venta;
-ALTER TABLE gastos ADD KEY idx_gastos_cuenta (idcta1);
-ALTER TABLE gastos ADD KEY idx_gastos_banco (banco_cuenta_id);
-ALTER TABLE gastos ADD KEY idx_gastos_cheque (cheque_id);
+ALTER TABLE gastos ADD COLUMN IF NOT EXISTS descripcion VARCHAR(255) NOT NULL AFTER fecha;
+ALTER TABLE gastos ADD COLUMN IF NOT EXISTS idcta1 INT UNSIGNED DEFAULT NULL AFTER fecha;
+ALTER TABLE gastos ADD COLUMN IF NOT EXISTS importe_cents INT NOT NULL DEFAULT 0 AFTER descripcion;
+ALTER TABLE gastos ADD COLUMN IF NOT EXISTS forma_pago ENUM('efectivo','transferencia','cheque') NOT NULL DEFAULT 'efectivo' AFTER importe_cents;
+ALTER TABLE gastos ADD COLUMN IF NOT EXISTS caja_destino ENUM('chica','general') NOT NULL DEFAULT 'general' AFTER forma_pago;
+ALTER TABLE gastos ADD COLUMN IF NOT EXISTS banco_cuenta_id INT UNSIGNED DEFAULT NULL AFTER caja_destino;
+ALTER TABLE gastos ADD COLUMN IF NOT EXISTS cheque_id INT UNSIGNED DEFAULT NULL AFTER banco_cuenta_id;
+ALTER TABLE gastos ADD COLUMN IF NOT EXISTS sucursal_id INT UNSIGNED DEFAULT NULL AFTER cheque_id;
+ALTER TABLE gastos ADD COLUMN IF NOT EXISTS punto_venta INT UNSIGNED DEFAULT NULL AFTER sucursal_id;
+ALTER TABLE gastos ADD COLUMN IF NOT EXISTS created_by INT UNSIGNED DEFAULT NULL AFTER punto_venta;
+ALTER TABLE gastos ADD COLUMN IF NOT EXISTS created_at DATETIME NOT NULL AFTER created_by;
+ALTER TABLE gastos ADD COLUMN IF NOT EXISTS updated_at DATETIME NOT NULL AFTER created_at;
 
 -- Movimientos bancarios (para transferencias, cheques y depósitos de efectivo)
 CREATE TABLE IF NOT EXISTS banco_movimientos (
