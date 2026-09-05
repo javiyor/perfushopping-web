@@ -5,6 +5,9 @@ $presupuestoId = (int)($presupuestoId ?? 0);
 $presupuestoItems = $presupuestoItems ?? [];
 $csrfToken = $csrf ?? '';
 $bancos = $bancos ?? [];
+$bancosCuentas = $bancosCuentas ?? [];
+$tarjetas = $tarjetas ?? [];
+$equipos = $equipos ?? [];
 $plazos = $plazos ?? [];
 ?>
 <style>
@@ -874,12 +877,14 @@ if (presInput) {
 
 // ── Payment lines (multi-pago) ──
 const BANCOS = <?= json_encode($bancos, JSON_UNESCAPED_UNICODE) ?>;
+const BANCOS_CUENTAS = <?= json_encode($bancosCuentas, JSON_UNESCAPED_UNICODE) ?>;
+const TARJETAS = <?= json_encode($tarjetas, JSON_UNESCAPED_UNICODE) ?>;
+const EQUIPOS = <?= json_encode($equipos, JSON_UNESCAPED_UNICODE) ?>;
 const PLAZOS = <?= json_encode($plazos, JSON_UNESCAPED_UNICODE) ?>;
 const FORMAS_PAGO = [
     ['efectivo', 'Efectivo'],
     ['transferencia', 'Transferencia bancaria'],
-    ['tarjeta_credito', 'Tarjeta de crédito'],
-    ['tarjeta_debito', 'Tarjeta de débito'],
+    ['tarjeta', 'Tarjetas'],
     ['mercadopago', 'Mercado Pago'],
     ['cuenta_corriente', 'Cuenta corriente'],
     ['cheque', 'Cheque de terceros'],
@@ -919,10 +924,26 @@ function onPagoFormaChange(sel) {
     const line = sel.closest('.pago-line');
     const extra = line.querySelector('.fp-extra');
     const forma = sel.value;
-    if (forma === 'tarjeta_credito') {
+    if (forma === 'tarjeta' || forma === 'tarjeta_credito' || forma === 'tarjeta_debito') {
+        let tarOpts = '<option value="">— Seleccionar tarjeta —</option>';
+        TARJETAS.forEach(t => { tarOpts += `<option value="${t.idtarje}">${esc(t.nomtar)}</option>`; });
+        let eqOpts = '<option value="">— Seleccionar equipo —</option>';
+        EQUIPOS.forEach(e => { eqOpts += `<option value="${e.idequipo}">${esc(e.empresa||'Equipo')} - ${esc(String(e.idequipo))} (Suc ${esc(String(e.idsucemp))})</option>`; });
         extra.innerHTML = `
             <div class="row g-1">
+                <div class="col-6"><label class="small text-muted">Tarjeta</label><select class="form-select form-select-sm fp-tarjeta">${tarOpts}</select></div>
+                <div class="col-6"><label class="small text-muted">Equipo / POS</label><select class="form-select form-select-sm fp-equipo">${eqOpts}</select></div>
                 <div class="col-12"><label class="small text-muted">N° de cupón</label><input class="form-control form-control-sm fp-cupon" placeholder="N° de cupón" /></div>
+            </div>`;
+    } else if (forma === 'transferencia') {
+        let bcOpts = '<option value="">— Seleccionar banco destino —</option>';
+        BANCOS_CUENTAS.forEach(b => { bcOpts += `<option value="${b.id}">${esc(b.banco)} - ${esc(b.numero_cuenta||b.cbu||'')}</option>`; });
+        if (BANCOS_CUENTAS.length===0) {
+            BANCOS.forEach(b => { bcOpts += `<option value="${b.idban}">${esc(b.nombanc)}</option>`; });
+        }
+        extra.innerHTML = `
+            <div class="row g-1">
+                <div class="col-12"><label class="small text-muted">Banco donde se acredita</label><select class="form-select form-select-sm fp-banco-cuenta">${bcOpts}</select></div>
             </div>`;
     } else if (forma === 'cuenta_corriente') {
         let opts = '<option value="">— Sin plazo —</option>';
@@ -1012,13 +1033,22 @@ function submitFactura() {
         const forma = line.querySelector('.fp-forma').value;
         const monto = parseInt(parseFloat(line.querySelector('.fp-monto').value) * 100) || 0;
         if (monto <= 0) return;
-        const entry = { forma_pago: forma, monto_cents: monto };
-        if (forma === 'tarjeta_credito') {
-            entry.cupon_numero = (line.querySelector('.fp-cupon').value || '').trim();
+        // Normalizar forma tarjeta unificada
+        let formaNorm = forma;
+        if (forma === 'tarjeta_credito' || forma === 'tarjeta_debito') formaNorm = 'tarjeta';
+        const entry = { forma_pago: formaNorm, monto_cents: monto };
+        if (formaNorm === 'tarjeta') {
+            entry.cupon_numero = (line.querySelector('.fp-cupon')?.value || '').trim();
             entry.cupon_monto_cents = monto || null;
-        } else if (forma === 'cuenta_corriente') {
+            entry.tarjeta_id = parseInt(line.querySelector('.fp-tarjeta')?.value) || null;
+            entry.equipo_id = parseInt(line.querySelector('.fp-equipo')?.value) || null;
+        } else if (formaNorm === 'transferencia') {
+            entry.banco_cuenta_id = parseInt(line.querySelector('.fp-banco-cuenta')?.value) || null;
+            // fallback si usa bancos viejos
+            if (!entry.banco_cuenta_id) entry.banco_id = parseInt(line.querySelector('.fp-banco-cuenta')?.value) || null;
+        } else if (formaNorm === 'cuenta_corriente') {
             entry.idplazo = parseInt(line.querySelector('.fp-plazo').value) || null;
-        } else if (forma === 'cheque') {
+        } else if (formaNorm === 'cheque') {
             const bancoSel = line.querySelector('.fp-banco');
             entry.cheque = {
                 banco_id: parseInt(bancoSel.value) || null,

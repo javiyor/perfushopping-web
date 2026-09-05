@@ -77,6 +77,9 @@ final class FacturaController
             'presupuestoItems' => $presupuestoItems,
             'vendedores' => $vendedores,
             'bancos' => $this->bancos(),
+            'bancosCuentas' => $this->bancosCuentas(),
+            'tarjetas' => $this->tarjetas(),
+            'equipos' => $this->equipos((int)$auth->getSucursalId()),
             'plazos' => $this->plazos(),
             'csrf' => Csrf::token(),
             'pageTitle' => 'Nueva factura',
@@ -144,6 +147,8 @@ final class FacturaController
             $monto = (int)($pg['monto_cents'] ?? 0);
             if ($monto <= 0) continue;
             $formaPagoP = trim((string)($pg['forma_pago'] ?? 'efectivo'));
+            // Normalizar tarjetas unificadas
+            if (in_array($formaPagoP, ['tarjeta_credito','tarjeta_debito','tarjetas'], true)) $formaPagoP = 'tarjeta';
             $bancoId = null;
             $chequeId = null;
             if ($formaPagoP === 'cheque' && !empty($pg['cheque'])) {
@@ -172,10 +177,13 @@ final class FacturaController
                 'forma_pago' => $formaPagoP,
                 'monto_cents' => $monto,
                 'cheque_id' => $chequeId,
-                'cupon_numero' => $formaPagoP === 'tarjeta_credito' ? trim((string)($pg['cupon_numero'] ?? '')) : null,
-                'cupon_monto_cents' => $formaPagoP === 'tarjeta_credito' ? (int)($pg['cupon_monto_cents'] ?? 0) : null,
+                'cupon_numero' => $formaPagoP === 'tarjeta' ? trim((string)($pg['cupon_numero'] ?? '')) : null,
+                'cupon_monto_cents' => $formaPagoP === 'tarjeta' ? (int)($pg['cupon_monto_cents'] ?? 0) : null,
                 'idplazo' => $formaPagoP === 'cuenta_corriente' ? ((int)($pg['idplazo'] ?? 0) ?: null) : null,
                 'banco_id' => $bancoId,
+                'banco_cuenta_id' => $formaPagoP === 'transferencia' ? ((int)($pg['banco_cuenta_id'] ?? $pg['banco_id'] ?? 0) ?: null) : null,
+                'tarjeta_id' => $formaPagoP === 'tarjeta' ? ((int)($pg['tarjeta_id'] ?? $pg['idtarje'] ?? 0) ?: null) : null,
+                'equipo_id' => $formaPagoP === 'tarjeta' ? ((int)($pg['equipo_id'] ?? $pg['idequipo'] ?? 0) ?: null) : null,
             ];
         }
 
@@ -501,6 +509,41 @@ final class FacturaController
         $st = \Perfushopping\Web\Infra\Db::pdo()->query('SELECT idban, nombanc, numbanc FROM bancos ORDER BY nombanc ASC');
         $rows = $st->fetchAll();
         return is_array($rows) ? $rows : [];
+    }
+
+    private function bancosCuentas(): array
+    {
+        try {
+            $st = \Perfushopping\Web\Infra\Db::pdo()->query('SELECT id, banco, numero_cuenta, cbu FROM banco_cuentas WHERE activo=1 ORDER BY banco ASC');
+            return $st->fetchAll() ?: [];
+        } catch (\Throwable $e) { return []; }
+    }
+
+    private function tarjetas(): array
+    {
+        try {
+            $st = \Perfushopping\Web\Infra\Db::pdo()->query('SELECT idtarje, nomtar FROM tarjeta ORDER BY nomtar ASC');
+            return $st->fetchAll() ?: [];
+        } catch (\Throwable $e) { return []; }
+    }
+
+    private function equipos(int $sucursalId = 0): array
+    {
+        try {
+            $pdo = \Perfushopping\Web\Infra\Db::pdo();
+            if ($sucursalId > 0) {
+                $suc = (new \Perfushopping\Web\Repo\SucursalRepo())->findById($sucursalId);
+                $idsucemp = $suc ? (int)($suc['idsucemp'] ?? 0) : 0;
+                if ($idsucemp > 0) {
+                    $st = $pdo->prepare('SELECT idequipo, empresa, idsucemp FROM equipotar WHERE idsucemp=:s ORDER BY empresa ASC, idequipo ASC');
+                    $st->execute([':s' => $idsucemp]);
+                    $rows = $st->fetchAll();
+                    if ($rows) return $rows;
+                }
+            }
+            $st = $pdo->query('SELECT idequipo, empresa, idsucemp FROM equipotar ORDER BY empresa ASC, idequipo ASC LIMIT 100');
+            return $st->fetchAll() ?: [];
+        } catch (\Throwable $e) { return []; }
     }
 
     private function plazos(): array

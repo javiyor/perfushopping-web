@@ -114,17 +114,37 @@ final class FacturaRepo
 
     public function pagos(int $facturaId): array
     {
-        $st = Db::pdo()->prepare('
-            SELECT fp.*, c.banco_emisor AS cheque_banco, c.numero_cheque, c.titular AS cheque_titular, c.fecha_vencimiento AS cheque_vto, c.estado AS cheque_estado,
-                   b.nombanc AS banco_nombre, p.descripcion AS plazo_descripcion, p.cuotas AS plazo_cuotas, p.dias AS plazo_dias, p.pricuo AS plazo_pricuo
-            FROM factura_pagos fp
-            LEFT JOIN cheques c ON c.id = fp.cheque_id
-            LEFT JOIN bancos b ON b.idban = fp.banco_id
-            LEFT JOIN plazopago p ON p.idplazo = fp.idplazo
-            WHERE fp.factura_id = :f ORDER BY fp.id ASC
-        ');
-        $st->execute([':f' => $facturaId]);
-        return $st->fetchAll();
+        // Intentar con nuevas columnas, fallback si no existen
+        try {
+            $st = Db::pdo()->prepare('
+                SELECT fp.*, c.banco_emisor AS cheque_banco, c.numero_cheque, c.titular AS cheque_titular, c.fecha_vencimiento AS cheque_vto, c.estado AS cheque_estado,
+                       b.nombanc AS banco_nombre, p.descripcion AS plazo_descripcion, p.cuotas AS plazo_cuotas, p.dias AS plazo_dias, p.pricuo AS plazo_pricuo,
+                       t.nomtar AS tarjeta_nombre, e.empresa AS equipo_empresa, e.idequipo AS equipo_idequipo,
+                       bc.banco AS banco_cuenta_nombre
+                FROM factura_pagos fp
+                LEFT JOIN cheques c ON c.id = fp.cheque_id
+                LEFT JOIN bancos b ON b.idban = fp.banco_id
+                LEFT JOIN plazopago p ON p.idplazo = fp.idplazo
+                LEFT JOIN tarjeta t ON t.idtarje = fp.tarjeta_id
+                LEFT JOIN equipotar e ON e.idequipo = fp.equipo_id
+                LEFT JOIN banco_cuentas bc ON bc.id = fp.banco_cuenta_id
+                WHERE fp.factura_id = :f ORDER BY fp.id ASC
+            ');
+            $st->execute([':f' => $facturaId]);
+            return $st->fetchAll();
+        } catch (\Throwable $e) {
+            $st = Db::pdo()->prepare('
+                SELECT fp.*, c.banco_emisor AS cheque_banco, c.numero_cheque, c.titular AS cheque_titular, c.fecha_vencimiento AS cheque_vto, c.estado AS cheque_estado,
+                       b.nombanc AS banco_nombre, p.descripcion AS plazo_descripcion, p.cuotas AS plazo_cuotas, p.dias AS plazo_dias, p.pricuo AS plazo_pricuo
+                FROM factura_pagos fp
+                LEFT JOIN cheques c ON c.id = fp.cheque_id
+                LEFT JOIN bancos b ON b.idban = fp.banco_id
+                LEFT JOIN plazopago p ON p.idplazo = fp.idplazo
+                WHERE fp.factura_id = :f ORDER BY fp.id ASC
+            ');
+            $st->execute([':f' => $facturaId]);
+            return $st->fetchAll();
+        }
     }
 
     public function countActivas(): int
@@ -235,18 +255,51 @@ final class FacturaRepo
                 ]);
             }
 
-            $stp = $pdo->prepare('INSERT INTO factura_pagos (factura_id, forma_pago, cheque_id, monto_cents, cupon_numero, cupon_monto_cents, idplazo, banco_id) VALUES (:fid, :forma, :chq, :monto, :cupon, :cuponm, :plazo, :banco)');
-            foreach ($pagos as $pg) {
-                $stp->execute([
-                    ':fid' => $id,
-                    ':forma' => $pg['forma_pago'],
-                    ':chq' => $pg['cheque_id'] ?? null,
-                    ':monto' => $pg['monto_cents'],
-                    ':cupon' => $pg['cupon_numero'] ?? null,
-                    ':cuponm' => $pg['cupon_monto_cents'] ?? null,
-                    ':plazo' => $pg['idplazo'] ?? null,
-                    ':banco' => $pg['banco_id'] ?? null,
-                ]);
+            // Inserción compatible con columnas nuevas y viejas
+            $hasTarjeta = false; $hasEquipo = false; $hasBancoCuenta = false;
+            try {
+                $cols = $pdo->query('SHOW COLUMNS FROM factura_pagos')->fetchAll();
+                $fields = array_column($cols, 'Field');
+                $hasTarjeta = in_array('tarjeta_id', $fields, true);
+                $hasEquipo = in_array('equipo_id', $fields, true);
+                $hasBancoCuenta = in_array('banco_cuenta_id', $fields, true);
+            } catch (\Throwable $e) {}
+            if ($hasTarjeta && $hasEquipo && $hasBancoCuenta) {
+                $stp = $pdo->prepare('INSERT INTO factura_pagos (factura_id, forma_pago, cheque_id, monto_cents, cupon_numero, cupon_monto_cents, idplazo, banco_id, tarjeta_id, equipo_id, banco_cuenta_id) VALUES (:fid, :forma, :chq, :monto, :cupon, :cuponm, :plazo, :banco, :tarjeta, :equipo, :bancoCuenta)');
+                foreach ($pagos as $pg) {
+                    // Normalizar tarjetas unificadas
+                    $forma = $pg['forma_pago'];
+                    if (in_array($forma, ['tarjeta_credito','tarjeta_debito','tarjeta','tarjetas'], true)) $forma = 'tarjeta';
+                    $stp->execute([
+                        ':fid' => $id,
+                        ':forma' => $forma,
+                        ':chq' => $pg['cheque_id'] ?? null,
+                        ':monto' => $pg['monto_cents'],
+                        ':cupon' => $pg['cupon_numero'] ?? null,
+                        ':cuponm' => $pg['cupon_monto_cents'] ?? null,
+                        ':plazo' => $pg['idplazo'] ?? null,
+                        ':banco' => $pg['banco_id'] ?? null,
+                        ':tarjeta' => $pg['tarjeta_id'] ?? null,
+                        ':equipo' => $pg['equipo_id'] ?? null,
+                        ':bancoCuenta' => $pg['banco_cuenta_id'] ?? null,
+                    ]);
+                }
+            } else {
+                $stp = $pdo->prepare('INSERT INTO factura_pagos (factura_id, forma_pago, cheque_id, monto_cents, cupon_numero, cupon_monto_cents, idplazo, banco_id) VALUES (:fid, :forma, :chq, :monto, :cupon, :cuponm, :plazo, :banco)');
+                foreach ($pagos as $pg) {
+                    $forma = $pg['forma_pago'];
+                    if (in_array($forma, ['tarjeta_credito','tarjeta_debito','tarjeta','tarjetas'], true)) $forma = 'tarjeta';
+                    $stp->execute([
+                        ':fid' => $id,
+                        ':forma' => $forma,
+                        ':chq' => $pg['cheque_id'] ?? null,
+                        ':monto' => $pg['monto_cents'],
+                        ':cupon' => $pg['cupon_numero'] ?? null,
+                        ':cuponm' => $pg['cupon_monto_cents'] ?? null,
+                        ':plazo' => $pg['idplazo'] ?? null,
+                        ':banco' => $pg['banco_id'] ?? null,
+                    ]);
+                }
             }
 
             $pdo->commit();
