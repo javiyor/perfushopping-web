@@ -509,18 +509,22 @@ function searchProd(q) {
 function showVariantPicker(p, priceCents, ivaRate) {
     let html = '<div class="pos-result-item" style="flex-direction:column;align-items:stretch;cursor:default">';
     html += '<div class="fw-bold mb-2">' + esc(p.produ) + ' — elegí variedad:</div>';
+    html += '<input type="text" id="variantFilter" placeholder="Filtrar por nombre o id (ej: saro, 123)" class="form-control form-control-sm mb-2" oninput="filterVariantPicker(this.value)" />';
+    html += '<div id="variantList" style="max-height:300px;overflow-y:auto;">';
     p.variants.forEach(v => {
         const cs = v.codscan ? ' (' + v.codscan + ')' : '';
         const vStockDep = v.stock_deposito ?? 0;
         const vStockTot = v.stock_total ?? 0;
-        html += '<div class="suggestion-item" data-id="' + v.idcodgusto + '" data-nom="' + esc(v.nomgusto) + '">'
-            + esc(v.nomgusto) + cs
+        html += '<div class="suggestion-item variant-item" data-id="' + v.idcodgusto + '" data-nom="' + esc(v.nomgusto) + '" data-cod="' + esc(String(v.idcodgusto)) + '">'
+            + esc(v.nomgusto) + cs + ' <span class="text-muted" style="font-size:10px">#'+v.idcodgusto+'</span>'
             + ' <span class="text-success" style="font-size:11px">Dep: ' + vStockDep + '</span>'
             + ' <span class="text-muted" style="font-size:11px">Total: ' + vStockTot + '</span>'
             + '</div>';
     });
-    html += '</div>';
+    html += '</div></div>';
     prodResults.innerHTML = html;
+    const filterInput = document.getElementById('variantFilter');
+    if (filterInput) filterInput.focus();
     prodResults.querySelectorAll('.suggestion-item').forEach(el => {
         el.addEventListener('mousedown', function(e) {
             e.preventDefault();
@@ -539,6 +543,16 @@ function showVariantPicker(p, priceCents, ivaRate) {
             prodInput.value = '';
             prodInput.focus();
         });
+    });
+}
+function filterVariantPicker(q) {
+    const needle = (q||'').toLowerCase().trim();
+    document.querySelectorAll('#variantList .variant-item').forEach(el => {
+        const nom = (el.dataset.nom||'').toLowerCase();
+        const id = (el.dataset.id||'').toLowerCase();
+        const cod = (el.dataset.cod||'').toLowerCase();
+        const visible = !needle || nom.includes(needle) || id.includes(needle) || cod.includes(needle);
+        el.style.display = visible ? '' : 'none';
     });
 }
 

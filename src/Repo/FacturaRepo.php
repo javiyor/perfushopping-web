@@ -421,9 +421,8 @@ final class FacturaRepo
                 SELECT idcodgusto, nomgusto, codscan, stockact
                 FROM gustos
                 WHERE idprodu = :id AND discont = 0
-                GROUP BY nomgusto
+                GROUP BY idcodgusto, nomgusto, codscan, stockact
                 ORDER BY nomgusto ASC
-                LIMIT 100
             ');
             $st3->execute([':id' => $idprodu]);
             $products[$idx]['variants'] = $st3->fetchAll();
