@@ -66,6 +66,7 @@ use Perfushopping\Web\Admin\WebUserController as AdminWebUserController;
 use Perfushopping\Web\Admin\WholesaleController as AdminWholesaleController;
 use Perfushopping\Web\Admin\AffiliateController as AdminAffiliateController;
 use Perfushopping\Web\Admin\WithdrawalController as AdminWithdrawalController;
+use Perfushopping\Web\Admin\WhatsappCatalog\Controller as AdminWhatsAppCatalogController;
 use Perfushopping\Web\Admin\CapacitacionController as AdminCapacitacionController;
 use Perfushopping\Web\Admin\CorreoController as AdminCorreoController;
 use Perfushopping\Web\Admin\ChequeController as AdminChequeController;
@@ -82,6 +83,7 @@ use Perfushopping\Web\Admin\EnvioController as AdminEnvioController;
 use Perfushopping\Web\Admin\SocialInboxController as AdminSocialInboxController;
 use Perfushopping\Web\Admin\GastoController as AdminGastoController;
 use Perfushopping\Web\Admin\BancoController as AdminBancoController;
+use Perfushopping\Web\Admin\BancoCuentaController as AdminBancoCuentaController;
 
 $router = new Router();
 
@@ -376,6 +378,16 @@ $router->post('/admin/caja/depositar', [AdminGastoController::class, 'depositarS
 $router->get('/admin/bancos', [AdminBancoController::class, 'index']);
 $router->post('/admin/bancos/save', [AdminBancoController::class, 'save']);
 $router->post('/admin/bancos/delete', [AdminBancoController::class, 'delete']);
+$router->get('/admin/banco-cuentas', [AdminBancoCuentaController::class, 'index']);
+$router->post('/admin/banco-cuentas/save', [AdminBancoCuentaController::class, 'save']);
+$router->post('/admin/banco-cuentas/delete', [AdminBancoCuentaController::class, 'delete']);
+$router->post('/admin/banco-cuentas/cobro/save', [AdminBancoCuentaController::class, 'saveCobro']);
+$router->post('/admin/banco-cuentas/cobro/delete-tarjeta', [AdminBancoCuentaController::class, 'deleteCobroTarjeta']);
+
+// Admin - Catálogo WhatsApp Business
+$router->get('/admin/whatsApp-catalog', [AdminWhatsAppCatalogController::class, 'index']);
+$router->get('/admin/whatsApp-catalog/generate', [AdminWhatsAppCatalogController::class, 'generate']);
+$router->get('/admin/whatsApp-catalog/download', [AdminWhatsAppCatalogController::class, 'download']);
 
 // Admin - Órdenes de pago a proveedores
 $router->get('/admin/ordenes-pago', [AdminOrdenPagoController::class, 'index']);
