@@ -81,6 +81,7 @@ use Perfushopping\Web\Admin\PortadaController as AdminPortadaController;
 use Perfushopping\Web\Admin\EnvioController as AdminEnvioController;
 use Perfushopping\Web\Admin\SocialInboxController as AdminSocialInboxController;
 use Perfushopping\Web\Admin\GastoController as AdminGastoController;
+use Perfushopping\Web\Admin\BancoController as AdminBancoController;
 
 $router = new Router();
 
@@ -372,6 +373,9 @@ $router->get('/admin/gastos', [AdminGastoController::class, 'index']);
 $router->post('/admin/gastos/guardar', [AdminGastoController::class, 'store']);
 $router->get('/admin/caja/depositar', [AdminGastoController::class, 'depositarForm']);
 $router->post('/admin/caja/depositar', [AdminGastoController::class, 'depositarStore']);
+$router->get('/admin/bancos', [AdminBancoController::class, 'index']);
+$router->post('/admin/bancos/save', [AdminBancoController::class, 'save']);
+$router->post('/admin/bancos/delete', [AdminBancoController::class, 'delete']);
 
 // Admin - Órdenes de pago a proveedores
 $router->get('/admin/ordenes-pago', [AdminOrdenPagoController::class, 'index']);
