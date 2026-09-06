@@ -154,23 +154,24 @@ final class Controller
                 'csvSize' => $csvSize,
                 'recordCount' => $recordCount,
                 'page' => 'whatsAppCatalog',
+                'title' => $title,
             ]);
 
             // Cargar contenido específico del catálogo
             $catalogContent = file_exists(__DIR__ . '/../../../templates/admin/whats_catalog.php')
                 ? include __DIR__ . '/../../../templates/admin/whats_catalog.php'
-                : self::defaultCatalogView($csvExists, $csvModTime, $csvSize, $recordCount);
+                : self::defaultCatalogView($csvExists, $csvModTime, $csvSize, $recordCount, $title);
 
             // Cargar layout
             require $layoutFile;
         } else {
             // Fallback sin layout
-            self::defaultCatalogView($csvExists, $csvModTime, $csvSize, $recordCount);
+            self::defaultCatalogView($csvExists, $csvModTime, $csvSize, $recordCount, $title);
         }
     }
 
     /** Vista por defecto del catálogo si no hay plantilla específica */
-    private static function defaultCatalogView(bool $csvExists, string $csvModTime, string $csvSize, int $recordCount): void
+    private static function defaultCatalogView(bool $csvExists, string $csvModTime, string $csvSize, int $recordCount, string $title): void
     {
         echo "<!DOCTYPE html>\n";
         echo "<html lang='es' dir='ltr'>\n";
