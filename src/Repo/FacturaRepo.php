@@ -423,7 +423,7 @@ final class FacturaRepo
                 WHERE idprodu = :id AND discont = 0
                 GROUP BY nomgusto
                 ORDER BY nomgusto ASC
-                LIMIT 20
+                LIMIT 100
             ');
             $st3->execute([':id' => $idprodu]);
             $products[$idx]['variants'] = $st3->fetchAll();
