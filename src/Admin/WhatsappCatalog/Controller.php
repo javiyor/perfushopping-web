@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Perfushopping\Web\Admin\WhatsappCatalog;
 
-use Perfushopping\Web\Infra\Auth;
-use Perfushopping\Web\Infra\Flash;
-use function\render\twig;
+use Perfushopping\Web\Infra\Db;
+use Perfushopping\Web\Service\AdminAuthService;
+use Perfushopping\Web\Support\Response;
 use function\header\send;
 use function\json\decode;
 use function\json\encode;
 
-class Controller
+final class Controller
 {
     /** @var string Ruta del archivo CSV generado */
     private const CSV_FILE = __DIR__ . '/../../../../catalog_products.csv';
@@ -19,34 +19,48 @@ class Controller
     /** Genera el catálogo y lo guarda en disco */
     public static function generate(): void
     {
-        // Verificar permisos de admin
-        if (!Auth::isLoggedIn() || !Auth::isAdmin()) {
-            http_response_code(401);
-            echo 'Acceso no autorizado';
+        // Verificar permisos de admin usando AdminAuthService
+        $auth = new AdminAuthService();
+        if (!$auth->user()) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Inicia sesión para continuar.'];
+            Response::redirect('/admin/login');
+            exit;
+        }
+
+        if (!$auth->checkPermiso('productos')) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No tenés permisos para acceder a esta sección.'];
+            Response::redirect('/admin');
             exit;
         }
 
         $result = Generator::generate();
 
         if ($result === false) {
-            Flash::error('Error al generar el catálogo. Revisar logs del servidor.');
-            header('Location: /admin/whatsApp-catalog?status=error');
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Error al generar el catálogo. Revisar logs del servidor.'];
+            Response::redirect('/admin/whatsApp-catalog?status=error');
             exit;
         }
 
-        Flash::success('Catálogo generado correctamente en: ' . basename($result));
-        header('Location: /admin/whatsApp-catalog?status=ok');
+        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Catálogo generado correctamente en: ' . basename($result)];
+        Response::redirect('/admin/whatsApp-catalog?status=ok');
         exit;
     }
 
     /** Descarga el archivo catalog_products.csv al usuario */
     public static function download(): void
     {
-        // Verificar permisos de admin
-        if (!Auth::isLoggedIn() || !Auth::isAdmin()) {
-            http_response_code(403);
+        // Verificar permisos de admin usando AdminAuthService
+        $auth = new AdminAuthService();
+        if (!$auth->user()) {
+            http_response_code(401);
             echo 'Acceso no autorizado';
-            return;
+            exit;
+        }
+
+        if (!$auth->checkPermiso('productos')) {
+            http_response_code(403);
+            echo 'No tenés permisos para acceder a esta sección.';
+            exit;
         }
 
         if (!file_exists(self::CSV_FILE)) {
@@ -65,8 +79,9 @@ class Controller
         $file = fopen(self::CSV_FILE, 'r');
 
         if ($file) {
+            // Enviar encabezado
             $headers = fgetcsv($file, 8192, ',');
-            // Reenviar encabezado CSV
+            // Reconstruir encabezado CSV
             header("Content-Type: text/csv; charset=utf-8");
             header("Content-Disposition: attachment; filename=\"catalog_products.csv\";");
             header("Pragma: public");
@@ -81,6 +96,7 @@ class Controller
                     $output .= $i > 0 ? ',' : '';
                     $output .= '"' . str_replace('"', '""', $row[$i]) . '"';
                 }
+                // Print each line
                 print $output . "\n";
             }
             fclose($file);
@@ -90,9 +106,17 @@ class Controller
     /** Muestra el formulario de configuración y estado del catálogo */
     public static function index(): void
     {
-        // Verificar permisos de admin
-        if (!Auth::isLoggedIn() || !Auth::isAdmin()) {
-            header('Location: /admin/login');
+        // Verificar permisos de admin usando AdminAuthService
+        $auth = new AdminAuthService();
+        if (!$auth->user()) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Inicia sesión para continuar.'];
+            Response::redirect('/admin/login');
+            exit;
+        }
+
+        if (!$auth->checkPermiso('productos')) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No tenés permisos para acceder a esta sección.'];
+            Response::redirect('/admin');
             exit;
         }
 
@@ -115,9 +139,8 @@ class Controller
             }
         }
 
-        // Renderizar vista usando twig o PHP inline
+        // Renderizar vista usando PHP inline (sin twig para evitar más dependencias)
         $title = 'Catálogo WhatsApp - Productos';
-        $showNavbar = true;
 
         // Cargar plantilla - buscar en la estructura de vistas
         $layoutFile = __DIR__ . '/../../../templates/admin/layout.php';
@@ -126,7 +149,6 @@ class Controller
             // Extraer solo el contenido principal o renderizar con variables
             extract([
                 'title' => $title,
-                'showNavbar' => $showNavbar,
                 'csvExists' => $csvExists,
                 'csvModTime' => $csvModTime,
                 'csvSize' => $csvSize,
