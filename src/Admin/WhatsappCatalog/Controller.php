@@ -155,9 +155,15 @@ final class Controller
                 : self::defaultCatalogView($csvExists, $csvModTime, $csvSize, $recordCount, $title);
 
             // Construir el cuerpo HTML para pasar al layout
-            // Usamos el ancho del sidebar definido en :root de layout.php (250px)
-            // Esto asegura que el contenido no se superponga con el menú lateral fixed
-            $body = '<div style="margin-left: 250px; padding-left: 0;">' . "\n" .
+            // El template whats_catalog.php ya incluye margin-left: 250px
+            // para compensar el sidebar fixed del admin, por lo que no es necesario
+            // agregar otro margen aquí. Esto evita márgenes duplicados.
+            $catalogContent = file_exists(__DIR__ . '/../../../templates/admin/whats_catalog.php')
+                ? include __DIR__ . '/../../../templates/admin/whats_catalog.php'
+                : self::defaultCatalogView($csvExists, $csvModTime, $csvSize, $recordCount, $title);
+
+            // Cuerpo simple sin margen adicional (el template provee el margen necesario)
+            $body = '<div>' . "\n" .
                 $catalogContent . '</div>';
 
             // Extraer solo el contenido principal o renderizar con variables
