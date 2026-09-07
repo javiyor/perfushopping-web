@@ -124,9 +124,15 @@ final class Generator
             $csvLines[] = implode(',', self::getCsvHeaders());
 
             // Filas de datos - completar URLs en cada fila
+            $validRows = 0;
             foreach ($rows as $row) {
                 $mapped = self::mapRow($row);
+                // Validación rápida: asegurar que id no esté vacío
+                if (trim($mapped['id']) === '') {
+                    continue; // Saltar filas sin ID
+                }
                 $csvLines[] = self::csvEncodeRow($mapped);
+                $validRows++;
             }
 
             $content = implode("\n", $csvLines);
@@ -139,13 +145,19 @@ final class Generator
 
             $result = file_put_contents(self::CSV_PATH, $content);
             if ($result === false) {
-                error_log('WhatsApp Catalog Generator: Cannot write to ' . self::CSV_PATH);
+                error_log('WhatsApp Catalog Generator: Cannot write to ' . self::CSV_PATH . ' (tried to write ' . strlen($content) . ' bytes)');
                 return false;
+            }
+
+            // Log informativo opcional - número de productos generados
+            if ($validRows > 0) {
+                error_log('WhatsApp Catalog Generator: Successfully generated catalog with ' . $validRows . ' products');
             }
 
             return self::CSV_PATH;
         } catch (\Exception $e) {
-            error_log('WhatsApp Catalog Generator Error: ' . $e->getMessage());
+            error_log('WhatsApp Catalog Generator Exception: ' . $e->getMessage());
+            error_log('WhatsApp Catalog Generator Stack: ' . $e->getTraceAsString());
             return false;
         }
     }
