@@ -42,7 +42,8 @@ final class Controller
         }
 
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Catálogo generado correctamente en: ' . basename($result)];
-        Response::redirect('/admin/whatsApp-catalog?status=ok');
+        $pageTitle = 'Catálogo WhatsApp'; // Título para el header
+        Response::redirect('/admin/whatsApp-catalog?status=ok&pageTitle=' . urlencode($pageTitle));
         exit;
     }
 
@@ -139,9 +140,11 @@ final class Controller
             }
         }
 
-        // Renderizar vista usando PHP inline (sin twig para evitar más dependencias)
+        // Título y subtítulo para la vista
         $title = 'Catálogo WhatsApp - Productos';
+        $pageTitle = 'Catálogo WhatsApp'; // Título para el header del layout
 
+        // Renderizar vista usando PHP inline (sin twig para evitar más dependencias)
         // Cargar plantilla - buscar en la estructura de vistas
         $layoutFile = __DIR__ . '/../../../templates/admin/layout.php';
 
@@ -158,8 +161,10 @@ final class Controller
                 $catalogContent . '</div>';
 
             // Extraer solo el contenido principal o renderizar con variables
+            // Incluimos pageTitle para que el layout muestre el título correcto
             extract([
                 'title' => $title,
+                'pageTitle' => $pageTitle,  // Agregado para el header
                 'csvExists' => $csvExists,
                 'csvModTime' => $csvModTime,
                 'csvSize' => $csvSize,
@@ -196,7 +201,7 @@ final class Controller
         echo "            <h4>Catálogo WhatsApp Business</h4>\n";
         echo "            <p>Archivo: catalog_products.csv</p>\n";
         echo "            <p>Última actualización: " . htmlspecialchars($csvModTime) . "</p>\n";
-        echo "            <p>Tamaño: " . htmlspecialchars((string)$csvSize) . "</p>\n";
+        echo "            <p>Tamaño: " . htmlspecialchars($csvSize) . "</p>\n";
         echo "            <p>Registros: " . htmlspecialchars((string)$recordCount) . "</p>\n";
         echo "        </div>\n";
 
