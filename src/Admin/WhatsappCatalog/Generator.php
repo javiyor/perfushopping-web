@@ -58,7 +58,7 @@ final class Generator
      *
      * @return string|false Ruta del archivo generado o false en error
      */
-    public static function generate(): ?string
+    public static function generate()
     {
         try {
             $pdo = Db::pdo();

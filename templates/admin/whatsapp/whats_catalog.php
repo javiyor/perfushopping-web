@@ -23,25 +23,22 @@ $statusBadge = $csvExists
 
 // Información del archivo
 ?>
-<!-- Empieza el contenido con margin-left para compensar sidebar fixed de 250px -->
-<div style="margin-left: 250px; padding-left: 0; width: calc(100% - 250px);">
-    <div class="row">
-        <div class="col-12">
-            <h2 class="text-center mb-4"><?php echo htmlspecialchars($title); ?></h2>
-        </div>
-    </row>
-    
-    <div class="row mt-3 justify-content-center">
-        <div class="col-12 col-md-9 col-lg-7">
-            <div class="card">
-                <div class="card-body p-0">
-                    <h5 class="card-title text-center py-3">Información del catálogo</h5>
-                    <hr class="m-0">
-                    <p><strong>Archivo:</strong> catalog_products.csv</p>
-                    <p><strong>Última actualización:</strong> <?php echo htmlspecialchars($csvModTime); ?></p>
-                    <p><strong>Tamaño:</strong> <?php echo htmlspecialchars($csvSize); ?></p>
-                    <p><strong>Número de productos:</strong> <?php echo $recordCount; ?></p>
-                </div>
+<div class="row">
+    <div class="col-12">
+        <h2 class="text-center mb-4"><?php echo htmlspecialchars($title); ?></h2>
+    </div>
+</div>
+
+<div class="row mt-3 justify-content-center">
+    <div class="col-12 col-md-9 col-lg-7">
+        <div class="card">
+            <div class="card-body p-0">
+                <h5 class="card-title text-center py-3">Información del catálogo</h5>
+                <hr class="m-0">
+                <p class="text-center"><strong>Archivo:</strong> catalog_products.csv</p>
+                <p class="text-center"><strong>Última actualización:</strong> <?php echo htmlspecialchars($csvModTime); ?></p>
+                <p class="text-center"><strong>Tamaño:</strong> <?php echo htmlspecialchars($csvSize); ?></p>
+                <p class="text-center"><strong>Número de productos:</strong> <?php echo $recordCount; ?></p>
             </div>
         </div>
     </div>
