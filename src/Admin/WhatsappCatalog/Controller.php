@@ -146,6 +146,19 @@ final class Controller
         $layoutFile = __DIR__ . '/../../../templates/admin/layout.php';
 
         if (file_exists($layoutFile)) {
+            // Generar contenido para el cuerpo de la página
+            $catalogContent = file_exists(__DIR__ . '/../../../templates/admin/whats_catalog.php')
+                ? include __DIR__ . '/../../../templates/admin/whats_catalog.php'
+                : self::defaultCatalogView($csvExists, $csvModTime, $csvSize, $recordCount, $title);
+
+            // Construir el cuerpo HTML para pasar al layout
+            $body = '<div class="row">' . "\n" .
+                '    <div class="col-12">' . "\n" .
+                '        <h2>' . htmlspecialchars($title) . '</h2>' . "\n" .
+                '    </div>' . "\n" .
+                '</div>' . "\n" .
+                $catalogContent;
+
             // Extraer solo el contenido principal o renderizar con variables
             extract([
                 'title' => $title,
@@ -154,13 +167,9 @@ final class Controller
                 'csvSize' => $csvSize,
                 'recordCount' => $recordCount,
                 'page' => 'whatsAppCatalog',
+                'body' => $body,
                 'title' => $title,
             ]);
-
-            // Cargar contenido específico del catálogo
-            $catalogContent = file_exists(__DIR__ . '/../../../templates/admin/whats_catalog.php')
-                ? include __DIR__ . '/../../../templates/admin/whats_catalog.php'
-                : self::defaultCatalogView($csvExists, $csvModTime, $csvSize, $recordCount, $title);
 
             // Cargar layout
             require $layoutFile;
