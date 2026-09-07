@@ -152,12 +152,10 @@ final class Controller
                 : self::defaultCatalogView($csvExists, $csvModTime, $csvSize, $recordCount, $title);
 
             // Construir el cuerpo HTML para pasar al layout
-            $body = '<div class="row">' . "\n" .
-                '    <div class="col-12">' . "\n" .
-                '        <h2>' . htmlspecialchars($title) . '</h2>' . "\n" .
-                '    </div>' . "\n" .
-                '</div>' . "\n" .
-                $catalogContent;
+            // Usamos el ancho del sidebar definido en :root de layout.php (250px)
+            // Esto asegura que el contenido no se superponga con el menú lateral fixed
+            $body = '<div style="margin-left: 250px; padding-left: 0;">' . "\n" .
+                $catalogContent . '</div>';
 
             // Extraer solo el contenido principal o renderizar con variables
             extract([
