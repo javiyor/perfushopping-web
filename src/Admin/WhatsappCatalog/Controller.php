@@ -189,8 +189,8 @@ final class Controller
         echo "            <h4>Catálogo WhatsApp Business</h4>\n";
         echo "            <p>Archivo: catalog_products.csv</p>\n";
         echo "            <p>Última actualización: " . htmlspecialchars($csvModTime) . "</p>\n";
-        echo "            <p>Tamaño: " . htmlspecialchars($csvSize) . "</p>\n";
-        echo "            <p>Registros: " . htmlspecialchars($recordCount) . "</p>\n";
+        echo "            <p>Tamaño: " . htmlspecialchars((string)$csvSize) . "</p>\n";
+        echo "            <p>Registros: " . htmlspecialchars((string)$recordCount) . "</p>\n";
         echo "        </div>\n";
 
         if (!$csvExists) {
