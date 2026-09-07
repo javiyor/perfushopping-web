@@ -134,10 +134,12 @@ final class Generator
             // Guardar archivo
             $dir = dirname(self::CSV_PATH);
             if (!is_dir($dir)) {
-                mkdir($dir, 0755, true);
+                @mkdir($dir, 0755, true);
             }
 
-            if (file_put_contents(self::CSV_PATH, $content) === false) {
+            $result = file_put_contents(self::CSV_PATH, $content);
+            if ($result === false) {
+                error_log('WhatsApp Catalog Generator: Cannot write to ' . self::CSV_PATH);
                 return false;
             }
 
