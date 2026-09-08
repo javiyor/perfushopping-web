@@ -33,10 +33,20 @@ final class Controller
             exit;
         }
 
-        $result = Generator::generate();
+        try {
+            $result = Generator::generate();
+        } catch (\Throwable $e) {
+            error_log('WhatsApp Catalog Controller generate throwable: '.$e->getMessage());
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Error al generar catálogo: '. $e->getMessage()];
+            Response::redirect('/admin/whatsApp-catalog?status=error');
+            exit;
+        }
 
-        if ($result === false) {
-            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Error al generar el catálogo. Revisar logs del servidor.'];
+        if ($result === false || $result === null) {
+            $last = error_get_last();
+            $msg = $last['message'] ?? 'Revisar logs del servidor (permisos escritura o DB).';
+            // Intentar leer último error_log del Generator si existe
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Error al generar el catálogo. '.$msg.' Ruta intentada: '.Generator::csvPath()];
             Response::redirect('/admin/whatsApp-catalog?status=error');
             exit;
         }

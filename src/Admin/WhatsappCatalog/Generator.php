@@ -212,18 +212,19 @@ final class Generator
         $decPart = strlen($decPart) === 1 ? $decPart . '0' : $decPart;
         $mapped['price'] = $intPart . '.' . $decPart . ' USD';
 
-        // Link - URL absoluta del producto
+        // Link - URL absoluta del producto (fallback perfushopping.ar si no hay HTTP_HOST, ej cron)
+        $host = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'perfushopping.ar';
         $id = (string)($row['id'] ?? '1');
         $linkBase = (string)($row['link_base'] ?? '/producto/1');
-        $mapped['link'] = 'https://' . $_SERVER['HTTP_HOST'] . $linkBase . '/' . $id;
+        $mapped['link'] = 'https://' . $host . $linkBase . '/' . $id;
 
         // Image link - construir URL con host + extensión verificada
         $img = (string)($row['image_filename'] ?? '');
         $ext = strtolower(pathinfo($img, PATHINFO_EXTENSION));
         $allowedExts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
         $mapped['image_link'] = in_array($ext, $allowedExts)
-            ? 'https://' . $_SERVER['HTTP_HOST'] . '/imagenes/' . $img
-            : 'https://' . $_SERVER['HTTP_HOST'] . '/images/default-product.jpg';
+            ? 'https://' . $host . '/imagenes/' . $img
+            : 'https://' . $host . '/images/default-product.jpg';
 
         // Marca - por defecto
         $mapped['brand'] = 'Perfushopping';
