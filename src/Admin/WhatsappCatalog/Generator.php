@@ -9,8 +9,18 @@ use PDO;
 
 final class Generator
 {
-    /** @var string Ruta donde se guardará el archivo CSV */
+    /** @var string Ruta donde se guardará el archivo CSV - en public para https://perfushopping.ar/catalog_products.csv */
     private const CSV_PATH = __DIR__ . '/../../../../catalog_products.csv';
+    public static function csvPath(): string
+    {
+        $cands = [
+            __DIR__ . '/../../../public/catalog_products.csv',
+            __DIR__ . '/../../../../public_html/catalog_products.csv',
+            __DIR__ . '/../../../../catalog_products.csv',
+        ];
+        foreach ($cands as $p) if (is_dir(dirname($p))) return $p;
+        return $cands[0];
+    }
 
     /** @var string[] Encabezados del catálogo Facebook/WhApp en orden exacto */
     private const HEADERS = [
@@ -137,24 +147,23 @@ final class Generator
 
             $content = implode("\n", $csvLines);
 
-            // Guardar archivo
-            $dir = dirname(self::CSV_PATH);
+            // Guardar en public para URL https://perfushopping.ar/catalog_products.csv
+            $csvPath = self::csvPath();
+            $dir = dirname($csvPath);
             if (!is_dir($dir)) {
                 @mkdir($dir, 0755, true);
             }
-
-            $result = file_put_contents(self::CSV_PATH, $content);
+            $result = file_put_contents($csvPath, $content);
             if ($result === false) {
-                error_log('WhatsApp Catalog Generator: Cannot write to ' . self::CSV_PATH . ' (tried to write ' . strlen($content) . ' bytes)');
+                error_log('WhatsApp Catalog Generator: Cannot write to ' . $csvPath . ' (tried to write ' . strlen($content) . ' bytes)');
                 return false;
             }
+            if ($csvPath !== self::CSV_PATH) @copy($csvPath, self::CSV_PATH);
 
-            // Log informativo opcional - número de productos generados
             if ($validRows > 0) {
-                error_log('WhatsApp Catalog Generator: Successfully generated catalog with ' . $validRows . ' products');
+                error_log('WhatsApp Catalog Generator: Successfully generated catalog with ' . $validRows . ' products at ' . $csvPath);
             }
-
-            return self::CSV_PATH;
+            return $csvPath;
         } catch (\Exception $e) {
             error_log('WhatsApp Catalog Generator Exception: ' . $e->getMessage());
             error_log('WhatsApp Catalog Generator Stack: ' . $e->getTraceAsString());

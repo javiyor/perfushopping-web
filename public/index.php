@@ -87,7 +87,8 @@ use Perfushopping\Web\Admin\BancoCuentaController as AdminBancoCuentaController;
 
 $router = new Router();
 
-// Public
+// Public - Catalog feed para Meta (sin auth)
+$router->get('/catalog_products.csv', [\Perfushopping\Web\Controller\CatalogFeedController::class, 'csv']);
 $router->get('/', [HomeController::class, 'index']);
 $router->get('/p/(?P<id>\d+)', [ProductController::class, 'show']);
 
