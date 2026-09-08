@@ -82,7 +82,7 @@ final class Generator
                     p.produ AS title,
                     IFNULL(p.observ, '') AS description,
                     CASE WHEN p.enweb = 1 THEN 'in stock' ELSE 'out of stock' END AS availability,
-                    'new' AS `condition`,
+                    'new' AS item_condition,
                     FORMAT(p.precio / 100, 2) AS price_raw,
                     CONCAT('/producto/', p.idprodu) AS link_base,
                     p.imagen AS image_filename,
@@ -103,11 +103,11 @@ final class Generator
                     '0 kg' AS shipping_weight,
                     '' AS offer_disclaimer,
                     '' AS offer_disclaimer_url,
-                    '' AS 'video[0].url',
-                    '' AS 'video[0].tag[0]',
-                    IF(LENGTH(TRIM(p.codscan)) IN (8, 12, 13, 14), p.codscan, '') AS gtin,
-                    '' AS 'product_tags[0]',
-                    '' AS 'product_tags[1]',
+                    '' AS `video[0].url`,
+                    '' AS `video[0].tag[0]`,
+                    '' AS gtin,
+                    '' AS `product_tags[0]`,
+                    '' AS `product_tags[1]`,
                     '' AS style
                 FROM producto p
                 WHERE p.enweb = 1
@@ -198,8 +198,8 @@ final class Generator
         $avail = (string)($row['availability'] ?? 'out of stock');
         $mapped['availability'] = in_array($avail, ['in stock', 'out of stock']) ? $avail : 'out of stock';
 
-        // Condición - valores exactos requeridos
-        $cond = (string)($row['condition'] ?? 'new');
+        // Condición - valores exactos requeridos (alias item_condition para evitar palabra reservada)
+        $cond = (string)($row['condition'] ?? $row['item_condition'] ?? 'new');
         $mapped['condition'] = in_array($cond, ['new', 'used']) ? $cond : 'new';
 
         // Precio - formato number_currency con punto decimal, espacio, código ISO
