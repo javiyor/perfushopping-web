@@ -894,6 +894,8 @@ const BANCOS = <?= json_encode($bancos, JSON_UNESCAPED_UNICODE) ?>;
 const BANCOS_CUENTAS = <?= json_encode($bancosCuentas, JSON_UNESCAPED_UNICODE) ?>;
 const TARJETAS = <?= json_encode($tarjetas, JSON_UNESCAPED_UNICODE) ?>;
 const EQUIPOS = <?= json_encode($equipos, JSON_UNESCAPED_UNICODE) ?>;
+const TRANSFER_CUENTA_ID = <?= json_encode($transferCuentaId ?? null) ?>;
+const TARJETA_BANCO_MAP = <?= json_encode($tarjetaBancoMap ?? []) ?>;
 const PLAZOS = <?= json_encode($plazos, JSON_UNESCAPED_UNICODE) ?>;
 const FORMAS_PAGO = [
     ['efectivo', 'Efectivo'],
@@ -959,6 +961,12 @@ function onPagoFormaChange(sel) {
             <div class="row g-1">
                 <div class="col-12"><label class="small text-muted">Banco donde se acredita</label><select class="form-select form-select-sm fp-banco-cuenta">${bcOpts}</select></div>
             </div>`;
+        // Preseleccionar cuenta predeterminada para transferencias
+        const sel = extra.querySelector('.fp-banco-cuenta');
+        if (sel && TRANSFER_CUENTA_ID) {
+            sel.value = String(TRANSFER_CUENTA_ID);
+            if (!sel.value && BANCOS_CUENTAS.length>0) sel.value = String(TRANSFER_CUENTA_ID);
+        }
     } else if (forma === 'cuenta_corriente') {
         let opts = '<option value="">— Sin plazo —</option>';
         PLAZOS.forEach(p => { opts += `<option value="${p.idplazo}">${esc(p.descripcion)}</option>`; });

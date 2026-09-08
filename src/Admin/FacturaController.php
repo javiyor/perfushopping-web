@@ -5,7 +5,9 @@ namespace Perfushopping\Web\Admin;
 
 use Perfushopping\Web\Infra\SmtpMailer;
 use Perfushopping\Web\Repo\FacturaRepo;
+use Perfushopping\Web\Repo\BancoCuentaRepo;
 use Perfushopping\Web\Repo\ChequeRepo;
+use Perfushopping\Web\Repo\CobroCuentaRepo;
 use Perfushopping\Web\Repo\StockRepo;
 use Perfushopping\Web\Repo\ArcaRepo;
 use Perfushopping\Web\Service\AdminAuthService;
@@ -69,6 +71,17 @@ final class FacturaController
             }
         }
 
+        $cobroRepo = new CobroCuentaRepo();
+        $transferCuentaId = $cobroRepo->getTransferenciaCuentaId();
+        $tarjetaCobros = [];
+        try { $tarjetaCobros = $cobroRepo->all(); } catch (\Throwable $e) {}
+        // Mapeo tarjeta -> banco_cuenta_id para preselección
+        $tarjetaBancoMap = [];
+        foreach ($tarjetaCobros as $tc) {
+            if (($tc['tipo'] ?? '') === 'tarjeta' && !empty($tc['idtarje'])) {
+                $tarjetaBancoMap[(int)$tc['idtarje']] = (int)$tc['banco_cuenta_id'];
+            }
+        }
         echo View::adminPage('admin/facturas/pos.php', [
             'adminUser' => $adminUser,
             'remitoId' => $remitoId,
@@ -81,6 +94,8 @@ final class FacturaController
             'tarjetas' => $this->tarjetas(),
             'equipos' => $this->equipos((int)$auth->getSucursalId()),
             'plazos' => $this->plazos(),
+            'transferCuentaId' => $transferCuentaId,
+            'tarjetaBancoMap' => $tarjetaBancoMap,
             'csrf' => Csrf::token(),
             'pageTitle' => 'Nueva factura',
         ]);
@@ -333,6 +348,31 @@ final class FacturaController
                 }
             }
         }
+
+        // Registrar movimientos bancarios para transferencias y tarjetas
+        try {
+            $bancoMovRepo = new \Perfushopping\Web\Repo\BancoMovimientoRepo();
+            $cobroRepo = new \Perfushopping\Web\Repo\CobroCuentaRepo();
+            foreach ($pagos as $pg) {
+                $fp = $pg['forma_pago'];
+                if ($fp === 'transferencia') {
+                    $bancoCuentaId = $pg['banco_cuenta_id'] ?? null;
+                    if (!$bancoCuentaId) $bancoCuentaId = $cobroRepo->getTransferenciaCuentaId();
+                    if ($bancoCuentaId) {
+                        $bancoMovRepo->create((int)$bancoCuentaId, 'credito', 'factura', $id, 'Cobro factura ' . $codigo . ' (transferencia)', (int)$pg['monto_cents'], $fecha, (int)$adminUser['id']);
+                    }
+                } elseif ($fp === 'tarjeta') {
+                    $tarjetaId = $pg['tarjeta_id'] ?? null;
+                    $bancoCuentaId = null;
+                    if ($tarjetaId) $bancoCuentaId = $cobroRepo->getTarjetaCuentaId((int)$tarjetaId);
+                    // fallback a cuenta seleccionada explícitamente
+                    if (!$bancoCuentaId) $bancoCuentaId = $pg['banco_cuenta_id'] ?? null;
+                    if ($bancoCuentaId) {
+                        $bancoMovRepo->create((int)$bancoCuentaId, 'credito', 'factura', $id, 'Cobro factura ' . $codigo . ' (tarjeta ' . ($pg['tarjeta_id'] ?? '') . ')', (int)$pg['monto_cents'], $fecha, (int)$adminUser['id']);
+                    }
+                }
+            }
+        } catch (\Throwable $e) { error_log('BancoMov factura: '.$e->getMessage()); }
 
         // Auto-post to current account if forma_pago = cuenta_corriente
         if ($clienteId && $formaPago === 'cuenta_corriente') {
