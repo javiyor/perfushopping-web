@@ -87,6 +87,8 @@ use Perfushopping\Web\Admin\BancoCuentaController as AdminBancoCuentaController;
 
 $router = new Router();
 
+// Health
+$router->get('/health', [\Perfushopping\Web\Controller\HealthController::class, 'check']);
 // Public - Catalog feed para Meta (sin auth)
 $router->get('/catalog_products.csv', [\Perfushopping\Web\Controller\CatalogFeedController::class, 'csv']);
 $router->get('/', [HomeController::class, 'index']);
