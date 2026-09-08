@@ -116,6 +116,23 @@ final class Generator
                   AND p.fecompra IS NOT NULL
                   AND p.fecompra <> '0000-00-00'
                   AND p.fecompra > DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
+                  AND TRIM(COALESCE(p.imagen,'')) <> ''
+                  AND EXISTS (
+                    SELECT 1 FROM gustos g
+                    LEFT JOIN (
+                      SELECT sd.idcodgusto, SUM(sd.canti) AS entradas
+                      FROM stockdet sd INNER JOIN stockcab sc ON sd.idstockcab=sc.idcabstock INNER JOIN deposito d ON sc.iddepoh=d.iddepo
+                      WHERE d.marca=2 GROUP BY sd.idcodgusto
+                    ) ent ON ent.idcodgusto=g.idcodgusto
+                    LEFT JOIN (
+                      SELECT sd.idcodgusto, SUM(sd.canti) AS salidas
+                      FROM stockdet sd INNER JOIN stockcab sc ON sd.idstockcab=sc.idcabstock INNER JOIN deposito d ON sc.iddepod=d.iddepo
+                      WHERE d.marca=2 GROUP BY sd.idcodgusto
+                    ) sal ON sal.idcodgusto=g.idcodgusto
+                    WHERE g.idprodu=p.idprodu AND g.discont=0
+                    AND (COALESCE(ent.entradas,0) - COALESCE(sal.salidas,0)) > 0
+                    LIMIT 1
+                  )
                 ORDER BY p.idprodu ASC
             ";
 
