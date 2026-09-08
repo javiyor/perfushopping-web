@@ -13,9 +13,10 @@ final class Generator
     private const CSV_PATH = __DIR__ . '/../../../../catalog_products.csv';
     public static function csvPath(): string
     {
+        // En server Hostinger el docroot es public_html al lado de repo
         $cands = [
-            __DIR__ . '/../../../public/catalog_products.csv',
             __DIR__ . '/../../../../public_html/catalog_products.csv',
+            __DIR__ . '/../../../public/catalog_products.csv',
             __DIR__ . '/../../../../catalog_products.csv',
         ];
         foreach ($cands as $p) if (is_dir(dirname($p))) return $p;
@@ -164,10 +165,10 @@ final class Generator
                 error_log('WhatsApp Catalog Generator: Successfully generated catalog with ' . $validRows . ' products at ' . $csvPath);
             }
             return $csvPath;
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             error_log('WhatsApp Catalog Generator Exception: ' . $e->getMessage());
             error_log('WhatsApp Catalog Generator Stack: ' . $e->getTraceAsString());
-            return false;
+            throw $e;
         }
     }
 
