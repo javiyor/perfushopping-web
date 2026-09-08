@@ -215,9 +215,32 @@ Rutas públicas de `/eventos/demo-tecnica/*` (frontend) se mantienen en `DemoTec
 - Historial de cierres anteriores
 - Tablas: `caja_aperturas`, `caja_movimientos`, `caja_arqueos`
 
+### 26. Catálogo WhatsApp / Meta
+- Generador `src/Admin/WhatsappCatalog/Generator.php` extrae `producto` (enweb=1, sin tester, 6 meses) y mapea a 32 campos Facebook/Meta (`catalog_products.csv`)
+- Rutas `/admin/whatsApp-catalog`, `/admin/whatsApp-catalog/generate`, `/admin/whatsApp-catalog/download` + feed público `/catalog_products.csv` sin auth para Meta
+- Vista `templates/admin/whatsapp/whats_catalog.php` dentro de `layout.php:.main-content` (sin margin duplicado)
+- Cron `*/30 * * * * php src/Admin/WhatsappCatalog/Generator.php`
+
+### 27. Mensajería Unificada (Social Inbox)
+- Bandeja `templates/admin/mensajes/inbox.php` para WhatsApp/Instagram/Facebook vía `SocialInboxRepo` + `SocialInboxController` (`/admin/mensajes`, `tomar/liberar/cerrar`)
+- Webhooks Meta `/webhooks/meta` (verify/receive) en `MetaWebhookController`
+- Layout sidebar con badge y acceso `Mensajes`
+
+### 28. Bancos y Cuentas Propias
+- ABM `bancos` (idban) y `banco_cuentas` con cuentas predeterminadas de cobro (`cobro_cuentas` mapea transferencias/tarjetas)
+- Pre-selección en POS según `CobroCuentaRepo`
+- Tablas: `bancos`, `banco_cuentas`, `cobro_cuentas`
+
+### 29. POS - Mejoras
+- Variantes sin límite 100 + filtro por nomgusto/idcodgusto
+- Transferencia con banco destino y tarjeta con tarjeta_id/equipo_id
+
+### 30. Meta Pixel
+- `templates/layout.php:43` Pixel `815822046012434` con `fbq PageView` en todas las páginas públicas
+
 ---
 
-## Pendientes
+## Pendientes (Perfushopping e-commerce, sin SaaS organizing-web)
 
 1. **AFIP/ARCA** — Factura electrónica (integración con servicios AFIP)
 2. ~~Órdenes de compra~~ ✅
@@ -230,6 +253,10 @@ Rutas públicas de `/eventos/demo-tecnica/*` (frontend) se mantienen en `DemoTec
 9. ~~Compactar formulario de producto~~ ✅
 10. ~~Sistema de permisos por rol~~ ✅ — columna `permisos` (JSON) en `admin_users`, checkboxes en modal, fallback a defaults del rol
 11. ~~Renombrar Demo Técnica → Capacitaciones~~ ✅
+12. ~~Catálogo WhatsApp~~ ✅ — sin tapado por sidebar (fix `whats_catalog.php` sin margin 250 duplicado)
+13. ~~Mensajería~~ ✅ — inbox unificado + webhooks Meta
+14. ~~Meta Pixel~~ ✅ — 815822046012434 en `layout.php`
+15. **SaaS organizing-web** (alquileres 30d, licencias, cuotas, suspensiones) — excluido de este repo, va en proyecto Laravel separado
 
 ---
 
