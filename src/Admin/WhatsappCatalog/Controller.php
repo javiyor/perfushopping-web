@@ -159,22 +159,20 @@ final class Controller
         $layoutFile = __DIR__ . '/../../../templates/admin/layout.php';
 
         if (file_exists($layoutFile)) {
-            // Generar contenido para el cuerpo de la página
-            $catalogContent = file_exists(__DIR__ . '/../../../templates/admin/whats_catalog.php')
-                ? include __DIR__ . '/../../../templates/admin/whats_catalog.php'
-                : self::defaultCatalogView($csvExists, $csvModTime, $csvSize, $recordCount, $title);
+            // Capturar contenido del template sin duplicar output
+            $templatePath = __DIR__ . '/../../../templates/admin/whats_catalog.php';
+            if (file_exists($templatePath)) {
+                ob_start();
+                include $templatePath;
+                $catalogContent = ob_get_clean();
+            } else {
+                ob_start();
+                self::defaultCatalogView($csvExists, $csvModTime, $csvSize, $recordCount, $title);
+                $catalogContent = ob_get_clean();
+            }
 
-            // Construir el cuerpo HTML para pasar al layout
-            // El template whats_catalog.php ya incluye margin-left: 250px
-            // para compensar el sidebar fixed del admin, por lo que no es necesario
-            // agregar otro margen aquí. Esto evita márgenes duplicados.
-            $catalogContent = file_exists(__DIR__ . '/../../../templates/admin/whats_catalog.php')
-                ? include __DIR__ . '/../../../templates/admin/whats_catalog.php'
-                : self::defaultCatalogView($csvExists, $csvModTime, $csvSize, $recordCount, $title);
-
-            // Cuerpo simple sin margen adicional (el template provee el margen necesario)
-            $body = '<div>' . "\n" .
-                $catalogContent . '</div>';
+            // Cuerpo simple (el layout .main-content ya compensa el sidebar)
+            $body = '<div>' . "\n" . $catalogContent . '</div>';
 
             // Extraer solo el contenido principal o renderizar con variables
             // Incluimos pageTitle para que el layout muestre el título correcto
