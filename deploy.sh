@@ -2,7 +2,12 @@
 set -e
 
 echo "=== Pull desde GitHub ==="
-git pull origin master
+git fetch origin
+# Si hay historia reescrita (force push), alinear sin merge
+if ! git pull --ff-only origin master 2>/dev/null; then
+  echo "Historias divergentes -> reset --hard origin/master"
+  git reset --hard origin/master
+fi
 
 echo "=== Copiando webroot ==="
 cp public/*.php ../public_html/
