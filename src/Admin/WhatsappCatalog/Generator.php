@@ -82,7 +82,7 @@ final class Generator
                     p.produ AS title,
                     IFNULL(p.observ, '') AS description,
                     CASE WHEN p.enweb = 1 THEN 'in stock' ELSE 'out of stock' END AS availability,
-                    'new' AS condition,
+                    'new' AS `condition`,
                     FORMAT(p.precio / 100, 2) AS price_raw,
                     CONCAT('/producto/', p.idprodu) AS link_base,
                     p.imagen AS image_filename,
