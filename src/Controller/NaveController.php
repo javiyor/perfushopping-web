@@ -14,6 +14,43 @@ use Perfushopping\Web\Support\View;
 
 final class NaveController
 {
+    public function diagnose(array $params): void
+    {
+        $configured = (new NaveService())->configured();
+        $env = Env::get('NAVE_ENV', 'sandbox');
+        $clientId = Env::get('NAVE_CLIENT_ID', '');
+        $posId = Env::get('NAVE_POS_ID', '');
+        $curl = extension_loaded('curl');
+        $test = ['ok' => false, 'error' => 'Sin probar'];
+        $dns = '';
+
+        $host = $env === 'production'
+            ? 'services.apinaranja.com'
+            : 'homoservices.apinaranja.com';
+        $dns = gethostbyname($host);
+
+        if ($configured) {
+            try {
+                $nave = new NaveService();
+                $token = $nave->getToken();
+                $test = ['ok' => true, 'token_prefix' => substr($token, 0, 8) . '...'];
+            } catch (\Throwable $e) {
+                $test = ['ok' => false, 'error' => $e->getMessage()];
+            }
+        }
+
+        Response::json([
+            'configured' => $configured,
+            'env' => $env,
+            'client_id_prefix' => $clientId ? substr($clientId, 0, 6) . '...' : 'vacío',
+            'pos_id_prefix' => $posId ? substr($posId, 0, 6) . '...' : 'vacío',
+            'curl_loaded' => $curl,
+            'dns_' . $host => $dns,
+            'test_token' => $test,
+            'time' => date('c'),
+        ]);
+    }
+
     public function start(array $params): void
     {
         $checkout = $_SESSION['nave_checkout'] ?? null;

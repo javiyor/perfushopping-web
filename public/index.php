@@ -123,6 +123,7 @@ $router->get('/webhooks/meta', [MetaWebhookController::class, 'verify']);
 $router->post('/webhooks/meta', [MetaWebhookController::class, 'receive']);
 
 // Payments Nave (minorista)
+$router->get('/pay/nave/diagnose', [NaveController::class, 'diagnose']);
 $router->get('/pay/nave/start', [NaveController::class, 'start']);
 $router->get('/pay/nave/success', [NaveController::class, 'success']);
 $router->get('/pay/nave/pending', [NaveController::class, 'pending']);
