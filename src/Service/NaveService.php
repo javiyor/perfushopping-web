@@ -111,9 +111,10 @@ final class NaveService
         $opts = [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HTTPHEADER => self::buildHeaders($headers),
-            CURLOPT_CONNECTTIMEOUT => 5,
-            CURLOPT_TIMEOUT => 15,
+            CURLOPT_CONNECTTIMEOUT_MS => 4000,
+            CURLOPT_TIMEOUT_MS => 8000,
             CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_NOSIGNAL => 1,
         ];
         if ($method === 'POST') {
             $opts[CURLOPT_POST] = true;

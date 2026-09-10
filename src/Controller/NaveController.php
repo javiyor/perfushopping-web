@@ -40,6 +40,16 @@ final class NaveController
             $network = ['ok' => false, 'host' => $baseHost, 'error' => $errstr, 'errno' => $errno];
         }
 
+        // Test específico al host de token (homoservices.apinaranja.com / services.apinaranja.com)
+        $tokenHost = $env === 'production' ? 'services.apinaranja.com' : 'homoservices.apinaranja.com';
+        $tokenConn = @fsockopen('ssl://' . $tokenHost, 443, $errno2, $errstr2, 5);
+        if ($tokenConn) {
+            $tokenNetwork = ['ok' => true, 'host' => $tokenHost, 'port' => 443];
+            fclose($tokenConn);
+        } else {
+            $tokenNetwork = ['ok' => false, 'host' => $tokenHost, 'error' => $errstr2, 'errno' => $errno2];
+        }
+
         $doTest = isset($_GET['test']) && $_GET['test'] === '1';
         if ($doTest && $configured) {
             try {
@@ -59,6 +69,7 @@ final class NaveController
             'curl_loaded' => $curl,
             'dns_' . $host => $dns,
             'network' => $network,
+            'token_network' => $tokenNetwork,
             'test_token' => $test,
             'time' => date('c'),
         ]);
