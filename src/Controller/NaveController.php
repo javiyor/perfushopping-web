@@ -50,6 +50,29 @@ final class NaveController
             $tokenNetwork = ['ok' => false, 'host' => $tokenHost, 'error' => $errstr2, 'errno' => $errno2];
         }
 
+        // Test genérico de cURL outbound a un endpoint público
+        $curlTest = ['ok' => false, 'error' => 'Sin probar'];
+        $ch = curl_init('https://httpbin.org/get');
+        if ($ch !== false) {
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_CONNECTTIMEOUT_MS => 3000,
+                CURLOPT_TIMEOUT_MS => 5000,
+                CURLOPT_FOLLOWLOCATION => false,
+                CURLOPT_NOSIGNAL => 1,
+                CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
+            ]);
+            $raw = curl_exec($ch);
+            $err = curl_error($ch);
+            $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            if ($raw !== false && $code === 200) {
+                $curlTest = ['ok' => true, 'http_code' => $code, 'len' => strlen($raw)];
+            } else {
+                $curlTest = ['ok' => false, 'http_code' => $code, 'error' => $err];
+            }
+        }
+
         $doTest = isset($_GET['test']) && $_GET['test'] === '1';
         if ($doTest && $configured) {
             try {
@@ -70,6 +93,8 @@ final class NaveController
             'dns_' . $host => $dns,
             'network' => $network,
             'token_network' => $tokenNetwork,
+            'curl_outbound_test' => $curlTest,
+            'php_max_execution_time' => ini_get('max_execution_time'),
             'test_token' => $test,
             'time' => date('c'),
         ]);
