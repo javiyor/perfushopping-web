@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Perfushopping\Web\Controller;
 
 use Perfushopping\Web\Repo\ProductRepo;
+use Perfushopping\Web\Repo\Marketing\ProductContentRepo;
 use Perfushopping\Web\Service\AuthService;
 use Perfushopping\Web\Support\Env;
 use Perfushopping\Web\Support\Format;
@@ -29,7 +30,15 @@ final class ProductController
         $auth = new AuthService();
         $user = $auth->user();
 
-        $share = $this->shareData($p, $id);
+        $contentRepo = new ProductContentRepo();
+        $content = $contentRepo->findContent($id) ?? [];
+        $relatedProducts = $contentRepo->findRelations($id);
+        $productTags = $contentRepo->findTags($id);
+        $productVideos = $contentRepo->findVideos($id);
+        $productFaqs = $contentRepo->findFaqs($id);
+        $score = $contentRepo->computeScore($id, !empty($p['imagen']), !empty($p['observ']));
+
+        $share = $this->shareData($p, $id, $content);
 
         echo View::page('product.php', [
             'product' => $p,
@@ -39,16 +48,28 @@ final class ProductController
             'share' => $share,
             'pageTitle' => (string)($p['produ'] ?? ''),
             'head' => $this->ogHead($share),
+            'commercial' => $content,
+            'relatedProducts' => $relatedProducts,
+            'productTags' => $productTags,
+            'productVideos' => $productVideos,
+            'productFaqs' => $productFaqs,
+            'score' => $score,
         ]);
     }
 
-    /** @param array<string,mixed> $p */
-    private function shareData(array $p, int $id): array
+    /**
+     * @param array<string,mixed> $p
+     * @param array<string,mixed> $content
+     */
+    private function shareData(array $p, int $id, array $content = []): array
     {
         $base = Format::baseUrl();
         $url = $base . '/p/' . $id;
         $title = trim((string)($p['produ'] ?? ''));
         $description = trim(preg_replace('/\s+/', ' ', strip_tags((string)($p['observ'] ?? ''))) ?? '');
+        if ($description === '') {
+            $description = trim((string)($content['benefit'] ?? ($content['problem'] ?? '')));
+        }
         $description = mb_substr($description, 0, 180, 'UTF-8');
         $image = Format::absoluteUploadUrl((string)($p['imagen'] ?: ($p['image'] ?? '')));
 

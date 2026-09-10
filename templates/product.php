@@ -65,6 +65,40 @@ if (!$isWholesale) {
         <div class="notice" style="white-space:pre-wrap"><?= htmlspecialchars((string)$p['observ']) ?></div>
       <?php endif; ?>
 
+      <?php
+      $commercial = $commercial ?? [];
+      $productTags = $productTags ?? [];
+      $relatedProducts = $relatedProducts ?? [];
+      $productVideos = $productVideos ?? [];
+      $productFaqs = $productFaqs ?? [];
+      ?>
+
+      <?php if (!empty($commercial['benefit'])): ?>
+        <div class="notice" style="white-space:pre-wrap"><strong>Beneficio:</strong> <?= htmlspecialchars((string)$commercial['benefit']) ?></div>
+      <?php endif; ?>
+      <?php if (!empty($commercial['ideal_for'])): ?>
+        <p style="color:rgba(246,244,239,0.7);margin:6px 0"><strong>Ideal para:</strong> <?= htmlspecialchars((string)$commercial['ideal_for']) ?></p>
+      <?php endif; ?>
+      <?php if (!empty($commercial['problem'])): ?>
+        <p style="color:rgba(246,244,239,0.7);margin:6px 0"><strong>Resuelve:</strong> <?= htmlspecialchars((string)$commercial['problem']) ?></p>
+      <?php endif; ?>
+      <?php if (!empty($commercial['usage'])): ?>
+        <p style="color:rgba(246,244,239,0.7);margin:6px 0"><strong>Modo de uso:</strong> <?= htmlspecialchars((string)$commercial['usage']) ?></p>
+      <?php endif; ?>
+      <?php if (!empty($commercial['advice'])): ?>
+        <div class="notice" style="white-space:pre-wrap"><strong>Consejo Perfushopping:</strong> <?= htmlspecialchars((string)$commercial['advice']) ?></div>
+      <?php endif; ?>
+
+      <?php if ($productTags): ?>
+        <div class="kpi" style="margin-top:12px">
+          <?php foreach ($productTags as $key => $terms): ?>
+            <?php foreach ((array)$terms as $term): ?>
+              <span class="chip"><?= htmlspecialchars((string)$term) ?></span>
+            <?php endforeach; ?>
+          <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
+
       <?php if (!empty($share['url'])): ?>
       <div class="share">
         <span class="share-label">Compartir</span>
@@ -133,6 +167,58 @@ if (!$isWholesale) {
           </div>
         <?php endforeach; ?>
       </div>
+
+      <?php if ($relatedProducts): ?>
+      <h3 style="margin:24px 0 10px">Productos relacionados</h3>
+      <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px">
+        <?php foreach ($relatedProducts as $rp): ?>
+        <a href="/p/<?= (int)$rp['related_id'] ?>" class="card-link" style="text-decoration:none;color:inherit">
+          <div class="card" style="padding:10px;text-align:center">
+            <?php if (!empty($rp['related_image'])): ?>
+            <img src="<?= htmlspecialchars(Format::uploadUrl((string)$rp['related_image'])) ?>" alt="" style="width:100%;height:120px;object-fit:contain;margin-bottom:6px">
+            <?php endif; ?>
+            <div class="small"><?= htmlspecialchars((string)($rp['related_name'] ?? '')) ?></div>
+          </div>
+        </a>
+        <?php endforeach; ?>
+      </div>
+      <?php endif; ?>
+
+      <?php if ($productVideos): ?>
+      <h3 style="margin:24px 0 10px">Videos</h3>
+      <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px">
+        <?php foreach ($productVideos as $pv):
+          $thumb = (string)($pv['thumbnail'] ?? '');
+          if ($thumb === '') $thumb = \Perfushopping\Web\Repo\Marketing\VideoRepo::youtubeThumb((string)$pv['url']);
+        ?>
+        <a href="/aprende/videos/<?= htmlspecialchars((string)$pv['slug']) ?>" class="card-link" style="text-decoration:none;color:inherit">
+          <div class="card" style="overflow:hidden">
+            <div style="position:relative;padding-top:56.25%;background:#000">
+              <?php if ($thumb): ?>
+              <img src="<?= htmlspecialchars($thumb) ?>" alt="" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover">
+              <?php endif; ?>
+            </div>
+            <div style="padding:10px">
+              <div class="small"><strong><?= htmlspecialchars((string)$pv['title']) ?></strong></div>
+            </div>
+          </div>
+        </a>
+        <?php endforeach; ?>
+      </div>
+      <?php endif; ?>
+
+      <?php if ($productFaqs): ?>
+      <h3 style="margin:24px 0 10px">Preguntas frecuentes</h3>
+      <div class="notice">
+        <?php foreach ($productFaqs as $faq): ?>
+        <details style="margin-bottom:8px">
+          <summary style="cursor:pointer;font-weight:600"><?= htmlspecialchars((string)$faq['question']) ?></summary>
+          <div style="margin-top:6px;color:rgba(246,244,239,0.75)"><?= nl2br(htmlspecialchars((string)$faq['answer'])) ?></div>
+        </details>
+        <?php endforeach; ?>
+      </div>
+      <?php endif; ?>
+
     </div>
   </div>
 </div>

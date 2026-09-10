@@ -157,6 +157,10 @@ final class AdminUserRepo
             'compras' => 'Compras',
             'pagos_proveedores' => 'Pagos Proveedores',
             'caja_movimientos' => 'Caja',
+            'marketing_videos' => 'Marketing - Videos',
+            'marketing_articles' => 'Marketing - Artículos',
+            'marketing_faqs' => 'Marketing - FAQs',
+            'product_commercial_edit' => 'Producto - Contenido comercial',
         ];
     }
 }

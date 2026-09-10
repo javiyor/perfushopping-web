@@ -84,6 +84,13 @@ use Perfushopping\Web\Admin\SocialInboxController as AdminSocialInboxController;
 use Perfushopping\Web\Admin\GastoController as AdminGastoController;
 use Perfushopping\Web\Admin\BancoController as AdminBancoController;
 use Perfushopping\Web\Admin\BancoCuentaController as AdminBancoCuentaController;
+use Perfushopping\Web\Admin\Marketing\ArticleController as AdminMarketingArticleController;
+use Perfushopping\Web\Admin\Marketing\EntitySearchController as AdminMarketingEntitySearchController;
+use Perfushopping\Web\Admin\Marketing\FaqController as AdminMarketingFaqController;
+use Perfushopping\Web\Admin\Marketing\VideoController as AdminMarketingVideoController;
+use Perfushopping\Web\Controller\Marketing\ArticleController as PublicArticleController;
+use Perfushopping\Web\Controller\Marketing\LearnController;
+use Perfushopping\Web\Controller\Marketing\VideoController as PublicVideoController;
 
 $router = new Router();
 
@@ -93,6 +100,12 @@ $router->get('/health', [\Perfushopping\Web\Controller\HealthController::class, 
 $router->get('/catalog_products.csv', [\Perfushopping\Web\Controller\CatalogFeedController::class, 'csv']);
 $router->get('/', [HomeController::class, 'index']);
 $router->get('/p/(?P<id>\d+)', [ProductController::class, 'show']);
+
+// Marketing / contenido público
+$router->get('/aprende', [LearnController::class, 'index']);
+$router->get('/aprende/videos/(?P<slug>[a-z0-9-]+)', [PublicVideoController::class, 'show']);
+$router->get('/articulos', [PublicArticleController::class, 'index']);
+$router->get('/articulos/(?P<slug>[a-z0-9-]+)', [PublicArticleController::class, 'show']);
 
 // Legal
 $router->get('/terms', [LegalController::class, 'terms']);
@@ -203,7 +216,27 @@ $router->post('/admin/productos/variant-logistics', [AdminProductControllerNew::
 $router->post('/admin/productos/variant-images', [AdminProductControllerNew::class, 'uploadVariantImages']);
 $router->post('/admin/productos/variant-images/delete', [AdminProductControllerNew::class, 'deleteVariantImage']);
 $router->post('/admin/productos/describe', [AdminProductControllerNew::class, 'describe']);
+$router->post('/admin/productos/describe-commercial', [AdminProductControllerNew::class, 'describeCommercial']);
 $router->get('/admin/productos/etiquetas/(?P<id>\d+)', [AdminProductControllerNew::class, 'printLabels']);
+
+// Admin - Marketing
+$router->get('/admin/marketing/videos', [AdminMarketingVideoController::class, 'index']);
+$router->get('/admin/marketing/videos/nuevo', [AdminMarketingVideoController::class, 'create']);
+$router->get('/admin/marketing/videos/(?P<id>\d+)', [AdminMarketingVideoController::class, 'edit']);
+$router->post('/admin/marketing/videos/guardar', [AdminMarketingVideoController::class, 'save']);
+$router->post('/admin/marketing/videos/eliminar', [AdminMarketingVideoController::class, 'delete']);
+
+$router->get('/admin/marketing/articulos', [AdminMarketingArticleController::class, 'index']);
+$router->get('/admin/marketing/articulos/nuevo', [AdminMarketingArticleController::class, 'create']);
+$router->get('/admin/marketing/articulos/(?P<id>\d+)', [AdminMarketingArticleController::class, 'edit']);
+$router->post('/admin/marketing/articulos/guardar', [AdminMarketingArticleController::class, 'save']);
+$router->post('/admin/marketing/articulos/eliminar', [AdminMarketingArticleController::class, 'delete']);
+
+$router->get('/admin/marketing/faqs', [AdminMarketingFaqController::class, 'index']);
+$router->post('/admin/marketing/faqs/guardar', [AdminMarketingFaqController::class, 'save']);
+$router->post('/admin/marketing/faqs/eliminar', [AdminMarketingFaqController::class, 'delete']);
+
+$router->get('/admin/api/entity-search', [AdminMarketingEntitySearchController::class, 'search']);
 $router->get('/admin/productos/importar', [AdminImportController::class, 'form']);
 $router->post('/admin/productos/importar/preview', [AdminImportController::class, 'preview']);
 $router->post('/admin/productos/importar/confirm', [AdminImportController::class, 'confirm']);

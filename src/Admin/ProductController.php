@@ -6,6 +6,10 @@ namespace Perfushopping\Web\Admin;
 use Perfushopping\Web\Repo\AdminProductRepo;
 use Perfushopping\Web\Repo\DepartamentoRepo;
 use Perfushopping\Web\Repo\ProveedorRepo;
+use Perfushopping\Web\Repo\Marketing\FaqRepo;
+use Perfushopping\Web\Repo\Marketing\ProductContentRepo;
+use Perfushopping\Web\Repo\Marketing\TaxonomyRepo;
+use Perfushopping\Web\Repo\Marketing\VideoRepo;
 use Perfushopping\Web\Service\AdminAuthService;
 use Perfushopping\Web\Service\AiProductDescriptionService;
 use Perfushopping\Web\Support\Csrf;
@@ -175,6 +179,18 @@ final class ProductController
         $departamentos = (new DepartamentoRepo())->findAll();
         $proveedores = (new ProveedorRepo())->findAll();
 
+        $contentRepo = new ProductContentRepo();
+        $content = $contentRepo->findContent($id) ?? [];
+        $relations = $contentRepo->findRelations($id);
+        $tags = $contentRepo->findTags($id);
+        $productVideos = $contentRepo->findVideos($id);
+        $productFaqs = $contentRepo->findFaqs($id);
+        $taxonomyTerms = (new TaxonomyRepo())->termsGrouped();
+        $allVideos = (new VideoRepo())->findActive();
+        $allFaqs = (new FaqRepo())->findActive();
+
+        $score = $contentRepo->computeScore($id, !empty($product['imagen']), !empty($product['observ']));
+
         echo View::adminPage('admin/productos/edit.php', [
             'adminUser' => $adminUser,
             'product' => $product,
@@ -187,6 +203,16 @@ final class ProductController
             'flash' => $_SESSION['admin_flash'] ?? null,
             'showOnboarding' => $this->tickOnboarding((int)$adminUser['id']),
             'pageTitle' => 'Producto: ' . htmlspecialchars(mb_substr((string)($product['produ'] ?? ''), 0, 40)),
+            'content' => $content,
+            'relations' => $relations,
+            'tags' => $tags,
+            'videos' => $productVideos,
+            'faqs' => $productFaqs,
+            'taxonomyTerms' => $taxonomyTerms,
+            'relationTypes' => ProductContentRepo::RELATION_TYPES,
+            'allVideos' => $allVideos,
+            'allFaqs' => $allFaqs,
+            'score' => $score,
         ]);
         unset($_SESSION['admin_flash']);
     }
@@ -273,6 +299,8 @@ final class ProductController
 
         $ivaRate = (float)($product['tiva'] ?? 0);
         $this->repo->updateProduct($idprodu, $observ, $this->grossToNet($precioBruto, $ivaRate), $this->grossToNet($precio1Bruto, $ivaRate), $enweb, $produ, $codrub, $codsub, $codepar, $codprove, $ganan1, $ganan2, $precomp);
+
+        $this->saveCommercial((int)$idprodu, (array)($_POST['commercial'] ?? []));
 
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Producto actualizado.'];
         Response::redirect('/admin/productos/' . $idprodu);
@@ -439,6 +467,26 @@ final class ProductController
         }
     }
 
+    public function describeCommercial(array $params): void
+    {
+        $this->auth->requirePermiso('productos');
+        Csrf::check($_POST['_csrf'] ?? null);
+        $idprodu = (int)($_POST['idprodu'] ?? 0);
+
+        $product = $this->repo->find($idprodu);
+        if (!$product) {
+            Response::json(['ok' => false, 'error' => 'Producto no encontrado.'], 404);
+            return;
+        }
+        $variants = $this->repo->variants($idprodu);
+        try {
+            $result = (new AiCommercialContentService())->suggestForProduct($product, $variants);
+            Response::json(['ok' => true, 'content' => $result['content'], 'tags' => $result['tags']]);
+        } catch (\Throwable $e) {
+            Response::json(['ok' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
     public function delete(array $params): void
     {
         $this->auth->requirePermiso('productos');
@@ -548,6 +596,42 @@ final class ProductController
         $this->repo->deleteVariant($idcodgusto);
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Variedad eliminada.'];
         Response::redirect('/admin/productos/' . $idprodu);
+    }
+
+    private function saveCommercial(int $productId, array $commercial): void
+    {
+        $repo = new ProductContentRepo();
+        $repo->saveContent($productId, $commercial);
+
+        $relations = [];
+        foreach ((array)($commercial['relations'] ?? []) as $rel) {
+            $rid = (int)($rel['related_id'] ?? 0);
+            if ($rid <= 0 || $rid === $productId) continue;
+            $relations[] = [
+                'related_id' => $rid,
+                'type' => trim((string)($rel['type'] ?? 'complement')),
+                'sort_order' => 0,
+            ];
+        }
+        $repo->saveRelations($productId, $relations);
+
+        $tags = [];
+        foreach ((array)($commercial['tags'] ?? []) as $key => $values) {
+            $key = trim((string)$key);
+            if ($key === '') continue;
+            foreach ((array)$values as $value) {
+                $value = trim((string)$value);
+                if ($value === '') continue;
+                $tags[] = ['taxonomy_key' => $key, 'term_value' => $value, 'source' => 'manual', 'ai_suggested' => 0, 'verified' => 1];
+            }
+        }
+        $repo->saveTags($productId, $tags);
+
+        $videoIds = array_values(array_filter(array_map('intval', (array)($commercial['videos'] ?? []))));
+        $repo->saveVideos($productId, $videoIds);
+
+        $faqIds = array_values(array_filter(array_map('intval', (array)($commercial['faqs'] ?? []))));
+        $repo->saveFaqs($productId, $faqIds);
     }
 
     private function grossToNet(float $gross, float $ivaRate): float

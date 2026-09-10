@@ -230,6 +230,11 @@
             <?php if ($can('productos')): ?><a href="/admin/stock/grilla" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Grilla de reposición sugerida por ventas"><i class="bi bi-grid-3x3-gap"></i>Grilla reposición</a><?php endif; ?>
             <?php if ($can('productos')): ?><a href="/admin/whatsApp-catalog" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Catálogo WhatsApp Business"><i class="bi bi-whatsapp"></i>Catálogo WhatsApp</a><?php endif; ?>
 
+            <?php $hasMarketing = $can('marketing_videos') || $can('marketing_articles') || $can('marketing_faqs'); if ($hasMarketing): ?><div class="nav-section">Contenido y Marketing</div><?php endif; ?>
+            <?php if ($can('marketing_videos')): ?><a href="/admin/marketing/videos" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Videos tutoriales y capacitación"><i class="bi bi-play-btn"></i>Videos</a><?php endif; ?>
+            <?php if ($can('marketing_articles')): ?><a href="/admin/marketing/articulos" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Artículos y guías para la web"><i class="bi bi-journal-text"></i>Artículos</a><?php endif; ?>
+            <?php if ($can('marketing_faqs')): ?><a href="/admin/marketing/faqs" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Preguntas frecuentes reutilizables"><i class="bi bi-question-circle"></i>FAQs</a><?php endif; ?>
+
             <div class="nav-section">Clientes</div>
             <?php if ($can('clientes')): ?><a href="/admin/clientes" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Base de clientes y fichas"><i class="bi bi-people"></i>Clientes</a><?php endif; ?>
             <?php if ($can('clientes')): ?><a href="/admin/users" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Usuarios web registrados"><i class="bi bi-person-gear"></i>Usuarios web<span class="badge-count green" id="badgeUsuariosNuevos" style="display:none">0</span></a><?php endif; ?>

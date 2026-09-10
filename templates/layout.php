@@ -31,6 +31,15 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title><?= htmlspecialchars((string)($pageTitle ?? '')) ?><?= ($pageTitle ?? '') !== '' ? ' · ' : '' ?><?= $empresaNombre ?></title>
     <link rel="icon" type="image/png" href="<?= htmlspecialchars($empresaLogoUrl) ?>" sizes="any" />
+    <?php
+    $seo = $seo ?? null;
+    if (is_array($seo) && !empty($seo['title'])): ?>
+    <meta name="description" content="<?= htmlspecialchars((string)($seo['meta_description'] ?? '')) ?>" />
+    <link rel="canonical" href="<?= htmlspecialchars((string)($seo['canonical'] ?? Format::baseUrl())) ?>" />
+    <meta property="og:title" content="<?= htmlspecialchars((string)($seo['title'])) ?>" />
+    <meta property="og:description" content="<?= htmlspecialchars((string)($seo['meta_description'] ?? '')) ?>" />
+    <?php if (!empty($seo['og_image'])): ?><meta property="og:image" content="<?= htmlspecialchars((string)$seo['og_image']) ?>" /><?php endif; ?>
+    <?php endif; ?>
     <?= $head ?? '' ?>
     <link rel="stylesheet" href="/assets/app.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
@@ -75,6 +84,8 @@ try {
             <span class="pill secondary">Minorista</span>
           <?php endif; ?>
           <a class="pill secondary" href="/cart">Carrito</a>
+          <a class="pill secondary" href="/aprende">Aprendé</a>
+          <a class="pill secondary" href="/articulos">Artículos</a>
           <a class="pill secondary" href="/eventos/capacitaciones">Capacitaciones</a>
           <a class="pill promo-link" href="/promociones">💳 Promociones</a>
           <?php if ($user): ?>

@@ -91,118 +91,142 @@ foreach ($proveedores as $prov) {
     <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
     <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
 
-    <div class="row g-2 compact-form">
-        <div class="col-lg-6">
-            <div class="card shadow-sm mb-2">
-                <div class="card-header bg-white fw-semibold">Categorización</div>
-                <div class="card-body">
-                    <div class="row g-1 mb-1">
-                        <div class="col-md-6">
-                            <label class="form-label small">Categoría</label>
-                            <div class="input-group">
-                                <select class="form-select form-select-sm" name="codrub">
-                                    <option value="">— Sin categoría —</option>
-                                    <?php foreach ($rubros as $rub): ?>
-                                        <option value="<?= (int) ($rub['codrub'] ?? 0) ?>"<?= ((int) ($rub['codrub'] ?? 0) === $selectedRubro) ? ' selected' : '' ?>><?= htmlspecialchars((string) ($rub['nomrub'] ?? '')) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                                <button class="btn btn-outline-secondary btn-sm" type="button" title="Nueva categoría" onclick="agregarCatalogo('rubro', 'categoría')"><i class="bi bi-plus-lg"></i></button>
+    <ul class="nav nav-tabs mb-2" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="tab-datos-btn" data-bs-toggle="tab" data-bs-target="#tab-datos" type="button" role="tab">Datos generales</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-venta-btn" data-bs-toggle="tab" data-bs-target="#tab-venta" type="button" role="tab">Venta Online</button>
+        </li>
+    </ul>
+
+    <div class="tab-content">
+        <div class="tab-pane fade show active" id="tab-datos" role="tabpanel">
+            <div class="row g-2 compact-form">
+                <div class="col-lg-6">
+                    <div class="card shadow-sm mb-2">
+                        <div class="card-header bg-white fw-semibold">Categorización</div>
+                        <div class="card-body">
+                            <div class="row g-1 mb-1">
+                                <div class="col-md-6">
+                                    <label class="form-label small">Categoría</label>
+                                    <div class="input-group">
+                                        <select class="form-select form-select-sm" name="codrub">
+                                            <option value="">— Sin categoría —</option>
+                                            <?php foreach ($rubros as $rub): ?>
+                                                <option value="<?= (int) ($rub['codrub'] ?? 0) ?>"<?= ((int) ($rub['codrub'] ?? 0) === $selectedRubro) ? ' selected' : '' ?>><?= htmlspecialchars((string) ($rub['nomrub'] ?? '')) ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                        <button class="btn btn-outline-secondary btn-sm" type="button" title="Nueva categoría" onclick="agregarCatalogo('rubro', 'categoría')"><i class="bi bi-plus-lg"></i></button>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small">Marca / Subrubro</label>
+                                    <div class="input-group">
+                                        <select class="form-select form-select-sm" name="codsub">
+                                            <option value="">— Sin marca —</option>
+                                            <?php foreach ($subrubros as $sub): ?>
+                                                <option value="<?= (int) ($sub['codsub'] ?? 0) ?>"<?= ((int) ($sub['codsub'] ?? 0) === $selectedSubrubro) ? ' selected' : '' ?>><?= htmlspecialchars((string) ($sub['nomsub'] ?? '')) ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                        <button class="btn btn-outline-secondary btn-sm" type="button" title="Nueva marca / subrubro" onclick="agregarCatalogo('subrubro', 'marca')"><i class="bi bi-plus-lg"></i></button>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small">Departamento</label>
+                                    <div class="input-group">
+                                        <select class="form-select form-select-sm" name="codepar">
+                                            <option value="">— Sin departamento —</option>
+                                            <?php foreach ($departamentos as $dep): ?>
+                                                <option value="<?= (int) ($dep['codepar'] ?? 0) ?>"<?= ((int) ($dep['codepar'] ?? 0) === $selectedDepartamento) ? ' selected' : '' ?>><?= htmlspecialchars((string) ($dep['nomdepar'] ?? '')) ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                        <button class="btn btn-outline-secondary btn-sm" type="button" title="Nuevo departamento" onclick="agregarCatalogo('departamento', 'departamento')"><i class="bi bi-plus-lg"></i></button>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small">Proveedor</label>
+                                    <select class="form-select form-select-sm" name="codprove">
+                                        <option value="">— Sin proveedor —</option>
+                                        <?php foreach ($proveedores as $prov): ?>
+                                            <option value="<?= (int)($prov['idprovee'] ?? 0) ?>"<?= ((int)($prov['idprovee'] ?? 0) === $selectedProveedor) ? ' selected' : '' ?>><?= htmlspecialchars((string)($prov['razon'] ?? '')) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label small">Marca / Subrubro</label>
-                            <div class="input-group">
-                                <select class="form-select form-select-sm" name="codsub">
-                                    <option value="">— Sin marca —</option>
-                                    <?php foreach ($subrubros as $sub): ?>
-                                        <option value="<?= (int) ($sub['codsub'] ?? 0) ?>"<?= ((int) ($sub['codsub'] ?? 0) === $selectedSubrubro) ? ' selected' : '' ?>><?= htmlspecialchars((string) ($sub['nomsub'] ?? '')) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                                <button class="btn btn-outline-secondary btn-sm" type="button" title="Nueva marca / subrubro" onclick="agregarCatalogo('subrubro', 'marca')"><i class="bi bi-plus-lg"></i></button>
-                            </div>
-</div>
-                        <div class="col-md-6">
-                            <label class="form-label small">Departamento</label>
-                            <div class="input-group">
-                                <select class="form-select form-select-sm" name="codepar">
-                                    <option value="">— Sin departamento —</option>
-                                    <?php foreach ($departamentos as $dep): ?>
-                                        <option value="<?= (int) ($dep['codepar'] ?? 0) ?>"<?= ((int) ($dep['codepar'] ?? 0) === $selectedDepartamento) ? ' selected' : '' ?>><?= htmlspecialchars((string) ($dep['nomdepar'] ?? '')) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                                <button class="btn btn-outline-secondary btn-sm" type="button" title="Nuevo departamento" onclick="agregarCatalogo('departamento', 'departamento')"><i class="bi bi-plus-lg"></i></button>
+                    </div>
+
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-white fw-semibold">Costos y márgenes</div>
+                        <div class="card-body">
+                            <div class="row g-1 mb-2">
+                                <div class="col-md-4">
+                                    <label class="form-label small">Costo <span class="text-muted">(sin IVA)</span></label>
+                                    <input class="form-control form-control-sm calc-trigger" name="precomp" value="<?= htmlspecialchars((string)($product['precomp'] ?? '0')) ?>" inputmode="decimal" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small">Margen minorista <span class="text-muted">(%)</span></label>
+                                    <input class="form-control form-control-sm calc-trigger" name="ganan1" value="<?= htmlspecialchars((string)($product['ganan1'] ?? '0')) ?>" inputmode="decimal" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small">Margen mayorista <span class="text-muted">(%)</span></label>
+                                    <input class="form-control form-control-sm calc-trigger" name="ganan2" value="<?= htmlspecialchars((string)($product['ganan2'] ?? '0')) ?>" inputmode="decimal" />
+                                </div>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label small">Proveedor</label>
-                            <select class="form-select form-select-sm" name="codprove">
-                                <option value="">— Sin proveedor —</option>
-                                <?php foreach ($proveedores as $prov): ?>
-                                    <option value="<?= (int)($prov['idprovee'] ?? 0) ?>"<?= ((int)($prov['idprovee'] ?? 0) === $selectedProveedor) ? ' selected' : '' ?>><?= htmlspecialchars((string)($prov['razon'] ?? '')) ?></option>
-                                <?php endforeach; ?>
-                            </select>
+                    </div>
+
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-white fw-semibold">Precios y visibilidad</div>
+                        <div class="card-body">
+                            <div class="row g-1 mb-1">
+                                <div class="col-md-6">
+                                    <label class="form-label small">Precio minorista <span class="text-muted">(IVA incl.)</span></label>
+                                    <input class="form-control form-control-sm" name="precio_gross" value="<?= htmlspecialchars($priceGross) ?>" inputmode="decimal" required />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small">Precio mayorista <span class="text-muted">(IVA incl.)</span></label>
+                                    <input class="form-control form-control-sm" name="precio1_gross" value="<?= htmlspecialchars($price1Gross) ?>" inputmode="decimal" required />
+                                </div>
+                            </div>
+
+                            <div class="mb-1">
+                                <label class="form-label small">Neto calculado</label>
+                                <div class="form-control form-control-sm bg-light text-muted" style="cursor:default" readonly>
+                                    Minorista $<?= number_format((float)($product['precio'] ?? 0), 2, ',', '.') ?> | Mayorista $<?= number_format((float)($product['precio1'] ?? 0), 2, ',', '.') ?>
+                                </div>
+                            </div>
+
+                            <div class="form-check mb-1">
+                                <input class="form-check-input" type="checkbox" name="enweb" id="enweb" <?= ((int)($product['enweb'] ?? 0) === 1) ? 'checked' : '' ?> />
+                                <label class="form-check-label" for="enweb">Visible en web</label>
+                            </div>
+
+                            <div class="mb-1">
+                                <label class="form-label small">Descripción</label>
+                                <textarea class="form-control form-control-sm" id="ai-description-field" name="observ" rows="5"><?= htmlspecialchars((string)($product['observ'] ?? '')) ?></textarea>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-accent btn-sm" type="submit"><i class="bi bi-check-lg"></i> Guardar</button>
+                                <button class="btn btn-outline-secondary btn-sm" type="button" data-ai-generate data-endpoint="/admin/productos/describe" data-csrf="<?= htmlspecialchars($csrf ?? '') ?>" data-idprodu="<?= $selectedId ?>" data-target="#ai-description-field">
+                                    <i class="bi bi-stars"></i> Generar IA
+                                </button>
+                                <span class="small text-muted align-self-center" data-ai-status></span>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <div class="card shadow-sm">
-                <div class="card-header bg-white fw-semibold">Costos y márgenes</div>
-                <div class="card-body">
-                    <div class="row g-1 mb-2">
-                        <div class="col-md-4">
-                            <label class="form-label small">Costo <span class="text-muted">(sin IVA)</span></label>
-                            <input class="form-control form-control-sm calc-trigger" name="precomp" value="<?= htmlspecialchars((string)($product['precomp'] ?? '0')) ?>" inputmode="decimal" />
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small">Margen minorista <span class="text-muted">(%)</span></label>
-                            <input class="form-control form-control-sm calc-trigger" name="ganan1" value="<?= htmlspecialchars((string)($product['ganan1'] ?? '0')) ?>" inputmode="decimal" />
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small">Margen mayorista <span class="text-muted">(%)</span></label>
-                            <input class="form-control form-control-sm calc-trigger" name="ganan2" value="<?= htmlspecialchars((string)($product['ganan2'] ?? '0')) ?>" inputmode="decimal" />
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card shadow-sm">
-                <div class="card-header bg-white fw-semibold">Precios y visibilidad</div>
-                <div class="card-body">
-                    <div class="row g-1 mb-1">
-                        <div class="col-md-6">
-                            <label class="form-label small">Precio minorista <span class="text-muted">(IVA incl.)</span></label>
-                            <input class="form-control form-control-sm" name="precio_gross" value="<?= htmlspecialchars($priceGross) ?>" inputmode="decimal" required />
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small">Precio mayorista <span class="text-muted">(IVA incl.)</span></label>
-                            <input class="form-control form-control-sm" name="precio1_gross" value="<?= htmlspecialchars($price1Gross) ?>" inputmode="decimal" required />
-                        </div>
-                    </div>
-
-                    <div class="mb-1">
-                        <label class="form-label small">Neto calculado</label>
-                        <div class="form-control form-control-sm bg-light text-muted" style="cursor:default" readonly>
-                            Minorista $<?= number_format((float)($product['precio'] ?? 0), 2, ',', '.') ?> | Mayorista $<?= number_format((float)($product['precio1'] ?? 0), 2, ',', '.') ?>
-                        </div>
-                    </div>
-
-                    <div class="form-check mb-1">
-                        <input class="form-check-input" type="checkbox" name="enweb" id="enweb" <?= ((int)($product['enweb'] ?? 0) === 1) ? 'checked' : '' ?> />
-                        <label class="form-check-label" for="enweb">Visible en web</label>
-                    </div>
-
-                    <div class="mb-1">
-                        <label class="form-label small">Descripción</label>
-                        <textarea class="form-control form-control-sm" id="ai-description-field" name="observ" rows="5"><?= htmlspecialchars((string)($product['observ'] ?? '')) ?></textarea>
-                    </div>
-
-                    <div class="d-flex gap-2">
-                        <button class="btn btn-accent btn-sm" type="submit"><i class="bi bi-check-lg"></i> Guardar</button>
-                        <button class="btn btn-outline-secondary btn-sm" type="button" data-ai-generate data-endpoint="/admin/productos/describe" data-csrf="<?= htmlspecialchars($csrf ?? '') ?>" data-idprodu="<?= $selectedId ?>" data-target="#ai-description-field">
-                            <i class="bi bi-stars"></i> Generar IA
-                        </button>
-                        <span class="small text-muted align-self-center" data-ai-status></span>
+        <div class="tab-pane fade" id="tab-venta" role="tabpanel">
+            <div class="row g-2 compact-form">
+                <div class="col-lg-12">
+                    <?php include __DIR__ . '/_venta_online.php'; ?>
+                    <div class="mt-3">
+                        <button class="btn btn-accent btn-sm" type="submit"><i class="bi bi-check-lg"></i> Guardar cambios</button>
                     </div>
                 </div>
             </div>
