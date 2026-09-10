@@ -21,7 +21,8 @@ final class NaveController
         $clientId = Env::get('NAVE_CLIENT_ID', '');
         $posId = Env::get('NAVE_POS_ID', '');
         $curl = extension_loaded('curl');
-        $test = ['ok' => false, 'error' => 'Sin probar'];
+        $test = ['ok' => false, 'error' => 'Sin probar (agregá ?test=1 para probar token)'];
+        $network = ['ok' => false, 'error' => 'Sin probar'];
         $dns = '';
 
         $host = $env === 'production'
@@ -29,7 +30,18 @@ final class NaveController
             : 'homoservices.apinaranja.com';
         $dns = gethostbyname($host);
 
-        if ($configured) {
+        // Test de red simple: intentar conectar a api.ranty.io / api-sandbox.ranty.io puerto 443
+        $baseHost = $env === 'production' ? 'api.ranty.io' : 'api-sandbox.ranty.io';
+        $conn = @fsockopen('ssl://' . $baseHost, 443, $errno, $errstr, 5);
+        if ($conn) {
+            $network = ['ok' => true, 'host' => $baseHost, 'port' => 443];
+            fclose($conn);
+        } else {
+            $network = ['ok' => false, 'host' => $baseHost, 'error' => $errstr, 'errno' => $errno];
+        }
+
+        $doTest = isset($_GET['test']) && $_GET['test'] === '1';
+        if ($doTest && $configured) {
             try {
                 $nave = new NaveService();
                 $token = $nave->getToken();
@@ -46,6 +58,7 @@ final class NaveController
             'pos_id_prefix' => $posId ? substr($posId, 0, 6) . '...' : 'vacío',
             'curl_loaded' => $curl,
             'dns_' . $host => $dns,
+            'network' => $network,
             'test_token' => $test,
             'time' => date('c'),
         ]);
