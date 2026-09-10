@@ -51,7 +51,7 @@ final class NaveService
             'audience' => Env::get('NAVE_AUDIENCE', self::AUDIENCE),
         ], JSON_UNESCAPED_SLASHES);
 
-        $res = $this->request($url, 'POST', $payload, []);
+        $res = $this->request($url, 'POST', $payload, [], false);
         $token = (string)($res['access_token'] ?? '');
         if ($token === '') {
             throw new \RuntimeException('Nave: no se obtuvo access_token.');
@@ -96,13 +96,16 @@ final class NaveService
     /**
      * @return array<string,mixed>
      */
-    private function request(string $url, string $method, string $body = '', array $headers = []): array
+    private function request(string $url, string $method, string $body = '', array $headers = [], bool $withAuth = true): array
     {
-        $headers = array_merge([
-            'Authorization' => 'Bearer ' . $this->getToken(),
+        $default = [
             'Content-Type'  => 'application/json',
             'Accept'        => 'application/json',
-        ], $headers);
+        ];
+        if ($withAuth) {
+            $default['Authorization'] = 'Bearer ' . $this->getToken();
+        }
+        $headers = array_merge($default, $headers);
 
         $ch = curl_init($url);
         if ($ch === false) {
