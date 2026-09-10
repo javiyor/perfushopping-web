@@ -160,6 +160,8 @@ final class AdminUserRepo
             'marketing_videos' => 'Marketing - Videos',
             'marketing_articles' => 'Marketing - Artículos',
             'marketing_faqs' => 'Marketing - FAQs',
+            'marketing_topics' => 'Marketing - Temas',
+            'marketing_needs' => 'Marketing - Necesidades',
             'product_commercial_edit' => 'Producto - Contenido comercial',
         ];
     }

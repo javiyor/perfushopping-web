@@ -87,9 +87,13 @@ use Perfushopping\Web\Admin\BancoCuentaController as AdminBancoCuentaController;
 use Perfushopping\Web\Admin\Marketing\ArticleController as AdminMarketingArticleController;
 use Perfushopping\Web\Admin\Marketing\EntitySearchController as AdminMarketingEntitySearchController;
 use Perfushopping\Web\Admin\Marketing\FaqController as AdminMarketingFaqController;
+use Perfushopping\Web\Admin\Marketing\NeedController as AdminMarketingNeedController;
+use Perfushopping\Web\Admin\Marketing\TopicController as AdminMarketingTopicController;
 use Perfushopping\Web\Admin\Marketing\VideoController as AdminMarketingVideoController;
 use Perfushopping\Web\Controller\Marketing\ArticleController as PublicArticleController;
 use Perfushopping\Web\Controller\Marketing\LearnController;
+use Perfushopping\Web\Controller\Marketing\NeedController as PublicNeedController;
+use Perfushopping\Web\Controller\Marketing\TopicController as PublicTopicController;
 use Perfushopping\Web\Controller\Marketing\VideoController as PublicVideoController;
 
 $router = new Router();
@@ -106,6 +110,10 @@ $router->get('/aprende', [LearnController::class, 'index']);
 $router->get('/aprende/videos/(?P<slug>[a-z0-9-]+)', [PublicVideoController::class, 'show']);
 $router->get('/articulos', [PublicArticleController::class, 'index']);
 $router->get('/articulos/(?P<slug>[a-z0-9-]+)', [PublicArticleController::class, 'show']);
+$router->get('/temas', [PublicTopicController::class, 'index']);
+$router->get('/temas/(?P<slug>[a-z0-9-]+)', [PublicTopicController::class, 'show']);
+$router->get('/soluciones', [PublicNeedController::class, 'index']);
+$router->get('/soluciones/(?P<slug>[a-z0-9-]+)', [PublicNeedController::class, 'show']);
 
 // Legal
 $router->get('/terms', [LegalController::class, 'terms']);
@@ -235,6 +243,18 @@ $router->post('/admin/marketing/articulos/eliminar', [AdminMarketingArticleContr
 $router->get('/admin/marketing/faqs', [AdminMarketingFaqController::class, 'index']);
 $router->post('/admin/marketing/faqs/guardar', [AdminMarketingFaqController::class, 'save']);
 $router->post('/admin/marketing/faqs/eliminar', [AdminMarketingFaqController::class, 'delete']);
+
+$router->get('/admin/marketing/temas', [AdminMarketingTopicController::class, 'index']);
+$router->get('/admin/marketing/temas/nuevo', [AdminMarketingTopicController::class, 'create']);
+$router->get('/admin/marketing/temas/(?P<id>\d+)', [AdminMarketingTopicController::class, 'edit']);
+$router->post('/admin/marketing/temas/guardar', [AdminMarketingTopicController::class, 'save']);
+$router->post('/admin/marketing/temas/eliminar', [AdminMarketingTopicController::class, 'delete']);
+
+$router->get('/admin/marketing/necesidades', [AdminMarketingNeedController::class, 'index']);
+$router->get('/admin/marketing/necesidades/nuevo', [AdminMarketingNeedController::class, 'create']);
+$router->get('/admin/marketing/necesidades/(?P<id>\d+)', [AdminMarketingNeedController::class, 'edit']);
+$router->post('/admin/marketing/necesidades/guardar', [AdminMarketingNeedController::class, 'save']);
+$router->post('/admin/marketing/necesidades/eliminar', [AdminMarketingNeedController::class, 'delete']);
 
 $router->get('/admin/api/entity-search', [AdminMarketingEntitySearchController::class, 'search']);
 $router->get('/admin/productos/importar', [AdminImportController::class, 'form']);
