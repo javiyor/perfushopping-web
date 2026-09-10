@@ -158,32 +158,39 @@ INSERT INTO cms_taxonomies (`key`, label, sort_order, active) VALUES
 ('usage', 'Uso', 5, 1)
 ON DUPLICATE KEY UPDATE label=VALUES(label);
 
-INSERT INTO cms_taxonomy_terms (taxonomy_id, value, label, sort_order, active)
-SELECT id, 'cabello_danado', 'Cabello dañado', 1, 1 FROM cms_taxonomies WHERE `key`='need'
-UNION ALL SELECT id, 'sequedad', 'Sequedad', 2, 1 FROM cms_taxonomies WHERE `key`='need'
-UNION ALL SELECT id, 'frizz', 'Frizz', 3, 1 FROM cms_taxonomies WHERE `key`='need'
-UNION ALL SELECT id, 'color', 'Color', 4, 1 FROM cms_taxonomies WHERE `key`='need'
-UNION ALL SELECT id, 'caida', 'Caída', 5, 1 FROM cms_taxonomies WHERE `key`='need'
-UNION ALL SELECT id, 'brillo', 'Brillo', 6, 1 FROM cms_taxonomies WHERE `key`='need'
-UNION ALL SELECT id, 'liso', 'Liso', 1, 1 FROM cms_taxonomies WHERE `key`='hair_type'
-UNION ALL SELECT id, 'ondulado', 'Ondulado', 2, 1 FROM cms_taxonomies WHERE `key`='hair_type'
-UNION ALL SELECT id, 'rizado', 'Rizado', 3, 1 FROM cms_taxonomies WHERE `key`='hair_type'
-UNION ALL SELECT id, 'afro', 'Afro', 4, 1 FROM cms_taxonomies WHERE `key`='hair_type'
-UNION ALL SELECT id, 'fino', 'Fino', 5, 1 FROM cms_taxonomies WHERE `key`='hair_type'
-UNION ALL SELECT id, 'grueso', 'Grueso', 6, 1 FROM cms_taxonomies WHERE `key`='hair_type'
-UNION ALL SELECT id, 'reparar', 'Reparar', 1, 1 FROM cms_taxonomies WHERE `key`='goal'
-UNION ALL SELECT id, 'hidratar', 'Hidratar', 2, 1 FROM cms_taxonomies WHERE `key`='goal'
-UNION ALL SELECT id, 'proteger', 'Proteger', 3, 1 FROM cms_taxonomies WHERE `key`='goal'
-UNION ALL SELECT id, 'definir_rizos', 'Definir rizos', 4, 1 FROM cms_taxonomies WHERE `key`='goal'
-UNION ALL SELECT id, 'volumen', 'Volumen', 5, 1 FROM cms_taxonomies WHERE `key`='goal'
-UNION ALL SELECT id, 'limpiar', 'Limpiar', 1, 1 FROM cms_taxonomies WHERE `key`='routine_step'
-UNION ALL SELECT id, 'acondicionar', 'Acondicionar', 2, 1 FROM cms_taxonomies WHERE `key`='routine_step'
-UNION ALL SELECT id, 'tratar', 'Tratar', 3, 1 FROM cms_taxonomies WHERE `key`='routine_step'
-UNION ALL SELECT id, 'mascarilla', 'Mascarilla', 4, 1 FROM cms_taxonomies WHERE `key`='routine_step'
-UNION ALL SELECT id, 'proteger', 'Proteger', 5, 1 FROM cms_taxonomies WHERE `key`='routine_step'
-UNION ALL SELECT id, 'finalizar', 'Finalizar', 6, 1 FROM cms_taxonomies WHERE `key`='routine_step'
-UNION ALL SELECT id, 'profesional', 'Profesional', 1, 1 FROM cms_taxonomies WHERE `key`='usage'
-UNION ALL SELECT id, 'hogar', 'Hogar', 2, 1 FROM cms_taxonomies WHERE `key`='usage'
-UNION ALL SELECT id, 'frecuente', 'Frecuente', 3, 1 FROM cms_taxonomies WHERE `key`='usage'
-UNION ALL SELECT id, 'ocasional', 'Ocasional', 4, 1 FROM cms_taxonomies WHERE `key`='usage'
-ON DUPLICATE KEY UPDATE label=VALUES(label);
+-- Necesidad
+INSERT INTO cms_taxonomy_terms (taxonomy_id, value, label, sort_order, active) VALUES ((SELECT id FROM cms_taxonomies WHERE `key`='need'), 'cabello_danado', 'Cabello dañado', 1, 1) ON DUPLICATE KEY UPDATE label=VALUES(label);
+INSERT INTO cms_taxonomy_terms (taxonomy_id, value, label, sort_order, active) VALUES ((SELECT id FROM cms_taxonomies WHERE `key`='need'), 'sequedad', 'Sequedad', 2, 1) ON DUPLICATE KEY UPDATE label=VALUES(label);
+INSERT INTO cms_taxonomy_terms (taxonomy_id, value, label, sort_order, active) VALUES ((SELECT id FROM cms_taxonomies WHERE `key`='need'), 'frizz', 'Frizz', 3, 1) ON DUPLICATE KEY UPDATE label=VALUES(label);
+INSERT INTO cms_taxonomy_terms (taxonomy_id, value, label, sort_order, active) VALUES ((SELECT id FROM cms_taxonomies WHERE `key`='need'), 'color', 'Color', 4, 1) ON DUPLICATE KEY UPDATE label=VALUES(label);
+INSERT INTO cms_taxonomy_terms (taxonomy_id, value, label, sort_order, active) VALUES ((SELECT id FROM cms_taxonomies WHERE `key`='need'), 'caida', 'Caída', 5, 1) ON DUPLICATE KEY UPDATE label=VALUES(label);
+INSERT INTO cms_taxonomy_terms (taxonomy_id, value, label, sort_order, active) VALUES ((SELECT id FROM cms_taxonomies WHERE `key`='need'), 'brillo', 'Brillo', 6, 1) ON DUPLICATE KEY UPDATE label=VALUES(label);
+
+-- Tipo de cabello
+INSERT INTO cms_taxonomy_terms (taxonomy_id, value, label, sort_order, active) VALUES ((SELECT id FROM cms_taxonomies WHERE `key`='hair_type'), 'liso', 'Liso', 1, 1) ON DUPLICATE KEY UPDATE label=VALUES(label);
+INSERT INTO cms_taxonomy_terms (taxonomy_id, value, label, sort_order, active) VALUES ((SELECT id FROM cms_taxonomies WHERE `key`='hair_type'), 'ondulado', 'Ondulado', 2, 1) ON DUPLICATE KEY UPDATE label=VALUES(label);
+INSERT INTO cms_taxonomy_terms (taxonomy_id, value, label, sort_order, active) VALUES ((SELECT id FROM cms_taxonomies WHERE `key`='hair_type'), 'rizado', 'Rizado', 3, 1) ON DUPLICATE KEY UPDATE label=VALUES(label);
+INSERT INTO cms_taxonomy_terms (taxonomy_id, value, label, sort_order, active) VALUES ((SELECT id FROM cms_taxonomies WHERE `key`='hair_type'), 'afro', 'Afro', 4, 1) ON DUPLICATE KEY UPDATE label=VALUES(label);
+INSERT INTO cms_taxonomy_terms (taxonomy_id, value, label, sort_order, active) VALUES ((SELECT id FROM cms_taxonomies WHERE `key`='hair_type'), 'fino', 'Fino', 5, 1) ON DUPLICATE KEY UPDATE label=VALUES(label);
+INSERT INTO cms_taxonomy_terms (taxonomy_id, value, label, sort_order, active) VALUES ((SELECT id FROM cms_taxonomies WHERE `key`='hair_type'), 'grueso', 'Grueso', 6, 1) ON DUPLICATE KEY UPDATE label=VALUES(label);
+
+-- Objetivo
+INSERT INTO cms_taxonomy_terms (taxonomy_id, value, label, sort_order, active) VALUES ((SELECT id FROM cms_taxonomies WHERE `key`='goal'), 'reparar', 'Reparar', 1, 1) ON DUPLICATE KEY UPDATE label=VALUES(label);
+INSERT INTO cms_taxonomy_terms (taxonomy_id, value, label, sort_order, active) VALUES ((SELECT id FROM cms_taxonomies WHERE `key`='goal'), 'hidratar', 'Hidratar', 2, 1) ON DUPLICATE KEY UPDATE label=VALUES(label);
+INSERT INTO cms_taxonomy_terms (taxonomy_id, value, label, sort_order, active) VALUES ((SELECT id FROM cms_taxonomies WHERE `key`='goal'), 'proteger', 'Proteger', 3, 1) ON DUPLICATE KEY UPDATE label=VALUES(label);
+INSERT INTO cms_taxonomy_terms (taxonomy_id, value, label, sort_order, active) VALUES ((SELECT id FROM cms_taxonomies WHERE `key`='goal'), 'definir_rizos', 'Definir rizos', 4, 1) ON DUPLICATE KEY UPDATE label=VALUES(label);
+INSERT INTO cms_taxonomy_terms (taxonomy_id, value, label, sort_order, active) VALUES ((SELECT id FROM cms_taxonomies WHERE `key`='goal'), 'volumen', 'Volumen', 5, 1) ON DUPLICATE KEY UPDATE label=VALUES(label);
+
+-- Paso de rutina
+INSERT INTO cms_taxonomy_terms (taxonomy_id, value, label, sort_order, active) VALUES ((SELECT id FROM cms_taxonomies WHERE `key`='routine_step'), 'limpiar', 'Limpiar', 1, 1) ON DUPLICATE KEY UPDATE label=VALUES(label);
+INSERT INTO cms_taxonomy_terms (taxonomy_id, value, label, sort_order, active) VALUES ((SELECT id FROM cms_taxonomies WHERE `key`='routine_step'), 'acondicionar', 'Acondicionar', 2, 1) ON DUPLICATE KEY UPDATE label=VALUES(label);
+INSERT INTO cms_taxonomy_terms (taxonomy_id, value, label, sort_order, active) VALUES ((SELECT id FROM cms_taxonomies WHERE `key`='routine_step'), 'tratar', 'Tratar', 3, 1) ON DUPLICATE KEY UPDATE label=VALUES(label);
+INSERT INTO cms_taxonomy_terms (taxonomy_id, value, label, sort_order, active) VALUES ((SELECT id FROM cms_taxonomies WHERE `key`='routine_step'), 'mascarilla', 'Mascarilla', 4, 1) ON DUPLICATE KEY UPDATE label=VALUES(label);
+INSERT INTO cms_taxonomy_terms (taxonomy_id, value, label, sort_order, active) VALUES ((SELECT id FROM cms_taxonomies WHERE `key`='routine_step'), 'proteger', 'Proteger', 5, 1) ON DUPLICATE KEY UPDATE label=VALUES(label);
+INSERT INTO cms_taxonomy_terms (taxonomy_id, value, label, sort_order, active) VALUES ((SELECT id FROM cms_taxonomies WHERE `key`='routine_step'), 'finalizar', 'Finalizar', 6, 1) ON DUPLICATE KEY UPDATE label=VALUES(label);
+
+-- Uso
+INSERT INTO cms_taxonomy_terms (taxonomy_id, value, label, sort_order, active) VALUES ((SELECT id FROM cms_taxonomies WHERE `key`='usage'), 'profesional', 'Profesional', 1, 1) ON DUPLICATE KEY UPDATE label=VALUES(label);
+INSERT INTO cms_taxonomy_terms (taxonomy_id, value, label, sort_order, active) VALUES ((SELECT id FROM cms_taxonomies WHERE `key`='usage'), 'hogar', 'Hogar', 2, 1) ON DUPLICATE KEY UPDATE label=VALUES(label);
+INSERT INTO cms_taxonomy_terms (taxonomy_id, value, label, sort_order, active) VALUES ((SELECT id FROM cms_taxonomies WHERE `key`='usage'), 'frecuente', 'Frecuente', 3, 1) ON DUPLICATE KEY UPDATE label=VALUES(label);
+INSERT INTO cms_taxonomy_terms (taxonomy_id, value, label, sort_order, active) VALUES ((SELECT id FROM cms_taxonomies WHERE `key`='usage'), 'ocasional', 'Ocasional', 4, 1) ON DUPLICATE KEY UPDATE label=VALUES(label);
