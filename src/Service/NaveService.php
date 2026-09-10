@@ -49,6 +49,7 @@ final class NaveService
             'client_id' => $clientId,
             'client_secret' => $clientSecret,
             'audience' => Env::get('NAVE_AUDIENCE', self::AUDIENCE),
+            'grant_type' => 'client_credentials',
         ], JSON_UNESCAPED_SLASHES);
 
         $res = $this->request($url, 'POST', $payload, [], false);
