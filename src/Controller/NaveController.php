@@ -28,27 +28,34 @@ final class NaveController
             Response::redirect('/');
         }
 
-        $nave = new NaveService();
-        if (!$nave->configured()) {
-            $_SESSION['flash'] = ['type' => 'danger', 'text' => 'El pago con Nave no esta disponible por el momento. Elegi otro metodo.'];
+        try {
+            $nave = new NaveService();
+            if (!$nave->configured()) {
+                $_SESSION['flash'] = ['type' => 'danger', 'text' => 'El pago con Nave no esta disponible por el momento. Elegi otro metodo.'];
+                Response::redirect('/checkout');
+            }
+
+            $returnToken = bin2hex(random_bytes(16));
+            $webhookSecret = bin2hex(random_bytes(16));
+            $payload = $this->buildPayload($order, (int)$checkout['total_cents'], $returnToken, $webhookSecret);
+
+            $res = $nave->createPaymentRequest($payload);
+            $paymentRequestId = (string)($res['id'] ?? '');
+            $checkoutUrl = (string)($res['checkout_url'] ?? '');
+
+            (new NaveRepo())->store((int)$order['id'], $paymentRequestId, $returnToken, $webhookSecret);
+            unset($_SESSION['nave_checkout']);
+
+            if ($checkoutUrl === '') {
+                throw new \RuntimeException('Nave no devolvio checkout_url.');
+            }
+            Response::redirect($checkoutUrl);
+        } catch (\Throwable $e) {
+            error_log('Nave start error: ' . $e->getMessage());
+            error_log('Nave start trace: ' . $e->getTraceAsString());
+            $_SESSION['flash'] = ['type' => 'danger', 'text' => 'No pudimos iniciar el pago con Nave. Error: ' . $e->getMessage()];
             Response::redirect('/checkout');
         }
-
-        $returnToken = bin2hex(random_bytes(16));
-        $webhookSecret = bin2hex(random_bytes(16));
-        $payload = $this->buildPayload($order, (int)$checkout['total_cents'], $returnToken, $webhookSecret);
-
-        $res = $nave->createPaymentRequest($payload);
-        $paymentRequestId = (string)($res['id'] ?? '');
-        $checkoutUrl = (string)($res['checkout_url'] ?? '');
-
-        (new NaveRepo())->store((int)$order['id'], $paymentRequestId, $returnToken, $webhookSecret);
-        unset($_SESSION['nave_checkout']);
-
-        if ($checkoutUrl === '') {
-            throw new \RuntimeException('Nave no devolvio checkout_url.');
-        }
-        Response::redirect($checkoutUrl);
     }
 
     public function success(array $params): void
