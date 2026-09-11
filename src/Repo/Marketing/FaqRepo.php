@@ -13,6 +13,11 @@ final class FaqRepo
         return Db::pdo()->query($sql)->fetchAll() ?: [];
     }
 
+    public function findActive(): array
+    {
+        return $this->findAll(true);
+    }
+
     public function findById(int $id): ?array
     {
         $st = Db::pdo()->prepare('SELECT * FROM cms_faqs WHERE id = :i LIMIT 1');
