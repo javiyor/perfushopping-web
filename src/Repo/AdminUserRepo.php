@@ -162,6 +162,7 @@ final class AdminUserRepo
             'marketing_faqs' => 'Marketing - FAQs',
             'marketing_topics' => 'Marketing - Temas',
             'marketing_needs' => 'Marketing - Necesidades',
+            'marketing_home' => 'Marketing - Home',
             'product_commercial_edit' => 'Producto - Contenido comercial',
         ];
     }

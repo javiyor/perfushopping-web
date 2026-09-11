@@ -5,6 +5,10 @@ namespace Perfushopping\Web\Controller;
 
 use Perfushopping\Web\Repo\MetaRepo;
 use Perfushopping\Web\Repo\ProductRepo;
+use Perfushopping\Web\Repo\Marketing\HomeBlockRepo;
+use Perfushopping\Web\Repo\Marketing\NeedRepo;
+use Perfushopping\Web\Repo\Marketing\VideoRepo;
+use Perfushopping\Web\Repo\Marketing\ArticleRepo;
 use Perfushopping\Web\Service\AuthService;
 use Perfushopping\Web\Support\View;
 
@@ -31,6 +35,11 @@ final class HomeController
         $auth = new AuthService();
         $user = $auth->user();
 
+        $blocks = [];
+        if (!$isFiltered) {
+            $blocks = (new HomeBlockRepo())->findForHome();
+        }
+
         echo View::page('home.php', [
             'products' => $products,
             'rubros' => $meta->rubros(),
@@ -38,6 +47,10 @@ final class HomeController
             'user' => $user,
             'isWholesale' => $auth->isWholesaleApproved($user),
             'portadaInfo' => $portadaInfo,
+            'blocks' => $blocks,
+            'homeNeeds' => (new NeedRepo())->findAll(true),
+            'homeVideos' => (new VideoRepo())->findActive(),
+            'homeArticles' => (new ArticleRepo())->findAll(true),
         ]);
     }
 }

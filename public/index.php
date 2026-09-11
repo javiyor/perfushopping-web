@@ -87,6 +87,7 @@ use Perfushopping\Web\Admin\BancoCuentaController as AdminBancoCuentaController;
 use Perfushopping\Web\Admin\Marketing\ArticleController as AdminMarketingArticleController;
 use Perfushopping\Web\Admin\Marketing\EntitySearchController as AdminMarketingEntitySearchController;
 use Perfushopping\Web\Admin\Marketing\FaqController as AdminMarketingFaqController;
+use Perfushopping\Web\Admin\Marketing\HomeBlockController as AdminMarketingHomeBlockController;
 use Perfushopping\Web\Admin\Marketing\NeedController as AdminMarketingNeedController;
 use Perfushopping\Web\Admin\Marketing\TopicController as AdminMarketingTopicController;
 use Perfushopping\Web\Admin\Marketing\VideoController as AdminMarketingVideoController;
@@ -255,6 +256,14 @@ $router->get('/admin/marketing/necesidades/nuevo', [AdminMarketingNeedController
 $router->get('/admin/marketing/necesidades/(?P<id>\d+)', [AdminMarketingNeedController::class, 'edit']);
 $router->post('/admin/marketing/necesidades/guardar', [AdminMarketingNeedController::class, 'save']);
 $router->post('/admin/marketing/necesidades/eliminar', [AdminMarketingNeedController::class, 'delete']);
+
+$router->get('/admin/marketing/home', [AdminMarketingHomeBlockController::class, 'index']);
+$router->get('/admin/marketing/home/nuevo', [AdminMarketingHomeBlockController::class, 'create']);
+$router->get('/admin/marketing/home/(?P<id>\d+)', [AdminMarketingHomeBlockController::class, 'edit']);
+$router->post('/admin/marketing/home/guardar', [AdminMarketingHomeBlockController::class, 'save']);
+$router->post('/admin/marketing/home/eliminar', [AdminMarketingHomeBlockController::class, 'delete']);
+$router->post('/admin/marketing/home/toggle', [AdminMarketingHomeBlockController::class, 'toggle']);
+$router->post('/admin/marketing/home/reordenar', [AdminMarketingHomeBlockController::class, 'reorder']);
 
 $router->get('/admin/api/entity-search', [AdminMarketingEntitySearchController::class, 'search']);
 $router->get('/admin/productos/importar', [AdminImportController::class, 'form']);

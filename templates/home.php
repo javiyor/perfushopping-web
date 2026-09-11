@@ -23,6 +23,16 @@ foreach ([1, 2, 3] as $bi) {
 }
 ?>
 
+<?php if (!empty($blocks)): ?>
+  <?php
+  foreach ($blocks as $block) {
+      $blockFile = __DIR__ . '/home/blocks/' . preg_replace('/[^a-z0-9_]/', '', (string)$block['block_type']) . '.php';
+      if (is_file($blockFile)) {
+          include $blockFile;
+      }
+  }
+  ?>
+<?php else: ?>
 <div class="hero">
   <div style="display:flex;justify-content:center;">
     <img src="<?= htmlspecialchars($empresaBanner) ?>" alt="<?= $empresaNombre ?>" loading="eager" decoding="async" style="width:26%;max-width:300px;height:auto;border-radius:22px;border:1px solid rgba(216,178,90,0.18);box-shadow:0 22px 70px rgba(0,0,0,0.55);" />
@@ -35,6 +45,7 @@ foreach ([1, 2, 3] as $bi) {
     <?php endforeach; ?>
   </div>
 </div>
+<?php endif; ?>
 
 <div class="page" style="margin-top:16px">
   <?php if ($isNovedades): ?>
