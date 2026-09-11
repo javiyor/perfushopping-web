@@ -29,6 +29,8 @@ final class AiProductDescriptionService
             }
         }
 
+        $isPerfume = $this->isPerfumeCategory((string)($product['nomrub'] ?? ''));
+
         $promptData = [
             'idprodu' => (int)($product['idprodu'] ?? 0),
             'codigo' => trim((string)($product['codprodu'] ?? '')),
@@ -41,6 +43,7 @@ final class AiProductDescriptionService
             'iva' => (float)($product['tiva'] ?? 0),
             'fecha_compra' => trim((string)($product['fecompra'] ?? '')),
             'variantes' => $variantNames,
+            'es_perfume' => $isPerfume,
         ];
 
         $payload = [
@@ -49,11 +52,11 @@ final class AiProductDescriptionService
             'messages' => [
                 [
                     'role' => 'system',
-                    'content' => 'Sos redactor ecommerce para Perfushopping. Escribi en espanol argentino, tono comercial claro y confiable. No inventes ingredientes, beneficios clinicos, duracion, origen ni datos tecnicos que no esten presentes. Entrega solo texto final, sin titulos ni comillas, en 1 o 2 parrafos breves.',
+                    'content' => 'Sos redactor ecommerce para Perfushopping. Escribi en espanol argentino, tono comercial claro y confiable. No inventes ingredientes, beneficios clinicos, duracion, origen ni datos tecnicos que no esten presentes, salvo que el producto sea perfume, fragancia, colonia o eau de toilette, caso en el que si inclui las notas de salida, corazon y fondo conocidas cuando sea posible. Entrega solo texto final, sin titulos ni comillas, en 1 o 2 parrafos breves.',
                 ],
                 [
                     'role' => 'user',
-                    'content' => "Genera una descripcion breve de producto para ecommerce usando estos datos JSON:\n" . json_encode($promptData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                    'content' => "Genera una descripcion breve de producto para ecommerce usando estos datos JSON:\n" . json_encode($promptData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ($isPerfume ? "\n\nEste producto es perfume/fragancia. Inclui obligatoriamente las notas de salida, corazon y fondo conocidas del perfume, si las conoces. Si no las conoces con certeza, no inventes notas especificas pero si menciona que es una fragancia con caracter aromatico/floral/fresco/etc. segun corresponda." : ""),
                 ],
             ],
         ];
@@ -109,5 +112,17 @@ final class AiProductDescriptionService
     private function grossPrice(float $net, float $ivaRate): float
     {
         return round($net * (1.0 + ($ivaRate / 100.0)), 2);
+    }
+
+    private function isPerfumeCategory(string $category): bool
+    {
+        $cat = mb_strtolower(trim($category));
+        $keywords = ['perfume', 'fragancia', 'colonia', 'eau', 'toilette', 'parfum', 'fragancias', 'perfumes'];
+        foreach ($keywords as $kw) {
+            if (str_contains($cat, $kw)) {
+                return true;
+            }
+        }
+        return false;
     }
 }
