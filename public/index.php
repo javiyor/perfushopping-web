@@ -89,12 +89,14 @@ use Perfushopping\Web\Admin\Marketing\EntitySearchController as AdminMarketingEn
 use Perfushopping\Web\Admin\Marketing\FaqController as AdminMarketingFaqController;
 use Perfushopping\Web\Admin\Marketing\HomeBlockController as AdminMarketingHomeBlockController;
 use Perfushopping\Web\Admin\Marketing\NeedController as AdminMarketingNeedController;
+use Perfushopping\Web\Admin\Marketing\QuizController as AdminMarketingQuizController;
 use Perfushopping\Web\Admin\Marketing\RoutineController as AdminMarketingRoutineController;
 use Perfushopping\Web\Admin\Marketing\TopicController as AdminMarketingTopicController;
 use Perfushopping\Web\Admin\Marketing\VideoController as AdminMarketingVideoController;
 use Perfushopping\Web\Controller\Marketing\ArticleController as PublicArticleController;
 use Perfushopping\Web\Controller\Marketing\LearnController;
 use Perfushopping\Web\Controller\Marketing\NeedController as PublicNeedController;
+use Perfushopping\Web\Controller\Marketing\QuizController as PublicQuizController;
 use Perfushopping\Web\Controller\Marketing\RoutineController as PublicRoutineController;
 use Perfushopping\Web\Controller\Marketing\TopicController as PublicTopicController;
 use Perfushopping\Web\Controller\Marketing\VideoController as PublicVideoController;
@@ -119,6 +121,9 @@ $router->get('/soluciones', [PublicNeedController::class, 'index']);
 $router->get('/soluciones/(?P<slug>[a-z0-9-]+)', [PublicNeedController::class, 'show']);
 $router->get('/rutinas', [PublicRoutineController::class, 'index']);
 $router->get('/rutinas/(?P<slug>[a-z0-9-]+)', [PublicRoutineController::class, 'show']);
+$router->get('/encontra-tu-rutina', [PublicQuizController::class, 'index']);
+$router->get('/encontra-tu-rutina/(?P<slug>[a-z0-9-]+)', [PublicQuizController::class, 'show']);
+$router->post('/encontra-tu-rutina/(?P<slug>[a-z0-9-]+)/resultado', [PublicQuizController::class, 'result']);
 
 // Legal
 $router->get('/terms', [LegalController::class, 'terms']);
@@ -275,6 +280,18 @@ $router->get('/admin/marketing/rutinas/nuevo', [AdminMarketingRoutineController:
 $router->get('/admin/marketing/rutinas/(?P<id>\d+)', [AdminMarketingRoutineController::class, 'edit']);
 $router->post('/admin/marketing/rutinas/guardar', [AdminMarketingRoutineController::class, 'save']);
 $router->post('/admin/marketing/rutinas/eliminar', [AdminMarketingRoutineController::class, 'delete']);
+
+$router->get('/admin/marketing/recomendadores', [AdminMarketingQuizController::class, 'index']);
+$router->get('/admin/marketing/recomendadores/nuevo', [AdminMarketingQuizController::class, 'create']);
+$router->get('/admin/marketing/recomendadores/(?P<id>\d+)', [AdminMarketingQuizController::class, 'edit']);
+$router->post('/admin/marketing/recomendadores/guardar', [AdminMarketingQuizController::class, 'save']);
+$router->post('/admin/marketing/recomendadores/eliminar', [AdminMarketingQuizController::class, 'delete']);
+$router->post('/admin/marketing/recomendadores/pregunta/guardar', [AdminMarketingQuizController::class, 'saveQuestion']);
+$router->post('/admin/marketing/recomendadores/pregunta/eliminar', [AdminMarketingQuizController::class, 'deleteQuestion']);
+$router->post('/admin/marketing/recomendadores/opcion/guardar', [AdminMarketingQuizController::class, 'saveOption']);
+$router->post('/admin/marketing/recomendadores/opcion/eliminar', [AdminMarketingQuizController::class, 'deleteOption']);
+$router->post('/admin/marketing/recomendadores/regla/guardar', [AdminMarketingQuizController::class, 'saveRule']);
+$router->post('/admin/marketing/recomendadores/regla/eliminar', [AdminMarketingQuizController::class, 'deleteRule']);
 
 $router->get('/admin/api/entity-search', [AdminMarketingEntitySearchController::class, 'search']);
 $router->get('/admin/productos/importar', [AdminImportController::class, 'form']);
