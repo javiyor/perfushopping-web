@@ -89,11 +89,13 @@ use Perfushopping\Web\Admin\Marketing\EntitySearchController as AdminMarketingEn
 use Perfushopping\Web\Admin\Marketing\FaqController as AdminMarketingFaqController;
 use Perfushopping\Web\Admin\Marketing\HomeBlockController as AdminMarketingHomeBlockController;
 use Perfushopping\Web\Admin\Marketing\NeedController as AdminMarketingNeedController;
+use Perfushopping\Web\Admin\Marketing\RoutineController as AdminMarketingRoutineController;
 use Perfushopping\Web\Admin\Marketing\TopicController as AdminMarketingTopicController;
 use Perfushopping\Web\Admin\Marketing\VideoController as AdminMarketingVideoController;
 use Perfushopping\Web\Controller\Marketing\ArticleController as PublicArticleController;
 use Perfushopping\Web\Controller\Marketing\LearnController;
 use Perfushopping\Web\Controller\Marketing\NeedController as PublicNeedController;
+use Perfushopping\Web\Controller\Marketing\RoutineController as PublicRoutineController;
 use Perfushopping\Web\Controller\Marketing\TopicController as PublicTopicController;
 use Perfushopping\Web\Controller\Marketing\VideoController as PublicVideoController;
 
@@ -115,6 +117,8 @@ $router->get('/temas', [PublicTopicController::class, 'index']);
 $router->get('/temas/(?P<slug>[a-z0-9-]+)', [PublicTopicController::class, 'show']);
 $router->get('/soluciones', [PublicNeedController::class, 'index']);
 $router->get('/soluciones/(?P<slug>[a-z0-9-]+)', [PublicNeedController::class, 'show']);
+$router->get('/rutinas', [PublicRoutineController::class, 'index']);
+$router->get('/rutinas/(?P<slug>[a-z0-9-]+)', [PublicRoutineController::class, 'show']);
 
 // Legal
 $router->get('/terms', [LegalController::class, 'terms']);
@@ -124,6 +128,7 @@ $router->get('/terms/affiliate', [LegalController::class, 'affiliateTerms']);
 // Cart
 $router->get('/cart', [CartController::class, 'view']);
 $router->post('/cart/add', [CartController::class, 'add']);
+$router->post('/cart/add-routine', [CartController::class, 'addRoutine']);
 $router->post('/cart/update', [CartController::class, 'update']);
 $router->post('/cart/remove', [CartController::class, 'remove']);
 $router->post('/cart/clear', [CartController::class, 'clear']);
@@ -264,6 +269,12 @@ $router->post('/admin/marketing/home/guardar', [AdminMarketingHomeBlockControlle
 $router->post('/admin/marketing/home/eliminar', [AdminMarketingHomeBlockController::class, 'delete']);
 $router->post('/admin/marketing/home/toggle', [AdminMarketingHomeBlockController::class, 'toggle']);
 $router->post('/admin/marketing/home/reordenar', [AdminMarketingHomeBlockController::class, 'reorder']);
+
+$router->get('/admin/marketing/rutinas', [AdminMarketingRoutineController::class, 'index']);
+$router->get('/admin/marketing/rutinas/nuevo', [AdminMarketingRoutineController::class, 'create']);
+$router->get('/admin/marketing/rutinas/(?P<id>\d+)', [AdminMarketingRoutineController::class, 'edit']);
+$router->post('/admin/marketing/rutinas/guardar', [AdminMarketingRoutineController::class, 'save']);
+$router->post('/admin/marketing/rutinas/eliminar', [AdminMarketingRoutineController::class, 'delete']);
 
 $router->get('/admin/api/entity-search', [AdminMarketingEntitySearchController::class, 'search']);
 $router->get('/admin/productos/importar', [AdminImportController::class, 'form']);

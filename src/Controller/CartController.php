@@ -108,4 +108,31 @@ final class CartController
         (new CartService())->clear();
         Response::redirect('/cart');
     }
+
+    public function addRoutine(array $params): void
+    {
+        Csrf::check($_POST['_csrf'] ?? null);
+        $items = (array)($_POST['items'] ?? []);
+        $repo = new ProductRepo();
+        $cart = new CartService();
+        $added = 0;
+        foreach ($items as $productId) {
+            $productId = (int)$productId;
+            if ($productId <= 0) continue;
+            $variants = $repo->variants($productId);
+            $chosen = null;
+            foreach ($variants as $v) {
+                if ((int)($v['discont'] ?? 0) === 0) {
+                    $chosen = $v;
+                    break;
+                }
+            }
+            if (!$chosen) continue;
+            if ((float)($chosen['stockact'] ?? 0) <= 0) continue;
+            $cart->add((int)$chosen['idcodgusto'], 1);
+            $added++;
+        }
+        $_SESSION['flash'] = ['type' => 'ok', 'text' => $added > 0 ? 'Rutina agregada al carrito.' : 'No se pudo agregar la rutina.'];
+        Response::redirect('/cart');
+    }
 }

@@ -28,6 +28,7 @@ $settings = $block['settings'] ?? [];
             <option value="videos_grid" <?= (($block['block_type'] ?? '') === 'videos_grid') ? 'selected' : '' ?>>Grilla de videos</option>
             <option value="articles_grid" <?= (($block['block_type'] ?? '') === 'articles_grid') ? 'selected' : '' ?>>Grilla de artículos</option>
             <option value="featured_products" <?= (($block['block_type'] ?? '') === 'featured_products') ? 'selected' : '' ?>>Productos destacados</option>
+            <option value="routines_grid" <?= (($block['block_type'] ?? '') === 'routines_grid') ? 'selected' : '' ?>>Grilla de rutinas</option>
             <option value="promo_banner" <?= (($block['block_type'] ?? '') === 'promo_banner') ? 'selected' : '' ?>>Banner promocional</option>
             <option value="categories_grid" <?= (($block['block_type'] ?? '') === 'categories_grid') ? 'selected' : '' ?>>Grilla de categorías</option>
             <option value="custom_html" <?= (($block['block_type'] ?? '') === 'custom_html') ? 'selected' : '' ?>>HTML libre</option>
@@ -83,6 +84,10 @@ $settings = $block['settings'] ?? [];
 
       <div id="featured_products-settings" class="settings-group row g-3 compact-form">
         <div class="col-md-4"><label class="form-label small">Cantidad</label><input type="number" class="form-control form-control-sm" name="settings[limit]" value="<?= (int)($settings['limit'] ?? 8) ?>" /></div>
+      </div>
+
+      <div id="routines_grid-settings" class="settings-group row g-3 compact-form">
+        <div class="col-md-4"><label class="form-label small">Cantidad</label><input type="number" class="form-control form-control-sm" name="settings[limit]" value="<?= (int)($settings['limit'] ?? 4) ?>" /></div>
       </div>
 
       <div id="promo_banner-settings" class="settings-group row g-3 compact-form">

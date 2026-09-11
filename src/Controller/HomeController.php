@@ -7,6 +7,7 @@ use Perfushopping\Web\Repo\MetaRepo;
 use Perfushopping\Web\Repo\ProductRepo;
 use Perfushopping\Web\Repo\Marketing\HomeBlockRepo;
 use Perfushopping\Web\Repo\Marketing\NeedRepo;
+use Perfushopping\Web\Repo\Marketing\RoutineRepo;
 use Perfushopping\Web\Repo\Marketing\VideoRepo;
 use Perfushopping\Web\Repo\Marketing\ArticleRepo;
 use Perfushopping\Web\Service\AuthService;
@@ -51,6 +52,7 @@ final class HomeController
             'homeNeeds' => (new NeedRepo())->findAll(true),
             'homeVideos' => (new VideoRepo())->findActive(),
             'homeArticles' => (new ArticleRepo())->findAll(true),
+            'homeRoutines' => (new RoutineRepo())->findAll(true),
         ]);
     }
 }
