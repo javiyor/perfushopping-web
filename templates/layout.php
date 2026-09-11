@@ -117,5 +117,23 @@ try {
         <a href="/terms/affiliate" style="text-decoration:underline">Programa de referidos</a>
       </div>
     </div>
+    <script>
+    (function(){
+      try {
+        var sid = localStorage.getItem('pfs_sid') || 's-' + Math.random().toString(36).slice(2);
+        localStorage.setItem('pfs_sid', sid);
+        document.cookie = 'pfs_sid=' + encodeURIComponent(sid) + ';path=/;SameSite=Lax';
+        var payload = {
+          t: 'pageview',
+          sid: sid,
+          u: window.location.href,
+          p: window.location.pathname + window.location.search,
+          pid: <?= (int)(isset($product) && is_array($product) ? ($product['idprodu'] ?? 0) : 0) ?>,
+          v: null
+        };
+        navigator.sendBeacon ? navigator.sendBeacon('/api/a/event', new URLSearchParams(payload)) : fetch('/api/a/event', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:new URLSearchParams(payload), keepalive:true}).catch(function(){});
+      } catch (e) {}
+    })();
+    </script>
   </body>
 </html>

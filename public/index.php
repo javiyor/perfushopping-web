@@ -84,6 +84,7 @@ use Perfushopping\Web\Admin\SocialInboxController as AdminSocialInboxController;
 use Perfushopping\Web\Admin\GastoController as AdminGastoController;
 use Perfushopping\Web\Admin\BancoController as AdminBancoController;
 use Perfushopping\Web\Admin\BancoCuentaController as AdminBancoCuentaController;
+use Perfushopping\Web\Admin\Marketing\AnalyticsController as AdminMarketingAnalyticsController;
 use Perfushopping\Web\Admin\Marketing\ArticleController as AdminMarketingArticleController;
 use Perfushopping\Web\Admin\Marketing\CampaignController as AdminMarketingCampaignController;
 use Perfushopping\Web\Admin\Marketing\EntitySearchController as AdminMarketingEntitySearchController;
@@ -94,6 +95,7 @@ use Perfushopping\Web\Admin\Marketing\QuizController as AdminMarketingQuizContro
 use Perfushopping\Web\Admin\Marketing\RoutineController as AdminMarketingRoutineController;
 use Perfushopping\Web\Admin\Marketing\TopicController as AdminMarketingTopicController;
 use Perfushopping\Web\Admin\Marketing\VideoController as AdminMarketingVideoController;
+use Perfushopping\Web\Controller\Marketing\AnalyticsController as PublicAnalyticsController;
 use Perfushopping\Web\Controller\Marketing\ArticleController as PublicArticleController;
 use Perfushopping\Web\Controller\Marketing\CampaignController as PublicCampaignController;
 use Perfushopping\Web\Controller\Marketing\LearnController;
@@ -125,6 +127,8 @@ $router->get('/rutinas', [PublicRoutineController::class, 'index']);
 $router->get('/rutinas/(?P<slug>[a-z0-9-]+)', [PublicRoutineController::class, 'show']);
 $router->get('/campanas', [PublicCampaignController::class, 'index']);
 $router->get('/campanas/(?P<slug>[a-z0-9-]+)', [PublicCampaignController::class, 'show']);
+$router->post('/api/a/event', [PublicAnalyticsController::class, 'event']);
+$router->get('/api/a/pixel.gif', [PublicAnalyticsController::class, 'sessionPixel']);
 $router->get('/encontra-tu-rutina', [PublicQuizController::class, 'index']);
 $router->get('/encontra-tu-rutina/(?P<slug>[a-z0-9-]+)', [PublicQuizController::class, 'show']);
 $router->post('/encontra-tu-rutina/(?P<slug>[a-z0-9-]+)/resultado', [PublicQuizController::class, 'result']);
@@ -303,6 +307,8 @@ $router->get('/admin/marketing/campanas/nuevo', [AdminMarketingCampaignControlle
 $router->get('/admin/marketing/campanas/(?P<id>\d+)', [AdminMarketingCampaignController::class, 'edit']);
 $router->post('/admin/marketing/campanas/guardar', [AdminMarketingCampaignController::class, 'save']);
 $router->post('/admin/marketing/campanas/eliminar', [AdminMarketingCampaignController::class, 'delete']);
+
+$router->get('/admin/marketing/analytics', [AdminMarketingAnalyticsController::class, 'index']);
 
 $router->get('/admin/api/entity-search', [AdminMarketingEntitySearchController::class, 'search']);
 $router->get('/admin/productos/importar', [AdminImportController::class, 'form']);
