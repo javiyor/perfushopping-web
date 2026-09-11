@@ -8,7 +8,7 @@ $csrfToken = $csrf ?? '';
 ?>
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
-        <h4 class="fw-bold mb-1">Puntos (Serviclub)</h4>
+        <h4 class="fw-bold mb-1">Puntos</h4>
         <p class="text-muted small">1 punto = $1 de crédito. Se acumula 1% del importe + bonus por marca/producto.</p>
     </div>
 </div>
