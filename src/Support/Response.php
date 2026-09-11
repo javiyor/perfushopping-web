@@ -34,7 +34,10 @@ final class Response
     public static function error(\Throwable $e): void
     {
         $env = Env::get('APP_ENV', 'local');
-        $msg = $env === 'local' ? (string)$e : 'Error interno.';
-        self::html(View::render('errors/500.php', ['message' => $msg]), 500);
+        if ($env === 'local') {
+            self::html(View::render('errors/500.php', ['message' => (string)$e]), 500);
+            return;
+        }
+        self::html(View::render('errors/maintenance.php', []), 503);
     }
 }

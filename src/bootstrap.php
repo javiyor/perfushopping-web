@@ -68,3 +68,17 @@ session_start();
 set_exception_handler(static function (Throwable $e): void {
     Response::error($e);
 });
+
+register_shutdown_function(static function (): void {
+    $error = error_get_last();
+    if ($error !== null && in_array((int)$error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR], true)) {
+        http_response_code(503);
+        header('Content-Type: text/html; charset=UTF-8');
+        $file = (defined('APP_BASE_DIR') ? (string)APP_BASE_DIR : (string)realpath(__DIR__ . '/..')) . '/templates/errors/maintenance.php';
+        if (is_file($file)) {
+            include $file;
+        } else {
+            echo '<h1>En mantenimiento</h1><p>Volvé a intentar en unos minutos.</p>';
+        }
+    }
+});
