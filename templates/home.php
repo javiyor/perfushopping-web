@@ -69,20 +69,8 @@ foreach ([1, 2, 3] as $bi) {
   <?php endif; ?>
 </div>
 
-<form class="filters" method="get" action="/">
-  <input name="q" value="<?= htmlspecialchars($q) ?>" placeholder="Buscar (producto, variedad, codigo)" />
-  <select name="codrub">
-    <option value="0">Todas las categorias</option>
-    <?php foreach ($rubros as $r): ?>
-      <option value="<?= (int)$r['codrub'] ?>" <?= ((int)$r['codrub'] === $codrub) ? 'selected' : '' ?>><?= htmlspecialchars((string)$r['nomrub']) ?></option>
-    <?php endforeach; ?>
-  </select>
-  <select name="codsub">
-    <option value="0">Todas las marcas</option>
-    <?php foreach ($marcas as $m): ?>
-      <option value="<?= (int)$m['codsub'] ?>" <?= ((int)$m['codsub'] === $codsub) ? 'selected' : '' ?>><?= htmlspecialchars(trim((string)$m['nomsub'])) ?></option>
-    <?php endforeach; ?>
-  </select>
+<form class="filters" method="get" action="/buscar">
+  <input name="q" value="<?= htmlspecialchars($q) ?>" placeholder="Buscar productos, marcas, rutinas, necesidades, contenido..." style="flex:1" />
   <button class="btn" type="submit">Buscar</button>
 </form>
 

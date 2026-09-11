@@ -33,6 +33,7 @@ use Perfushopping\Web\Controller\ApiSyncController;
 use Perfushopping\Web\Controller\ApiUploadController;
 use Perfushopping\Web\Controller\ApiSyncTablesController;
 use Perfushopping\Web\Controller\DemoTechController;
+use Perfushopping\Web\Controller\SearchController;
 use Perfushopping\Web\Controller\PromoTarjetasController as PromoTarjetasController;
 use Perfushopping\Web\Controller\MetaWebhookController;
 use Perfushopping\Web\Controller\AdminProductController;
@@ -116,8 +117,9 @@ $router->get('/health', [\Perfushopping\Web\Controller\HealthController::class, 
 // Public - Catalog feed para Meta (sin auth)
 $router->get('/catalog_products.csv', [\Perfushopping\Web\Controller\CatalogFeedController::class, 'csv']);
 $router->get('/', [HomeController::class, 'index']);
-$router->get('/p/(?P<id>\d+)', [ProductController::class, 'show']);
+$router->get('/buscar', [SearchController::class, 'index']);
 
+$router->get('/p/(?P<id>\d+)', [ProductController::class, 'show']);
 // Marketing / contenido público
 $router->get('/aprende', [LearnController::class, 'index']);
 $router->get('/aprende/videos/(?P<slug>[a-z0-9-]+)', [PublicVideoController::class, 'show']);
