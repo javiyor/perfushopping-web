@@ -61,9 +61,17 @@ $refLink = $refCode !== '' ? ($appUrl . '/?ref=' . urlencode($refCode)) : '';
   </div>
 
   <div class="page" style="margin-top:12px">
+    <h3 style="margin:0 0 10px;color:var(--gold);font-family:Georgia, 'Times New Roman', serif;letter-spacing:0.6px">Usar tu crédito</h3>
+    <div style="color:rgba(246,244,239,0.7);line-height:1.5">
+      Podés usar el <strong>100%</strong> de tu crédito para comprar productos en Perfushopping. También podés retirar una parte en efectivo.
+    </div>
+  </div>
+
+  <div class="page" style="margin-top:12px">
     <h3 style="margin:0 0 10px;color:var(--gold);font-family:Georgia, 'Times New Roman', serif;letter-spacing:0.6px">Retirar en pesos</h3>
     <div style="color:rgba(246,244,239,0.7);line-height:1.5">
-      Minimo: <strong>$20.000</strong> de credito. Al retirar, se paga el <strong>50%</strong> en ARS (el 100% del credito solicitado se debita).
+      Si elegís retirar en efectivo, se te abona el <strong>50%</strong> del crédito acumulado. El 100% del crédito solicitado se debita de tu cuenta.<br />
+      Mínimo de retiro: <strong>$20.000</strong> de crédito.
     </div>
 
     <form method="post" action="/affiliate/withdraw" style="margin-top:12px;display:grid;gap:10px">

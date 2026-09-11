@@ -15,7 +15,7 @@ final class AnalyticsController
             Response::json(['ok' => false], 400);
             return;
         }
-        $allowed = ['pageview', 'product_view', 'add_to_cart', 'add_routine', 'quiz_start', 'quiz_complete', 'campaign_view', 'checkout_start', 'checkout_complete'];
+        $allowed = ['pageview', 'product_view', 'add_to_cart', 'add_routine', 'quiz_start', 'quiz_complete', 'campaign_view', 'checkout_start', 'checkout_complete', 'view_seller_program_banner', 'click_seller_program_register', 'click_seller_program_learn_more'];
         if (!in_array($type, $allowed, true)) {
             Response::json(['ok' => false], 400);
             return;

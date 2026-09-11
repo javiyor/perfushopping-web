@@ -32,6 +32,7 @@ $settings = $block['settings'] ?? [];
             <option value="featured_products" <?= (($block['block_type'] ?? '') === 'featured_products') ? 'selected' : '' ?>>Productos destacados</option>
             <option value="routines_grid" <?= (($block['block_type'] ?? '') === 'routines_grid') ? 'selected' : '' ?>>Grilla de rutinas</option>
             <option value="promo_banner" <?= (($block['block_type'] ?? '') === 'promo_banner') ? 'selected' : '' ?>>Banner promocional</option>
+            <option value="seller_program" <?= (($block['block_type'] ?? '') === 'seller_program') ? 'selected' : '' ?>>Programa de vendedores</option>
             <option value="categories_grid" <?= (($block['block_type'] ?? '') === 'categories_grid') ? 'selected' : '' ?>>Grilla de categorías</option>
             <option value="custom_html" <?= (($block['block_type'] ?? '') === 'custom_html') ? 'selected' : '' ?>>HTML libre</option>
           </select>
@@ -99,6 +100,59 @@ $settings = $block['settings'] ?? [];
         <div class="col-md-6"><label class="form-label small">Color fondo</label><input class="form-control form-control-sm" name="settings[bg_color]" value="<?= htmlspecialchars((string)($settings['bg_color'] ?? '')) ?>" /></div>
       </div>
 
+      <div id="seller_program-settings" class="settings-group">
+        <h6 class="fw-semibold small">Contenido promocional</h6>
+        <div class="row g-3 compact-form">
+          <div class="col-md-4"><label class="form-label small">Eyebrow</label><input class="form-control form-control-sm" name="settings[eyebrow]" value="<?= htmlspecialchars((string)($settings['eyebrow'] ?? 'GANÁ CON PERFUSHOPPING')) ?>" /></div>
+          <div class="col-md-4"><label class="form-label small">Título</label><input class="form-control form-control-sm" name="settings[title]" value="<?= htmlspecialchars((string)($settings['title'] ?? 'Registrate y convertite en vendedor Perfushopping')) ?>" /></div>
+          <div class="col-md-2"><label class="form-label small">% comisión</label><input type="number" class="form-control form-control-sm" name="settings[commission_pct]" value="<?= (int)($settings['commission_pct'] ?? 10) ?>" /></div>
+          <div class="col-md-2"><label class="form-label small">Color fondo</label><input class="form-control form-control-sm" name="settings[bg_color]" value="<?= htmlspecialchars((string)($settings['bg_color'] ?? '')) ?>" /></div>
+          <div class="col-12"><label class="form-label small">Texto</label><textarea class="form-control form-control-sm" name="settings[body]" rows="3"><?= htmlspecialchars((string)($settings['body'] ?? 'Compartí y recomendá nuestros productos y ganá hasta un 10% de comisión. Usá tus ganancias para comprarte lo que quieras en Perfushopping o retirá una parte en efectivo.')) ?></textarea></div>
+        </div>
+        <hr />
+        <h6 class="fw-semibold small">Imágenes y video</h6>
+        <div class="row g-3 compact-form">
+          <div class="col-md-4"><label class="form-label small">Imagen desktop (URL)</label><input class="form-control form-control-sm" name="settings[image_desktop]" value="<?= htmlspecialchars((string)($settings['image_desktop'] ?? '')) ?>" /></div>
+          <div class="col-md-4"><label class="form-label small">Imagen mobile (URL)</label><input class="form-control form-control-sm" name="settings[image_mobile]" value="<?= htmlspecialchars((string)($settings['image_mobile'] ?? '')) ?>" /></div>
+          <div class="col-md-4"><label class="form-label small">Video URL (opcional)</label><input class="form-control form-control-sm" name="settings[video_url]" value="<?= htmlspecialchars((string)($settings['video_url'] ?? '')) ?>" /></div>
+        </div>
+        <hr />
+        <h6 class="fw-semibold small">CTAs</h6>
+        <div class="row g-3 compact-form">
+          <div class="col-md-3"><label class="form-label small">CTA principal texto</label><input class="form-control form-control-sm" name="settings[primary_cta_text]" value="<?= htmlspecialchars((string)($settings['primary_cta_text'] ?? 'QUIERO SER VENDEDOR')) ?>" /></div>
+          <div class="col-md-3"><label class="form-label small">CTA principal URL</label><input class="form-control form-control-sm" name="settings[primary_cta_url]" value="<?= htmlspecialchars((string)($settings['primary_cta_url'] ?? '/login')) ?>" /></div>
+          <div class="col-md-3"><label class="form-label small">CTA secundario texto</label><input class="form-control form-control-sm" name="settings[secondary_cta_text]" value="<?= htmlspecialchars((string)($settings['secondary_cta_text'] ?? 'CÓMO FUNCIONA')) ?>" /></div>
+          <div class="col-md-3"><label class="form-label small">CTA secundario URL</label><input class="form-control form-control-sm" name="settings[secondary_cta_url]" value="<?= htmlspecialchars((string)($settings['secondary_cta_url'] ?? '/terms/affiliate')) ?>" /></div>
+        </div>
+        <hr />
+        <h6 class="fw-semibold small">Beneficios</h6>
+        <div id="benefits-list">
+          <?php
+          $benefits = $settings['benefits'] ?? ['Registrate gratis', 'Compartí productos', 'Ganá hasta 10% de comisión', 'Usá tu saldo o retiralo parcialmente'];
+          if (!is_array($benefits)) $benefits = [];
+          foreach ($benefits as $i => $b): ?>
+          <div class="row g-2 compact-form align-items-end mb-2 benefit-row">
+            <div class="col-md-10"><input class="form-control form-control-sm" name="settings[benefits][]" value="<?= htmlspecialchars((string)$b) ?>" placeholder="Beneficio" /></div>
+            <div class="col-md-2"><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.benefit-row').remove()">Eliminar</button></div>
+          </div>
+          <?php endforeach; ?>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="add-benefit"><i class="bi bi-plus-lg"></i> Agregar beneficio</button>
+        <hr />
+        <h6 class="fw-semibold small">Modo logueado (recordatorio)</h6>
+        <div class="row g-3 compact-form">
+          <div class="col-md-6"><label class="form-label small">Título</label><input class="form-control form-control-sm" name="settings[logged_in_title]" value="<?= htmlspecialchars((string)($settings['logged_in_title'] ?? 'Ganá recomendando productos Perfushopping')) ?>" /></div>
+          <div class="col-md-6"><label class="form-label small">CTA texto</label><input class="form-control form-control-sm" name="settings[logged_in_cta_text]" value="<?= htmlspecialchars((string)($settings['logged_in_cta_text'] ?? 'VER MI CRÉDITO')) ?>" /></div>
+          <div class="col-12"><label class="form-label small">Texto</label><textarea class="form-control form-control-sm" name="settings[logged_in_body]" rows="2"><?= htmlspecialchars((string)($settings['logged_in_body'] ?? 'Compartí tus productos favoritos y ganá comisiones por las ventas que generes. Podés usar tus ganancias para comprar en Perfushopping o retirar una parte en efectivo.')) ?></textarea></div>
+        </div>
+        <hr />
+        <h6 class="fw-semibold small">Tracking y segmento</h6>
+        <div class="row g-3 compact-form">
+          <div class="col-md-6"><label class="form-label small">Campaign ID</label><input class="form-control form-control-sm" name="settings[tracking_campaign_id]" value="<?= htmlspecialchars((string)($settings['tracking_campaign_id'] ?? '')) ?>" /></div>
+          <div class="col-md-6"><label class="form-label small">Segmento (reservado)</label><input class="form-control form-control-sm" name="settings[segment]" value="<?= htmlspecialchars((string)($settings['segment'] ?? '')) ?>" /></div>
+        </div>
+      </div>
+
       <div id="categories_grid-settings" class="settings-group row g-3 compact-form">
         <div class="col-md-4"><label class="form-label small">Cantidad</label><input type="number" class="form-control form-control-sm" name="settings[limit]" value="<?= (int)($settings['limit'] ?? 6) ?>" /></div>
       </div>
@@ -127,5 +181,16 @@ $settings = $block['settings'] ?? [];
   }
   sel.addEventListener('change', update);
   update();
+
+  var addBtn = document.getElementById('add-benefit');
+  var list = document.getElementById('benefits-list');
+  if (addBtn && list) {
+    addBtn.addEventListener('click', function(){
+      var row = document.createElement('div');
+      row.className = 'row g-2 compact-form align-items-end mb-2 benefit-row';
+      row.innerHTML = '<div class="col-md-10"><input class="form-control form-control-sm" name="settings[benefits][]" placeholder="Beneficio" /></div><div class="col-md-2"><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest(\'.benefit-row\').remove()">Eliminar</button></div>';
+      list.appendChild(row);
+    });
+  }
 })();
 </script>
