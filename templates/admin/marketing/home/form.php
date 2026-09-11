@@ -14,9 +14,11 @@ $settings = $block['settings'] ?? [];
 
 <div class="card shadow-sm">
   <div class="card-body">
-    <form method="post" action="/admin/marketing/home/guardar">
+    <form method="post" action="<?= htmlspecialchars($formAction ?? '/admin/marketing/home/guardar') ?>">
       <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
       <input type="hidden" name="id" value="<?= $id ?>" />
+      <?php if (isset($pageType)): ?><input type="hidden" name="page_type" value="<?= htmlspecialchars($pageType) ?>" /><?php endif; ?>
+      <?php if (isset($pageId)): ?><input type="hidden" name="page_id" value="<?= (int)$pageId ?>" /><?php endif; ?>
 
       <div class="row g-3 compact-form">
         <div class="col-md-4">
@@ -108,7 +110,7 @@ $settings = $block['settings'] ?? [];
 
       <div class="mt-3">
         <button class="btn btn-accent btn-sm" type="submit"><i class="bi bi-check-lg"></i> Guardar</button>
-        <a class="btn btn-outline-secondary btn-sm" href="/admin/marketing/home">Cancelar</a>
+        <a class="btn btn-outline-secondary btn-sm" href="<?= htmlspecialchars($cancelUrl ?? '/admin/marketing/home') ?>">Cancelar</a>
       </div>
     </form>
   </div>

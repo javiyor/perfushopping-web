@@ -86,6 +86,7 @@ use Perfushopping\Web\Admin\BancoController as AdminBancoController;
 use Perfushopping\Web\Admin\BancoCuentaController as AdminBancoCuentaController;
 use Perfushopping\Web\Admin\Marketing\AnalyticsController as AdminMarketingAnalyticsController;
 use Perfushopping\Web\Admin\Marketing\ArticleController as AdminMarketingArticleController;
+use Perfushopping\Web\Admin\Marketing\CampaignBlockController as AdminMarketingCampaignBlockController;
 use Perfushopping\Web\Admin\Marketing\CampaignController as AdminMarketingCampaignController;
 use Perfushopping\Web\Admin\Marketing\EntitySearchController as AdminMarketingEntitySearchController;
 use Perfushopping\Web\Admin\Marketing\FaqController as AdminMarketingFaqController;
@@ -307,6 +308,13 @@ $router->get('/admin/marketing/campanas/nuevo', [AdminMarketingCampaignControlle
 $router->get('/admin/marketing/campanas/(?P<id>\d+)', [AdminMarketingCampaignController::class, 'edit']);
 $router->post('/admin/marketing/campanas/guardar', [AdminMarketingCampaignController::class, 'save']);
 $router->post('/admin/marketing/campanas/eliminar', [AdminMarketingCampaignController::class, 'delete']);
+
+$router->get('/admin/marketing/campanas/(?P<campaign_id>\d+)/bloques', [AdminMarketingCampaignBlockController::class, 'index']);
+$router->get('/admin/marketing/campanas/(?P<campaign_id>\d+)/bloques/nuevo', [AdminMarketingCampaignBlockController::class, 'create']);
+$router->get('/admin/marketing/campanas/(?P<campaign_id>\d+)/bloques/(?P<id>\d+)', [AdminMarketingCampaignBlockController::class, 'edit']);
+$router->post('/admin/marketing/campanas/(?P<campaign_id>\d+)/bloques/guardar', [AdminMarketingCampaignBlockController::class, 'save']);
+$router->post('/admin/marketing/campanas/(?P<campaign_id>\d+)/bloques/eliminar', [AdminMarketingCampaignBlockController::class, 'delete']);
+$router->post('/admin/marketing/campanas/(?P<campaign_id>\d+)/bloques/ordenar', [AdminMarketingCampaignBlockController::class, 'reorder']);
 
 $router->get('/admin/marketing/analytics', [AdminMarketingAnalyticsController::class, 'index']);
 

@@ -27,6 +27,7 @@ $campaigns = $campaigns ?? [];
         <td><?= htmlspecialchars((string)$c['title']) ?></td>
         <td><?= (int)$c['active'] ? 'Sí' : 'No' ?></td>
         <td class="text-end">
+          <a class="btn btn-sm btn-outline-primary" href="/admin/marketing/campanas/<?= (int)$c['id'] ?>/bloques" title="Bloques"><i class="bi bi-layout-text-window"></i></a>
           <a class="btn btn-sm btn-outline-secondary" href="/admin/marketing/campanas/<?= (int)$c['id'] ?>"><i class="bi bi-pencil"></i></a>
           <form method="post" action="/admin/marketing/campanas/eliminar" style="display:inline" onsubmit="return confirm('¿Eliminar campaña?')">
             <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
