@@ -165,6 +165,7 @@ final class AdminUserRepo
             'marketing_home' => 'Marketing - Home',
             'marketing_routines' => 'Marketing - Rutinas',
             'marketing_quizzes' => 'Marketing - Recomendadores',
+            'marketing_campaigns' => 'Marketing - Campañas',
             'product_commercial_edit' => 'Producto - Contenido comercial',
         ];
     }

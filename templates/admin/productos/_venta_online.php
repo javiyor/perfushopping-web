@@ -30,9 +30,12 @@ $relationTypes = $relationTypes ?? [];
 
 <div class="row g-2 compact-form">
   <div class="col-12">
-    <div class="d-flex gap-2 align-items-center mb-2">
+    <div class="d-flex gap-2 align-items-center mb-2 flex-wrap">
       <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-ai-commercial" data-idprodu="<?= (int)($product['idprodu'] ?? 0) ?>" data-csrf="<?= htmlspecialchars($csrf) ?>">
         <i class="bi bi-stars"></i> Sugerir contenido con IA
+      </button>
+      <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-ai-tags" data-idprodu="<?= (int)($product['idprodu'] ?? 0) ?>" data-csrf="<?= htmlspecialchars($csrf) ?>">
+        <i class="bi bi-tags"></i> Etiquetar con IA
       </button>
       <span class="small text-muted" id="ai-commercial-status"></span>
     </div>
@@ -248,6 +251,7 @@ $relationTypes = $relationTypes ?? [];
 
   // IA comercial
   var aiBtn = document.getElementById('btn-ai-commercial');
+  var aiTagsBtn = document.getElementById('btn-ai-tags');
   var aiStatus = document.getElementById('ai-commercial-status');
   if (aiBtn) {
     aiBtn.addEventListener('click', function(){
@@ -264,6 +268,19 @@ $relationTypes = $relationTypes ?? [];
           if (el && c[k]) el.value = c[k];
         });
         aiStatus.textContent = 'Sugerencias aplicadas. Revisá y guardá.';
+      }).catch(function(e){ aiStatus.textContent = 'Error: ' + e.message; });
+    });
+  }
+  if (aiTagsBtn) {
+    aiTagsBtn.addEventListener('click', function(){
+      aiStatus.textContent = 'Etiquetando con IA...';
+      fetch('/admin/productos/ai-tags', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: '_csrf=' + encodeURIComponent(aiTagsBtn.dataset.csrf) + '&idprodu=' + encodeURIComponent(aiTagsBtn.dataset.idprodu)
+      }).then(r => r.json()).then(function(data){
+        if (!data.ok) { aiStatus.textContent = data.error || 'Error'; return; }
+        aiStatus.textContent = (data.tags || []).length + ' etiquetas sugeridas. Recargá para verlas.';
       }).catch(function(e){ aiStatus.textContent = 'Error: ' + e.message; });
     });
   }

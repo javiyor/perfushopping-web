@@ -12,6 +12,7 @@ use Perfushopping\Web\Repo\Marketing\TaxonomyRepo;
 use Perfushopping\Web\Repo\Marketing\VideoRepo;
 use Perfushopping\Web\Service\AdminAuthService;
 use Perfushopping\Web\Service\AiProductDescriptionService;
+use Perfushopping\Web\Service\AiTaggingService;
 use Perfushopping\Web\Support\Csrf;
 use Perfushopping\Web\Support\Format;
 use Perfushopping\Web\Support\Response;
@@ -482,6 +483,26 @@ final class ProductController
         try {
             $result = (new AiCommercialContentService())->suggestForProduct($product, $variants);
             Response::json(['ok' => true, 'content' => $result['content'], 'tags' => $result['tags']]);
+        } catch (\Throwable $e) {
+            Response::json(['ok' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function aiTags(array $params): void
+    {
+        $this->auth->requirePermiso('productos');
+        Csrf::check($_POST['_csrf'] ?? null);
+        $idprodu = (int)($_POST['idprodu'] ?? 0);
+
+        $product = $this->repo->find($idprodu);
+        if (!$product) {
+            Response::json(['ok' => false, 'error' => 'Producto no encontrado.'], 404);
+            return;
+        }
+        $variants = $this->repo->variants($idprodu);
+        try {
+            $tags = (new AiTaggingService())->suggestAndApply($idprodu, $product, $variants);
+            Response::json(['ok' => true, 'tags' => $tags]);
         } catch (\Throwable $e) {
             Response::json(['ok' => false, 'error' => $e->getMessage()], 500);
         }
