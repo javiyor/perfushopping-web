@@ -167,6 +167,7 @@ final class AdminUserRepo
             'marketing_quizzes' => 'Marketing - Recomendadores',
             'marketing_campaigns' => 'Marketing - Campañas',
             'marketing_analytics' => 'Marketing - Analytics',
+            'marketing_brands' => 'Marketing - Marcas',
             'product_commercial_edit' => 'Producto - Contenido comercial',
         ];
     }

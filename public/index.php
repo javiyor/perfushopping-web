@@ -86,6 +86,8 @@ use Perfushopping\Web\Admin\BancoController as AdminBancoController;
 use Perfushopping\Web\Admin\BancoCuentaController as AdminBancoCuentaController;
 use Perfushopping\Web\Admin\Marketing\AnalyticsController as AdminMarketingAnalyticsController;
 use Perfushopping\Web\Admin\Marketing\ArticleController as AdminMarketingArticleController;
+use Perfushopping\Web\Admin\Marketing\BrandBlockController as AdminMarketingBrandBlockController;
+use Perfushopping\Web\Admin\Marketing\BrandPageController as AdminMarketingBrandPageController;
 use Perfushopping\Web\Admin\Marketing\CampaignBlockController as AdminMarketingCampaignBlockController;
 use Perfushopping\Web\Admin\Marketing\CampaignController as AdminMarketingCampaignController;
 use Perfushopping\Web\Admin\Marketing\EntitySearchController as AdminMarketingEntitySearchController;
@@ -98,6 +100,7 @@ use Perfushopping\Web\Admin\Marketing\TopicController as AdminMarketingTopicCont
 use Perfushopping\Web\Admin\Marketing\VideoController as AdminMarketingVideoController;
 use Perfushopping\Web\Controller\Marketing\AnalyticsController as PublicAnalyticsController;
 use Perfushopping\Web\Controller\Marketing\ArticleController as PublicArticleController;
+use Perfushopping\Web\Controller\Marketing\BrandPageController as PublicBrandPageController;
 use Perfushopping\Web\Controller\Marketing\CampaignController as PublicCampaignController;
 use Perfushopping\Web\Controller\Marketing\LearnController;
 use Perfushopping\Web\Controller\Marketing\NeedController as PublicNeedController;
@@ -128,6 +131,7 @@ $router->get('/rutinas', [PublicRoutineController::class, 'index']);
 $router->get('/rutinas/(?P<slug>[a-z0-9-]+)', [PublicRoutineController::class, 'show']);
 $router->get('/campanas', [PublicCampaignController::class, 'index']);
 $router->get('/campanas/(?P<slug>[a-z0-9-]+)', [PublicCampaignController::class, 'show']);
+$router->get('/marcas/(?P<slug>[a-z0-9-]+)', [PublicBrandPageController::class, 'show']);
 $router->post('/api/a/event', [PublicAnalyticsController::class, 'event']);
 $router->get('/api/a/pixel.gif', [PublicAnalyticsController::class, 'sessionPixel']);
 $router->get('/encontra-tu-rutina', [PublicQuizController::class, 'index']);
@@ -315,6 +319,19 @@ $router->get('/admin/marketing/campanas/(?P<campaign_id>\d+)/bloques/(?P<id>\d+)
 $router->post('/admin/marketing/campanas/(?P<campaign_id>\d+)/bloques/guardar', [AdminMarketingCampaignBlockController::class, 'save']);
 $router->post('/admin/marketing/campanas/(?P<campaign_id>\d+)/bloques/eliminar', [AdminMarketingCampaignBlockController::class, 'delete']);
 $router->post('/admin/marketing/campanas/(?P<campaign_id>\d+)/bloques/ordenar', [AdminMarketingCampaignBlockController::class, 'reorder']);
+
+$router->get('/admin/marketing/marcas', [AdminMarketingBrandPageController::class, 'index']);
+$router->get('/admin/marketing/marcas/nuevo', [AdminMarketingBrandPageController::class, 'create']);
+$router->get('/admin/marketing/marcas/(?P<id>\d+)', [AdminMarketingBrandPageController::class, 'edit']);
+$router->post('/admin/marketing/marcas/guardar', [AdminMarketingBrandPageController::class, 'save']);
+$router->post('/admin/marketing/marcas/eliminar', [AdminMarketingBrandPageController::class, 'delete']);
+
+$router->get('/admin/marketing/marcas/(?P<page_id>\d+)/bloques', [AdminMarketingBrandBlockController::class, 'index']);
+$router->get('/admin/marketing/marcas/(?P<page_id>\d+)/bloques/nuevo', [AdminMarketingBrandBlockController::class, 'create']);
+$router->get('/admin/marketing/marcas/(?P<page_id>\d+)/bloques/(?P<id>\d+)', [AdminMarketingBrandBlockController::class, 'edit']);
+$router->post('/admin/marketing/marcas/(?P<page_id>\d+)/bloques/guardar', [AdminMarketingBrandBlockController::class, 'save']);
+$router->post('/admin/marketing/marcas/(?P<page_id>\d+)/bloques/eliminar', [AdminMarketingBrandBlockController::class, 'delete']);
+$router->post('/admin/marketing/marcas/(?P<page_id>\d+)/bloques/ordenar', [AdminMarketingBrandBlockController::class, 'reorder']);
 
 $router->get('/admin/marketing/analytics', [AdminMarketingAnalyticsController::class, 'index']);
 

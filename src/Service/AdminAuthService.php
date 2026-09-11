@@ -11,7 +11,7 @@ final class AdminAuthService
 {
     private static array $permisosPorRol = [
         'superadmin' => ['*'],
-        'ventas' => ['productos', 'clientes', 'facturacion', 'presupuestos', 'remitos', 'recibos', 'cta_cte', 'marketing_videos', 'marketing_articles', 'marketing_faqs', 'marketing_topics', 'marketing_needs', 'marketing_home', 'marketing_routines', 'marketing_quizzes', 'marketing_campaigns', 'marketing_analytics', 'product_commercial_edit'],
+        'ventas' => ['productos', 'clientes', 'facturacion', 'presupuestos', 'remitos', 'recibos', 'cta_cte', 'marketing_videos', 'marketing_articles', 'marketing_faqs', 'marketing_topics', 'marketing_needs', 'marketing_home', 'marketing_routines', 'marketing_quizzes', 'marketing_campaigns', 'marketing_analytics', 'marketing_brands', 'product_commercial_edit'],
         'administracion' => ['arca', 'estadisticas', 'pagos', 'cheques', 'usuarios_admin'],
         'compras' => ['compras', 'pagos_proveedores'],
         'caja' => ['caja_movimientos'],
