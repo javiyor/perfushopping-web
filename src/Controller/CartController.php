@@ -113,6 +113,24 @@ final class CartController
     {
         Csrf::check($_POST['_csrf'] ?? null);
         $items = (array)($_POST['items'] ?? []);
+        $this->addRoutineItems($items);
+    }
+
+    public function addRoutineById(array $params): void
+    {
+        $routineId = (int)($params['id'] ?? 0);
+        $items = [];
+        if ($routineId > 0) {
+            foreach ((new \Perfushopping\Web\Repo\Marketing\RoutineRepo())->findItems($routineId) as $it) {
+                $items[] = (int)$it['product_id'];
+            }
+        }
+        $this->addRoutineItems($items);
+    }
+
+    /** @param array<int,int> $items */
+    private function addRoutineItems(array $items): void
+    {
         $repo = new ProductRepo();
         $cart = new CartService();
         $added = 0;

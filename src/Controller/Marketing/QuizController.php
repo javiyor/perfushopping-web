@@ -4,6 +4,8 @@ declare(strict_types=1);
 namespace Perfushopping\Web\Controller\Marketing;
 
 use Perfushopping\Web\Repo\Marketing\QuizRepo;
+use Perfushopping\Web\Repo\Marketing\RoutineRepo;
+use Perfushopping\Web\Service\AuthService;
 use Perfushopping\Web\Service\RecommendationService;
 use Perfushopping\Web\Support\Response;
 use Perfushopping\Web\Support\View;
@@ -48,10 +50,24 @@ final class QuizController
             $answers[(int)$qid] = (int)$oid;
         }
         $result = (new RecommendationService())->recommend((int)$quiz['id'], $answers);
+
+        $auth = new AuthService();
+        $user = $auth->user();
+        $isWholesale = $auth->isWholesaleApproved($user);
+
+        $firstRoutine = $result['routines'][0] ?? null;
+        $routineItems = [];
+        if ($firstRoutine) {
+            $routineItems = (new RoutineRepo())->findItems((int)$firstRoutine['id']);
+        }
+
         echo View::page('quizzes/result.php', [
             'quiz' => $quiz,
             'answers' => $answers,
             'result' => $result,
+            'firstRoutine' => $firstRoutine,
+            'routineItems' => $routineItems,
+            'isWholesale' => $isWholesale,
             'title' => 'Tu recomendación',
         ]);
     }

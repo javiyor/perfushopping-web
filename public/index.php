@@ -147,6 +147,7 @@ $router->get('/terms/affiliate', [LegalController::class, 'affiliateTerms']);
 $router->get('/cart', [CartController::class, 'view']);
 $router->post('/cart/add', [CartController::class, 'add']);
 $router->post('/cart/add-routine', [CartController::class, 'addRoutine']);
+$router->get('/cart/add-routine/(?P<id>\d+)', [CartController::class, 'addRoutineById']);
 $router->post('/cart/update', [CartController::class, 'update']);
 $router->post('/cart/remove', [CartController::class, 'remove']);
 $router->post('/cart/clear', [CartController::class, 'clear']);
