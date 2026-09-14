@@ -60,7 +60,7 @@ final class SearchService
 
     private function needs(string $like): array
     {
-        $st = Db::pdo()->prepare('SELECT id, name, slug FROM cms_needs WHERE active = 1 AND (name LIKE :q OR description LIKE :q) ORDER BY name ASC LIMIT ' . $this->limitOther);
+        $st = Db::pdo()->prepare('SELECT id, name, slug FROM cms_needs WHERE active = 1 AND (name LIKE :q OR description_short LIKE :q OR description_long LIKE :q) ORDER BY name ASC LIMIT ' . $this->limitOther);
         $st->execute([':q' => $like]);
         return $st->fetchAll() ?: [];
     }
