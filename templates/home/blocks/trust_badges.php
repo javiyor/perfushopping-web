@@ -18,6 +18,8 @@ $mlUrl = trim((string)($s['ml_url'] ?? '#'));
 
 $hasGoogleImage = $googleImage !== '';
 $hasMlImage = $mlImage !== '';
+$showGoogle = $hasGoogleImage || $googleScore !== '';
+$showMl = $hasMlImage || $mlScore !== '';
 ?>
 <style>
 .trust-badges {
@@ -92,6 +94,7 @@ $hasMlImage = $mlImage !== '';
     <?php endif; ?>
     <div class="trust-badges__items <?= $layout === 'stacked' ? 'stacked' : '' ?>">
 
+      <?php if ($showGoogle): ?>
       <a href="<?= htmlspecialchars($googleUrl) ?>" target="_blank" rel="noopener noreferrer" class="trust-badge">
         <?php if ($hasGoogleImage): ?>
           <img src="<?= htmlspecialchars($googleImage) ?>" alt="Google opiniones" class="trust-badge__img" loading="lazy" />
@@ -105,7 +108,9 @@ $hasMlImage = $mlImage !== '';
           </div>
         <?php endif; ?>
       </a>
+      <?php endif; ?>
 
+      <?php if ($showMl): ?>
       <a href="<?= htmlspecialchars($mlUrl) ?>" target="_blank" rel="noopener noreferrer" class="trust-badge">
         <?php if ($hasMlImage): ?>
           <img src="<?= htmlspecialchars($mlImage) ?>" alt="Mercado Libre reputación" class="trust-badge__img" loading="lazy" />
@@ -116,6 +121,7 @@ $hasMlImage = $mlImage !== '';
           </div>
         <?php endif; ?>
       </a>
+      <?php endif; ?>
 
     </div>
   </div>

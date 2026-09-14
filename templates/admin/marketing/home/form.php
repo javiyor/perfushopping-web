@@ -157,7 +157,7 @@ $settings = $block['settings'] ?? [];
       <div id="trust_badges-settings" class="settings-group">
         <h6 class="fw-semibold small">Mensaje de confianza</h6>
         <div class="row g-3 compact-form">
-          <div class="col-12"><label class="form-label small">Texto principal</label><textarea class="form-control form-control-sm" name="settings[message]" rows="2"><?= htmlspecialchars((string)($settings['message'] ?? 'Comprá con confianza. Nos eligen miles de clientes y nuestra reputación habla por sí sola.')) ?></textarea></div>
+          <div class="col-12"><label class="form-label small">Texto principal</label><textarea class="form-control form-control-sm" name="settings[message]" rows="2"><?= htmlspecialchars((string)($settings['message'] ?? 'Comprá con confianza. Nos avalan las opiniones de nuestros clientes en Google.')) ?></textarea></div>
           <div class="col-md-3"><label class="form-label small">Disposición</label>
             <select class="form-select form-select-sm" name="settings[layout]">
               <option value="horizontal" <?= (($settings['layout'] ?? 'horizontal') === 'horizontal') ? 'selected' : '' ?>>Horizontal</option>
@@ -178,14 +178,14 @@ $settings = $block['settings'] ?? [];
         <div class="row g-3 compact-form">
           <div class="col-md-2"><label class="form-label small">Puntaje</label><input class="form-control form-control-sm" name="settings[google_score]" value="<?= htmlspecialchars((string)($settings['google_score'] ?? '4.8')) ?>" /></div>
           <div class="col-md-2"><label class="form-label small">Opiniones</label><input class="form-control form-control-sm" name="settings[google_reviews]" value="<?= htmlspecialchars((string)($settings['google_reviews'] ?? '120+')) ?>" /></div>
-          <div class="col-md-4"><label class="form-label small">Imagen (URL)</label><input class="form-control form-control-sm" name="settings[google_image]" value="<?= htmlspecialchars((string)($settings['google_image'] ?? '')) ?>" placeholder="/uploads/google-badge.png" /></div>
+          <div class="col-md-4"><label class="form-label small">Imagen (URL)</label><input class="form-control form-control-sm" name="settings[google_image]" value="<?= htmlspecialchars((string)($settings['google_image'] ?? '/assets/trust/calificacion-google.jpg')) ?>" placeholder="/assets/trust/calificacion-google.jpg" /></div>
           <div class="col-md-4"><label class="form-label small">Link</label><input class="form-control form-control-sm" name="settings[google_url]" value="<?= htmlspecialchars((string)($settings['google_url'] ?? '#')) ?>" /></div>
         </div>
         <hr />
         <h6 class="fw-semibold small">Mercado Libre</h6>
         <div class="row g-3 compact-form">
-          <div class="col-md-2"><label class="form-label small">Puntaje</label><input class="form-control form-control-sm" name="settings[ml_score]" value="<?= htmlspecialchars((string)($settings['ml_score'] ?? 'Platinum')) ?>" /></div>
-          <div class="col-md-2"><label class="form-label small">Ventas</label><input class="form-control form-control-sm" name="settings[ml_sales]" value="<?= htmlspecialchars((string)($settings['ml_sales'] ?? '10.000+')) ?>" /></div>
+          <div class="col-md-2"><label class="form-label small">Puntaje</label><input class="form-control form-control-sm" name="settings[ml_score]" value="<?= htmlspecialchars((string)($settings['ml_score'] ?? '')) ?>" /></div>
+          <div class="col-md-2"><label class="form-label small">Ventas</label><input class="form-control form-control-sm" name="settings[ml_sales]" value="<?= htmlspecialchars((string)($settings['ml_sales'] ?? '')) ?>" /></div>
           <div class="col-md-4"><label class="form-label small">Imagen (URL)</label><input class="form-control form-control-sm" name="settings[ml_image]" value="<?= htmlspecialchars((string)($settings['ml_image'] ?? '')) ?>" placeholder="/uploads/mercadolibre-badge.png" /></div>
           <div class="col-md-4"><label class="form-label small">Link</label><input class="form-control form-control-sm" name="settings[ml_url]" value="<?= htmlspecialchars((string)($settings['ml_url'] ?? '#')) ?>" /></div>
         </div>
