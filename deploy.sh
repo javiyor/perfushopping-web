@@ -20,6 +20,9 @@ mkdir -p ../public_html/assets
 cp public/assets/app.css ../public_html/assets/
 cp public/assets/app.js ../public_html/assets/
 cp -r public/assets/brand ../public_html/assets/
+if [ -d public/assets/trust ]; then
+  cp -r public/assets/trust ../public_html/assets/
+fi
 
 echo "=== Copiando src y templates ==="
 cp -r src/* ../src/
