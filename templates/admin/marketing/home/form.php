@@ -33,6 +33,7 @@ $settings = $block['settings'] ?? [];
             <option value="routines_grid" <?= (($block['block_type'] ?? '') === 'routines_grid') ? 'selected' : '' ?>>Grilla de rutinas</option>
             <option value="promo_banner" <?= (($block['block_type'] ?? '') === 'promo_banner') ? 'selected' : '' ?>>Banner promocional</option>
             <option value="seller_program" <?= (($block['block_type'] ?? '') === 'seller_program') ? 'selected' : '' ?>>Programa de vendedores</option>
+            <option value="trust_badges" <?= (($block['block_type'] ?? '') === 'trust_badges') ? 'selected' : '' ?>>Confianza / reputación</option>
             <option value="categories_grid" <?= (($block['block_type'] ?? '') === 'categories_grid') ? 'selected' : '' ?>>Grilla de categorías</option>
             <option value="custom_html" <?= (($block['block_type'] ?? '') === 'custom_html') ? 'selected' : '' ?>>HTML libre</option>
           </select>
@@ -151,6 +152,48 @@ $settings = $block['settings'] ?? [];
           <div class="col-md-6"><label class="form-label small">Campaign ID</label><input class="form-control form-control-sm" name="settings[tracking_campaign_id]" value="<?= htmlspecialchars((string)($settings['tracking_campaign_id'] ?? '')) ?>" /></div>
           <div class="col-md-6"><label class="form-label small">Segmento (reservado)</label><input class="form-control form-control-sm" name="settings[segment]" value="<?= htmlspecialchars((string)($settings['segment'] ?? '')) ?>" /></div>
         </div>
+      </div>
+
+      <div id="trust_badges-settings" class="settings-group">
+        <h6 class="fw-semibold small">Mensaje de confianza</h6>
+        <div class="row g-3 compact-form">
+          <div class="col-12"><label class="form-label small">Texto principal</label><textarea class="form-control form-control-sm" name="settings[message]" rows="2"><?= htmlspecialchars((string)($settings['message'] ?? 'Comprá con confianza. Nos eligen miles de clientes y nuestra reputación habla por sí sola.')) ?></textarea></div>
+          <div class="col-md-3"><label class="form-label small">Disposición</label>
+            <select class="form-select form-select-sm" name="settings[layout]">
+              <option value="horizontal" <?= (($settings['layout'] ?? 'horizontal') === 'horizontal') ? 'selected' : '' ?>>Horizontal</option>
+              <option value="stacked" <?= (($settings['layout'] ?? '') === 'stacked') ? 'selected' : '' ?>>Apilado</option>
+            </select>
+          </div>
+          <div class="col-md-3"><label class="form-label small">Color fondo</label><input class="form-control form-control-sm" name="settings[bg_color]" value="<?= htmlspecialchars((string)($settings['bg_color'] ?? '#f8f9fa')) ?>" /></div>
+          <div class="col-md-3"><label class="form-label small">Color texto</label><input class="form-control form-control-sm" name="settings[text_color]" value="<?= htmlspecialchars((string)($settings['text_color'] ?? '#212529')) ?>" /></div>
+          <div class="col-md-3"><label class="form-label small">Mostrar estrellas</label>
+            <select class="form-select form-select-sm" name="settings[show_stars]">
+              <option value="1" <?= (($settings['show_stars'] ?? '1') == '1') ? 'selected' : '' ?>>Sí</option>
+              <option value="0" <?= (($settings['show_stars'] ?? '') == '0') ? 'selected' : '' ?>>No</option>
+            </select>
+          </div>
+        </div>
+        <hr />
+        <h6 class="fw-semibold small">Google</h6>
+        <div class="row g-3 compact-form">
+          <div class="col-md-2"><label class="form-label small">Puntaje</label><input class="form-control form-control-sm" name="settings[google_score]" value="<?= htmlspecialchars((string)($settings['google_score'] ?? '4.8')) ?>" /></div>
+          <div class="col-md-2"><label class="form-label small">Opiniones</label><input class="form-control form-control-sm" name="settings[google_reviews]" value="<?= htmlspecialchars((string)($settings['google_reviews'] ?? '120+')) ?>" /></div>
+          <div class="col-md-4"><label class="form-label small">Imagen (URL)</label><input class="form-control form-control-sm" name="settings[google_image]" value="<?= htmlspecialchars((string)($settings['google_image'] ?? '')) ?>" placeholder="/uploads/google-badge.png" /></div>
+          <div class="col-md-4"><label class="form-label small">Link</label><input class="form-control form-control-sm" name="settings[google_url]" value="<?= htmlspecialchars((string)($settings['google_url'] ?? '#')) ?>" /></div>
+        </div>
+        <hr />
+        <h6 class="fw-semibold small">Mercado Libre</h6>
+        <div class="row g-3 compact-form">
+          <div class="col-md-2"><label class="form-label small">Puntaje</label><input class="form-control form-control-sm" name="settings[ml_score]" value="<?= htmlspecialchars((string)($settings['ml_score'] ?? 'Platinum')) ?>" /></div>
+          <div class="col-md-2"><label class="form-label small">Ventas</label><input class="form-control form-control-sm" name="settings[ml_sales]" value="<?= htmlspecialchars((string)($settings['ml_sales'] ?? '10.000+')) ?>" /></div>
+          <div class="col-md-4"><label class="form-label small">Imagen (URL)</label><input class="form-control form-control-sm" name="settings[ml_image]" value="<?= htmlspecialchars((string)($settings['ml_image'] ?? '')) ?>" placeholder="/uploads/mercadolibre-badge.png" /></div>
+          <div class="col-md-4"><label class="form-label small">Link</label><input class="form-control form-control-sm" name="settings[ml_url]" value="<?= htmlspecialchars((string)($settings['ml_url'] ?? '#')) ?>" /></div>
+        </div>
+        <hr />
+        <p class="text-muted small mb-0">
+          Si subís imágenes, se muestran ellas. Si no, se muestra el puntaje y las opiniones/ventas como texto.
+          Para consulta automática real de Google o Mercado Libre se requiere API key / seller ID; avisame si querés agregar eso.
+        </p>
       </div>
 
       <div id="categories_grid-settings" class="settings-group row g-3 compact-form">
