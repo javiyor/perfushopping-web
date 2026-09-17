@@ -12,7 +12,7 @@ final class EmpresaRepo
         $st = Db::pdo()->prepare('
             SELECT e.*, t.tipiva AS tipiva_label
             FROM empre e
-            LEFT JOIN tipoiva t ON t.codtipiva = e.tipoiva
+            LEFT JOIN tipoiva t ON t.codtipiva = e.codtip
             WHERE e.idempre = :id LIMIT 1
         ');
         $st->execute([':id' => $id]);

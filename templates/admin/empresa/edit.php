@@ -44,7 +44,7 @@ if (!$empresa):
                             <label class="form-label small">Condición IVA</label>
                             <select class="form-select form-select-sm" name="tipoiva">
                                 <option value="">— Seleccionar —</option>
-                                <?php $ivaActual = (int)($empresa['tipoiva'] ?? $empresa['codtip'] ?? 0); ?>
+                                <?php $ivaActual = (int)($empresa['codtip'] ?? $empresa['tipoiva'] ?? 0); ?>
                                 <?php foreach ($tiposIva as $t): ?>
                                 <option value="<?= (int)$t['codtipiva'] ?>" <?= $ivaActual === (int)$t['codtipiva'] ? 'selected' : '' ?>><?= htmlspecialchars($t['tipiva'] ?? '') ?></option>
                                 <?php endforeach; ?>
