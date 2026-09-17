@@ -56,8 +56,8 @@ final class EmpresaController
             'benef1' => trim((string)($_POST['benef1'] ?? '')),
             'benef2' => trim((string)($_POST['benef2'] ?? '')),
             'benef3' => trim((string)($_POST['benef3'] ?? '')),
-            'codtip' => (int)($_POST['tipoiva'] ?? $_POST['codtip'] ?? 0) ?: null,
-            'tipoiva' => (int)($_POST['tipoiva'] ?? $_POST['codtip'] ?? 0) ?: null,
+            'codtip' => trim((string)($_POST['tipoiva'] ?? $_POST['codtip'] ?? '')) ?: null,
+            'tipoiva' => trim((string)($_POST['tipoiva'] ?? $_POST['codtip'] ?? '')) ?: null,
         ];
 
         // Logo upload
