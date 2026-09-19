@@ -391,16 +391,33 @@ final class CompraController
         $adminUser = $auth->requirePermiso('compras');
 
         $q = trim((string)($_GET['q'] ?? ''));
-        $prod = (new StockRepo())->searchProducts($q, 15);
+        $limit = max(1, min(100, (int)($_GET['limit'] ?? 50)));
+        $prod = (new StockRepo())->searchProducts($q, $limit);
         $out = [];
         foreach ($prod as $p) {
             $variants = (new StockRepo())->variantesPorProducto((int)$p['idprodu']);
+            $matched = null;
+            $matchedId = (int)($p['matched_variant_id'] ?? 0);
+            if ($matchedId > 0) {
+                foreach ($variants as $v) {
+                    if ((int)($v['idcodgusto'] ?? 0) === $matchedId) {
+                        $matched = [
+                            'idcodgusto' => $matchedId,
+                            'nomgusto' => (string)($v['nomgusto'] ?? ''),
+                            'codscan' => (string)($v['codscan'] ?? ''),
+                        ];
+                        break;
+                    }
+                }
+            }
             $out[] = [
                 'idprodu' => (int)$p['idprodu'],
                 'codprodu' => (string)($p['codprodu'] ?? ''),
+                'codprodup' => (string)($p['codprodup'] ?? ''),
                 'produ' => (string)($p['produ'] ?? ''),
                 'precomp' => (float)($p['precomp'] ?? 0),
                 'precio' => (float)($p['precio'] ?? 0),
+                'matched_variant' => $matched,
                 'variants' => $variants,
             ];
         }

@@ -246,6 +246,7 @@ $idcta1Sel = (int)($compra['idcta1'] ?? 0);
 
 <script>
 let rowCounter = 1;
+const COMPRA_PROD_SEARCH_LIMIT = 50;
 
 document.addEventListener('DOMContentLoaded', function() {
     <?php if ($items): ?>
@@ -324,6 +325,15 @@ function setupRow(row) {
         timer = setTimeout(() => searchProducts(val, suggestions, row), 250);
     });
 
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            clearTimeout(timer);
+            const val = this.value.trim();
+            if (val.length >= 2) { searchProducts(val, suggestions, row); }
+        }
+    });
+
     input.addEventListener('blur', function() {
         setTimeout(() => suggestions.innerHTML = '', 300);
     });
@@ -339,7 +349,7 @@ function setupRow(row) {
 }
 
 function searchProducts(q, container, row) {
-    fetch('/admin/compras/productos?q=' + encodeURIComponent(q))
+    fetch('/admin/compras/productos?q=' + encodeURIComponent(q) + '&limit=' + COMPRA_PROD_SEARCH_LIMIT)
         .then(r => r.json())
         .then(data => {
             container.innerHTML = '';
@@ -347,17 +357,29 @@ function searchProducts(q, container, row) {
                 container.innerHTML = '<div class="suggestion-item text-muted">Sin resultados</div>';
                 return;
             }
+            if (data.length === 1 && data[0].matched_variant && String(data[0].matched_variant.codscan || '') === q) {
+                selectProduct(data[0], row, container);
+                return;
+            }
             data.forEach(p => {
                 const div = document.createElement('div');
                 div.className = 'suggestion-item';
                 const costStr = p.precomp ? '$' + Number(p.precomp).toLocaleString('es-AR', {minimumFractionDigits:2}) : '';
-                div.innerHTML = '<strong>' + esc(p.produ) + '</strong> <span class="text-muted">(' + esc(p.codprodu) + ') ' + costStr + '</span>';
+                const provStr = p.codprodup ? ' Prov:' + esc(p.codprodup) : '';
+                const barStr = p.matched_variant && p.matched_variant.codscan ? ' BAR:' + esc(p.matched_variant.codscan) : '';
+                div.innerHTML = '<strong>' + esc(p.produ) + '</strong> <span class="text-muted">(' + esc(p.codprodu) + ')' + provStr + barStr + ' ' + costStr + '</span>';
                 div.addEventListener('mousedown', function(e) {
                     e.preventDefault();
                     selectProduct(p, row, container);
                 });
                 container.appendChild(div);
             });
+            if (data.length >= COMPRA_PROD_SEARCH_LIMIT) {
+                const more = document.createElement('div');
+                more.className = 'suggestion-item text-muted';
+                more.textContent = 'Puede haber más resultados: escribí más caracteres o el código exacto.';
+                container.appendChild(more);
+            }
         });
 }
 
@@ -373,15 +395,19 @@ function selectProduct(p, row, container) {
     vs.disabled = false;
     row.querySelector('.idprodu').value = p.idprodu || '';
     if (p.variants && p.variants.length > 0) {
-        p.variants.forEach(v => {
+        let selectedIdx = -1;
+        p.variants.forEach((v, i) => {
             const opt = document.createElement('option');
             opt.value = v.idcodgusto || '';
             opt.dataset.gusto = v.idcodgusto || '';
             opt.dataset.idprodu = p.idprodu || '';
             opt.textContent = (v.nomgusto || '') + (v.codscan ? ' (' + v.codscan + ')' : '');
             vs.appendChild(opt);
+            if (p.matched_variant && String(v.idcodgusto) === String(p.matched_variant.idcodgusto)) {
+                selectedIdx = i + 1;
+            }
         });
-        vs.selectedIndex = 1;
+        vs.selectedIndex = selectedIdx > 0 ? selectedIdx : 1;
         vs.dispatchEvent(new Event('change'));
     }
 }

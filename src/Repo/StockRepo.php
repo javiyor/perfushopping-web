@@ -557,19 +557,65 @@ final class StockRepo
         return $st->fetchAll();
     }
 
+    private static ?array $productoColumns = null;
+
+    private function productoColumns(): array
+    {
+        if (self::$productoColumns !== null) {
+            return self::$productoColumns;
+        }
+        try {
+            $rows = Db::pdo()->query('SHOW COLUMNS FROM producto')->fetchAll();
+            self::$productoColumns = array_column($rows, 'Field');
+        } catch (\Throwable $e) {
+            self::$productoColumns = [];
+        }
+        return self::$productoColumns;
+    }
+
     public function searchProducts(string $q, int $limit = 20): array
     {
-        $limit = max(1, min(50, $limit));
+        $limit = max(1, min(100, $limit));
         $q = trim($q);
         if ($q === '') return [];
 
+        $hasCodbarra = in_array('codbarra', $this->productoColumns(), true);
+        $like = '%' . $q . '%';
+        $params = [
+            ':likeProdu' => $like,
+            ':likeCod' => $like,
+            ':likeProv' => $like,
+            ':likeBarcode' => $like,
+            ':exactCod' => $q,
+            ':exactProv' => $q,
+            ':exactBarcode' => $q,
+            ':exactVariant' => $q,
+            ':exactNombre' => $q,
+        ];
+        $where = ['p.produ LIKE :likeProdu', 'p.codprodu LIKE :likeCod', 'p.codprodup LIKE :likeProv'];
+        $exactRank = ['p.codprodu = :exactCod', 'p.codprodup = :exactProv'];
+        if ($hasCodbarra) {
+            $params[':likeCodbarra'] = $like;
+            $params[':exactCodbarra'] = $q;
+            $where[] = 'p.codbarra LIKE :likeCodbarra';
+            $exactRank[] = 'p.codbarra = :exactCodbarra';
+        }
+
         $st = Db::pdo()->prepare('
-            SELECT idprodu, codprodu, produ, stocact, precomp, precio
-            FROM producto
-            WHERE produ LIKE :like OR codprodu LIKE :like OR codprodup LIKE :like
-            ORDER BY produ ASC LIMIT ' . $limit
+            SELECT DISTINCT p.idprodu, p.codprodu, p.produ, p.codprodup, p.stocact, p.precomp, p.precio,
+                (SELECT g2.idcodgusto
+                 FROM gustos g2
+                 WHERE g2.idprodu = p.idprodu AND g2.codscan = :exactVariant AND g2.discont = 0
+                 ORDER BY g2.idcodgusto ASC LIMIT 1) AS matched_variant_id
+            FROM producto p
+            WHERE ' . implode(' OR ', $where) . '
+                OR EXISTS (SELECT 1 FROM gustos g WHERE g.idprodu = p.idprodu AND g.codscan LIKE :likeBarcode)
+            ORDER BY CASE WHEN ' . implode(' OR ', $exactRank) . ' THEN 0
+                WHEN EXISTS (SELECT 1 FROM gustos g3 WHERE g3.idprodu = p.idprodu AND g3.codscan = :exactBarcode) THEN 1
+                WHEN p.produ = :exactNombre THEN 2 ELSE 3 END,
+                p.produ ASC LIMIT ' . $limit
         );
-        $st->execute([':like' => '%' . $q . '%']);
+        $st->execute($params);
         return $st->fetchAll();
     }
 
