@@ -190,6 +190,8 @@ final class CompraRepo
             WHERE id = :id LIMIT 1
         ');
         $p = $this->params($d);
+        // El UPDATE no toca origen ni created_by: deben salir del binding.
+        unset($p[':origen'], $p[':cb']);
         if (!in_array('ret_ing_brutos', $cols, true)) {
             unset($p[':ret_ib']);
         }
