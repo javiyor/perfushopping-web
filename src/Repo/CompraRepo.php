@@ -7,6 +7,23 @@ use Perfushopping\Web\Infra\Db;
 
 final class CompraRepo
 {
+    private static ?array $facturaColumns = null;
+
+    /** @return array<int, string> */
+    private function facturaColumns(): array
+    {
+        if (self::$facturaColumns !== null) {
+            return self::$facturaColumns;
+        }
+        try {
+            $rows = Db::pdo()->query('SHOW COLUMNS FROM factura_compra')->fetchAll();
+            self::$facturaColumns = array_column($rows, 'Field');
+        } catch (\Throwable $e) {
+            self::$facturaColumns = [];
+        }
+        return self::$facturaColumns;
+    }
+
     /** @param array{q?:string, estado?:string, desde?:string, hasta?:string} $f
      *  @return array<int, array<string,mixed>>
      */
@@ -115,24 +132,52 @@ final class CompraRepo
     /** @param array<string,mixed> $d */
     public function insert(array $d): int
     {
+        $cols = $this->facturaColumns();
+        $extraCols = [];
+        $extraVals = [];
+        if (in_array('ret_ing_brutos', $cols, true)) {
+            $extraCols[] = 'ret_ing_brutos';
+            $extraVals[] = ':ret_ib';
+        }
+        if (in_array('ret_iva', $cols, true)) {
+            $extraCols[] = 'ret_iva';
+            $extraVals[] = ':ret_iva';
+        }
+        $extraColsSql = $extraCols ? ', ' . implode(', ', $extraCols) : '';
+        $extraValsSql = $extraVals ? ', ' . implode(', ', $extraVals) : '';
         $st = Db::pdo()->prepare('
             INSERT INTO factura_compra
               (origen, estado, fecha, tipo, punto_venta, numero_desde, numero_hasta, cod_autorizacion,
                cuit_proveedor, razon_proveedor, idprovee, moneda, tipo_cambio, imp_neto_gravado,
-               imp_no_gravado, imp_exento, otros_tributos, imp_iva, imp_total, idcta1, iddepo,
+               imp_no_gravado, imp_exento, otros_tributos, imp_iva' . $extraColsSql . ', imp_total, idcta1, iddepo,
                observaciones, created_by)
             VALUES
               (:origen, :estado, :fecha, :tipo, :pv, :nd, :nh, :cae,
-               :cuit, :razon, :idprov, :moneda, :tc, :ing, :inng, :iex, :ot, :iva, :total, :idcta1, :depo,
+               :cuit, :razon, :idprov, :moneda, :tc, :ing, :inng, :iex, :ot, :iva' . $extraValsSql . ', :total, :idcta1, :depo,
                :obs, :cb)
         ');
-        $st->execute($this->params($d));
+        $p = $this->params($d);
+        if (!in_array('ret_ing_brutos', $cols, true)) {
+            unset($p[':ret_ib']);
+        }
+        if (!in_array('ret_iva', $cols, true)) {
+            unset($p[':ret_iva']);
+        }
+        $st->execute($p);
         return (int)Db::pdo()->lastInsertId();
     }
 
     /** @param array<string,mixed> $d */
     public function update(int $id, array $d): void
     {
+        $cols = $this->facturaColumns();
+        $extraSet = '';
+        if (in_array('ret_ing_brutos', $cols, true)) {
+            $extraSet .= ', ret_ing_brutos = :ret_ib';
+        }
+        if (in_array('ret_iva', $cols, true)) {
+            $extraSet .= ', ret_iva = :ret_iva';
+        }
         $st = Db::pdo()->prepare('
             UPDATE factura_compra SET
               estado = :estado, fecha = :fecha, tipo = :tipo, punto_venta = :pv,
@@ -140,11 +185,17 @@ final class CompraRepo
               cuit_proveedor = :cuit, razon_proveedor = :razon, idprovee = :idprov,
               moneda = :moneda, tipo_cambio = :tc, imp_neto_gravado = :ing,
               imp_no_gravado = :inng, imp_exento = :iex, otros_tributos = :ot,
-              imp_iva = :iva, imp_total = :total, idcta1 = :idcta1, iddepo = :depo,
+              imp_iva = :iva' . $extraSet . ', imp_total = :total, idcta1 = :idcta1, iddepo = :depo,
               observaciones = :obs
             WHERE id = :id LIMIT 1
         ');
         $p = $this->params($d);
+        if (!in_array('ret_ing_brutos', $cols, true)) {
+            unset($p[':ret_ib']);
+        }
+        if (!in_array('ret_iva', $cols, true)) {
+            unset($p[':ret_iva']);
+        }
         $p[':id'] = $id;
         $st->execute($p);
     }
@@ -176,6 +227,8 @@ final class CompraRepo
             ':iex' => (float)($d['imp_exento'] ?? 0),
             ':ot' => (float)($d['otros_tributos'] ?? 0),
             ':iva' => (float)($d['imp_iva'] ?? 0),
+            ':ret_ib' => (float)($d['ret_ing_brutos'] ?? 0),
+            ':ret_iva' => (float)($d['ret_iva'] ?? 0),
             ':total' => (float)($d['imp_total'] ?? 0),
             ':idcta1' => ((int)($d['idcta1'] ?? 0)) > 0 ? (int)$d['idcta1'] : null,
             ':depo' => ((int)($d['iddepo'] ?? 0)) > 0 ? (int)$d['iddepo'] : null,

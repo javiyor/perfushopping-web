@@ -175,6 +175,14 @@ $idcta1Sel = (int)($compra['idcta1'] ?? 0);
                             <input class="form-control form-control-sm importe-input" name="imp_iva" value="<?= htmlspecialchars((string)($compra['imp_iva'] ?? '0')) ?>" />
                         </div>
                         <div class="col-6">
+                            <label class="form-label small">Ret. Ing. Brutos</label>
+                            <input class="form-control form-control-sm importe-input" name="ret_ing_brutos" value="<?= htmlspecialchars((string)($compra['ret_ing_brutos'] ?? '0')) ?>" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Ret. IVA</label>
+                            <input class="form-control form-control-sm importe-input" name="ret_iva" value="<?= htmlspecialchars((string)($compra['ret_iva'] ?? '0')) ?>" />
+                        </div>
+                        <div class="col-6">
                             <label class="form-label small fw-bold">Total</label>
                             <input class="form-control form-control-sm importe-input fw-bold" name="imp_total" value="<?= htmlspecialchars((string)($compra['imp_total'] ?? '0')) ?>" />
                         </div>

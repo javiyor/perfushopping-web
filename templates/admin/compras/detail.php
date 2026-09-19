@@ -94,6 +94,14 @@ $estado = (string)($compra['estado'] ?? 'pendiente');
                             <td colspan="4" class="text-end">IVA</td>
                             <td class="text-end">$<?= $mon($compra['imp_iva'] ?? 0) ?></td>
                         </tr>
+                        <tr>
+                            <td colspan="4" class="text-end">Ret. Ing. Brutos</td>
+                            <td class="text-end">$<?= $mon($compra['ret_ing_brutos'] ?? 0) ?></td>
+                        </tr>
+                        <tr>
+                            <td colspan="4" class="text-end">Ret. IVA</td>
+                            <td class="text-end">$<?= $mon($compra['ret_iva'] ?? 0) ?></td>
+                        </tr>
                         <tr class="fw-bold">
                             <td colspan="4" class="text-end">Total</td>
                             <td class="text-end fs-6">$<?= $mon($compra['imp_total'] ?? 0) ?></td>
