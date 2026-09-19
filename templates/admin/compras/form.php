@@ -288,7 +288,7 @@ function addRow(data) {
                 <option value="">—</option>
             </select>
         </td>
-        <td><input class="form-control form-control-sm qty-input" name="item_qty[]" type="number" value="${qty}" min="0" step="0.01" /></td>
+        <td><input class="form-control form-control-sm qty-input" name="item_qty[]" type="number" value="${qty}" min="0" step="1" /></td>
         <td>
             <div class="input-group input-group-sm">
                 <span class="input-group-text">$</span>
