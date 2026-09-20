@@ -60,6 +60,17 @@ $plazos = $plazos ?? [];
 .pos-cart-item .ci-total { width:100px; text-align:right; font-weight:700; }
 .pos-cart-item .ci-del { width:30px; text-align:center; color:#dc3545; cursor:pointer; font-size:18px; opacity:.5; }
 .pos-cart-item .ci-del:hover { opacity:1; }
+.pos-cart-cols {
+    display:flex; align-items:center; gap:10px; padding:8px 14px;
+    font-size:11px; text-transform:uppercase; letter-spacing:.4px; color:#6c757d;
+    border-bottom:1px solid #e9ecef; background:#fff; font-weight:600;
+}
+.pos-cart-cols .ci-name { flex:1; min-width:0; }
+.pos-cart-cols .ci-qty { width:60px; text-align:center; }
+.pos-cart-cols .ci-dto { width:64px; text-align:center; }
+.pos-cart-cols .ci-price { width:100px; text-align:right; }
+.pos-cart-cols .ci-total { width:100px; text-align:right; }
+.pos-cart-cols .ci-del { width:30px; }
 
 .pos-totals { padding:14px 16px; border-top:2px solid #e9ecef; }
 .pos-totals .pt-row { display:flex; justify-content:space-between; padding:2px 0; font-size:14px; }
@@ -89,6 +100,7 @@ $plazos = $plazos ?? [];
     #clienteSection input { width:100% !important; }
 }
 @media (max-width: 480px) {
+    .pos-cart-cols { display:none !important; }
     .pos-cart-item { flex-wrap:wrap; gap:4px; }
     .pos-cart-item .ci-name { width:100%; }
     .pos-cart-item .ci-qty { width:40px; }
@@ -239,6 +251,14 @@ $plazos = $plazos ?? [];
             <div class="pos-cart-header">
                 <span>Carrito</span>
                 <span id="cartCount">0 items</span>
+            </div>
+            <div class="pos-cart-cols" id="cartCols" style="display:none">
+                <div class="ci-name">Producto</div>
+                <div class="ci-qty">Cant.</div>
+                <div class="ci-dto">Dto. %</div>
+                <div class="ci-price">Precio</div>
+                <div class="ci-total">Total</div>
+                <div class="ci-del"></div>
             </div>
             <div class="pos-cart-items" id="cartItems">
                 <div class="text-muted text-center py-4 small">Buscá productos para agregar al carrito</div>
@@ -591,6 +611,8 @@ function addToCart(item) {
 function renderCart() {
     const container = document.getElementById('cartItems');
     const count = document.getElementById('cartCount');
+    const cols = document.getElementById('cartCols');
+    if (cols) cols.style.display = cart.length === 0 ? 'none' : 'flex';
     if (cart.length === 0) {
         container.innerHTML = '<div class="text-muted text-center py-4 small">Carrito vacío</div>';
         count.textContent = '0 items';
