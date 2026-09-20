@@ -71,6 +71,27 @@ final class FacturaController
             }
         }
 
+        $pedidoId = (int)($_GET['pedido_id'] ?? 0);
+        $pedido = null;
+        $pedidoItems = [];
+        $pedidoCliente = null;
+        $pedidoEnvio = null;
+        $pedidoPago = null;
+        $pedidoDescPct = 0;
+        if ($pedidoId > 0) {
+            $prefill = $this->pedidoPrefill($pedidoId);
+            if ($prefill) {
+                $pedido = $prefill['pedido'];
+                $pedidoItems = $prefill['items'];
+                $pedidoCliente = $prefill['cliente'];
+                $pedidoEnvio = $prefill['envio'];
+                $pedidoPago = $prefill['pago'];
+                $pedidoDescPct = $prefill['descuento_pct'];
+            } else {
+                $pedidoId = 0;
+            }
+        }
+
         $cobroRepo = new CobroCuentaRepo();
         $transferCuentaId = $cobroRepo->getTransferenciaCuentaId();
         $tarjetaCobros = [];
@@ -88,6 +109,13 @@ final class FacturaController
             'remitoItems' => $remitoItems,
             'presupuestoId' => $presupuestoId,
             'presupuestoItems' => $presupuestoItems,
+            'pedidoId' => $pedidoId,
+            'pedidoCodigo' => $pedido ? (string)($pedido['codigo'] ?? '') : '',
+            'pedidoItems' => $pedidoItems,
+            'pedidoCliente' => $pedidoCliente,
+            'pedidoEnvio' => $pedidoEnvio,
+            'pedidoPago' => $pedidoPago,
+            'pedidoDescPct' => $pedidoDescPct,
             'vendedores' => $vendedores,
             'bancos' => $this->bancos(),
             'bancosCuentas' => $this->bancosCuentas(),
@@ -276,6 +304,19 @@ final class FacturaController
                 $presupuestoId = null;
             }
         }
+        $pedidoId = (int)($input['pedido_id'] ?? 0) ?: null;
+        if ($pedidoId) {
+            $order = (new \Perfushopping\Web\Repo\OrderRepo())->find($pedidoId);
+            if (!$order || !in_array((string)($order['status'] ?? ''), $this->pedidosImportables(), true)) {
+                Response::json(['ok' => false, 'error' => 'El pedido no está apto para facturar.'], 422);
+                return;
+            }
+            if ($repo->facturaIdByOrder($pedidoId)) {
+                Response::json(['ok' => false, 'error' => 'El pedido ya fue facturado.'], 422);
+                return;
+            }
+            $notas = ($notas ? $notas . "\n" : '') . 'Pedido web: ' . (string)($order['order_code'] ?? $pedidoId);
+        }
 
         $fecha = (string)($input['fecha'] ?? date('Y-m-d'));
         $descuento = max(0, (int)($input['descuento_cents'] ?? 0));
@@ -300,6 +341,7 @@ final class FacturaController
             'tipo_comprobante' => $tipo,
             'remito_id' => $remitoId,
             'presupuesto_id' => $presupuestoId,
+            'order_id' => $pedidoId,
             'cliente_id' => $clienteId,
             'idclien' => $clienteErpId,
             'cliente_nombre' => $clienteNombre,
@@ -610,6 +652,145 @@ final class FacturaController
         $results = (new FacturaRepo())->searchProducts($q, 20, $iddepo ?: null);
 
         Response::json($results);
+    }
+
+    /** Estados de pedidos web que se pueden importar a factura. @return array<int,string> */
+    private function pedidosImportables(): array
+    {
+        return ['paid', 'pending_transfer', 'transfer_reported', 'preparing', 'prepared', 'shipped'];
+    }
+
+    /**
+     * Arma los datos para precargar el POS desde un pedido web.
+     * @return array{pedido:array,items:array,cliente:?array,envio:array,pago:array,descuento_pct:float}|null
+     */
+    private function pedidoPrefill(int $pedidoId): ?array
+    {
+        $orderRepo = new \Perfushopping\Web\Repo\OrderRepo();
+        $order = $orderRepo->find($pedidoId);
+        if (!$order || !in_array((string)($order['status'] ?? ''), $this->pedidosImportables(), true)) {
+            return null;
+        }
+
+        $items = [];
+        foreach ($orderRepo->itemsByOrderIds([$pedidoId]) as $oi) {
+            $items[] = [
+                'idprodu' => (int)($oi['idprodu'] ?? 0),
+                'idcodgusto' => (int)($oi['idcodgusto'] ?? 0),
+                'producto' => (string)($oi['product_name'] ?? ''),
+                'variedad' => (string)($oi['variant_name'] ?? ''),
+                'qty' => max(1, (int)($oi['qty'] ?? 1)),
+                'unit_price_cents' => max(0, (int)($oi['unit_net_cents'] ?? 0)),
+                'iva_rate' => (float)($oi['iva_rate'] ?? 21),
+            ];
+        }
+
+        $method = (string)($order['shipping_method'] ?? '');
+        $methodLabels = ['correo_argentino' => 'Correo Argentino', 'local_delivery' => 'Delivery', 'local' => 'Retiro en local'];
+        $shipCost = max(0, (int)($order['shipping_cost_cents'] ?? 0));
+        if ($shipCost > 0) {
+            $items[] = [
+                'idprodu' => 0,
+                'idcodgusto' => 0,
+                'producto' => 'Envío (' . ($methodLabels[$method] ?? $method ?: 'web') . ')',
+                'variedad' => '',
+                'qty' => 1,
+                'unit_price_cents' => $shipCost,
+                'iva_rate' => 21,
+            ];
+        }
+
+        $cliente = $this->clientePorEmail((string)($order['email'] ?? ''));
+        if (!$cliente) {
+            $cliente = [
+                'id' => 0,
+                'idclien' => 0,
+                'name' => (string)($order['ship_name'] ?? ''),
+                'cuit' => '',
+                'condicion_iva' => 'consumidor_final',
+            ];
+        }
+
+        if ($method === 'correo_argentino') {
+            $envio = ['tipo' => 'envio', 'transporte' => 'correo_argentino'];
+        } elseif ($method === 'local_delivery') {
+            $envio = ['tipo' => 'envio', 'transporte' => 'delivery'];
+        } else {
+            $envio = ['tipo' => 'local', 'transporte' => 'propio'];
+        }
+        $direccion = trim(trim((string)($order['ship_address'] ?? '')) . ', ' . trim((string)($order['ship_city'] ?? '')) . ' (' . trim((string)($order['ship_postal_code'] ?? '')) . ')', ', ()');
+        $envio['direccion'] = $direccion;
+        $envio['obs'] = trim((string)($order['shipping_detail'] ?? ''));
+
+        $status = (string)($order['status'] ?? '');
+        $forma = ($status === 'pending_transfer' || $status === 'transfer_reported') ? 'transferencia' : 'mercadopago';
+        try {
+            $st = \Perfushopping\Web\Infra\Db::pdo()->prepare('SELECT status FROM mp_payments WHERE order_id = :o LIMIT 1');
+            $st->execute([':o' => $pedidoId]);
+            if (strtolower((string)$st->fetchColumn()) === 'approved') {
+                $forma = 'mercadopago';
+            }
+        } catch (\Throwable $e) {
+        }
+
+        return [
+            'pedido' => ['id' => $pedidoId, 'codigo' => (string)($order['order_code'] ?? '')],
+            'items' => $items,
+            'cliente' => $cliente,
+            'envio' => $envio,
+            'pago' => ['forma' => $forma, 'monto_cents' => max(0, (int)($order['total_cents'] ?? 0))],
+            'descuento_pct' => (float)($order['discount_percent'] ?? 0),
+        ];
+    }
+
+    /** @return array{id:int,idclien:int,name:string,cuit:string,condicion_iva:string}|null */
+    private function clientePorEmail(string $email): ?array
+    {
+        $email = trim($email);
+        if ($email === '') {
+            return null;
+        }
+        try {
+            $st = \Perfushopping\Web\Infra\Db::pdo()->prepare("SELECT idclien, razon AS name, cuit, COALESCE(condicion_iva, 'consumidor_final') AS condicion_iva FROM clientes WHERE mail = :m LIMIT 1");
+            $st->execute([':m' => $email]);
+            $r = $st->fetch();
+        } catch (\Throwable $e) {
+            return null;
+        }
+        if (!$r) {
+            return null;
+        }
+        return [
+            'id' => 0,
+            'idclien' => (int)($r['idclien'] ?? 0),
+            'name' => (string)($r['name'] ?? ''),
+            'cuit' => (string)($r['cuit'] ?? ''),
+            'condicion_iva' => (string)($r['condicion_iva'] ?? 'consumidor_final'),
+        ];
+    }
+
+    public function searchPedidos(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requirePermiso('facturacion');
+
+        $q = trim((string)($_GET['q'] ?? ''));
+        (new FacturaRepo())->ensureOrderColumn();
+        $rows = (new \Perfushopping\Web\Repo\OrderRepo())->searchImportables($q, 20);
+        $out = [];
+        foreach ($rows as $r) {
+            $out[] = [
+                'id' => (int)$r['id'],
+                'codigo' => (string)($r['order_code'] ?? ''),
+                'cliente' => (string)($r['ship_name'] ?? ''),
+                'email' => (string)($r['email'] ?? ''),
+                'total' => (int)($r['total_cents'] ?? 0),
+                'estado' => (string)($r['status'] ?? ''),
+                'fecha' => (string)($r['created_at'] ?? ''),
+                'facturado' => (int)($r['items_facturados'] ?? 0) > 0,
+            ];
+        }
+        Response::json($out);
     }
 
     public function crearCliente(array $params): void

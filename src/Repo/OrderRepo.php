@@ -42,6 +42,29 @@ final class OrderRepo
         return $st->fetchAll();
     }
 
+    /** Pedidos web aptos para facturar (pagos o en curso, no cancelados ni archivados). */
+    public function searchImportables(string $q, int $limit = 20): array
+    {
+        $limit = max(1, min(50, $limit));
+        $q = trim($q);
+        $params = [];
+        $where = ["o.status IN ('paid','pending_transfer','transfer_reported','preparing','prepared','shipped')"];
+        if ($q !== '') {
+            $where[] = '(o.order_code LIKE :like OR o.email LIKE :like OR o.ship_name LIKE :like OR o.phone LIKE :like)';
+            $params[':like'] = '%' . $q . '%';
+        }
+        $st = Db::pdo()->prepare('
+            SELECT o.id, o.order_code, o.status, o.email, o.phone, o.ship_name, o.ship_city,
+                   o.total_cents, o.created_at,
+                   (SELECT COUNT(*) FROM factura_items fi INNER JOIN facturas f ON f.id = fi.factura_id WHERE f.order_id = o.id) AS items_facturados
+            FROM orders o
+            WHERE ' . implode(' AND ', $where) . '
+            ORDER BY o.created_at DESC, o.id DESC LIMIT ' . $limit
+        );
+        $st->execute($params);
+        return $st->fetchAll();
+    }
+
     /** @return array<int, array<string,mixed>> */
     public function itemsByOrderIds(array $orderIds): array
     {

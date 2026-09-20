@@ -297,6 +297,10 @@ $discriminaIva = in_array($factura['tipo_comprobante'] ?? '', ['FACT-A']);
                     <dt class="col-sm-5">Remito</dt>
                     <dd class="col-sm-7"><a href="/admin/remitos/<?= (int)$factura['remito_id'] ?>">#<?= (int)$factura['remito_id'] ?></a></dd>
                     <?php endif; ?>
+                    <?php if (!empty($factura['order_id'])): ?>
+                    <dt class="col-sm-5">Pedido web</dt>
+                    <dd class="col-sm-7"><a href="/admin/orders">Pedido #<?= (int)$factura['order_id'] ?></a></dd>
+                    <?php endif; ?>
                     <?php if ($factura['vendedor_nombre'] ?? ''): ?>
                     <dt class="col-sm-5">Vendedor</dt>
                     <dd class="col-sm-7"><?= htmlspecialchars($factura['vendedor_nombre']) ?></dd>

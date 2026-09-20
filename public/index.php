@@ -391,6 +391,7 @@ $router->get('/admin/facturas/buscar-clientes', [AdminFacturaController::class, 
 $router->post('/admin/facturas/clientes/crear', [AdminFacturaController::class, 'crearCliente']);
 $router->get('/admin/facturas/buscar-remitos', [AdminFacturaController::class, 'searchRemitos']);
 $router->get('/admin/facturas/buscar-presupuestos', [AdminFacturaController::class, 'searchPresupuestos']);
+$router->get('/admin/facturas/buscar-pedidos', [AdminFacturaController::class, 'searchPedidos']);
 $router->get('/admin/facturas/imprimir/(?P<id>\d+)', [AdminFacturaController::class, 'print']);
 $router->post('/admin/facturas/(?P<id>\d+)/enviar-email', [AdminFacturaController::class, 'sendEmail']);
 $router->get('/admin/envios', [AdminEnvioController::class, 'index']);

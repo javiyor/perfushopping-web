@@ -61,6 +61,45 @@ final class FacturaRepo
 
     private static ?bool $facturasEntregaChecked = null;
     private static bool $facturasEntregaHasCols = false;
+    private static ?bool $facturasOrderChecked = null;
+    private static bool $facturasOrderHasCol = false;
+
+    /** Crea la columna facturas.order_id si falta. Devuelve si quedó disponible. */
+    public function ensureOrderColumn(): bool
+    {
+        if (self::$facturasOrderChecked !== null) {
+            return self::$facturasOrderHasCol;
+        }
+        self::$facturasOrderChecked = true;
+        try {
+            $cols = Db::pdo()->query('SHOW COLUMNS FROM facturas')->fetchAll();
+            $fields = array_column($cols, 'Field');
+            if (!in_array('order_id', $fields, true)) {
+                Db::pdo()->exec('ALTER TABLE facturas ADD COLUMN order_id INT UNSIGNED DEFAULT NULL AFTER presupuesto_id');
+                Db::pdo()->exec('ALTER TABLE facturas ADD KEY idx_order (order_id)');
+            }
+            self::$facturasOrderHasCol = true;
+        } catch (\Throwable $e) {
+            try {
+                $cols = Db::pdo()->query('SHOW COLUMNS FROM facturas')->fetchAll();
+                self::$facturasOrderHasCol = in_array('order_id', array_column($cols, 'Field'), true);
+            } catch (\Throwable $e2) {
+                self::$facturasOrderHasCol = false;
+            }
+        }
+        return self::$facturasOrderHasCol;
+    }
+
+    public function facturaIdByOrder(int $orderId): ?int
+    {
+        if (!$this->ensureOrderColumn()) {
+            return null;
+        }
+        $st = Db::pdo()->prepare('SELECT id FROM facturas WHERE order_id = :o LIMIT 1');
+        $st->execute([':o' => $orderId]);
+        $v = $st->fetchColumn();
+        return $v !== false && $v !== null ? (int)$v : null;
+    }
 
     private function ensureEntregaColumns(): void
     {
@@ -163,76 +202,59 @@ final class FacturaRepo
     public function create(array $data, array $items, array $pagos): int
     {
         $this->ensureEntregaColumns();
+        $hasOrder = $this->ensureOrderColumn();
+        $orderCol = $hasOrder ? ', order_id' : '';
+        $orderVal = $hasOrder ? ', :order_id' : '';
         $pdo = Db::pdo();
         $pdo->beginTransaction();
         try {
+            $fparams = [
+                ':codigo' => $data['codigo'],
+                ':tipo' => $data['tipo_comprobante'],
+                ':punto_venta' => $data['punto_venta'] ?? 1,
+                ':remito_id' => $data['remito_id'],
+                ':presupuesto_id' => $data['presupuesto_id'],
+                ':cliente_id' => $data['cliente_id'],
+                ':idclien' => $data['idclien'],
+                ':cliente_nombre' => $data['cliente_nombre'],
+                ':cliente_cuit' => $data['cliente_cuit'],
+                ':cliente_direc' => $data['cliente_direc'],
+                ':cliente_tele' => $data['cliente_tele'],
+                ':cliente_mail' => $data['cliente_mail'],
+                ':cliente_condicion_iva' => $data['cliente_condicion_iva'],
+                ':fecha' => $data['fecha'],
+                ':subtotal' => $data['subtotal_cents'],
+                ':iva' => $data['iva_cents'],
+                ':descuento' => $data['descuento_cents'] ?? 0,
+                ':puntos' => $data['puntos_cents'] ?? 0,
+                ':total' => $data['total_cents'],
+                ':estado' => $data['estado'] ?? 'emitida',
+                ':forma_pago' => $data['forma_pago'],
+                ':notas' => $data['notas'],
+                ':created_by' => $data['created_by'],
+                ':vendedor_id' => $data['vendedor_id'] ?? null,
+            ];
+            if ($hasOrder) {
+                $fparams[':order_id'] = $data['order_id'] ?? null;
+            }
             if (self::$facturasEntregaHasCols) {
                 $st = $pdo->prepare('
-                    INSERT INTO facturas (codigo, tipo_comprobante, punto_venta, remito_id, presupuesto_id, cliente_id, idclien, cliente_nombre, cliente_cuit, cliente_direc, cliente_tele, cliente_mail, cliente_condicion_iva, fecha, subtotal_cents, iva_cents, descuento_cents, puntos_cents, total_cents, estado, forma_pago, entrega_tipo, transporte, envio_estado, envio_direccion, envio_observacion, notas, created_by, vendedor_id, created_at, updated_at)
-                    VALUES (:codigo, :tipo, :punto_venta, :remito_id, :presupuesto_id, :cliente_id, :idclien, :cliente_nombre, :cliente_cuit, :cliente_direc, :cliente_tele, :cliente_mail, :cliente_condicion_iva, :fecha, :subtotal, :iva, :descuento, :puntos, :total, :estado, :forma_pago, :entrega_tipo, :transporte, :envio_estado, :envio_direccion, :envio_obs, :notas, :created_by, :vendedor_id, NOW(), NOW())
+                    INSERT INTO facturas (codigo, tipo_comprobante, punto_venta, remito_id, presupuesto_id' . $orderCol . ', cliente_id, idclien, cliente_nombre, cliente_cuit, cliente_direc, cliente_tele, cliente_mail, cliente_condicion_iva, fecha, subtotal_cents, iva_cents, descuento_cents, puntos_cents, total_cents, estado, forma_pago, entrega_tipo, transporte, envio_estado, envio_direccion, envio_observacion, notas, created_by, vendedor_id, created_at, updated_at)
+                    VALUES (:codigo, :tipo, :punto_venta, :remito_id, :presupuesto_id' . $orderVal . ', :cliente_id, :idclien, :cliente_nombre, :cliente_cuit, :cliente_direc, :cliente_tele, :cliente_mail, :cliente_condicion_iva, :fecha, :subtotal, :iva, :descuento, :puntos, :total, :estado, :forma_pago, :entrega_tipo, :transporte, :envio_estado, :envio_direccion, :envio_obs, :notas, :created_by, :vendedor_id, NOW(), NOW())
                 ');
-                $st->execute([
-                    ':codigo' => $data['codigo'],
-                    ':tipo' => $data['tipo_comprobante'],
-                    ':punto_venta' => $data['punto_venta'] ?? 1,
-                    ':remito_id' => $data['remito_id'],
-                    ':presupuesto_id' => $data['presupuesto_id'],
-                    ':cliente_id' => $data['cliente_id'],
-                    ':idclien' => $data['idclien'],
-                    ':cliente_nombre' => $data['cliente_nombre'],
-                    ':cliente_cuit' => $data['cliente_cuit'],
-                    ':cliente_direc' => $data['cliente_direc'],
-                    ':cliente_tele' => $data['cliente_tele'],
-                    ':cliente_mail' => $data['cliente_mail'],
-                    ':cliente_condicion_iva' => $data['cliente_condicion_iva'],
-                    ':fecha' => $data['fecha'],
-                    ':subtotal' => $data['subtotal_cents'],
-                    ':iva' => $data['iva_cents'],
-                    ':descuento' => $data['descuento_cents'] ?? 0,
-                    ':puntos' => $data['puntos_cents'] ?? 0,
-                    ':total' => $data['total_cents'],
-                    ':estado' => $data['estado'] ?? 'emitida',
-                    ':forma_pago' => $data['forma_pago'],
-                    ':entrega_tipo' => $data['entrega_tipo'] ?? 'local',
-                    ':transporte' => $data['transporte'] ?? null,
-                    ':envio_estado' => $data['envio_estado'] ?? null,
-                    ':envio_direccion' => $data['envio_direccion'] ?? null,
-                    ':envio_obs' => $data['envio_observacion'] ?? null,
-                    ':notas' => $data['notas'],
-                    ':created_by' => $data['created_by'],
-                    ':vendedor_id' => $data['vendedor_id'] ?? null,
-                ]);
+                $fparams[':entrega_tipo'] = $data['entrega_tipo'] ?? 'local';
+                $fparams[':transporte'] = $data['transporte'] ?? null;
+                $fparams[':envio_estado'] = $data['envio_estado'] ?? null;
+                $fparams[':envio_direccion'] = $data['envio_direccion'] ?? null;
+                $fparams[':envio_obs'] = $data['envio_observacion'] ?? null;
+                $st->execute($fparams);
             } else {
                 $st = $pdo->prepare('
                     INSERT INTO facturas (codigo, tipo_comprobante, punto_venta, remito_id, presupuesto_id, cliente_id, idclien, cliente_nombre, cliente_cuit, cliente_direc, cliente_tele, cliente_mail, cliente_condicion_iva, fecha, subtotal_cents, iva_cents, descuento_cents, puntos_cents, total_cents, estado, forma_pago, notas, created_by, vendedor_id, created_at, updated_at)
                     VALUES (:codigo, :tipo, :punto_venta, :remito_id, :presupuesto_id, :cliente_id, :idclien, :cliente_nombre, :cliente_cuit, :cliente_direc, :cliente_tele, :cliente_mail, :cliente_condicion_iva, :fecha, :subtotal, :iva, :descuento, :puntos, :total, :estado, :forma_pago, :notas, :created_by, :vendedor_id, NOW(), NOW())
                 ');
-                $st->execute([
-                    ':codigo' => $data['codigo'],
-                    ':tipo' => $data['tipo_comprobante'],
-                    ':punto_venta' => $data['punto_venta'] ?? 1,
-                    ':remito_id' => $data['remito_id'],
-                    ':presupuesto_id' => $data['presupuesto_id'],
-                    ':cliente_id' => $data['cliente_id'],
-                    ':idclien' => $data['idclien'],
-                    ':cliente_nombre' => $data['cliente_nombre'],
-                    ':cliente_cuit' => $data['cliente_cuit'],
-                    ':cliente_direc' => $data['cliente_direc'],
-                    ':cliente_tele' => $data['cliente_tele'],
-                    ':cliente_mail' => $data['cliente_mail'],
-                    ':cliente_condicion_iva' => $data['cliente_condicion_iva'],
-                    ':fecha' => $data['fecha'],
-                    ':subtotal' => $data['subtotal_cents'],
-                    ':iva' => $data['iva_cents'],
-                    ':descuento' => $data['descuento_cents'] ?? 0,
-                    ':puntos' => $data['puntos_cents'] ?? 0,
-                    ':total' => $data['total_cents'],
-                    ':estado' => $data['estado'] ?? 'emitida',
-                    ':forma_pago' => $data['forma_pago'],
-                    ':notas' => $data['notas'],
-                    ':created_by' => $data['created_by'],
-                    ':vendedor_id' => $data['vendedor_id'] ?? null,
-                ]);
+                unset($fparams[':order_id']);
+                $st->execute($fparams);
             }
             $id = (int)$pdo->lastInsertId();
 

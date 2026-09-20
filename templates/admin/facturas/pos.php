@@ -165,6 +165,21 @@ $plazos = $plazos ?? [];
         <div id="presupuestoSuggestions" style="position:absolute;z-index:1050;width:100%"></div>
     </div>
     <?php endif; ?>
+
+    <?php $pedidoId = (int)($pedidoId ?? 0); ?>
+    <?php if ($pedidoId > 0): ?>
+    <span class="badge bg-success fs-6">Pedido web <?= htmlspecialchars($pedidoCodigo ?? '') ?> cargado</span>
+    <input type="hidden" id="pedidoId" value="<?= $pedidoId ?>" />
+    <?php else: ?>
+    <input type="hidden" id="pedidoId" value="0" />
+    <button class="btn btn-sm btn-outline-success" type="button" onclick="document.getElementById('pedidoSearchWrap').style.display='block'">
+        <i class="bi bi-cart"></i> Desde pedido web
+    </button>
+    <div id="pedidoSearchWrap" style="display:none;position:relative">
+        <input class="form-control form-control-sm" id="pedidoSearch" placeholder="Buscar pedido pagado..." autocomplete="off" style="width:250px" />
+        <div id="pedidoSuggestions" style="position:absolute;z-index:1050;width:100%"></div>
+    </div>
+    <?php endif; ?>
 </div>
 
 <div class="pos-cliente mb-2" id="clienteSection">
@@ -929,6 +944,105 @@ if (presInput) {
     });
 }
 
+// ── Pedido web search ──
+const pedInput = document.getElementById('pedidoSearch');
+const pedSuggestions = document.getElementById('pedidoSuggestions');
+if (pedInput) {
+    let pedTimer;
+    pedInput.addEventListener('input', function() {
+        clearTimeout(pedTimer);
+        const val = this.value.trim();
+        if (val.length < 2) { pedSuggestions.innerHTML = ''; return; }
+        pedTimer = setTimeout(() => {
+            fetch('/admin/facturas/buscar-pedidos?q=' + encodeURIComponent(val))
+                .then(r => r.json())
+                .then(data => {
+                    pedSuggestions.innerHTML = '';
+                    if (!data || data.length === 0) {
+                        pedSuggestions.innerHTML = '<div class="suggestion-item text-muted">Sin resultados</div>';
+                        return;
+                    }
+                    data.forEach(p => {
+                        const div = document.createElement('div');
+                        div.className = 'suggestion-item';
+                        const extra = (p.facturado ? ' <span class="badge bg-secondary">facturado</span>' : '') + ' <span class="text-muted">' + esc(p.estado || '') + '</span>';
+                        div.innerHTML = '<strong>' + esc(p.codigo) + '</strong> <span class="text-muted">' + esc(p.cliente || '') + '</span>' + extra;
+                        div.style.cssText = 'padding:6px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid #eee;background:#fff;';
+                        div.addEventListener('mousedown', function(e) {
+                            e.preventDefault();
+                            window.location.href = '/admin/facturas/nueva?pedido_id=' + p.id;
+                        });
+                        pedSuggestions.appendChild(div);
+                    });
+                });
+        }, 300);
+    });
+    pedInput.addEventListener('blur', function() {
+        setTimeout(() => pedSuggestions.innerHTML = '', 300);
+    });
+}
+
+// ── Prefill desde pedido web ──
+const PEDIDO_ITEMS = <?= json_encode($pedidoItems ?? [], JSON_UNESCAPED_UNICODE) ?>;
+const PEDIDO_CLIENTE = <?= json_encode($pedidoCliente, JSON_UNESCAPED_UNICODE) ?>;
+const PEDIDO_ENVIO = <?= json_encode($pedidoEnvio, JSON_UNESCAPED_UNICODE) ?>;
+const PEDIDO_PAGO = <?= json_encode($pedidoPago, JSON_UNESCAPED_UNICODE) ?>;
+const PEDIDO_DESC_PCT = <?= json_encode($pedidoDescPct ?? 0) ?>;
+
+function pedidoDisplayedTotalCents() {
+    const t = (document.getElementById('posTotal').textContent || '').replace(/[^0-9,.\-]/g, '').replace(/\./g, '').replace(',', '.');
+    const v = Math.round(parseFloat(t) * 100);
+    return isNaN(v) ? 0 : v;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const pidEl = document.getElementById('pedidoId');
+    if (!pidEl || parseInt(pidEl.value) <= 0) return;
+    (PEDIDO_ITEMS || []).forEach(it => addToCart({
+        idprodu: it.idprodu || 0,
+        idcodgusto: it.idcodgusto || 0,
+        producto: it.producto || '',
+        variedad: it.variedad || '',
+        qty: it.qty || 1,
+        unit_price_cents: it.unit_price_cents || 0,
+        iva_rate: it.iva_rate || 21,
+    }));
+    if (PEDIDO_CLIENTE && (PEDIDO_CLIENTE.name || PEDIDO_CLIENTE.idclien)) {
+        selectCliente(PEDIDO_CLIENTE);
+    }
+    if (PEDIDO_ENVIO) {
+        const radio = document.querySelector('input[name="entrega_tipo"][value="' + (PEDIDO_ENVIO.tipo === 'envio' ? 'envio' : 'local') + '"]');
+        if (radio) { radio.checked = true; onEntregaChange(); }
+        if (PEDIDO_ENVIO.transporte) {
+            const ts = document.getElementById('transporteSelect');
+            if (ts) ts.value = PEDIDO_ENVIO.transporte;
+        }
+        if (PEDIDO_ENVIO.direccion) {
+            const ed = document.getElementById('envioDireccion');
+            if (ed) ed.value = PEDIDO_ENVIO.direccion;
+        }
+        if (PEDIDO_ENVIO.obs) {
+            const eo = document.getElementById('envioObs');
+            if (eo) eo.value = PEDIDO_ENVIO.obs;
+        }
+    }
+    if (PEDIDO_DESC_PCT > 0) {
+        const dp = document.getElementById('posDescuento');
+        if (dp) dp.value = PEDIDO_DESC_PCT;
+    }
+    renderCart();
+    if (PEDIDO_PAGO && PEDIDO_PAGO.monto_cents > 0) {
+        addPagoLine(PEDIDO_PAGO.forma || 'mercadopago');
+        const lines = document.querySelectorAll('#pagosContainer .pago-line');
+        const last = lines[lines.length - 1];
+        if (last) {
+            const monto = last.querySelector('.fp-monto');
+            if (monto) monto.value = (pedidoDisplayedTotalCents() / 100).toFixed(2);
+        }
+        recalcTotals();
+    }
+});
+
 // ── Payment lines (multi-pago) ──
 const BANCOS = <?= json_encode($bancos, JSON_UNESCAPED_UNICODE) ?>;
 const BANCOS_CUENTAS = <?= json_encode($bancosCuentas, JSON_UNESCAPED_UNICODE) ?>;
@@ -1155,6 +1269,7 @@ function submitFactura() {
         },
         remito_id: remitoId,
         presupuesto_id: presupuestoId,
+        pedido_id: parseInt((document.getElementById('pedidoId') || {}).value) || 0,
         vendedor_id: vendedorEl ? parseInt(vendedorEl.value) || null : null,
         notas: notas,
         fecha: new Date().toISOString().slice(0,10),
