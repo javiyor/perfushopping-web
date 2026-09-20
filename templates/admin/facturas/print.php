@@ -104,6 +104,7 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
                 <th>Cant</th>
                 <th>Producto</th>
                 <th class="text-right">Precio</th>
+                <th class="text-right">Dto.</th>
                 <th class="text-right">Total</th>
             </tr>
         </thead>
@@ -119,6 +120,7 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
                 <td class="text-center"><?= $qty ?></td>
                 <td><?= htmlspecialchars((string)($it['producto'] ?? '')) ?><?= ($it['variedad'] ?? '') ? ' (' . htmlspecialchars($it['variedad']) . ')' : '' ?></td>
                 <td class="text-right"><?= htmlspecialchars(Format::moneyRoundedFromCents($unitDisplay)) ?></td>
+                <td class="text-right"><?= ((float)($it['descuento_pct'] ?? 0) > 0 ? rtrim(rtrim(number_format((float)$it['descuento_pct'], 2, ',', '.'), '0'), ',') . ' %' : '—') ?></td>
                 <td class="text-right"><?= htmlspecialchars(Format::moneyRoundedFromCents($totalDisplay)) ?></td>
             </tr>
             <?php endforeach; ?>

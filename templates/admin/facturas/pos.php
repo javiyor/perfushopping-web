@@ -54,6 +54,8 @@ $plazos = $plazos ?? [];
 .pos-cart-item .ci-name .ci-var { font-size:12px; color:#6c757d; }
 .pos-cart-item .ci-qty { width:60px; }
 .pos-cart-item .ci-qty input { width:100%; text-align:center; padding:4px; border:1px solid #dee2e6; border-radius:6px; font-weight:600; }
+.pos-cart-item .ci-dto { width:64px; }
+.pos-cart-item .ci-dto input { width:100%; text-align:center; padding:4px 2px; border:1px solid #dee2e6; border-radius:6px; font-size:12px; }
 .pos-cart-item .ci-price { width:100px; text-align:right; font-weight:600; }
 .pos-cart-item .ci-total { width:100px; text-align:right; font-weight:700; }
 .pos-cart-item .ci-del { width:30px; text-align:center; color:#dc3545; cursor:pointer; font-size:18px; opacity:.5; }
@@ -76,6 +78,7 @@ $plazos = $plazos ?? [];
     .pos-cart-item .ci-price { width:70px; }
     .pos-cart-item .ci-total { width:70px; }
     .pos-cart-item .ci-qty { width:50px; }
+    .pos-cart-item .ci-dto { width:56px; }
     .pos-totals .pt-row.pt-total { font-size:18px; }
     .pos-toolbar { flex-direction:column; align-items:stretch; }
     .pos-toolbar select { width:100% !important; }
@@ -89,6 +92,7 @@ $plazos = $plazos ?? [];
     .pos-cart-item { flex-wrap:wrap; gap:4px; }
     .pos-cart-item .ci-name { width:100%; }
     .pos-cart-item .ci-qty { width:40px; }
+    .pos-cart-item .ci-dto { width:auto; }
     .pos-cart-item .ci-price { width:auto; }
     .pos-cart-item .ci-total { width:auto; }
 }
@@ -557,10 +561,16 @@ function filterVariantPicker(q) {
 }
 
 // ── Cart ──
+function lineDto(v) {
+    const d = parseFloat(v) || 0;
+    return Math.min(100, Math.max(0, d));
+}
+
 function addToCart(item) {
     const netPrice = item.unit_price_cents || 0;
-    const key = item.idprodu + '-' + item.idcodgusto;
-    const existing = cart.find(c => (c.idprodu + '-' + c.idcodgusto) === key);
+    const dto = lineDto(item.dto);
+    const key = item.idprodu + '-' + item.idcodgusto + '-' + dto;
+    const existing = cart.find(c => (c.idprodu + '-' + c.idcodgusto + '-' + lineDto(c.dto)) === key);
     if (existing) {
         existing.qty += item.qty || 1;
     } else {
@@ -571,6 +581,7 @@ function addToCart(item) {
             variedad: item.variedad || '',
             qty: item.qty || 1,
             net_price_cents: netPrice,
+            dto: dto,
             iva_rate: item.iva_rate || 21,
         });
     }
@@ -589,8 +600,9 @@ function renderCart() {
 
     count.textContent = cart.length + ' item(s)';
     container.innerHTML = cart.map((item, idx) => {
+        const dto = lineDto(item.dto);
         const displayPrice = getDisplayPrice(item.net_price_cents, item.iva_rate);
-        const total = item.qty * displayPrice;
+        const total = item.qty * displayPrice * (1 - dto / 100);
         return `
             <div class="pos-cart-item" data-idx="${idx}">
                 <div class="ci-name">
@@ -598,6 +610,7 @@ function renderCart() {
                     <div class="ci-var">${item.variedad ? esc(item.variedad) : '—'}</div>
                 </div>
                 <div class="ci-qty"><input type="number" value="${item.qty}" min="1" onchange="updateQty(${idx}, this.value)" /></div>
+                <div class="ci-dto"><input type="number" value="${dto}" min="0" max="100" step="1" title="Descuento %" onchange="updateDto(${idx}, this.value)" /></div>
                 <div class="ci-price">$${fmtPrice(displayPrice)}</div>
                 <div class="ci-total">$${fmtPrice(total)}</div>
                 <div class="ci-del" onclick="removeItem(${idx})">&times;</div>
@@ -612,6 +625,11 @@ function updateQty(idx, val) {
     renderCart();
 }
 
+function updateDto(idx, val) {
+    cart[idx].dto = lineDto(val);
+    renderCart();
+}
+
 function removeItem(idx) {
     cart.splice(idx, 1);
     renderCart();
@@ -620,7 +638,7 @@ function removeItem(idx) {
 function recalcTotals() {
     let subtotal = 0, iva = 0, total = 0;
     cart.forEach(item => {
-        const netLine = item.qty * item.net_price_cents;
+        const netLine = Math.round(item.qty * item.net_price_cents * (1 - lineDto(item.dto) / 100));
         const lineIva = item.iva_rate > 0 ? Math.round(netLine * item.iva_rate / 100) : 0;
         subtotal += netLine;
         iva += lineIva;
@@ -1044,7 +1062,7 @@ function submitFactura() {
 
     const descPct = parseInt(document.getElementById('posDescuento').value) || 0;
     const totalBruto = cart.reduce((sum, item) => {
-        const netLine = item.qty * item.net_price_cents;
+        const netLine = Math.round(item.qty * item.net_price_cents * (1 - lineDto(item.dto) / 100));
         const lineIva = item.iva_rate > 0 ? Math.round(netLine * item.iva_rate / 100) : 0;
         return sum + netLine + lineIva;
     }, 0);
@@ -1135,6 +1153,7 @@ function submitFactura() {
             qty: item.qty,
             unit_price_cents: item.net_price_cents,
             iva_rate: item.iva_rate,
+            descuento_pct: lineDto(item.dto),
         })),
         pagos: pagos,
     };

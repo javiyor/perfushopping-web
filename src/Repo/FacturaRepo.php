@@ -236,12 +236,17 @@ final class FacturaRepo
             }
             $id = (int)$pdo->lastInsertId();
 
+            $hasDtoCol = false;
+            try {
+                $itemCols = $pdo->query('SHOW COLUMNS FROM factura_items')->fetchAll();
+                $hasDtoCol = in_array('descuento_pct', array_column($itemCols, 'Field'), true);
+            } catch (\Throwable $e) {}
             $sti = $pdo->prepare('
-                INSERT INTO factura_items (factura_id, idprodu, idcodgusto, producto, variedad, qty, unit_price_cents, iva_rate, iva_cents, total_cents)
-                VALUES (:fid, :idprodu, :idcodgusto, :producto, :variedad, :qty, :unit_price, :iva_rate, :iva_cents, :total)
+                INSERT INTO factura_items (factura_id, idprodu, idcodgusto, producto, variedad, qty, unit_price_cents, iva_rate, iva_cents, total_cents' . ($hasDtoCol ? ', descuento_pct' : '') . ')
+                VALUES (:fid, :idprodu, :idcodgusto, :producto, :variedad, :qty, :unit_price, :iva_rate, :iva_cents, :total' . ($hasDtoCol ? ', :dto' : '') . ')
             ');
             foreach ($items as $it) {
-                $sti->execute([
+                $itemParams = [
                     ':fid' => $id,
                     ':idprodu' => $it['idprodu'],
                     ':idcodgusto' => $it['idcodgusto'],
@@ -252,7 +257,11 @@ final class FacturaRepo
                     ':iva_rate' => $it['iva_rate'],
                     ':iva_cents' => $it['iva_cents'],
                     ':total' => $it['total_cents'],
-                ]);
+                ];
+                if ($hasDtoCol) {
+                    $itemParams[':dto'] = $it['descuento_pct'] ?? 0;
+                }
+                $sti->execute($itemParams);
             }
 
             // Inserción compatible con columnas nuevas y viejas

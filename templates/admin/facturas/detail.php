@@ -61,6 +61,7 @@ $discriminaIva = in_array($factura['tipo_comprobante'] ?? '', ['FACT-A']);
                             <th>Variedad</th>
                             <th class="text-center">Cant.</th>
                             <th class="text-end">P. unit.</th>
+                            <th class="text-end">Dto.</th>
                             <?php if ($discriminaIva): ?>
                             <th class="text-end">IVA</th>
                             <?php endif; ?>
@@ -80,6 +81,7 @@ $discriminaIva = in_array($factura['tipo_comprobante'] ?? '', ['FACT-A']);
                                 <td><?= htmlspecialchars((string)($it['variedad'] ?? '')) ?: '<span class="text-muted">—</span>' ?></td>
                                 <td class="text-center"><?= $qty ?></td>
                                 <td class="text-end"><?= htmlspecialchars(Format::moneyRoundedFromCents($unitDisplay)) ?></td>
+                                <td class="text-end"><?= ((float)($it['descuento_pct'] ?? 0) > 0 ? rtrim(rtrim(number_format((float)$it['descuento_pct'], 2, ',', '.'), '0'), ',') . ' %' : '—') ?></td>
                                 <?php if ($discriminaIva): ?>
                                 <td class="text-end"><?= htmlspecialchars(Format::moneyRoundedFromCents($ivaCents)) ?></td>
                                 <?php endif; ?>

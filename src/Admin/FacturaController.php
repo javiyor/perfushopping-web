@@ -132,8 +132,9 @@ final class FacturaController
             $qty = max(1, (int)($it['qty'] ?? 1));
             $unitPrice = max(0, (int)($it['unit_price_cents'] ?? 0));
             $ivaRate = (float)($it['iva_rate'] ?? 21);
-            $lineTotal = $qty * $unitPrice;
-            $lineIva = $ivaRate > 0 ? (int)round($lineTotal * $ivaRate / 100) : 0;
+            $dtoPct = min(100.0, max(0.0, (float)($it['descuento_pct'] ?? 0)));
+            $lineNet = (int)round($qty * $unitPrice * (1 - $dtoPct / 100));
+            $lineIva = $ivaRate > 0 ? (int)round($lineNet * $ivaRate / 100) : 0;
             $items[] = [
                 'idprodu' => (int)($it['idprodu'] ?? 0) ?: null,
                 'idcodgusto' => (int)($it['idcodgusto'] ?? 0) ?: null,
@@ -142,10 +143,11 @@ final class FacturaController
                 'qty' => $qty,
                 'unit_price_cents' => $unitPrice,
                 'iva_rate' => $ivaRate,
+                'descuento_pct' => $dtoPct,
                 'iva_cents' => $lineIva,
-                'total_cents' => $lineTotal + $lineIva,
+                'total_cents' => $lineNet + $lineIva,
             ];
-            $subtotal += $unitPrice * $qty;
+            $subtotal += $lineNet;
             $ivaTotal += $lineIva;
         }
 
