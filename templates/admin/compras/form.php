@@ -71,11 +71,19 @@ $idcta1Sel = (int)($compra['idcta1'] ?? 0);
                                 <th>Variedad</th>
                                 <th style="width:70px">Cant.</th>
                                 <th style="width:110px">Costo unit.</th>
+                                <th style="width:80px">Bonif %</th>
                                 <th style="width:100px">Subtotal</th>
                                 <th style="width:36px"></th>
                             </tr>
                         </thead>
                         <tbody id="itemsBody"></tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="5" class="text-end small text-muted">Total líneas</td>
+                                <td class="text-end small fw-bold" id="itemsFootTotal">$0,00</td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
                     </table>
                     <div class="p-2 text-muted small">
                         <i class="bi bi-info-circle"></i> Al guardar con ítems, se suma stock al depósito y se recalculan los precios con los márgenes del producto.
@@ -267,6 +275,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 qty: <?= (float)($it['qty'] ?? 1) ?>,
                 unit_cost: <?= (float)($it['unit_cost'] ?? 0) ?>,
                 precomp: <?= (float)($it['unit_cost'] ?? 0) ?>,
+                bonif_pct: <?= (float)($it['bonif_pct'] ?? 0) ?>,
                 variants: []
             });
         <?php endforeach; ?>
@@ -285,6 +294,7 @@ function addRow(data) {
     const nomgusto = data ? (data.nomgusto || '') : '';
     const qty = data ? data.qty : 1;
     const cost = data ? (data.unit_cost || data.precomp || 0) : 0;
+    const bonif = data ? (data.bonif_pct || 0) : 0;
     row.innerHTML = `
         <td>
             <input class="form-control form-control-sm prod-input" name="item_name[]" placeholder="Buscar producto..." autocomplete="off" value="${esc(name)}" />
@@ -301,6 +311,12 @@ function addRow(data) {
             <div class="input-group input-group-sm">
                 <span class="input-group-text">$</span>
                 <input class="form-control form-control-sm cost-input" name="item_cost[]" type="number" value="${cost}" min="0" step="0.01" />
+            </div>
+        </td>
+        <td>
+            <div class="input-group input-group-sm">
+                <input class="form-control form-control-sm bonif-input" name="item_bonif[]" type="number" value="${bonif}" min="0" max="100" step="0.01" />
+                <span class="input-group-text">%</span>
             </div>
         </td>
         <td class="text-end line-total pt-3 small">$0,00</td>
@@ -324,6 +340,7 @@ function setupRow(row) {
     const variedadSelect = row.querySelector('.variedad-select');
     const qtyInput = row.querySelector('.qty-input');
     const costInput = row.querySelector('.cost-input');
+    const bonifInput = row.querySelector('.bonif-input');
 
     let timer;
     input.addEventListener('input', function() {
@@ -354,6 +371,7 @@ function setupRow(row) {
 
     qtyInput.addEventListener('input', recalcular);
     costInput.addEventListener('input', recalcular);
+    bonifInput.addEventListener('input', recalcular);
 }
 
 function searchProducts(q, container, row) {
@@ -428,12 +446,18 @@ function removeRow(btn) {
 }
 
 function recalcular() {
+    let totalLineas = 0;
     document.querySelectorAll('.item-row').forEach(row => {
         const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
         const cost = parseFloat(row.querySelector('.cost-input').value) || 0;
-        const line = qty * cost;
+        const bonifRaw = parseFloat(row.querySelector('.bonif-input').value) || 0;
+        const bonif = Math.min(100, Math.max(0, bonifRaw));
+        const line = qty * cost * (1 - bonif / 100);
+        totalLineas += line;
         row.querySelector('.line-total').textContent = '$' + line.toLocaleString('es-AR', {minimumFractionDigits:2});
     });
+    const foot = document.getElementById('itemsFootTotal');
+    if (foot) foot.textContent = '$' + totalLineas.toLocaleString('es-AR', {minimumFractionDigits:2});
 }
 
 document.addEventListener('change', function(e) {

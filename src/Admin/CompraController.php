@@ -481,7 +481,7 @@ final class CompraController
         ];
     }
 
-    /** @return array<int, array{idprodu:int, idcodgusto:?int, product_name:string, qty:float, unit_cost:float}> */
+    /** @return array<int, array{idprodu:int, idcodgusto:?int, product_name:string, qty:float, unit_cost:float, bonif_pct:float}> */
     private function parseItems(): array
     {
         $ids = $_POST['item_idprodu'] ?? [];
@@ -492,6 +492,7 @@ final class CompraController
         $names = $_POST['item_name'] ?? [];
         $qtys = $_POST['item_qty'] ?? [];
         $costs = $_POST['item_cost'] ?? [];
+        $bonifs = $_POST['item_bonif'] ?? [];
 
         $out = [];
         foreach ($ids as $i => $idprodu) {
@@ -505,6 +506,7 @@ final class CompraController
                 'product_name' => (string)($names[$i] ?? ''),
                 'qty' => (float)str_replace(',', '.', (string)($qtys[$i] ?? '1')),
                 'unit_cost' => ExcelReader::toFloat((string)($costs[$i] ?? '0')),
+                'bonif_pct' => min(100.0, max(0.0, (float)str_replace(',', '.', (string)($bonifs[$i] ?? '0')))),
             ];
         }
         return $out;

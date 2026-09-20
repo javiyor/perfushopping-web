@@ -24,6 +24,23 @@ final class CompraRepo
         return self::$facturaColumns;
     }
 
+    private static ?array $itemsColumns = null;
+
+    /** @return array<int, string> */
+    private function itemsColumns(): array
+    {
+        if (self::$itemsColumns !== null) {
+            return self::$itemsColumns;
+        }
+        try {
+            $rows = Db::pdo()->query('SHOW COLUMNS FROM factura_compra_items')->fetchAll();
+            self::$itemsColumns = array_column($rows, 'Field');
+        } catch (\Throwable $e) {
+            self::$itemsColumns = [];
+        }
+        return self::$itemsColumns;
+    }
+
     /** @param array{q?:string, estado?:string, desde?:string, hasta?:string} $f
      *  @return array<int, array<string,mixed>>
      */
@@ -334,7 +351,7 @@ final class CompraRepo
     // ── Aplicar ítems: stock + precios ──
 
     /**
-     * @param array<int, array{idprodu:int, idcodgusto:?int, product_name:string, qty:float, unit_cost:float}> $items
+     * @param array<int, array{idprodu:int, idcodgusto:?int, product_name:string, qty:float, unit_cost:float, bonif_pct:float}> $items
      */
     public function aplicarItems(int $facturaCompraId, array $items, int $iddepo, string $fecha, ?string $notas): void
     {
@@ -344,9 +361,10 @@ final class CompraRepo
             // Limpiar ítems previos (re-carga)
             $pdo->prepare('DELETE FROM factura_compra_items WHERE factura_compra_id = :id')->execute([':id' => $facturaCompraId]);
 
+            $hasBonif = in_array('bonif_pct', $this->itemsColumns(), true);
             $stItem = $pdo->prepare('
-                INSERT INTO factura_compra_items (factura_compra_id, idprodu, idcodgusto, product_name, qty, unit_cost, line_total)
-                VALUES (:fc, :prod, :gusto, :name, :qty, :cost, :line)
+                INSERT INTO factura_compra_items (factura_compra_id, idprodu, idcodgusto, product_name, qty, unit_cost, line_total' . ($hasBonif ? ', bonif_pct' : '') . ')
+                VALUES (:fc, :prod, :gusto, :name, :qty, :cost, :line' . ($hasBonif ? ', :bonif' : '') . ')
             ');
 
             foreach ($items as $it) {
@@ -360,6 +378,8 @@ final class CompraRepo
                     continue;
                 }
                 $unitCost = (float)($it['unit_cost'] ?? 0);
+                $bonif = min(100.0, max(0.0, (float)($it['bonif_pct'] ?? 0)));
+                $netCost = round($unitCost * (1 - $bonif / 100), 2);
                 $name = (string)($it['product_name'] ?? '');
 
                 // Stock + precios por producto
@@ -368,8 +388,8 @@ final class CompraRepo
                     if ($idcodgusto === null) {
                         $idcodgusto = $this->resolveVariant($idprodu);
                     }
-                    if ($unitCost > 0) {
-                        $precomp = round($unitCost, 2);
+                    if ($netCost > 0) {
+                        $precomp = $netCost;
                         $ganan1 = (float)($prod['ganan1'] ?? 0);
                         $ganan2 = (float)($prod['ganan2'] ?? 0);
                         $precio = round($precomp * (1 + $ganan1 / 100), 2);
@@ -399,15 +419,19 @@ final class CompraRepo
                     $this->recalcularProducto($pdo, $idprodu, $idcodgusto);
                 }
 
-                $stItem->execute([
+                $itemParams = [
                     ':fc' => $facturaCompraId,
                     ':prod' => $idprodu,
                     ':gusto' => $idcodgusto,
                     ':name' => $name,
                     ':qty' => $qty,
                     ':cost' => $unitCost,
-                    ':line' => round($qty * $unitCost, 2),
-                ]);
+                    ':line' => round($qty * $netCost, 2),
+                ];
+                if ($hasBonif) {
+                    $itemParams[':bonif'] = $bonif;
+                }
+                $stItem->execute($itemParams);
             }
 
             $pdo->commit();
@@ -435,7 +459,7 @@ final class CompraRepo
 
     /**
      * Persiste los ítems de un comprobante ya aplicado (no vuelve a sumar stock).
-     * @param array<int, array{idprodu:int, idcodgusto:?int, product_name:string, qty:float, unit_cost:float}> $items
+     * @param array<int, array{idprodu:int, idcodgusto:?int, product_name:string, qty:float, unit_cost:float, bonif_pct:float}> $items
      */
     public function reemplazarItems(int $facturaCompraId, array $items): void
     {
@@ -443,9 +467,10 @@ final class CompraRepo
         $pdo->beginTransaction();
         try {
             $pdo->prepare('DELETE FROM factura_compra_items WHERE factura_compra_id = :id')->execute([':id' => $facturaCompraId]);
+            $hasBonif = in_array('bonif_pct', $this->itemsColumns(), true);
             $st = $pdo->prepare('
-                INSERT INTO factura_compra_items (factura_compra_id, idprodu, idcodgusto, product_name, qty, unit_cost, line_total)
-                VALUES (:fc, :prod, :gusto, :name, :qty, :cost, :line)
+                INSERT INTO factura_compra_items (factura_compra_id, idprodu, idcodgusto, product_name, qty, unit_cost, line_total' . ($hasBonif ? ', bonif_pct' : '') . ')
+                VALUES (:fc, :prod, :gusto, :name, :qty, :cost, :line' . ($hasBonif ? ', :bonif' : '') . ')
             ');
             foreach ($items as $it) {
                 $idprodu = (int)($it['idprodu'] ?? 0);
@@ -457,15 +482,21 @@ final class CompraRepo
                     continue;
                 }
                 $unitCost = (float)($it['unit_cost'] ?? 0);
-                $st->execute([
+                $bonif = min(100.0, max(0.0, (float)($it['bonif_pct'] ?? 0)));
+                $netCost = round($unitCost * (1 - $bonif / 100), 2);
+                $itemParams = [
                     ':fc' => $facturaCompraId,
                     ':prod' => $idprodu,
                     ':gusto' => ((int)($it['idcodgusto'] ?? 0)) > 0 ? (int)$it['idcodgusto'] : null,
                     ':name' => (string)($it['product_name'] ?? ''),
                     ':qty' => $qty,
                     ':cost' => $unitCost,
-                    ':line' => round($qty * $unitCost, 2),
-                ]);
+                    ':line' => round($qty * $netCost, 2),
+                ];
+                if ($hasBonif) {
+                    $itemParams[':bonif'] = $bonif;
+                }
+                $st->execute($itemParams);
             }
             $pdo->commit();
         } catch (\Throwable $e) {

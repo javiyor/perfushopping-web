@@ -67,12 +67,13 @@ $estado = (string)($compra['estado'] ?? 'pendiente');
                             <th>Variedad</th>
                             <th class="text-center">Cant.</th>
                             <th class="text-end">Costo unit.</th>
+                            <th class="text-end">Bonif.</th>
                             <th class="text-end">Total</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (!$items): ?>
-                            <tr><td colspan="5" class="text-muted text-center">Sin ítems cargados</td></tr>
+                            <tr><td colspan="6" class="text-muted text-center">Sin ítems cargados</td></tr>
                         <?php else: ?>
                             <?php foreach ($items as $it): ?>
                                 <tr>
@@ -80,6 +81,7 @@ $estado = (string)($compra['estado'] ?? 'pendiente');
                                     <td class="small text-muted"><?= htmlspecialchars((string)($it['nomgusto'] ?? '-')) ?></td>
                                     <td class="text-center"><?= (float)($it['qty'] ?? 0) ?></td>
                                     <td class="text-end">$<?= $mon($it['unit_cost']) ?></td>
+                                    <td class="text-end"><?= ((float)($it['bonif_pct'] ?? 0) > 0 ? $mon($it['bonif_pct']) . ' %' : '—') ?></td>
                                     <td class="text-end fw-bold">$<?= $mon($it['line_total']) ?></td>
                                 </tr>
                             <?php endforeach; ?>
@@ -87,23 +89,23 @@ $estado = (string)($compra['estado'] ?? 'pendiente');
                     </tbody>
                     <tfoot>
                         <tr class="fw-bold">
-                            <td colspan="4" class="text-end">Neto gravado</td>
+                            <td colspan="5" class="text-end">Neto gravado</td>
                             <td class="text-end">$<?= $mon($compra['imp_neto_gravado'] ?? 0) ?></td>
                         </tr>
                         <tr>
-                            <td colspan="4" class="text-end">IVA</td>
+                            <td colspan="5" class="text-end">IVA</td>
                             <td class="text-end">$<?= $mon($compra['imp_iva'] ?? 0) ?></td>
                         </tr>
                         <tr>
-                            <td colspan="4" class="text-end">Ret. Ing. Brutos</td>
+                            <td colspan="5" class="text-end">Ret. Ing. Brutos</td>
                             <td class="text-end">$<?= $mon($compra['ret_ing_brutos'] ?? 0) ?></td>
                         </tr>
                         <tr>
-                            <td colspan="4" class="text-end">Ret. IVA</td>
+                            <td colspan="5" class="text-end">Ret. IVA</td>
                             <td class="text-end">$<?= $mon($compra['ret_iva'] ?? 0) ?></td>
                         </tr>
                         <tr class="fw-bold">
-                            <td colspan="4" class="text-end">Total</td>
+                            <td colspan="5" class="text-end">Total</td>
                             <td class="text-end fs-6">$<?= $mon($compra['imp_total'] ?? 0) ?></td>
                         </tr>
                     </tfoot>
