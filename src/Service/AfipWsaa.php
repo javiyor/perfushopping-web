@@ -250,14 +250,26 @@ XML;
         $dom = new \DOMDocument();
         $dom->loadXML($response);
 
-        $token = $dom->getElementsByTagName('token')->item(0)?->textContent ?? '';
-        $sign = $dom->getElementsByTagName('sign')->item(0)?->textContent ?? '';
-        $expiration = $dom->getElementsByTagName('expirationTime')->item(0)?->textContent ?? '';
-
-        if (!$token || !$sign) {
-            // Try to get fault info
+        // WSAA devuelve el TA dentro de <loginCmsReturn> codificado con entidades XML.
+        $returnNode = $dom->getElementsByTagName('loginCmsReturn')->item(0);
+        if ($returnNode === null) {
             $fault = $dom->getElementsByTagName('faultstring')->item(0)?->textContent ?? '';
             throw new \RuntimeException('AFIP WSAA: error de autenticación. ' . $fault);
+        }
+
+        $returnXml = html_entity_decode((string)$returnNode->textContent, ENT_QUOTES | ENT_HTML401, 'UTF-8');
+        $taDom = new \DOMDocument();
+        if (!@$taDom->loadXML($returnXml)) {
+            throw new \RuntimeException('AFIP WSAA: no se pudo parsear el Ticket de Acceso devuelto.');
+        }
+
+        $token = $taDom->getElementsByTagName('token')->item(0)?->textContent ?? '';
+        $sign = $taDom->getElementsByTagName('sign')->item(0)?->textContent ?? '';
+        $expiration = $taDom->getElementsByTagName('expirationTime')->item(0)?->textContent ?? '';
+
+        if ($token === '' || $sign === '') {
+            $fault = $dom->getElementsByTagName('faultstring')->item(0)?->textContent ?? '';
+            throw new \RuntimeException('AFIP WSAA: token/sign vacíos. ' . $fault);
         }
 
         return [
