@@ -11,6 +11,8 @@ final class AfipWsaa
     private string $keyPath;
     private string $url;
     private bool $homologacion;
+    private string $lastRequest = '';
+    private string $lastResponse = '';
 
     private static array $serviceDestMap = [
         'wsfe' => [
@@ -65,6 +67,16 @@ final class AfipWsaa
             'sign' => $taData['sign'],
             'expiration' => $taData['expiration'],
         ];
+    }
+
+    public function lastRequest(): string
+    {
+        return $this->lastRequest;
+    }
+
+    public function lastResponse(): string
+    {
+        return $this->lastResponse;
     }
 
     private function generarTicketXml(string $service): string
@@ -194,6 +206,8 @@ XML;
 XML;
 
         $ch = curl_init();
+        $this->lastRequest = $xml;
+
         curl_setopt_array($ch, [
             CURLOPT_URL => $this->url,
             CURLOPT_POST => true,
@@ -206,6 +220,7 @@ XML;
         ]);
 
         $response = curl_exec($ch);
+        $this->lastResponse = is_string($response) ? $response : '';
         $error = curl_error($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);

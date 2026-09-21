@@ -82,6 +82,28 @@ final class ArcaController
         Response::redirect('/admin/arca');
     }
 
+    public function diagnostico(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $auth->requirePermiso('arca');
+
+        header('Content-Type: text/plain; charset=utf-8');
+
+        $wsaa = new AfipWsaa();
+        try {
+            $wsaa->login();
+            echo "OK: login exitoso\n\n";
+        } catch (\Throwable $e) {
+            echo "ERROR: " . $e->getMessage() . "\n\n";
+        }
+
+        echo "=== SOAP REQUEST ===\n";
+        echo $wsaa->lastRequest() ?: '(vacío)';
+        echo "\n\n=== SOAP RESPONSE ===\n";
+        echo $wsaa->lastResponse() ?: '(vacío)';
+        exit;
+    }
+
     public function reenviar(array $params): void
     {
         $auth = new AdminAuthService();
