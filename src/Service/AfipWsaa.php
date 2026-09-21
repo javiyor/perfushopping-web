@@ -73,6 +73,7 @@ final class AfipWsaa
         $genTime = gmdate('Y-m-d\TH:i:s.') . substr(microtime(), 2, 3) . 'Z';
         $expTime = gmdate('Y-m-d\TH:i:s.', strtotime('+12 hours')) . substr(microtime(), 2, 3) . 'Z';
 
+        // Según el schema de AFIP, <service> va fuera de <header>.
         return <<<XML
 <?xml version="1.0" encoding="UTF-8"?>
 <loginTicketRequest version="1.0">
@@ -80,8 +81,8 @@ final class AfipWsaa
 <uniqueId>{$this->uniqueId()}</uniqueId>
 <generationTime>{$genTime}</generationTime>
 <expirationTime>{$expTime}</expirationTime>
-<service>{$service}</service>
 </header>
+<service>{$service}</service>
 </loginTicketRequest>
 XML;
     }
