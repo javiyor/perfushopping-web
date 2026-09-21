@@ -131,10 +131,6 @@ XML;
             unlink($xmlFile);
             throw new \RuntimeException('AFIP: clave privada invalida, protegida con passphrase o con formato incorrecto. ' . $this->opensslErrors());
         }
-        if (is_object($keyRes)) {
-            openssl_free_key($keyRes);
-        }
-
         // AFIP WSAA espera el CMS en modo adjunto (attached): el TRA va
         // dentro del PKCS#7. Con PKCS7_DETACHED el "CMS" extraído queda con
         // texto MIME y el XML en claro, y WSAA responde HTTP 500 (SAXParseException).
@@ -164,6 +160,12 @@ XML;
             // Remove trailing headers
             $cms = preg_replace('/\n-----END.*/', '', $cms);
             $cms = str_replace("\n", '', $cms);
+        }
+
+        error_log('AFIP WSAA debug firmarTicket: signed_len=' . strlen($signed) . ' cms_len=' . strlen($cms) . ' cms_first30=' . substr($cms, 0, 30));
+
+        if (trim($cms) === '') {
+            throw new \RuntimeException('AFIP: CMS extraído vacío tras firmar.');
         }
 
         return $cms;
@@ -213,7 +215,8 @@ XML;
         }
         if ($httpCode !== 200) {
             $body = is_string($response) ? $response : '';
-            error_log('AFIP WSAA [' . $this->url . '] HTTP ' . $httpCode . ' respuesta: ' . substr($body, 0, 2000));
+            error_log('AFIP WSAA [' . $this->url . '] HTTP ' . $httpCode . ' REQUEST: ' . $xml);
+            error_log('AFIP WSAA [' . $this->url . '] HTTP ' . $httpCode . ' RESPONSE: ' . $body);
             $fault = '';
             if ($body !== '' && ($dom = new \DOMDocument()) && @$dom->loadXML($body)) {
                 $fault = $dom->getElementsByTagName('faultstring')->item(0)?->textContent ?? '';
