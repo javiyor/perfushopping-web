@@ -138,6 +138,24 @@ final class AfipWsfe
         return (int)$nro;
     }
 
+    public function getUltimoId(): int
+    {
+        $this->autenticarSiNecesario();
+
+        $body = '<FEUltNroRequest xmlns="' . self::NS . '">';
+        $body .= $this->buildAuthXml();
+        $body .= '</FEUltNroRequest>';
+
+        $xml = $this->buildEnvelope($body);
+        $response = $this->call($xml, 'FEUltNroRequest');
+
+        $dom = new \DOMDocument();
+        $dom->loadXML($response);
+        $nro = $dom->getElementsByTagName('nro')->item(0)?->textContent ?? '0';
+
+        return (int)$nro;
+    }
+
     public function solicitarCAE(array $factura, array $items): array
     {
         $tipoCbte = self::$tipoCbteMap[$factura['tipo_comprobante']] ?? 6;
@@ -166,8 +184,8 @@ final class AfipWsfe
         $imptoLiqRni = 0;
         $impOpEx = 0;
 
-        // Generamos un id de lote simple (dentro de 32 bits)
-        $id = random_int(1, 2147483647);
+        // El id de lote debe ser el ultimo numero de request + 1
+        $id = $this->getUltimoId() + 1;
 
         $puntoVenta = $this->resolvePuntoVentaArca($factura);
 
