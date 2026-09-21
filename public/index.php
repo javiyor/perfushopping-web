@@ -476,6 +476,7 @@ $router->get('/admin/arca', [AdminArcaController::class, 'index']);
 $router->get('/admin/arca/config', [AdminArcaController::class, 'config']);
 $router->post('/admin/arca/config/guardar', [AdminArcaController::class, 'configSave']);
 $router->get('/admin/arca/diagnostico', [AdminArcaController::class, 'diagnostico']);
+$router->get('/admin/arca/diagnostico-wsfe', [AdminArcaController::class, 'diagnosticoWsfe']);
 $router->post('/admin/arca/test', [AdminArcaController::class, 'testConnection']);
 $router->post('/admin/arca/reenviar', [AdminArcaController::class, 'reenviar']);
 $router->post('/admin/arca/generar-csr', [AdminArcaController::class, 'generarCsr']);

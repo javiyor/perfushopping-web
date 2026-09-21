@@ -92,15 +92,37 @@ final class ArcaController
         $wsaa = new AfipWsaa();
         try {
             $wsaa->login();
-            echo "OK: login exitoso\n\n";
+            echo "OK: login WSAA exitoso\n\n";
         } catch (\Throwable $e) {
-            echo "ERROR: " . $e->getMessage() . "\n\n";
+            echo "ERROR WSAA: " . $e->getMessage() . "\n\n";
         }
 
-        echo "=== SOAP REQUEST ===\n";
+        echo "=== WSAA REQUEST ===\n";
         echo $wsaa->lastRequest() ?: '(vacío)';
-        echo "\n\n=== SOAP RESPONSE ===\n";
+        echo "\n\n=== WSAA RESPONSE ===\n";
         echo $wsaa->lastResponse() ?: '(vacío)';
+        exit;
+    }
+
+    public function diagnosticoWsfe(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $auth->requirePermiso('arca');
+
+        header('Content-Type: text/plain; charset=utf-8');
+
+        $wsfe = new \Perfushopping\Web\Service\AfipWsfe();
+        try {
+            $wsfe->getUltimoComprobanteAutorizado(1, 6);
+            echo "OK: consulta WSFE exitosa\n\n";
+        } catch (\Throwable $e) {
+            echo "ERROR WSFE: " . $e->getMessage() . "\n\n";
+        }
+
+        echo "=== WSFE REQUEST ===\n";
+        echo $wsfe->lastRequest() ?: '(vacío)';
+        echo "\n\n=== WSFE RESPONSE ===\n";
+        echo $wsfe->lastResponse() ?: '(vacío)';
         exit;
     }
 

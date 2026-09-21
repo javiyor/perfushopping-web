@@ -12,6 +12,8 @@ final class AfipWsfe
     private string $token;
     private string $sign;
     private bool $homologacion;
+    private string $lastRequest = '';
+    private string $lastResponse = '';
 
     private static array $tipoCbteMap = [
         'FACT-A' => 1,
@@ -43,7 +45,7 @@ final class AfipWsfe
     {
         $repo = new ArcaRepo();
         $this->homologacion = $repo->esHomologacion();
-        $this->cuit = $repo->getConfig('cuit');
+        $this->cuit = preg_replace('/\D/', '', $repo->getConfig('cuit'));
         $this->url = $this->homologacion
             ? 'https://wswhomo.afip.gov.ar/wsfe/service.asmx'
             : 'https://servicios1.afip.gov.ar/wsfe/service.asmx';
@@ -314,12 +316,14 @@ XML;
     private function call(string $xml, string $method = 'FECAESolicitar'): string
     {
         $soapAction = self::$soapActions[$method] ?? 'http://ar.gov.afip.dif.FEV1/FECAESolicitar';
+        $this->lastRequest = $xml;
+
         $ch = curl_init();
         curl_setopt_array($ch, [
             CURLOPT_URL => $this->url,
             CURLOPT_POST => true,
             CURLOPT_POSTFIELDS => $xml,
-            CURLOPT_HTTPHEADER => ['Content-Type: text/xml; charset=UTF-8', 'SOAPAction: ' . $soapAction],
+            CURLOPT_HTTPHEADER => ['Content-Type: text/xml; charset=UTF-8', 'SOAPAction: "' . $soapAction . '"'],
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => 120,
             CURLOPT_SSL_VERIFYPEER => false,
@@ -327,6 +331,7 @@ XML;
         ]);
 
         $response = curl_exec($ch);
+        $this->lastResponse = is_string($response) ? $response : '';
         $error = curl_error($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
@@ -335,10 +340,22 @@ XML;
             throw new \RuntimeException('AFIP WSFE: ' . $error);
         }
         if ($httpCode !== 200) {
+            error_log('AFIP WSFE [' . $this->url . '] HTTP ' . $httpCode . ' REQUEST: ' . $xml);
+            error_log('AFIP WSFE [' . $this->url . '] HTTP ' . $httpCode . ' RESPONSE: ' . $this->lastResponse);
             throw new \RuntimeException('AFIP WSFE: HTTP ' . $httpCode);
         }
 
         return $response;
+    }
+
+    public function lastRequest(): string
+    {
+        return $this->lastRequest;
+    }
+
+    public function lastResponse(): string
+    {
+        return $this->lastResponse;
     }
 
     private function parsearRespuesta(string $response, string $requestXml, int $cbteNro): array
