@@ -55,6 +55,8 @@ foreach ($envPaths as $p) {
 ini_set('display_errors', Env::get('APP_ENV', 'local') === 'local' ? '1' : '0');
 error_reporting(E_ALL);
 
+date_default_timezone_set(Env::get('APP_TIMEZONE', 'America/Argentina/Buenos_Aires'));
+
 session_name('perfushopping_web');
 session_set_cookie_params([
     'lifetime' => 0,
