@@ -76,12 +76,12 @@ final class AfipWsaa
         return <<<XML
 <?xml version="1.0" encoding="UTF-8"?>
 <loginTicketRequest version="1.0">
-    <header>
-        <uniqueId>{$this->uniqueId()}</uniqueId>
-        <generationTime>{$genTime}</generationTime>
-        <expirationTime>{$expTime}</expirationTime>
-        <service>{$service}</service>
-    </header>
+<header>
+<uniqueId>{$this->uniqueId()}</uniqueId>
+<generationTime>{$genTime}</generationTime>
+<expirationTime>{$expTime}</expirationTime>
+<service>{$service}</service>
+</header>
 </loginTicketRequest>
 XML;
     }
@@ -133,13 +133,16 @@ XML;
             openssl_free_key($keyRes);
         }
 
+        // AFIP WSAA espera el CMS en modo adjunto (attached): el TRA va
+        // dentro del PKCS#7. Con PKCS7_DETACHED el "CMS" extraído queda con
+        // texto MIME y el XML en claro, y WSAA responde HTTP 500 (SAXParseException).
         $ok = openssl_pkcs7_sign(
             $xmlFile,
             $tmpSigned,
             'file://' . $cert,
             ['file://' . $key, ''],
             [],
-            PKCS7_BINARY | PKCS7_DETACHED
+            PKCS7_BINARY
         );
 
         unlink($xmlFile);
@@ -178,11 +181,11 @@ XML;
         $xml = <<<XML
 <?xml version="1.0" encoding="UTF-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:wsdl="http://wsaa.view.sua.dvadac.desein.afip.gov">
-    <soap:Body>
-        <wsdl:loginCms>
-            <wsdl:in0>{$cms}</wsdl:in0>
-        </wsdl:loginCms>
-    </soap:Body>
+<soap:Body>
+<wsdl:loginCms>
+<wsdl:in0>{$cms}</wsdl:in0>
+</wsdl:loginCms>
+</soap:Body>
 </soap:Envelope>
 XML;
 
