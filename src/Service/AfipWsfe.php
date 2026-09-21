@@ -134,7 +134,7 @@ final class AfipWsfe
         $impOpEx = 0;
 
         // Generamos un id de lote simple (dentro de 32 bits)
-        $id = (int)date('YmdHi');
+        $id = random_int(1, 2147483647);
 
         $puntoVenta = $this->resolvePuntoVentaArca($factura);
 
