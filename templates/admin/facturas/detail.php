@@ -252,7 +252,7 @@ $discriminaIva = in_array($factura['tipo_comprobante'] ?? '', ['FACT-A']);
                     <dd class="col-sm-7"><code><?= htmlspecialchars((string)($factura['cae'] ?? '-')) ?></code></dd>
                     <?php if ($factura['cae_vto'] ?? ''): ?>
                     <dt class="col-sm-5">Vto. CAE</dt>
-                    <dd class="col-sm-7"><?= htmlspecialchars($factura['cae_vto']) ?></dd>
+                    <dd class="col-sm-7"><?= date('d/m/Y', strtotime($factura['cae_vto'])) ?></dd>
                     <?php endif; ?>
                     <?php if ($arcaObservaciones !== ''): ?>
                     <dt class="col-sm-12" style="margin-top:6px">Obs.</dt>
@@ -292,7 +292,7 @@ $discriminaIva = in_array($factura['tipo_comprobante'] ?? '', ['FACT-A']);
                     <dt class="col-sm-5">Código</dt>
                     <dd class="col-sm-7"><strong><?= htmlspecialchars((string)($factura['codigo'] ?? '')) ?></strong></dd>
                     <dt class="col-sm-5">Fecha</dt>
-                    <dd class="col-sm-7"><?= htmlspecialchars((string)($factura['fecha'] ?? '-')) ?></dd>
+                    <dd class="col-sm-7"><?= !empty($factura['fecha']) ? date('d/m/Y', strtotime($factura['fecha'])) : '-' ?></dd>
                     <?php if ($factura['remito_id']): ?>
                     <dt class="col-sm-5">Remito</dt>
                     <dd class="col-sm-7"><a href="/admin/remitos/<?= (int)$factura['remito_id'] ?>">#<?= (int)$factura['remito_id'] ?></a></dd>
@@ -308,7 +308,7 @@ $discriminaIva = in_array($factura['tipo_comprobante'] ?? '', ['FACT-A']);
                     <dt class="col-sm-5">Creado por</dt>
                     <dd class="col-sm-7"><?= htmlspecialchars((string)($factura['created_by_nombre'] ?? '-')) ?></dd>
                     <dt class="col-sm-5">Creado</dt>
-                    <dd class="col-sm-7"><?= htmlspecialchars((string)($factura['created_at'] ?? '-')) ?></dd>
+                    <dd class="col-sm-7"><?= !empty($factura['created_at']) ? date('d/m/Y H:i', strtotime($factura['created_at'])) : '-' ?></dd>
                 </dl>
             </div>
         </div>

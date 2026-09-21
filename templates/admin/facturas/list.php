@@ -68,7 +68,7 @@ $tipoBadges = ['FACT-A' => 'primary', 'FACT-B' => 'success', 'FACT-C' => 'second
                             <td><strong><?= htmlspecialchars((string)($f['codigo'] ?? '')) ?></strong></td>
                             <td><span class="badge bg-<?= $tipoBadges[$f['tipo_comprobante'] ?? 'FACT-B'] ?? 'secondary' ?>"><?= htmlspecialchars($tipoLabels[$f['tipo_comprobante'] ?? 'FACT-B'] ?? $f['tipo_comprobante'] ?? '') ?></span></td>
                             <td><?= htmlspecialchars((string)($f['cliente_nombre'] ?? '-')) ?></td>
-                            <td class="small"><?= htmlspecialchars((string)($f['fecha'] ?? '-')) ?></td>
+                            <td class="small"><?= !empty($f['fecha']) ? date('d/m/Y', strtotime($f['fecha'])) : '-' ?></td>
                             <td class="text-center"><?= (int)($f['items_count'] ?? 0) ?></td>
                             <td class="text-end fw-bold"><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($f['total_cents'] ?? 0))) ?></td>
                             <td>

@@ -76,13 +76,13 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
         <hr />
         <h1><?= htmlspecialchars($tipoLabels[$factura['tipo_comprobante'] ?? 'FACT-B'] ?? $factura['tipo_comprobante'] ?? '') ?></h1>
         <div class="data">Código: <strong><?= htmlspecialchars($factura['codigo'] ?? '') ?></strong></div>
-        <div class="data">Fecha: <?= htmlspecialchars($factura['fecha'] ?? '') ?></div>
+        <div class="data">Fecha: <?= !empty($factura['fecha']) ? date('d/m/Y', strtotime($factura['fecha'])) : '' ?></div>
         <?php if ($factura['punto_venta'] ?? 0): ?>
         <div class="data">Punto de venta: <?= (int)$factura['punto_venta'] ?></div>
         <?php endif; ?>
         <?php if ($factura['cae'] ?? ''): ?>
         <div class="data">CAE: <strong><?= htmlspecialchars($factura['cae']) ?></strong></div>
-        <div class="data">Vto. CAE: <?= htmlspecialchars($factura['cae_vto'] ?? '') ?></div>
+        <div class="data">Vto. CAE: <?= !empty($factura['cae_vto']) ? date('d/m/Y', strtotime($factura['cae_vto'])) : '' ?></div>
         <?php endif; ?>
         <hr />
         <div class="data<?= $formato === 'a4' ? ' cliente-box' : '' ?>" style="text-align:left">
