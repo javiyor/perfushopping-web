@@ -74,12 +74,12 @@ final class AfipWsfe
     ];
 
     private static array $alicuotaIvaMap = [
-        0 => 3,
-        10.5 => 4,
-        21 => 5,
-        27 => 6,
-        5 => 8,
-        2.5 => 9,
+        '0' => 3,
+        '10.5' => 4,
+        '21' => 5,
+        '27' => 6,
+        '5' => 8,
+        '2.5' => 9,
     ];
 
     private const NS = 'http://ar.gov.afip.dif.FEV1/';
@@ -218,7 +218,7 @@ final class AfipWsfe
             if ($g['iva'] <= 0) {
                 continue;
             }
-            $id = self::$alicuotaIvaMap[$rate] ?? 5;
+            $id = self::$alicuotaIvaMap[(string)$rate] ?? 5;
             $ivaXml .= '<AlicIva>';
             $ivaXml .= '<Id>' . $id . '</Id>';
             $ivaXml .= '<BaseImp>' . $this->centsToDecimal($g['base']) . '</BaseImp>';
