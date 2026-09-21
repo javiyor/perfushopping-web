@@ -458,6 +458,13 @@ final class FacturaController
                 $resultado = $wsfe->solicitarCAE($facturaData, $facturaItems);
                 $arcaRepo->guardarComprobante($id, $resultado);
                 $arcaResult = $resultado['cae'] ?? null;
+                if (!empty($resultado['cae']) && !empty($resultado['codigo_emision']) && !empty($resultado['punto_venta_arca'])) {
+                    $pv = (int)$resultado['punto_venta_arca'];
+                    $nro = (int)$resultado['codigo_emision'];
+                    $nuevoCodigo = sprintf('%04d-%08d', $pv, $nro);
+                    $repo->actualizarCodigo($id, $nuevoCodigo);
+                    $codigo = $nuevoCodigo;
+                }
             } catch (\Throwable $e) {
                 $arcaError = $e->getMessage();
                 $arcaRepo->guardarComprobante($id, [
@@ -928,6 +935,15 @@ final class FacturaController
 
         $empresa = (new \Perfushopping\Web\Repo\EmpresaRepo())->getDefault();
 
+        $sucursalRepo = new \Perfushopping\Web\Repo\SucursalRepo();
+        $sucursal = null;
+        if (!empty($factura['sucursal_id'])) {
+            $sucursal = $sucursalRepo->findById((int)$factura['sucursal_id']);
+        }
+        if (!$sucursal && !empty($factura['punto_venta'])) {
+            $sucursal = $sucursalRepo->findByPuntoVenta((int)$factura['punto_venta']);
+        }
+
         echo View::render('admin/facturas/print.php', [
             'factura' => $factura,
             'items' => $items,
@@ -935,6 +951,7 @@ final class FacturaController
             'formato' => $formato,
             'qrUrl' => $qrUrl,
             'empresa' => $empresa,
+            'sucursal' => $sucursal,
         ]);
     }
 

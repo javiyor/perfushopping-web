@@ -255,6 +255,24 @@ final class SucursalRepo
         return $row;
     }
 
+    public function findByPuntoVenta(int $puntoVenta): ?array
+    {
+        $this->ensurePuntosVentaTable();
+        $st = Db::pdo()->prepare('
+            SELECT s.id
+            FROM admin_sucursales s
+            JOIN admin_sucursal_puntos_venta spv ON spv.sucursal_id = s.id
+            WHERE spv.punto_venta = :pv
+            LIMIT 1
+        ');
+        $st->execute([':pv' => $puntoVenta]);
+        $id = $st->fetchColumn();
+        if ($id === false || $id === null) {
+            return null;
+        }
+        return $this->findById((int)$id);
+    }
+
     public function updatePuntoVenta(int $id, int $puntoVenta): void
     {
         $this->syncPuntosVenta($id, [$puntoVenta]);

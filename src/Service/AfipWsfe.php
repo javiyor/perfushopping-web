@@ -430,6 +430,7 @@ XML;
             'cae' => $cae,
             'cae_vto' => $caeVto ?: null,
             'codigo_emision' => $cbteNro,
+            'punto_venta_arca' => $puntoVenta,
             'observaciones' => $obs ?: null,
             'request_xml' => $requestXml,
             'response_xml' => $response,

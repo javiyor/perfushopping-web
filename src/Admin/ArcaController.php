@@ -158,6 +158,12 @@ final class ArcaController
             $wsfe->autenticar();
             $resultado = $wsfe->solicitarCAE($factura, $items);
             $repo->guardarComprobante($facturaId, $resultado);
+            if (!empty($resultado['cae']) && !empty($resultado['codigo_emision']) && !empty($resultado['punto_venta_arca'])) {
+                $pv = (int)$resultado['punto_venta_arca'];
+                $nro = (int)$resultado['codigo_emision'];
+                $nuevoCodigo = sprintf('%04d-%08d', $pv, $nro);
+                (new \Perfushopping\Web\Repo\FacturaRepo())->actualizarCodigo($facturaId, $nuevoCodigo);
+            }
             $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Factura enviada a ARCA. CAE: ' . ($resultado['cae'] ?? '—')];
         } catch (\Throwable $e) {
             $repo->guardarComprobante($facturaId, [

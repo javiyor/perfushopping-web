@@ -73,6 +73,12 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
         <?php if ($empresa['dire_emp'] ?? ''): ?><div class="data"><?= htmlspecialchars($empresa['dire_emp']) ?></div><?php endif; ?>
         <?php if ($empresa['telefono'] ?? ''): ?><div class="data">Tel: <?= htmlspecialchars($empresa['telefono']) ?></div><?php endif; ?>
         <?php if ($empresa['mail'] ?? ''): ?><div class="data"><?= htmlspecialchars($empresa['mail']) ?></div><?php endif; ?>
+        <?php if (!empty($sucursal)): ?>
+        <hr />
+        <div class="data"><strong>Sucursal:</strong> <?= htmlspecialchars($sucursal['nomsuc'] ?? '') ?></div>
+        <?php if (!empty($sucursal['direccion'])): ?><div class="data"><?= htmlspecialchars($sucursal['direccion']) ?></div><?php endif; ?>
+        <?php if (!empty($sucursal['telefono'])): ?><div class="data">Tel: <?= htmlspecialchars($sucursal['telefono']) ?></div><?php endif; ?>
+        <?php endif; ?>
         <hr />
         <h1><?= htmlspecialchars($tipoLabels[$factura['tipo_comprobante'] ?? 'FACT-B'] ?? $factura['tipo_comprobante'] ?? '') ?></h1>
         <div class="data">Código: <strong><?= htmlspecialchars($factura['codigo'] ?? '') ?></strong></div>

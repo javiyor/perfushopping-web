@@ -429,6 +429,12 @@ final class FacturaRepo
         $st->execute([':e' => $estado, ':i' => $id]);
     }
 
+    public function actualizarCodigo(int $id, string $codigo): void
+    {
+        $st = Db::pdo()->prepare('UPDATE facturas SET codigo = :c, updated_at = NOW() WHERE id = :i LIMIT 1');
+        $st->execute([':c' => $codigo, ':i' => $id]);
+    }
+
     public function delete(int $id): void
     {
         $st = Db::pdo()->prepare('DELETE FROM facturas WHERE id = :i LIMIT 1');
