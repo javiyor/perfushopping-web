@@ -84,6 +84,38 @@ final class SucursalRepo
 
     public function puntoVentaArca(int $sucursalId): ?int
     {
+        // Prioridad: tabla ERP ptovta ligada a sucur.idsucemp
+        $st = Db::pdo()->prepare('
+            SELECT p.numptovta
+            FROM admin_sucursales a
+            JOIN sucur s ON s.idsucemp = a.idsucemp AND a.idsucemp > 0
+            JOIN ptovta p ON p.idsucemp = s.idsucemp
+            WHERE a.id = :id
+            ORDER BY p.numptovta ASC
+            LIMIT 1
+        ');
+        $st->execute([':id' => $sucursalId]);
+        $val = $st->fetchColumn();
+        if ($val !== false && $val !== null) {
+            return (int)$val;
+        }
+
+        // Fallback por numsuc si idsucemp no está poblado
+        $st = Db::pdo()->prepare('
+            SELECT p.numptovta
+            FROM sucur s
+            JOIN ptovta p ON p.idsucemp = s.idsucemp
+            WHERE s.numsuc = (SELECT numsuc FROM admin_sucursales WHERE id = :id LIMIT 1)
+            ORDER BY p.numptovta ASC
+            LIMIT 1
+        ');
+        $st->execute([':id' => $sucursalId]);
+        $val = $st->fetchColumn();
+        if ($val !== false && $val !== null) {
+            return (int)$val;
+        }
+
+        // Fallback a columna manual
         $this->ensureArcaColumn();
         $st = Db::pdo()->prepare('SELECT punto_venta_arca FROM admin_sucursales WHERE id = :id LIMIT 1');
         $st->execute([':id' => $sucursalId]);
@@ -93,18 +125,20 @@ final class SucursalRepo
 
     public function puntoVentaArcaPorPuntoVenta(int $puntoVenta): ?int
     {
-        $this->ensureArcaColumn();
         $this->ensurePuntosVentaTable();
         $st = Db::pdo()->prepare('
-            SELECT s.punto_venta_arca
+            SELECT s.id
             FROM admin_sucursales s
             JOIN admin_sucursal_puntos_venta spv ON spv.sucursal_id = s.id
             WHERE spv.punto_venta = :pv
             LIMIT 1
         ');
         $st->execute([':pv' => $puntoVenta]);
-        $val = $st->fetchColumn();
-        return $val === null || $val === false ? null : (int)$val;
+        $sucursalId = $st->fetchColumn();
+        if ($sucursalId !== false && $sucursalId !== null) {
+            return $this->puntoVentaArca((int)$sucursalId);
+        }
+        return null;
     }
 
     public function puntosVentaPorSucursal(): array
