@@ -208,7 +208,7 @@ final class AfipWsfe
         $detalle .= '<ImpOpEx>' . $this->centsToDecimal(0) . '</ImpOpEx>';
         $detalle .= '<ImpTrib>' . $this->centsToDecimal(0) . '</ImpTrib>';
         $detalle .= '<ImpIVA>' . $this->centsToDecimal($impIva) . '</ImpIVA>';
-        $detalle .= '<FchVtoPago>' . $fechaVencPago . '</FchVtoPago>';
+        // FchVtoPago solo aplica para Concepto 2 (servicios) o 3 (productos y servicios)
         $detalle .= '<MonId>PES</MonId>';
         $detalle .= '<MonCotiz>1.000000</MonCotiz>';
         $detalle .= '<CondicionIVAReceptorId>' . $condIvaReceptor . '</CondicionIVAReceptorId>';
