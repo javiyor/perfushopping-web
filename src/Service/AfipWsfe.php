@@ -62,13 +62,6 @@ final class AfipWsfe
         'ND' => 9,
     ];
 
-    private static array $condIvaMap = [
-        'consumidor_final' => 4,
-        'responsable_inscripto' => 1,
-        'exento' => 3,
-        'monotributo' => 5,
-    ];
-
     private static array $condIvaReceptorMap = [
         'responsable_inscripto' => 1,
         'responsable_no_inscripto' => 2,
@@ -80,13 +73,16 @@ final class AfipWsfe
         'sujeto_no_categorizado' => 7,
     ];
 
-    private static array $tipoDocMap = [
-        'cuit' => 80,
-        'dni' => 96,
-        'consumidor_final' => 99,
+    private static array $alicuotaIvaMap = [
+        0 => 3,
+        10.5 => 4,
+        21 => 5,
+        27 => 6,
+        5 => 8,
+        2.5 => 9,
     ];
 
-    private const NS = 'http://ar.gov.afip.dif.facturaelectronica/';
+    private const NS = 'http://ar.gov.afip.dif.FEV1/';
 
     public function __construct()
     {
@@ -94,8 +90,8 @@ final class AfipWsfe
         $this->homologacion = $repo->esHomologacion();
         $this->cuit = preg_replace('/\D/', '', $repo->getConfig('cuit'));
         $this->url = $this->homologacion
-            ? 'https://wswhomo.afip.gov.ar/wsfe/service.asmx'
-            : 'https://servicios1.afip.gov.ar/wsfe/service.asmx';
+            ? 'https://wswhomo.afip.gov.ar/wsfev1/service.asmx'
+            : 'https://servicios1.afip.gov.ar/wsfev1/service.asmx';
     }
 
     public function autenticar(): void
@@ -123,35 +119,18 @@ final class AfipWsfe
     {
         $this->autenticarSiNecesario();
 
-        $body = '<FERecuperaLastCMPRequest xmlns="' . self::NS . '">';
+        $body = '<FECompUltimoAutorizado xmlns="' . self::NS . '">';
         $body .= $this->buildAuthXml();
-        $body .= '<argTCMP><PtoVta>' . $puntoVenta . '</PtoVta><TipoCbte>' . $tipoCbte . '</TipoCbte></argTCMP>';
-        $body .= '</FERecuperaLastCMPRequest>';
+        $body .= '<PtoVta>' . $puntoVenta . '</PtoVta>';
+        $body .= '<CbteTipo>' . $tipoCbte . '</CbteTipo>';
+        $body .= '</FECompUltimoAutorizado>';
 
         $xml = $this->buildEnvelope($body);
-        $response = $this->call($xml, 'FERecuperaLastCMPRequest');
+        $response = $this->call($xml, 'FECompUltimoAutorizado');
 
         $dom = new \DOMDocument();
         $dom->loadXML($response);
         $nro = $dom->getElementsByTagName('cbte_nro')->item(0)?->textContent ?? '0';
-
-        return (int)$nro;
-    }
-
-    public function getUltimoId(): int
-    {
-        $this->autenticarSiNecesario();
-
-        $body = '<FEUltNroRequest xmlns="' . self::NS . '">';
-        $body .= $this->buildAuthXml();
-        $body .= '</FEUltNroRequest>';
-
-        $xml = $this->buildEnvelope($body);
-        $response = $this->call($xml, 'FEUltNroRequest');
-
-        $dom = new \DOMDocument();
-        $dom->loadXML($response);
-        $nro = $dom->getElementsByTagName('nro')->item(0)?->textContent ?? '0';
 
         return (int)$nro;
     }
@@ -170,54 +149,98 @@ final class AfipWsfe
         $fechaVencPago = $fecha;
 
         $descuento = (int)($factura['descuento_cents'] ?? 0);
-        $subtotalOriginal = (int)($factura['subtotal_cents'] ?? 0);
-        $ivaTotal = (int)($factura['iva_cents'] ?? 0);
 
-        $neto = $subtotalOriginal - $descuento;
-        if ($neto < 0) {
-            $neto = 0;
+        // Agrupar neto/iva por alícuota
+        $grupos = [];
+        foreach ($items as $it) {
+            $rate = (float)($it['iva_rate'] ?? 0);
+            $lineIva = (int)($it['iva_cents'] ?? 0);
+            $lineTotal = (int)($it['total_cents'] ?? 0);
+            $lineNet = $lineTotal - $lineIva;
+            if ($lineNet < 0) {
+                $lineNet = 0;
+            }
+            if (!isset($grupos[$rate])) {
+                $grupos[$rate] = ['base' => 0, 'iva' => 0];
+            }
+            $grupos[$rate]['base'] += $lineNet;
+            $grupos[$rate]['iva'] += $lineIva;
         }
-        $total = $neto + $ivaTotal;
 
-        $imptoLiq = $ivaTotal;
-        $impTotConc = 0;
-        $imptoLiqRni = 0;
-        $impOpEx = 0;
+        // Distribuir descuento proporcionalmente sobre las bases
+        if ($descuento > 0) {
+            $totalBase = array_sum(array_column($grupos, 'base'));
+            if ($totalBase > 0) {
+                foreach ($grupos as $rate => &$g) {
+                    $g['base'] -= (int)round($descuento * $g['base'] / $totalBase);
+                    if ($g['base'] < 0) {
+                        $g['base'] = 0;
+                    }
+                }
+                unset($g);
+            }
+        }
 
-        // El id de lote debe ser el ultimo numero de request + 1
-        $id = $this->getUltimoId() + 1;
+        $impNeto = array_sum(array_column($grupos, 'base'));
+        $impIva = array_sum(array_column($grupos, 'iva'));
+        $impTotal = $impNeto + $impIva;
 
-        $puntoVenta = $this->resolvePuntoVentaArca($factura);
+        // Para Factura C no se informa IVA
+        $esFacturaC = $tipoCbte === 11;
+        if ($esFacturaC) {
+            $impNeto = $impTotal;
+            $impIva = 0;
+            $grupos = [];
+        }
 
-        $detalle = '<FEDetalleRequest>';
-        $detalle .= '<tipo_doc>' . $tipoDoc . '</tipo_doc>';
-        $detalle .= '<nro_doc>' . $nroDoc . '</nro_doc>';
-        $detalle .= '<tipo_cbte>' . $tipoCbte . '</tipo_cbte>';
-        $detalle .= '<punto_vta>' . $puntoVenta . '</punto_vta>';
-        $detalle .= '<cbt_desde>' . $cbteNro . '</cbt_desde>';
-        $detalle .= '<cbt_hasta>' . $cbteNro . '</cbt_hasta>';
-        $detalle .= '<imp_total>' . $this->centsToDecimal($total) . '</imp_total>';
-        $detalle .= '<imp_tot_conc>' . $this->centsToDecimal($impTotConc) . '</imp_tot_conc>';
-        $detalle .= '<imp_neto>' . $this->centsToDecimal($neto) . '</imp_neto>';
-        $detalle .= '<impto_liq>' . $this->centsToDecimal($imptoLiq) . '</impto_liq>';
-        $detalle .= '<impto_liq_rni>' . $this->centsToDecimal($imptoLiqRni) . '</impto_liq_rni>';
-        $detalle .= '<imp_op_ex>' . $this->centsToDecimal($impOpEx) . '</imp_op_ex>';
-        $detalle .= '<fecha_cbte>' . $fecha . '</fecha_cbte>';
-        $detalle .= '<fecha_venc_pago>' . $fechaVencPago . '</fecha_venc_pago>';
         $condIvaReceptor = self::$condIvaReceptorMap[$factura['cliente_condicion_iva'] ?? ''] ?? 5;
-        $detalle .= '<Cond_IVA_Receptor_Id>' . $condIvaReceptor . '</Cond_IVA_Receptor_Id>';
-        $detalle .= '</FEDetalleRequest>';
 
-        $body = '<FEAutRequest xmlns="' . self::NS . '">';
+        $detalle = '<FECAEDetRequest>';
+        $detalle .= '<Concepto>1</Concepto>';
+        $detalle .= '<DocTipo>' . $tipoDoc . '</DocTipo>';
+        $detalle .= '<DocNro>' . $nroDoc . '</DocNro>';
+        $detalle .= '<CbteDesde>' . $cbteNro . '</CbteDesde>';
+        $detalle .= '<CbteHasta>' . $cbteNro . '</CbteHasta>';
+        $detalle .= '<CbteFch>' . $fecha . '</CbteFch>';
+        $detalle .= '<ImpTotal>' . $this->centsToDecimal($impTotal) . '</ImpTotal>';
+        $detalle .= '<ImpTotConc>' . $this->centsToDecimal(0) . '</ImpTotConc>';
+        $detalle .= '<ImpNeto>' . $this->centsToDecimal($impNeto) . '</ImpNeto>';
+        $detalle .= '<ImpOpEx>' . $this->centsToDecimal(0) . '</ImpOpEx>';
+        $detalle .= '<ImpTrib>' . $this->centsToDecimal(0) . '</ImpTrib>';
+        $detalle .= '<ImpIVA>' . $this->centsToDecimal($impIva) . '</ImpIVA>';
+        $detalle .= '<FchVtoPago>' . $fechaVencPago . '</FchVtoPago>';
+        $detalle .= '<MonId>PES</MonId>';
+        $detalle .= '<MonCotiz>1.000000</MonCotiz>';
+        $detalle .= '<CondicionIVAReceptorId>' . $condIvaReceptor . '</CondicionIVAReceptorId>';
+
+        $ivaXml = '';
+        foreach ($grupos as $rate => $g) {
+            if ($g['iva'] <= 0) {
+                continue;
+            }
+            $id = self::$alicuotaIvaMap[$rate] ?? 5;
+            $ivaXml .= '<AlicIva>';
+            $ivaXml .= '<Id>' . $id . '</Id>';
+            $ivaXml .= '<BaseImp>' . $this->centsToDecimal($g['base']) . '</BaseImp>';
+            $ivaXml .= '<Importe>' . $this->centsToDecimal($g['iva']) . '</Importe>';
+            $ivaXml .= '</AlicIva>';
+        }
+        if ($ivaXml !== '') {
+            $detalle .= '<Iva>' . $ivaXml . '</Iva>';
+        }
+
+        $detalle .= '</FECAEDetRequest>';
+
+        $body = '<FECAESolicitar xmlns="' . self::NS . '">';
         $body .= $this->buildAuthXml();
-        $body .= '<Fer>';
-        $body .= '<Fecr><id>' . $id . '</id><cantidadreg>1</cantidadreg><presta_serv>0</presta_serv></Fecr>';
-        $body .= '<Fedr>' . $detalle . '</Fedr>';
-        $body .= '</Fer>';
-        $body .= '</FEAutRequest>';
+        $body .= '<FeCAEReq>';
+        $body .= '<FeCabReq><CantReg>1</CantReg><PtoVta>' . $puntoVenta . '</PtoVta><CbteTipo>' . $tipoCbte . '</CbteTipo></FeCabReq>';
+        $body .= '<FeDetReq>' . $detalle . '</FeDetReq>';
+        $body .= '</FeCAEReq>';
+        $body .= '</FECAESolicitar>';
 
         $xml = $this->buildEnvelope($body);
-        $response = $this->call($xml, 'FEAutRequest');
+        $response = $this->call($xml, 'FECAESolicitar');
 
         return $this->parsearRespuesta($response, $xml, $cbteNro);
     }
@@ -292,11 +315,11 @@ final class AfipWsfe
 
     private function buildAuthXml(): string
     {
-        return '<argAuth>'
+        return '<Auth>'
             . '<Token>' . htmlspecialchars($this->token) . '</Token>'
             . '<Sign>' . htmlspecialchars($this->sign) . '</Sign>'
-            . '<cuit>' . $this->cuit . '</cuit>'
-            . '</argAuth>';
+            . '<Cuit>' . $this->cuit . '</Cuit>'
+            . '</Auth>';
     }
 
     private function buildEnvelope(string $body): string
@@ -358,35 +381,36 @@ XML;
         $dom->loadXML($response);
         $dom->preserveWhiteSpace = false;
 
-        $resultNode = $dom->getElementsByTagName('FEAutRequestResult')->item(0);
+        $resultNode = $dom->getElementsByTagName('FECAESolicitarResult')->item(0);
         if ($resultNode === null) {
             $fault = $dom->getElementsByTagName('faultstring')->item(0)?->textContent ?? '';
             throw new \RuntimeException('ARCA: respuesta inesperada. ' . $fault);
         }
 
-        $percode = $resultNode->getElementsByTagName('percode')->item(0)?->textContent ?? '';
-        if ($percode !== '' && (int)$percode !== 0) {
-            $perrmsg = $resultNode->getElementsByTagName('perrmsg')->item(0)?->textContent ?? '';
-            throw new \RuntimeException('ARCA: error ' . $percode . ' - ' . $perrmsg);
+        $errors = $resultNode->getElementsByTagName('Err');
+        $errorMsgs = [];
+        foreach ($errors as $err) {
+            $code = $err->getElementsByTagName('Code')->item(0)?->textContent ?? '';
+            $msg = $err->getElementsByTagName('Msg')->item(0)?->textContent ?? '';
+            if ($code !== '') {
+                $errorMsgs[] = $code . ' - ' . $msg;
+            }
+        }
+        if ($errorMsgs) {
+            throw new \RuntimeException('ARCA: ' . implode(' / ', $errorMsgs));
         }
 
-        $resultado = $resultNode->getElementsByTagName('resultado')->item(0)?->textContent ?? '';
-        $motivoHeader = $resultNode->getElementsByTagName('motivo')->item(0)?->textContent ?? '';
-        $reproceso = $resultNode->getElementsByTagName('reproceso')->item(0)?->textContent ?? '';
+        $cabResp = $resultNode->getElementsByTagName('FeCabResp')->item(0);
+        $resultado = $cabResp?->getElementsByTagName('Resultado')->item(0)?->textContent ?? '';
+        $reproceso = $cabResp?->getElementsByTagName('Reproceso')->item(0)?->textContent ?? '';
 
-        $detResp = $resultNode->getElementsByTagName('FEDetalleResponse')->item(0);
-        $cae = $detResp?->getElementsByTagName('cae')->item(0)?->textContent ?? '';
-        $caeVto = $detResp?->getElementsByTagName('fecha_vto')->item(0)?->textContent ?? '';
-        $motivoDet = $detResp?->getElementsByTagName('motivo')->item(0)?->textContent ?? '';
+        $detResp = $resultNode->getElementsByTagName('FECAEDetResponse')->item(0);
+        $cae = $detResp?->getElementsByTagName('CAE')->item(0)?->textContent ?? '';
+        $caeVto = $detResp?->getElementsByTagName('CAEFchVto')->item(0)?->textContent ?? '';
+        $obs = $detResp?->getElementsByTagName('Observaciones')->item(0)?->textContent ?? '';
 
-        $motivo = $motivoHeader;
-        if ($motivo === '' || $motivo === 'NULL' || $motivo === '00') {
-            $motivo = $motivoDet;
-        }
-
-        $obs = '';
-        if ($motivo !== '' && $motivo !== 'NULL' && $motivo !== '00') {
-            $obs = 'Motivo: ' . $motivo;
+        if ($cae === 'NULL' || $cae === '') {
+            $cae = '';
         }
 
         if ($resultado === 'R') {
