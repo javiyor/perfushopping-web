@@ -9,8 +9,8 @@ final class AfipWsfe
 {
     private string $url;
     private string $cuit;
-    private string $token;
-    private string $sign;
+    private string $token = '';
+    private string $sign = '';
     private bool $homologacion;
     private string $lastRequest = '';
     private string $lastResponse = '';
