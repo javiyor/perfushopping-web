@@ -449,6 +449,7 @@ final class FacturaController
         $arcaError = null;
         $arcaRepo = new \Perfushopping\Web\Repo\ArcaRepo();
         $wsfe = new \Perfushopping\Web\Service\AfipWsfe();
+        $wsfe->setDebugTag('factura-' . $id);
         if ($arcaRepo->isHabilitado()) {
             try {
                 $facturaData = $repo->findById($id);

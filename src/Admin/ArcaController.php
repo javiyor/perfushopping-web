@@ -153,6 +153,7 @@ final class ArcaController
         $items = $facturaRepo->items($facturaId);
 
         $wsfe = new \Perfushopping\Web\Service\AfipWsfe();
+        $wsfe->setDebugTag('reenvio-' . $facturaId);
         try {
             $wsfe->autenticar();
             $resultado = $wsfe->solicitarCAE($factura, $items);

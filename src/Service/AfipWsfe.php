@@ -14,6 +14,28 @@ final class AfipWsfe
     private bool $homologacion;
     private string $lastRequest = '';
     private string $lastResponse = '';
+    private ?string $debugTag = null;
+
+    public function setDebugTag(string $tag): void
+    {
+        $this->debugTag = preg_replace('/[^a-zA-Z0-9_-]/', '_', $tag);
+    }
+
+    private function writeDebugFiles(): void
+    {
+        if ($this->debugTag === null || $this->debugTag === '') {
+            return;
+        }
+        if (!defined('APP_BASE_DIR')) {
+            return;
+        }
+        $dir = rtrim((string)APP_BASE_DIR, '/\\') . '/storage/arca';
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0755, true);
+        }
+        @file_put_contents($dir . '/' . $this->debugTag . '-request.xml', $this->lastRequest);
+        @file_put_contents($dir . '/' . $this->debugTag . '-response.xml', $this->lastResponse);
+    }
 
     private function resolvePuntoVentaArca(array $factura): int
     {
@@ -282,6 +304,7 @@ XML;
 
         $response = curl_exec($ch);
         $this->lastResponse = is_string($response) ? $response : '';
+        $this->writeDebugFiles();
         $error = curl_error($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
