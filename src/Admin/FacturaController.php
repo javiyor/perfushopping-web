@@ -92,6 +92,15 @@ final class FacturaController
             }
         }
 
+        $pedidosPendientes = [];
+        try {
+            if ($repo->ensureOrderColumn()) {
+                $pedidosPendientes = (new \Perfushopping\Web\Repo\OrderRepo())->paidNotInvoiced(100);
+            }
+        } catch (\Throwable $e) {
+            $pedidosPendientes = [];
+        }
+
         $cobroRepo = new CobroCuentaRepo();
         $transferCuentaId = $cobroRepo->getTransferenciaCuentaId();
         $tarjetaCobros = [];
@@ -116,6 +125,7 @@ final class FacturaController
             'pedidoEnvio' => $pedidoEnvio,
             'pedidoPago' => $pedidoPago,
             'pedidoDescPct' => $pedidoDescPct,
+            'pedidosPendientes' => $pedidosPendientes,
             'vendedores' => $vendedores,
             'bancos' => $this->bancos(),
             'bancosCuentas' => $this->bancosCuentas(),

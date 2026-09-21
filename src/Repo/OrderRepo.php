@@ -65,6 +65,22 @@ final class OrderRepo
         return $st->fetchAll();
     }
 
+    /** Pedidos pagados que todavía no tienen factura asociada. */
+    public function paidNotInvoiced(int $limit = 100): array
+    {
+        $limit = max(1, min(300, $limit));
+        $st = Db::pdo()->prepare("
+            SELECT o.id, o.order_code, o.status, o.email, o.ship_name, o.ship_city,
+                   o.total_cents, o.created_at
+            FROM orders o
+            LEFT JOIN facturas f ON f.order_id = o.id
+            WHERE o.status = 'paid' AND f.id IS NULL
+            ORDER BY o.created_at ASC, o.id ASC LIMIT " . $limit
+        );
+        $st->execute();
+        return $st->fetchAll();
+    }
+
     /** @return array<int, array<string,mixed>> */
     public function itemsByOrderIds(array $orderIds): array
     {

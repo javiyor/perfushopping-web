@@ -176,7 +176,14 @@ $plazos = $plazos ?? [];
         <i class="bi bi-cart"></i> Desde pedido web
     </button>
     <div id="pedidoSearchWrap" style="display:none;position:relative">
-        <input class="form-control form-control-sm" id="pedidoSearch" placeholder="Buscar pedido pagado..." autocomplete="off" style="width:250px" />
+        <?php $pends = $pedidosPendientes ?? []; ?>
+        <select class="form-select form-select-sm mb-1" id="pedidoPendSelect" style="width:320px" onchange="if(this.value)window.location.href='/admin/facturas/nueva?pedido_id='+this.value">
+            <option value="">— Pagados sin facturar (<?= count($pends) ?>) —</option>
+            <?php foreach ($pends as $pp): ?>
+            <option value="<?= (int)$pp['id'] ?>"><?= htmlspecialchars((string)($pp['order_code'] ?? '')) ?> — <?= htmlspecialchars((string)($pp['ship_name'] ?? '')) ?> — $<?= number_format((int)($pp['total_cents'] ?? 0) / 100, 2, ',', '.') ?></option>
+            <?php endforeach; ?>
+        </select>
+        <input class="form-control form-control-sm" id="pedidoSearch" placeholder="...o buscar otro pedido" autocomplete="off" style="width:320px" />
         <div id="pedidoSuggestions" style="position:absolute;z-index:1050;width:100%"></div>
     </div>
     <?php endif; ?>
