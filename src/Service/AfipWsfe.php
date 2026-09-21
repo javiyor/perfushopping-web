@@ -69,6 +69,17 @@ final class AfipWsfe
         'monotributo' => 5,
     ];
 
+    private static array $condIvaReceptorMap = [
+        'responsable_inscripto' => 1,
+        'responsable_no_inscripto' => 2,
+        'no_responsable' => 3,
+        'exento' => 4,
+        'consumidor_final' => 5,
+        'monotributo' => 6,
+        'monotributista' => 6,
+        'sujeto_no_categorizado' => 7,
+    ];
+
     private static array $tipoDocMap = [
         'cuit' => 80,
         'dni' => 96,
@@ -175,6 +186,8 @@ final class AfipWsfe
         $detalle .= '<imp_op_ex>' . $this->centsToDecimal($impOpEx) . '</imp_op_ex>';
         $detalle .= '<fecha_cbte>' . $fecha . '</fecha_cbte>';
         $detalle .= '<fecha_venc_pago>' . $fechaVencPago . '</fecha_venc_pago>';
+        $condIvaReceptor = self::$condIvaReceptorMap[$factura['cliente_condicion_iva'] ?? ''] ?? 5;
+        $detalle .= '<Cond_IVA_Receptor_Id>' . $condIvaReceptor . '</Cond_IVA_Receptor_Id>';
         $detalle .= '</FEDetalleRequest>';
 
         $body = '<FEAutRequest xmlns="' . self::NS . '">';
