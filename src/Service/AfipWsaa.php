@@ -70,8 +70,9 @@ final class AfipWsaa
     private function generarTicketXml(string $service): string
     {
         $cuit = preg_replace('/\D/', '', (new ArcaRepo())->getConfig('cuit'));
-        $genTime = gmdate('Y-m-d\TH:i:s.') . substr(microtime(), 2, 3) . 'Z';
-        $expTime = gmdate('Y-m-d\TH:i:s.', strtotime('+12 hours')) . substr(microtime(), 2, 3) . 'Z';
+        // Formato del manual de AFIP, sin milisegundos.
+        $genTime = gmdate('Y-m-d\TH:i:s\Z');
+        $expTime = gmdate('Y-m-d\TH:i:s\Z', strtotime('+12 hours'));
 
         // Según el schema de AFIP, <service> va fuera de <header>.
         return <<<XML
