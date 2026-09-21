@@ -130,7 +130,7 @@ final class AfipWsfe
 
         $dom = new \DOMDocument();
         $dom->loadXML($response);
-        $nro = $dom->getElementsByTagName('cbte_nro')->item(0)?->textContent ?? '0';
+        $nro = $dom->getElementsByTagName('CbteNro')->item(0)?->textContent ?? '0';
 
         return (int)$nro;
     }
