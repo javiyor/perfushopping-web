@@ -43,11 +43,21 @@ final class FacturaRepo
         }
 
         $sql = '
-            SELECT f.*, a.nombre AS created_by_nombre, v.nombre AS vendedor_nombre, COUNT(fi.id) AS items_count
+            SELECT f.*, a.nombre AS created_by_nombre, v.nombre AS vendedor_nombre, COUNT(fi.id) AS items_count,
+                   ac.cae, ac.cae_vto, ac.resultado AS arca_resultado, ac.observaciones AS arca_observaciones
             FROM facturas f
             LEFT JOIN admin_users a ON a.id = f.created_by
             LEFT JOIN admin_users v ON v.id = f.vendedor_id
             LEFT JOIN factura_items fi ON fi.factura_id = f.id
+            LEFT JOIN (
+                SELECT ac1.*
+                FROM arca_comprobantes ac1
+                INNER JOIN (
+                    SELECT factura_id, MAX(id) AS max_id
+                    FROM arca_comprobantes
+                    GROUP BY factura_id
+                ) ac2 ON ac2.factura_id = ac1.factura_id AND ac2.max_id = ac1.id
+            ) ac ON ac.factura_id = f.id
         ';
         if ($where) {
             $sql .= ' WHERE ' . implode(' AND ', $where);

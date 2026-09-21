@@ -53,6 +53,7 @@ $tipoBadges = ['FACT-A' => 'primary', 'FACT-B' => 'success', 'FACT-C' => 'second
                     <th>Items</th>
                     <th class="text-end">Total</th>
                     <th>Estado</th>
+                    <th>ARCA</th>
                     <th>Pago</th>
                     <th>Vendedor</th>
                     <th>Creado por</th>
@@ -61,7 +62,7 @@ $tipoBadges = ['FACT-A' => 'primary', 'FACT-B' => 'success', 'FACT-C' => 'second
             </thead>
             <tbody>
                 <?php if (!$list): ?>
-                    <tr><td colspan="11" class="text-muted text-center">Sin facturas.</td></tr>
+                    <tr><td colspan="12" class="text-muted text-center">Sin facturas.</td></tr>
                 <?php else: ?>
                     <?php foreach ($list as $f): ?>
                         <tr class="<?= $f['estado'] === 'anulada' ? 'table-light text-muted' : '' ?>">
@@ -74,6 +75,27 @@ $tipoBadges = ['FACT-A' => 'primary', 'FACT-B' => 'success', 'FACT-C' => 'second
                             <td>
                                 <?php $badge = ['pendiente' => 'warning', 'emitida' => 'success', 'anulada' => 'secondary']; ?>
                                 <span class="badge bg-<?= $badge[$f['estado'] ?? 'pendiente'] ?? 'secondary' ?>"><?= htmlspecialchars($f['estado'] ?? 'pendiente') ?></span>
+                            </td>
+                            <td class="small">
+                                <?php
+                                $cae = !empty($f['cae']) && (string)$f['cae'] !== 'NULL' ? (string)$f['cae'] : '';
+                                if ($cae !== ''):
+                                ?>
+                                    <span class="badge bg-success" title="CAE <?= htmlspecialchars($cae) ?>">Autorizada</span>
+                                <?php elseif (($f['arca_resultado'] ?? '') === 'R'): ?>
+                                    <span class="badge bg-danger" title="<?= htmlspecialchars((string)($f['arca_observaciones'] ?? '')) ?>">Rechazada</span>
+                                    <form method="post" action="/admin/arca/reenviar" class="d-inline">
+                                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>" />
+                                        <input type="hidden" name="factura_id" value="<?= (int)$f['id'] ?>" />
+                                        <button type="submit" class="btn btn-sm btn-outline-primary py-0 px-1" title="Reenviar a ARCA"><i class="bi bi-arrow-repeat"></i></button>
+                                    </form>
+                                <?php else: ?>
+                                    <form method="post" action="/admin/arca/reenviar" class="d-inline">
+                                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>" />
+                                        <input type="hidden" name="factura_id" value="<?= (int)$f['id'] ?>" />
+                                        <button type="submit" class="btn btn-sm btn-outline-primary py-0 px-1">Autorizar</button>
+                                    </form>
+                                <?php endif; ?>
                             </td>
                             <td class="small"><?= htmlspecialchars((string)($f['forma_pago'] ?? '-')) ?></td>
                             <td class="small"><?= htmlspecialchars((string)($f['vendedor_nombre'] ?? '-')) ?></td>
