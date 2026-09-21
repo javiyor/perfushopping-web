@@ -162,7 +162,6 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
     <?php if ($qrUrl ?? null): ?>
     <div style="text-align:center;margin:8px 0">
         <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=<?= urlencode($qrUrl) ?>" alt="Código QR AFIP" style="width:120px;height:120px" />
-        <div style="font-size:8px;word-break:break-all;margin-top:2px"><?= htmlspecialchars($qrUrl) ?></div>
     </div>
     <?php endif; ?>
     <div class="footer">
