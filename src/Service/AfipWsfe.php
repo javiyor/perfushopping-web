@@ -15,6 +15,23 @@ final class AfipWsfe
     private string $lastRequest = '';
     private string $lastResponse = '';
 
+    private function resolvePuntoVentaArca(array $factura): int
+    {
+        $sucursalId = (int)($factura['sucursal_id'] ?? 0);
+        if ($sucursalId > 0) {
+            $arcaPv = (new \Perfushopping\Web\Repo\SucursalRepo())->puntoVentaArca($sucursalId);
+            if ($arcaPv !== null && $arcaPv > 0) {
+                return $arcaPv;
+            }
+        }
+        $internalPv = (int)($factura['punto_venta'] ?? 1);
+        $arcaPv = (new \Perfushopping\Web\Repo\SucursalRepo())->puntoVentaArcaPorPuntoVenta($internalPv);
+        if ($arcaPv !== null && $arcaPv > 0) {
+            return $arcaPv;
+        }
+        return $internalPv;
+    }
+
     private static array $tipoCbteMap = [
         'FACT-A' => 1,
         'FACT-B' => 6,
@@ -91,7 +108,7 @@ final class AfipWsfe
     public function solicitarCAE(array $factura, array $items): array
     {
         $tipoCbte = self::$tipoCbteMap[$factura['tipo_comprobante']] ?? 6;
-        $puntoVenta = (int)($factura['punto_venta'] ?? 1);
+        $puntoVenta = $this->resolvePuntoVentaArca($factura);
         $ultimo = $this->getUltimoComprobanteAutorizado($puntoVenta, $tipoCbte);
         $cbteNro = $ultimo + 1;
 
@@ -118,6 +135,8 @@ final class AfipWsfe
 
         // Generamos un id de lote simple (dentro de 32 bits)
         $id = (int)date('YmdHi');
+
+        $puntoVenta = $this->resolvePuntoVentaArca($factura);
 
         $detalle = '<FEDetalleRequest>';
         $detalle .= '<tipo_doc>' . $tipoDoc . '</tipo_doc>';
@@ -158,7 +177,7 @@ final class AfipWsfe
     public function getUrlQr(array $factura, int $codigoEmision, string $cae): string
     {
         $tipoCbte = self::getTipoCbteCode($factura['tipo_comprobante'] ?? 'FACT-B');
-        $puntoVenta = (int)($factura['punto_venta'] ?? 1);
+        $puntoVenta = $this->resolvePuntoVentaArca($factura);
 
         $descuento = (int)($factura['descuento_cents'] ?? 0);
         $subtotal = (int)($factura['subtotal_cents'] ?? 0);

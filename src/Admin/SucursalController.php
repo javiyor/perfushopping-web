@@ -53,6 +53,7 @@ final class SucursalController
         $direccion = trim((string)($_POST['direccion'] ?? ''));
         $telefono = trim((string)($_POST['telefono'] ?? ''));
         $email = trim((string)($_POST['email'] ?? ''));
+        $puntoVentaArca = (int)($_POST['punto_venta_arca'] ?? 0) ?: null;
 
         if ($nomsuc === '') {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'El nombre de la sucursal es obligatorio.'];
@@ -65,7 +66,7 @@ final class SucursalController
 
         $repo = new SucursalRepo();
         try {
-            $repo->save($id, $nomsuc, $numsuc, $puntosVenta, $iddepo, $activo, $direccion, $telefono, $email);
+            $repo->save($id, $nomsuc, $numsuc, $puntosVenta, $iddepo, $activo, $direccion, $telefono, $email, $puntoVentaArca);
         } catch (\Throwable $e) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => $e->getMessage()];
             Response::redirect('/admin/sucursales');

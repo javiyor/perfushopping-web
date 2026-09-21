@@ -130,6 +130,33 @@ final class FacturaRepo
         }
     }
 
+    private static ?bool $sucursalColumnChecked = null;
+    private static bool $sucursalColumnExists = false;
+
+    private function ensureSucursalColumn(): bool
+    {
+        if (self::$sucursalColumnChecked !== null) {
+            return self::$sucursalColumnExists;
+        }
+        self::$sucursalColumnChecked = true;
+        try {
+            $st = Db::pdo()->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'facturas' AND COLUMN_NAME = 'sucursal_id'");
+            $exists = (int)$st->fetchColumn() > 0;
+            if (!$exists) {
+                Db::pdo()->exec('ALTER TABLE facturas ADD COLUMN sucursal_id INT UNSIGNED DEFAULT NULL AFTER punto_venta');
+            }
+            self::$sucursalColumnExists = true;
+        } catch (\Throwable $e) {
+            try {
+                $cols = Db::pdo()->query('SHOW COLUMNS FROM facturas')->fetchAll();
+                self::$sucursalColumnExists = in_array('sucursal_id', array_column($cols, 'Field'), true);
+            } catch (\Throwable $e2) {
+                self::$sucursalColumnExists = false;
+            }
+        }
+        return self::$sucursalColumnExists;
+    }
+
     public function findById(int $id): ?array
     {
         $this->ensureEntregaColumns();
@@ -203,8 +230,11 @@ final class FacturaRepo
     {
         $this->ensureEntregaColumns();
         $hasOrder = $this->ensureOrderColumn();
+        $hasSucursal = $this->ensureSucursalColumn();
         $orderCol = $hasOrder ? ', order_id' : '';
         $orderVal = $hasOrder ? ', :order_id' : '';
+        $sucursalCol = $hasSucursal ? ', sucursal_id' : '';
+        $sucursalVal = $hasSucursal ? ', :sucursal_id' : '';
         $pdo = Db::pdo();
         $pdo->beginTransaction();
         try {
@@ -212,6 +242,7 @@ final class FacturaRepo
                 ':codigo' => $data['codigo'],
                 ':tipo' => $data['tipo_comprobante'],
                 ':punto_venta' => $data['punto_venta'] ?? 1,
+                ':sucursal_id' => $data['sucursal_id'] ?? null,
                 ':remito_id' => $data['remito_id'],
                 ':presupuesto_id' => $data['presupuesto_id'],
                 ':cliente_id' => $data['cliente_id'],
@@ -237,10 +268,13 @@ final class FacturaRepo
             if ($hasOrder) {
                 $fparams[':order_id'] = $data['order_id'] ?? null;
             }
+            if (!$hasSucursal) {
+                unset($fparams[':sucursal_id']);
+            }
             if (self::$facturasEntregaHasCols) {
                 $st = $pdo->prepare('
-                    INSERT INTO facturas (codigo, tipo_comprobante, punto_venta, remito_id, presupuesto_id' . $orderCol . ', cliente_id, idclien, cliente_nombre, cliente_cuit, cliente_direc, cliente_tele, cliente_mail, cliente_condicion_iva, fecha, subtotal_cents, iva_cents, descuento_cents, puntos_cents, total_cents, estado, forma_pago, entrega_tipo, transporte, envio_estado, envio_direccion, envio_observacion, notas, created_by, vendedor_id, created_at, updated_at)
-                    VALUES (:codigo, :tipo, :punto_venta, :remito_id, :presupuesto_id' . $orderVal . ', :cliente_id, :idclien, :cliente_nombre, :cliente_cuit, :cliente_direc, :cliente_tele, :cliente_mail, :cliente_condicion_iva, :fecha, :subtotal, :iva, :descuento, :puntos, :total, :estado, :forma_pago, :entrega_tipo, :transporte, :envio_estado, :envio_direccion, :envio_obs, :notas, :created_by, :vendedor_id, NOW(), NOW())
+                    INSERT INTO facturas (codigo, tipo_comprobante, punto_venta' . $sucursalCol . ', remito_id, presupuesto_id' . $orderCol . ', cliente_id, idclien, cliente_nombre, cliente_cuit, cliente_direc, cliente_tele, cliente_mail, cliente_condicion_iva, fecha, subtotal_cents, iva_cents, descuento_cents, puntos_cents, total_cents, estado, forma_pago, entrega_tipo, transporte, envio_estado, envio_direccion, envio_observacion, notas, created_by, vendedor_id, created_at, updated_at)
+                    VALUES (:codigo, :tipo, :punto_venta' . $sucursalVal . ', :remito_id, :presupuesto_id' . $orderVal . ', :cliente_id, :idclien, :cliente_nombre, :cliente_cuit, :cliente_direc, :cliente_tele, :cliente_mail, :cliente_condicion_iva, :fecha, :subtotal, :iva, :descuento, :puntos, :total, :estado, :forma_pago, :entrega_tipo, :transporte, :envio_estado, :envio_direccion, :envio_obs, :notas, :created_by, :vendedor_id, NOW(), NOW())
                 ');
                 $fparams[':entrega_tipo'] = $data['entrega_tipo'] ?? 'local';
                 $fparams[':transporte'] = $data['transporte'] ?? null;
@@ -250,8 +284,8 @@ final class FacturaRepo
                 $st->execute($fparams);
             } else {
                 $st = $pdo->prepare('
-                    INSERT INTO facturas (codigo, tipo_comprobante, punto_venta, remito_id, presupuesto_id, cliente_id, idclien, cliente_nombre, cliente_cuit, cliente_direc, cliente_tele, cliente_mail, cliente_condicion_iva, fecha, subtotal_cents, iva_cents, descuento_cents, puntos_cents, total_cents, estado, forma_pago, notas, created_by, vendedor_id, created_at, updated_at)
-                    VALUES (:codigo, :tipo, :punto_venta, :remito_id, :presupuesto_id, :cliente_id, :idclien, :cliente_nombre, :cliente_cuit, :cliente_direc, :cliente_tele, :cliente_mail, :cliente_condicion_iva, :fecha, :subtotal, :iva, :descuento, :puntos, :total, :estado, :forma_pago, :notas, :created_by, :vendedor_id, NOW(), NOW())
+                    INSERT INTO facturas (codigo, tipo_comprobante, punto_venta' . $sucursalCol . ', remito_id, presupuesto_id, cliente_id, idclien, cliente_nombre, cliente_cuit, cliente_direc, cliente_tele, cliente_mail, cliente_condicion_iva, fecha, subtotal_cents, iva_cents, descuento_cents, puntos_cents, total_cents, estado, forma_pago, notas, created_by, vendedor_id, created_at, updated_at)
+                    VALUES (:codigo, :tipo, :punto_venta' . $sucursalVal . ', :remito_id, :presupuesto_id, :cliente_id, :idclien, :cliente_nombre, :cliente_cuit, :cliente_direc, :cliente_tele, :cliente_mail, :cliente_condicion_iva, :fecha, :subtotal, :iva, :descuento, :puntos, :total, :estado, :forma_pago, :notas, :created_by, :vendedor_id, NOW(), NOW())
                 ');
                 unset($fparams[':order_id']);
                 $st->execute($fparams);

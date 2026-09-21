@@ -15,6 +15,7 @@
                     <th>Email</th>
                     <th>Núm. Suc.</th>
                     <th>Ptos. Venta</th>
+                    <th>PV ARCA</th>
                     <th>Depósito</th>
                     <th>Activo</th>
                     <th style="width:80px"></th>
@@ -30,6 +31,7 @@
                     <td class="small"><?= htmlspecialchars((string)($s['email'] ?? '')) ?></td>
                     <td><?= htmlspecialchars((string)($s['numsuc'] ?? '')) ?></td>
                     <td><?= htmlspecialchars((string)($s['puntos_venta_csv'] ?? ($s['punto_venta'] ?? ''))) ?></td>
+                    <td><?= (int)($s['punto_venta_arca'] ?? 0) ?: '—' ?></td>
                     <td>
                         <?php
                         $depoId = (int)($s['iddepo'] ?? 0);
@@ -102,6 +104,11 @@
                         <input type="text" name="puntos_venta" id="inputPuntosVenta" class="form-control" value="1" placeholder="Ej: 1, 3, 7" required />
                         <small class="text-muted">Podés cargar uno o varios, separados por coma. Deben ser únicos entre sucursales.</small>
                     </div>
+                    <div class="col">
+                        <label class="form-label">Punto de venta ARCA</label>
+                        <input type="number" name="punto_venta_arca" id="inputPuntoVentaArca" class="form-control" min="1" placeholder="Ej: 2" />
+                        <small class="text-muted">Punto de venta habilitado en ARCA/AFIP para esta sucursal.</small>
+                    </div>
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Depósito asociado</label>
@@ -135,6 +142,7 @@ const sucursales = <?= json_encode(array_map(function($s) {
         'email' => $s['email'] ?? '',
         'numsuc' => $s['numsuc'] ?? '',
         'puntos_venta_csv' => (string)($s['puntos_venta_csv'] ?? ($s['punto_venta'] ?? '')),
+        'punto_venta_arca' => (int)($s['punto_venta_arca'] ?? 0),
         'iddepo' => (int)($s['iddepo'] ?? 0),
         'activo' => !empty($s['activo']),
     ];
@@ -149,6 +157,7 @@ function abrirModal(id) {
     document.getElementById('inputEmail').value = '';
     document.getElementById('inputNumsuc').value = '';
     document.getElementById('inputPuntosVenta').value = '1';
+    document.getElementById('inputPuntoVentaArca').value = '';
     document.getElementById('inputIddepo').value = '';
     document.getElementById('inputActivo').checked = true;
     document.getElementById('modalTitle').textContent = 'Nueva sucursal';
@@ -163,6 +172,7 @@ function abrirModal(id) {
             document.getElementById('inputEmail').value = s.email;
             document.getElementById('inputNumsuc').value = s.numsuc;
             document.getElementById('inputPuntosVenta').value = s.puntos_venta_csv || '1';
+            document.getElementById('inputPuntoVentaArca').value = s.punto_venta_arca || '';
             document.getElementById('inputIddepo').value = s.iddepo || '';
             document.getElementById('inputActivo').checked = s.activo;
             document.getElementById('modalTitle').textContent = 'Editar sucursal';

@@ -361,6 +361,7 @@ final class FacturaController
             'cliente_mail' => $clienteMail,
             'cliente_condicion_iva' => $clienteCondIva,
             'punto_venta' => $auth->getPuntoVenta(),
+            'sucursal_id' => $auth->getSucursalId(),
             'fecha' => $fecha,
             'subtotal_cents' => $subtotal,
             'iva_cents' => $ivaTotal,

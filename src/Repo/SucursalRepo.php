@@ -8,6 +8,20 @@ use Perfushopping\Web\Infra\Db;
 final class SucursalRepo
 {
     private static bool $puntosTableReady = false;
+    private static bool $arcaColumnChecked = false;
+
+    private function ensureArcaColumn(): void
+    {
+        if (self::$arcaColumnChecked) {
+            return;
+        }
+        self::$arcaColumnChecked = true;
+        $pdo = Db::pdo();
+        $st = $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'admin_sucursales' AND COLUMN_NAME = 'punto_venta_arca'");
+        if ((int)$st->fetchColumn() === 0) {
+            $pdo->exec('ALTER TABLE admin_sucursales ADD COLUMN punto_venta_arca INT UNSIGNED DEFAULT NULL AFTER punto_venta');
+        }
+    }
 
     private function ensurePuntosVentaTable(): void
     {
@@ -68,6 +82,31 @@ final class SucursalRepo
             ->execute([':pv' => $puntos[0], ':id' => $sucursalId]);
     }
 
+    public function puntoVentaArca(int $sucursalId): ?int
+    {
+        $this->ensureArcaColumn();
+        $st = Db::pdo()->prepare('SELECT punto_venta_arca FROM admin_sucursales WHERE id = :id LIMIT 1');
+        $st->execute([':id' => $sucursalId]);
+        $val = $st->fetchColumn();
+        return $val === null || $val === false ? null : (int)$val;
+    }
+
+    public function puntoVentaArcaPorPuntoVenta(int $puntoVenta): ?int
+    {
+        $this->ensureArcaColumn();
+        $this->ensurePuntosVentaTable();
+        $st = Db::pdo()->prepare('
+            SELECT s.punto_venta_arca
+            FROM admin_sucursales s
+            JOIN admin_sucursal_puntos_venta spv ON spv.sucursal_id = s.id
+            WHERE spv.punto_venta = :pv
+            LIMIT 1
+        ');
+        $st->execute([':pv' => $puntoVenta]);
+        $val = $st->fetchColumn();
+        return $val === null || $val === false ? null : (int)$val;
+    }
+
     public function puntosVentaPorSucursal(): array
     {
         $this->ensurePuntosVentaTable();
@@ -97,6 +136,7 @@ final class SucursalRepo
 
     public function findAll(): array
     {
+        $this->ensureArcaColumn();
         $list = Db::pdo()->query('SELECT * FROM admin_sucursales ORDER BY nomsuc ASC')->fetchAll();
         $map = $this->puntosVentaPorSucursal();
         foreach ($list as &$s) {
@@ -115,8 +155,9 @@ final class SucursalRepo
         return $list;
     }
 
-    public function save(?int $id, string $nomsuc, string $numsuc, array $puntosVenta, ?int $iddepo, int $activo, string $direccion = '', string $telefono = '', string $email = ''): int
+    public function save(?int $id, string $nomsuc, string $numsuc, array $puntosVenta, ?int $iddepo, int $activo, string $direccion = '', string $telefono = '', string $email = '', ?int $puntoVentaArca = null): int
     {
+        $this->ensureArcaColumn();
         $pdo = Db::pdo();
         $puntos = $this->normalizarPuntosVenta($puntosVenta);
         if (!$puntos) {
@@ -126,12 +167,12 @@ final class SucursalRepo
         $pdo->beginTransaction();
         try {
             if ($id) {
-                $st = $pdo->prepare('UPDATE admin_sucursales SET nomsuc=:n, numsuc=:ns, punto_venta=:pv, iddepo=:depo, activo=:a, direccion=:dir, telefono=:tel, email=:em, updated_at=NOW() WHERE id=:id LIMIT 1');
-                $st->execute([':n' => $nomsuc, ':ns' => $numsuc, ':pv' => $puntos[0], ':depo' => $iddepo, ':a' => $activo, ':dir' => $direccion, ':tel' => $telefono, ':em' => $email, ':id' => $id]);
+                $st = $pdo->prepare('UPDATE admin_sucursales SET nomsuc=:n, numsuc=:ns, punto_venta=:pv, punto_venta_arca=:pva, iddepo=:depo, activo=:a, direccion=:dir, telefono=:tel, email=:em, updated_at=NOW() WHERE id=:id LIMIT 1');
+                $st->execute([':n' => $nomsuc, ':ns' => $numsuc, ':pv' => $puntos[0], ':pva' => $puntoVentaArca, ':depo' => $iddepo, ':a' => $activo, ':dir' => $direccion, ':tel' => $telefono, ':em' => $email, ':id' => $id]);
                 $sucursalId = $id;
             } else {
-                $st = $pdo->prepare('INSERT INTO admin_sucursales (idsucemp, nomsuc, numsuc, punto_venta, iddepo, activo, direccion, telefono, email, created_at, updated_at) VALUES (0, :n, :ns, :pv, :depo, :a, :dir, :tel, :em, NOW(), NOW())');
-                $st->execute([':n' => $nomsuc, ':ns' => $numsuc, ':pv' => $puntos[0], ':depo' => $iddepo, ':a' => $activo, ':dir' => $direccion, ':tel' => $telefono, ':em' => $email]);
+                $st = $pdo->prepare('INSERT INTO admin_sucursales (idsucemp, nomsuc, numsuc, punto_venta, punto_venta_arca, iddepo, activo, direccion, telefono, email, created_at, updated_at) VALUES (0, :n, :ns, :pv, :pva, :depo, :a, :dir, :tel, :em, NOW(), NOW())');
+                $st->execute([':n' => $nomsuc, ':ns' => $numsuc, ':pv' => $puntos[0], ':pva' => $puntoVentaArca, ':depo' => $iddepo, ':a' => $activo, ':dir' => $direccion, ':tel' => $telefono, ':em' => $email]);
                 $sucursalId = (int)$pdo->lastInsertId();
             }
 
@@ -163,6 +204,7 @@ final class SucursalRepo
 
     public function findById(int $id): ?array
     {
+        $this->ensureArcaColumn();
         $st = Db::pdo()->prepare('
             SELECT s.*
             FROM admin_sucursales s
@@ -182,6 +224,13 @@ final class SucursalRepo
     public function updatePuntoVenta(int $id, int $puntoVenta): void
     {
         $this->syncPuntosVenta($id, [$puntoVenta]);
+    }
+
+    public function updatePuntoVentaArca(int $id, ?int $puntoVentaArca): void
+    {
+        $this->ensureArcaColumn();
+        Db::pdo()->prepare('UPDATE admin_sucursales SET punto_venta_arca = :pva, updated_at = NOW() WHERE id = :id LIMIT 1')
+            ->execute([':pva' => $puntoVentaArca, ':id' => $id]);
     }
 
     public function vendedoresDisponibles(): array
