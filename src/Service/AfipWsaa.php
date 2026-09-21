@@ -102,7 +102,9 @@ XML;
 
     private function uniqueId(): string
     {
-        return time() . rand(1000, 9999);
+        // AFIP schema define uniqueId como entero de 32 bits con signo.
+        // time() actual (1.7G) entra; no concatenar rand porque supera 2^31.
+        return (string)time();
     }
 
     private function firmarTicket(string $xml): string
