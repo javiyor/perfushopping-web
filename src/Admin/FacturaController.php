@@ -448,11 +448,11 @@ final class FacturaController
         $arcaResult = null;
         $arcaError = null;
         $arcaRepo = new \Perfushopping\Web\Repo\ArcaRepo();
+        $wsfe = new \Perfushopping\Web\Service\AfipWsfe();
         if ($arcaRepo->isHabilitado()) {
             try {
                 $facturaData = $repo->findById($id);
                 $facturaItems = $repo->items($id);
-                $wsfe = new \Perfushopping\Web\Service\AfipWsfe();
                 $wsfe->autenticar();
                 $resultado = $wsfe->solicitarCAE($facturaData, $facturaItems);
                 $arcaRepo->guardarComprobante($id, $resultado);
@@ -465,8 +465,8 @@ final class FacturaController
                     'cae' => null,
                     'cae_vto' => null,
                     'codigo_emision' => null,
-                    'request_xml' => null,
-                    'response_xml' => null,
+                    'request_xml' => $wsfe->lastRequest(),
+                    'response_xml' => $wsfe->lastResponse(),
                 ]);
             }
         }
