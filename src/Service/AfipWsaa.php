@@ -50,6 +50,9 @@ final class AfipWsaa
 
         $ticketXml = $this->generarTicketXml($service);
         $cms = $this->firmarTicket($ticketXml);
+        if (trim($cms) === '') {
+            throw new \RuntimeException('AFIP: no se pudo extraer el CMS firmado del ticket.');
+        }
 
         $response = $this->callWsaa($cms);
         $taData = $this->parsearRespuesta($response);
@@ -66,7 +69,7 @@ final class AfipWsaa
 
     private function generarTicketXml(string $service): string
     {
-        $cuit = (new ArcaRepo())->getConfig('cuit');
+        $cuit = preg_replace('/\D/', '', (new ArcaRepo())->getConfig('cuit'));
         $genTime = gmdate('Y-m-d\TH:i:s.') . substr(microtime(), 2, 3) . 'Z';
         $expTime = gmdate('Y-m-d\TH:i:s.', strtotime('+12 hours')) . substr(microtime(), 2, 3) . 'Z';
 
@@ -110,9 +113,15 @@ XML;
         }
 
         $certContent = (string)@file_get_contents($cert);
-        if ($certContent === '' || !openssl_x509_read($certContent)) {
+        $certRes = $certContent !== '' ? @openssl_x509_read($certContent) : false;
+        if ($certRes === false) {
             unlink($xmlFile);
             throw new \RuntimeException('AFIP: certificado invalido o en formato incorrecto. ' . $this->opensslErrors());
+        }
+        $certInfo = openssl_x509_parse($certRes);
+        if (is_array($certInfo) && isset($certInfo['validTo_time_t']) && (int)$certInfo['validTo_time_t'] < time()) {
+            unlink($xmlFile);
+            throw new \RuntimeException('AFIP: el certificado venció el ' . date('d/m/Y H:i', (int)$certInfo['validTo_time_t']) . '. Generá uno nuevo y asocialo en AFIP.');
         }
 
         $keyRes = @openssl_pkey_get_private('file://' . $key);
@@ -198,7 +207,14 @@ XML;
             throw new \RuntimeException('AFIP WSAA: ' . $error);
         }
         if ($httpCode !== 200) {
-            throw new \RuntimeException('AFIP WSAA: HTTP ' . $httpCode);
+            $body = is_string($response) ? $response : '';
+            error_log('AFIP WSAA [' . $this->url . '] HTTP ' . $httpCode . ' respuesta: ' . substr($body, 0, 2000));
+            $fault = '';
+            if ($body !== '' && ($dom = new \DOMDocument()) && @$dom->loadXML($body)) {
+                $fault = $dom->getElementsByTagName('faultstring')->item(0)?->textContent ?? '';
+            }
+            $detail = $fault !== '' ? ' Motivo AFIP: ' . trim($fault) : ' (sin detalle de AFIP en el cuerpo)';
+            throw new \RuntimeException('AFIP WSAA: HTTP ' . $httpCode . '.' . $detail);
         }
 
         return $response;
