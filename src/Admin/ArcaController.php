@@ -111,12 +111,15 @@ final class ArcaController
 
         header('Content-Type: text/plain; charset=utf-8');
 
+        $pv = (int)($_GET['pv'] ?? 1);
+        $tipo = (int)($_GET['tipo'] ?? 6);
+
         $wsfe = new \Perfushopping\Web\Service\AfipWsfe();
         try {
-            $wsfe->getUltimoComprobanteAutorizado(1, 6);
-            echo "OK: consulta WSFE exitosa\n\n";
+            $wsfe->getUltimoComprobanteAutorizado($pv, $tipo);
+            echo "OK: consulta WSFE exitosa para PV={$pv} TIPO={$tipo}\n\n";
         } catch (\Throwable $e) {
-            echo "ERROR WSFE: " . $e->getMessage() . "\n\n";
+            echo "ERROR WSFE (PV={$pv} TIPO={$tipo}): " . $e->getMessage() . "\n\n";
         }
 
         echo "=== WSFE REQUEST ===\n";
@@ -149,8 +152,8 @@ final class ArcaController
 
         $items = $facturaRepo->items($facturaId);
 
+        $wsfe = new \Perfushopping\Web\Service\AfipWsfe();
         try {
-            $wsfe = new \Perfushopping\Web\Service\AfipWsfe();
             $wsfe->autenticar();
             $resultado = $wsfe->solicitarCAE($factura, $items);
             $repo->guardarComprobante($facturaId, $resultado);
@@ -162,8 +165,8 @@ final class ArcaController
                 'cae' => null,
                 'cae_vto' => null,
                 'codigo_emision' => null,
-                'request_xml' => null,
-                'response_xml' => null,
+                'request_xml' => $wsfe->lastRequest(),
+                'response_xml' => $wsfe->lastResponse(),
             ]);
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Error ARCA: ' . $e->getMessage()];
         }
