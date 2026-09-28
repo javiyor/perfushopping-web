@@ -276,4 +276,43 @@ final class ArcaController
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Certificado subido correctamente.'];
         Response::redirect('/admin/arca/config');
     }
+
+    public function descargarCertificado(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $auth->requirePermiso('arca');
+
+        $path = (new ArcaRepo())->getConfig('cert_path');
+        $this->descargarArchivoArca($path, 'certificado');
+    }
+
+    public function descargarClave(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $auth->requirePermiso('arca');
+
+        $path = (new ArcaRepo())->getConfig('key_path');
+        $this->descargarArchivoArca($path, 'clave privada');
+    }
+
+    private function descargarArchivoArca(string $path, string $label): void
+    {
+        if ($path === '') {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No hay ' . $label . ' configurada.'];
+            Response::redirect('/admin/arca/config');
+        }
+
+        $storageDir = rtrim((string)APP_BASE_DIR, '/\\') . '/storage/arca';
+        $real = realpath($path);
+        if ($real === false || !is_file($real) || strncmp($real, $storageDir, strlen($storageDir)) !== 0) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'El archivo de ' . $label . ' ya no existe en el servidor.'];
+            Response::redirect('/admin/arca/config');
+        }
+
+        header('Content-Type: application/octet-stream');
+        header('Content-Disposition: attachment; filename="' . basename($real) . '"');
+        header('Content-Length: ' . filesize($real));
+        readfile($real);
+        exit;
+    }
 }

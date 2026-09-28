@@ -481,6 +481,8 @@ $router->post('/admin/arca/test', [AdminArcaController::class, 'testConnection']
 $router->post('/admin/arca/reenviar', [AdminArcaController::class, 'reenviar']);
 $router->post('/admin/arca/generar-csr', [AdminArcaController::class, 'generarCsr']);
 $router->post('/admin/arca/cargar-certificado', [AdminArcaController::class, 'cargarCertificado']);
+$router->get('/admin/arca/certificado', [AdminArcaController::class, 'descargarCertificado']);
+$router->get('/admin/arca/clave', [AdminArcaController::class, 'descargarClave']);
 $router->get('/admin/reportes', [AdminReporteController::class, 'index']);
 $router->get('/admin/reportes/data', [AdminReporteController::class, 'data']);
 

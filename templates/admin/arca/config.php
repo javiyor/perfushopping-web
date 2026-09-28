@@ -77,11 +77,17 @@ if ($certExiste) {
                         <div class="mb-1"><?= $keyExiste ? '<span class="text-success"><i class="bi bi-check-circle-fill fs-4"></i></span>' : '<span class="text-danger"><i class="bi bi-x-circle-fill fs-4"></i></span>' ?></div>
                         <div class="small fw-semibold">Clave privada</div>
                         <div class="small text-muted"><?= $keyExiste ? 'Existente' : 'Pendiente' ?></div>
+                        <?php if ($keyExiste): ?>
+                            <div class="mt-1"><a class="btn btn-sm btn-outline-secondary" href="/admin/arca/clave" download><i class="bi bi-download"></i> Descargar</a></div>
+                        <?php endif; ?>
                     </div>
                     <div class="text-center">
                         <div class="mb-1"><?= $certExiste ? '<span class="text-success"><i class="bi bi-check-circle-fill fs-4"></i></span>' : '<span class="text-danger"><i class="bi bi-x-circle-fill fs-4"></i></span>' ?></div>
                         <div class="small fw-semibold">Certificado</div>
                         <div class="small text-muted"><?= $certExiste ? 'Existente' : 'Pendiente' ?></div>
+                        <?php if ($certExiste): ?>
+                            <div class="mt-1"><a class="btn btn-sm btn-outline-secondary" href="/admin/arca/certificado" download><i class="bi bi-download"></i> Descargar</a></div>
+                        <?php endif; ?>
                     </div>
                 </div>
 
