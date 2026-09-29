@@ -271,7 +271,7 @@
             <?php if ($can('cheques')): ?><a href="/admin/banco-cuentas" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Cuentas propias y cuentas predeterminadas de cobro"><i class="bi bi-wallet"></i>Cuentas propias</a><?php endif; ?>
             <?php if ($can('usuarios_admin')): ?><a href="/admin/empresa" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Datos de la empresa y logo"><i class="bi bi-building"></i>Empresa</a><?php endif; ?>
             <?php if ($can('usuarios_admin')): ?><a href="/admin/sucursales" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Sucursales y puntos de venta ARCA"><i class="bi bi-building"></i>Sucursales</a><?php endif; ?>
-            <?php if ($can('estadisticas')): ?><a href="/admin/promo-tarjetas" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Promociones con tarjetas bancarias"><i class="bi bi-credit-card-2-front"></i>Promo Tarjetas</a><?php endif; ?>
+            <?php if ($can('estadisticas') || $can('marketing_promos')): ?><a href="/admin/promo-tarjetas" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Promociones con tarjetas bancarias"><i class="bi bi-credit-card-2-front"></i>Promo Tarjetas</a><?php endif; ?>
             <?php if ($can('estadisticas')): ?><a href="/admin/email" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Bandeja de email integrada"><i class="bi bi-envelope"></i>Email</a><?php endif; ?>
         </nav>
     </aside>

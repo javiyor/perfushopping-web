@@ -168,6 +168,7 @@ final class AdminUserRepo
             'marketing_campaigns' => 'Marketing - Campañas',
             'marketing_analytics' => 'Marketing - Analytics',
             'marketing_brands' => 'Marketing - Marcas',
+            'marketing_promos' => 'Marketing - Promociones',
             'product_commercial_edit' => 'Producto - Contenido comercial',
         ];
     }
