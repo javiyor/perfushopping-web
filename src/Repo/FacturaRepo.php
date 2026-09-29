@@ -441,6 +441,22 @@ final class FacturaRepo
         $st->execute([':i' => $id]);
     }
 
+    private static ?array $productoColumns = null;
+
+    private static function productoColumns(): array
+    {
+        if (self::$productoColumns !== null) {
+            return self::$productoColumns;
+        }
+        try {
+            $rows = Db::pdo()->query('SHOW COLUMNS FROM producto')->fetchAll();
+            self::$productoColumns = array_column($rows, 'Field');
+        } catch (\Throwable $e) {
+            self::$productoColumns = [];
+        }
+        return self::$productoColumns;
+    }
+
     public function searchProducts(string $q, int $limit = 20, ?int $iddepo = null): array
     {
         $limit = max(1, min(50, $limit));
@@ -448,16 +464,27 @@ final class FacturaRepo
         if ($q === '') return [];
 
         $pdo = Db::pdo();
-        $params = [':like' => '%' . $q . '%'];
+        $like = '%' . $q . '%';
+        $params = [':like' => $like, ':likeBarcode' => $like, ':exact' => $q];
+
+        // Mismos criterios que la búsqueda de compras: nombre, códigos,
+        // código de barras del producto y código de variante (parcial).
+        $where = ['p.produ LIKE :like', 'p.codprodu LIKE :like', 'p.codprodup LIKE :like'];
+        $exactRank = ['p.codprodu = :exact', 'p.codprodup = :exact'];
+        if (in_array('codbarra', self::productoColumns(), true)) {
+            $where[] = 'p.codbarra LIKE :like';
+            $exactRank[] = 'p.codbarra = :exact';
+        }
 
         $sql = '
             SELECT p.idprodu, p.codprodu, p.produ, p.precio, p.precomp, p.codprodup, p.enweb, p.stocact,
                    i.codivaprodu, i.tiva
             FROM producto p
             LEFT JOIN ivaprodu i ON i.codivaprodu = p.iva
-            WHERE p.produ LIKE :like OR p.codprodu LIKE :like OR p.codprodup LIKE :like
+            WHERE ' . implode(' OR ', $where) . '
+               OR EXISTS (SELECT 1 FROM gustos g WHERE g.idprodu = p.idprodu AND g.codscan LIKE :likeBarcode)
             GROUP BY p.idprodu
-            ORDER BY p.produ ASC
+            ORDER BY CASE WHEN ' . implode(' OR ', $exactRank) . ' THEN 0 ELSE 1 END, p.produ ASC
             LIMIT ' . $limit;
         $st = $pdo->prepare($sql);
         $st->execute($params);

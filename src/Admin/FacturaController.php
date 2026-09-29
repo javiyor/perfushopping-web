@@ -668,7 +668,7 @@ final class FacturaController
             $suc = (new \Perfushopping\Web\Repo\SucursalRepo())->findById($sucId);
             $iddepo = $suc ? (int)($suc['iddepo'] ?? 0) : null;
         }
-        $results = (new FacturaRepo())->searchProducts($q, 20, $iddepo ?: null);
+        $results = (new FacturaRepo())->searchProducts($q, 50, $iddepo ?: null);
 
         Response::json($results);
     }
