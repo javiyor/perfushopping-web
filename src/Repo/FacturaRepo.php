@@ -589,12 +589,16 @@ final class FacturaRepo
         $condIvaExpr = $this->clientesTieneCondicionIva()
             ? 'COALESCE(c.condicion_iva, \'consumidor_final\')'
             : '\'consumidor_final\'';
+        $catExpr = $this->clientesTieneCategoria()
+            ? 'COALESCE(c.categoria, \'minorista\') AS categoria, COALESCE(c.precio_mayorista, 0) AS precio_mayorista, c.especialidad'
+            : '\'minorista\' AS categoria, 0 AS precio_mayorista, NULL AS especialidad';
 
         $st = Db::pdo()->prepare('
             SELECT COALESCE(w.id, 0) AS id, c.idclien,
                    c.razon AS name, c.cuit, c.direc, c.tele AS phone, c.mail AS email,
                    c.Localidad AS city,
-                   ' . $condIvaExpr . ' AS condicion_iva
+                   ' . $condIvaExpr . ' AS condicion_iva,
+                   ' . $catExpr . '
             FROM clientes c
             LEFT JOIN web_users w ON w.cliente_id = c.idclien
             WHERE c.razon LIKE :like OR c.cuit LIKE :like2
@@ -605,8 +609,67 @@ final class FacturaRepo
         $rows = $st->fetchAll();
         foreach ($rows as &$r) {
             $r['condicion_iva'] = self::normalizeCondIva($r['condicion_iva'] ?? null);
+            $r['categoria'] = self::normalizeCategoria($r['categoria'] ?? null);
+            $r['precio_mayorista'] = (int)($r['precio_mayorista'] ?? 0);
         }
         return $rows;
+    }
+
+    public static function normalizeCategoria(?string $value): string
+    {
+        $normalized = strtolower(trim((string)$value));
+        $map = [
+            'minorista' => 'minorista',
+            'minor' => 'minorista',
+            'consumidor' => 'minorista',
+            'mayorista' => 'mayorista',
+            'mayor' => 'mayorista',
+            'profesional' => 'profesional',
+            'prof' => 'profesional',
+        ];
+        return $map[$normalized] ?? 'minorista';
+    }
+
+    public static function categoriaLabels(): array
+    {
+        return ['minorista' => 'Minorista', 'mayorista' => 'Mayorista', 'profesional' => 'Profesional'];
+    }
+
+    private static ?bool $clientesCategoriaChecked = null;
+    private static bool $clientesTieneCategoria = false;
+
+    private function clientesTieneCategoria(): bool
+    {
+        if (self::$clientesCategoriaChecked !== null) {
+            return self::$clientesTieneCategoria;
+        }
+        self::$clientesCategoriaChecked = true;
+        try {
+            $cols = Db::pdo()->query('SHOW COLUMNS FROM clientes')->fetchAll();
+            $fields = array_column($cols, 'Field');
+            $missing = [];
+            if (!in_array('categoria', $fields, true)) {
+                $missing[] = "ADD COLUMN categoria VARCHAR(20) NOT NULL DEFAULT 'minorista'";
+            }
+            if (!in_array('precio_mayorista', $fields, true)) {
+                $missing[] = 'ADD COLUMN precio_mayorista TINYINT(1) NOT NULL DEFAULT 0';
+            }
+            if (!in_array('especialidad', $fields, true)) {
+                $missing[] = 'ADD COLUMN especialidad VARCHAR(60) DEFAULT NULL';
+            }
+            foreach ($missing as $ddl) {
+                Db::pdo()->exec("ALTER TABLE clientes {$ddl}");
+            }
+            self::$clientesTieneCategoria = true;
+        } catch (\Throwable $e) {
+            try {
+                $cols = Db::pdo()->query('SHOW COLUMNS FROM clientes')->fetchAll();
+                self::$clientesTieneCategoria = in_array('categoria', array_column($cols, 'Field'), true);
+            } catch (\Throwable $e2) {
+                self::$clientesTieneCategoria = false;
+            }
+        }
+        return self::$clientesTieneCategoria;
     }
 
     private static ?bool $clientesCondicionIva = null;
@@ -776,6 +839,10 @@ final class FacturaRepo
         $mail = trim($data['mail'] ?? '');
         $condIva = self::normalizeCondIva($data['condicion_iva'] ?? 'consumidor_final');
         $tieneCondIva = $this->clientesTieneCondicionIva();
+        $tieneCat = $this->clientesTieneCategoria();
+        $categoria = self::normalizeCategoria($data['categoria'] ?? 'minorista');
+        $precioMayorista = !empty($data['precio_mayorista']) ? 1 : 0;
+        $especialidad = mb_substr(trim((string)($data['especialidad'] ?? '')), 0, 60) ?: null;
 
         $existing = null;
         if ($cuit !== '') {
@@ -786,23 +853,36 @@ final class FacturaRepo
 
         if ($existing) {
             $setCond = $tieneCondIva ? ', condicion_iva = :ci' : '';
+            $setCat = $tieneCat ? ', categoria = :cat, precio_mayorista = :pm, especialidad = :esp' : '';
             $st = Db::pdo()->prepare('
-                UPDATE clientes SET razon = :r, direc = :d, tele = :t, mail = :m' . $setCond . '
+                UPDATE clientes SET razon = :r, direc = :d, tele = :t, mail = :m' . $setCond . $setCat . '
                 WHERE idclien = :id LIMIT 1
             ');
             $params = [':r' => $razon, ':d' => $direc, ':t' => $tele, ':m' => $mail, ':id' => $existing['idclien']];
             if ($tieneCondIva) $params[':ci'] = $condIva;
+            if ($tieneCat) {
+                $params[':cat'] = $categoria;
+                $params[':pm'] = $precioMayorista;
+                $params[':esp'] = $especialidad;
+            }
             $st->execute($params);
             $idclien = (int)$existing['idclien'];
         } else {
             $condCol = $tieneCondIva ? ', condicion_iva' : '';
             $condVal = $tieneCondIva ? ', :ci' : '';
+            $catCol = $tieneCat ? ', categoria, precio_mayorista, especialidad' : '';
+            $catVal = $tieneCat ? ', :cat, :pm, :esp' : '';
             $st = Db::pdo()->prepare('
-                INSERT INTO clientes (razon, cuit, direc, tele, mail, activo, fealta' . $condCol . ')
-                VALUES (:r, :c, :d, :t, :m, 1, NOW()' . $condVal . ')
+                INSERT INTO clientes (razon, cuit, direc, tele, mail, activo, fealta' . $condCol . $catCol . ')
+                VALUES (:r, :c, :d, :t, :m, 1, NOW()' . $condVal . $catVal . ')
             ');
             $params = [':r' => $razon, ':c' => $cuit, ':d' => $direc, ':t' => $tele, ':m' => $mail];
             if ($tieneCondIva) $params[':ci'] = $condIva;
+            if ($tieneCat) {
+                $params[':cat'] = $categoria;
+                $params[':pm'] = $precioMayorista;
+                $params[':esp'] = $especialidad;
+            }
             $st->execute($params);
             $idclien = (int)Db::pdo()->lastInsertId();
         }
@@ -811,11 +891,15 @@ final class FacturaRepo
         $condIvaExpr = $tieneCondIva
             ? 'COALESCE(c.condicion_iva, \'consumidor_final\')'
             : '\'consumidor_final\'';
+        $catExpr = $tieneCat
+            ? 'COALESCE(c.categoria, \'minorista\') AS categoria, COALESCE(c.precio_mayorista, 0) AS precio_mayorista, c.especialidad'
+            : '\'minorista\' AS categoria, 0 AS precio_mayorista, NULL AS especialidad';
         $st = Db::pdo()->prepare('
             SELECT COALESCE(w.id, 0) AS id, c.idclien,
                    c.razon AS name, c.cuit, c.direc, c.tele AS phone, c.mail AS email,
                    c.Localidad AS city,
-                   ' . $condIvaExpr . ' AS condicion_iva
+                   ' . $condIvaExpr . ' AS condicion_iva,
+                   ' . $catExpr . '
             FROM clientes c
             LEFT JOIN web_users w ON w.cliente_id = c.idclien
             WHERE c.idclien = :id LIMIT 1
@@ -824,6 +908,8 @@ final class FacturaRepo
         $r = $st->fetch();
         if ($r) {
             $r['condicion_iva'] = self::normalizeCondIva($r['condicion_iva'] ?? null);
+            $r['categoria'] = self::normalizeCategoria($r['categoria'] ?? null);
+            $r['precio_mayorista'] = (int)($r['precio_mayorista'] ?? 0);
         }
         return $r ?: null;
     }

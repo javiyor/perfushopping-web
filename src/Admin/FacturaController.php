@@ -832,6 +832,9 @@ final class FacturaController
             'tele' => trim((string)($_POST['tele'] ?? '')),
             'mail' => trim((string)($_POST['mail'] ?? '')),
             'condicion_iva' => trim((string)($_POST['condicion_iva'] ?? 'consumidor_final')),
+            'categoria' => trim((string)($_POST['categoria'] ?? 'minorista')),
+            'precio_mayorista' => trim((string)($_POST['precio_mayorista'] ?? '')),
+            'especialidad' => trim((string)($_POST['especialidad'] ?? '')),
         ]);
 
         if (!$cliente) {

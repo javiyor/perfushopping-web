@@ -248,6 +248,34 @@ $plazos = $plazos ?? [];
                         <option value="exento">Exento</option>
                     </select>
                 </div>
+                <div class="mb-2">
+                    <label class="form-label small">Categoría</label>
+                    <select class="form-select form-select-sm" id="ncCategoria" onchange="toggleNcCategoria()">
+                        <option value="minorista">Minorista</option>
+                        <option value="mayorista">Mayorista</option>
+                        <option value="profesional">Profesional</option>
+                    </select>
+                </div>
+                <div id="ncMayoristaBox" style="display:none">
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="ncPrecioMayorista" value="1" />
+                        <label class="form-check-label small" for="ncPrecioMayorista">Aplica precios mayoristas</label>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">Especialidad</label>
+                        <input type="text" class="form-control form-control-sm" id="ncEspecialidad" list="ncEspecialidades" autocomplete="off" placeholder="Ej: peluquería, barbería..." />
+                        <datalist id="ncEspecialidades">
+                            <option value="Peluquería"></option>
+                            <option value="Barbería"></option>
+                            <option value="Masajes"></option>
+                            <option value="Cosmetología"></option>
+                            <option value="Manicuría"></option>
+                            <option value="Estética"></option>
+                            <option value="Maquillaje"></option>
+                            <option value="Depilación"></option>
+                        </datalist>
+                    </div>
+                </div>
                 <div id="ncError" class="alert alert-danger small py-2" style="display:none"></div>
             </div>
             <div class="modal-footer">
@@ -739,7 +767,7 @@ cliInput.addEventListener('input', function() {
                     const div = document.createElement('div');
                     div.className = 'suggestion-item';
                     const condIvaLabel = c.condicion_iva === 'responsable_inscripto' ? ' (RI)' : c.condicion_iva === 'monotributista' ? ' (Mono)' : c.condicion_iva === 'exento' ? ' (EX)' : '';
-                    div.innerHTML = '<strong>' + esc(c.name) + '</strong> ' + esc(c.cuit || '') + condIvaLabel + ' <span class="text-muted">' + esc(c.email || '') + '</span>';
+                    div.innerHTML = '<strong>' + esc(c.name) + '</strong> ' + esc(c.cuit || '') + condIvaLabel + esc(categoriaBadge(c)) + ' <span class="text-muted">' + esc(c.email || '') + '</span>';
                     div.style.cssText = 'padding:6px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid #eee;background:#fff;';
                     div.addEventListener('mousedown', function(e) {
                         e.preventDefault();
@@ -761,7 +789,7 @@ function selectCliente(c) {
     document.getElementById('clienteNombre').textContent = c.name || 'Consumidor Final';
     document.getElementById('clienteCuit').textContent = c.cuit || '';
     document.getElementById('clienteCondIva').value = c.condicion_iva || 'consumidor_final';
-    const displayName = (c.name || 'Consumidor Final') + (c.cuit ? ' - ' + c.cuit : '');
+    const displayName = (c.name || 'Consumidor Final') + (c.cuit ? ' - ' + c.cuit : '') + categoriaBadge(c);
     document.getElementById('clienteNombre').textContent = displayName;
     cliInput.value = c.name || '';
     cliSuggestions.innerHTML = '';
@@ -819,6 +847,24 @@ function clearCliente() {
 }
 
 // ── Nuevo cliente (directo desde el POS) ──
+function toggleNcCategoria() {
+    const cat = document.getElementById('ncCategoria').value;
+    document.getElementById('ncMayoristaBox').style.display = (cat === 'mayorista' || cat === 'profesional') ? '' : 'none';
+    if (cat === 'mayorista') {
+        document.getElementById('ncPrecioMayorista').checked = true;
+    }
+}
+function categoriaBadge(c) {
+    const cat = c.categoria || 'minorista';
+    if (cat === 'mayorista') return ' [Mayorista]';
+    if (cat === 'profesional') {
+        let label = ' [Profesional';
+        if (c.especialidad) label += ' · ' + c.especialidad;
+        if (parseInt(c.precio_mayorista) > 0) label += ' · PM';
+        return label + ']';
+    }
+    return '';
+}
 function guardarNuevoCliente() {
     const razon = document.getElementById('ncRazon').value.trim();
     const cuit = document.getElementById('ncCuit').value.trim();
@@ -836,6 +882,9 @@ function guardarNuevoCliente() {
     body.append('direc', document.getElementById('ncDirec').value.trim());
     body.append('localidad', document.getElementById('ncLocalidad').value.trim());
     body.append('condicion_iva', document.getElementById('ncCondIva').value);
+    body.append('categoria', document.getElementById('ncCategoria').value);
+    body.append('precio_mayorista', document.getElementById('ncPrecioMayorista').checked ? '1' : '0');
+    body.append('especialidad', document.getElementById('ncEspecialidad').value.trim());
 
     fetch('/admin/facturas/clientes/crear', {
         method: 'POST',
@@ -856,6 +905,10 @@ function guardarNuevoCliente() {
                 document.getElementById('ncDirec').value = '';
                 document.getElementById('ncLocalidad').value = '';
                 document.getElementById('ncCondIva').value = 'consumidor_final';
+                document.getElementById('ncCategoria').value = 'minorista';
+                document.getElementById('ncPrecioMayorista').checked = false;
+                document.getElementById('ncEspecialidad').value = '';
+                toggleNcCategoria();
             } else {
                 document.getElementById('ncError').textContent = res.error || 'Error al crear el cliente.';
                 document.getElementById('ncError').style.display = '';
