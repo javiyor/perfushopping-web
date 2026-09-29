@@ -66,6 +66,41 @@ $hasta = (string)($hasta ?? date('Y-m-d'));
         </div>
     </div>
 
+    <div class="row g-3 mb-4" id="kpiRow2">
+        <div class="col-6 col-md-4">
+            <div class="card-dashboard text-center">
+                <div class="h3 fw-bold mb-0" id="kpiTicket">-</div>
+                <div class="small text-muted">Ticket promedio</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4">
+            <div class="card-dashboard text-center">
+                <div class="h3 fw-bold mb-0 text-success" id="kpiGanancia">-</div>
+                <div class="small text-muted">Ganancia neta (sin IVA)</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4">
+            <div class="card-dashboard text-center">
+                <div class="h3 fw-bold mb-0" id="kpiMargen">-</div>
+                <div class="small text-muted">Margen neto %</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white fw-semibold">Comparativas del mes (del día 1 al mismo día)</div>
+                <div class="table-responsive">
+                    <table class="table table-admin mb-0">
+                        <thead><tr><th>Período</th><th class="text-end">Facturas</th><th class="text-end">Total</th><th class="text-end">Var. vs actual</th></tr></thead>
+                        <tbody id="compBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="row g-3">
         <!-- Chart -->
         <div class="col-lg-8">
@@ -80,10 +115,67 @@ $hasta = (string)($hasta ?? date('Y-m-d'));
         <div class="col-lg-4">
             <div class="card shadow-sm">
                 <div class="card-header bg-white fw-semibold">Formas de pago</div>
+                <div class="card-body">
+                    <canvas id="formasChart" height="180"></canvas>
+                </div>
                 <div class="card-body p-0">
                     <table class="table table-admin mb-0">
                         <thead><tr><th>Forma</th><th class="text-end">Monto</th></tr></thead>
                         <tbody id="formaPagoBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mt-2">
+        <!-- Mensual -->
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white fw-semibold">Ventas mensuales (24 meses)</div>
+                <div class="card-body">
+                    <canvas id="mensualChart" height="220"></canvas>
+                </div>
+            </div>
+        </div>
+        <!-- Por sucursal -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white fw-semibold">Ventas por sucursal</div>
+                <div class="card-body">
+                    <canvas id="sucursalChart" height="180"></canvas>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-admin mb-0">
+                        <thead><tr><th>Sucursal</th><th class="text-end">Cant.</th><th class="text-end">Total</th></tr></thead>
+                        <tbody id="sucursalBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mt-2">
+        <!-- Top ganancia -->
+        <div class="col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white fw-semibold">Top productos por ganancia <span class="text-muted fw-normal" style="font-size:11px">(bruta, sin prorratear descuentos)</span></div>
+                <div class="table-responsive">
+                    <table class="table table-admin mb-0">
+                        <thead><tr><th>#</th><th>Producto</th><th class="text-end">Cant.</th><th class="text-end">Neto</th><th class="text-end">Costo</th><th class="text-end">Ganancia</th></tr></thead>
+                        <tbody id="topGananciaBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <!-- Margen por departamento -->
+        <div class="col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white fw-semibold">Margen por departamento</div>
+                <div class="table-responsive">
+                    <table class="table table-admin mb-0">
+                        <thead><tr><th>Departamento</th><th class="text-end">Cant.</th><th class="text-end">Neto</th><th class="text-end">Ganancia</th><th class="text-end">Margen</th></tr></thead>
+                        <tbody id="margenDeptoBody"></tbody>
                     </table>
                 </div>
             </div>
@@ -136,6 +228,28 @@ $hasta = (string)($hasta ?? date('Y-m-d'));
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
 let ventasChartInstance = null;
+let mensualChartInstance = null;
+let sucursalChartInstance = null;
+let formasChartInstance = null;
+
+function fmtPct(actual, previo) {
+    previo = parseInt(previo || 0);
+    if (!previo) return '—';
+    const v = (parseInt(actual || 0) - previo) / previo * 100;
+    const cls = v > 0 ? 'text-success' : (v < 0 ? 'text-danger' : 'text-muted');
+    return '<span class="' + cls + '">' + (v > 0 ? '+' : '') + v.toFixed(1) + '%</span>';
+}
+
+function chartColors(n) {
+    const base = [
+        'rgba(216,178,90,0.7)', 'rgba(13,110,253,0.6)', 'rgba(25,135,84,0.6)',
+        'rgba(220,53,69,0.6)', 'rgba(111,66,193,0.6)', 'rgba(253,126,20,0.6)',
+        'rgba(32,201,151,0.6)', 'rgba(13,202,240,0.6)',
+    ];
+    const out = [];
+    for (let i = 0; i < n; i++) out.push(base[i % base.length]);
+    return out;
+}
 
 function fmtCents(c) {
     let sign = c < 0 ? '-' : '';
@@ -162,6 +276,33 @@ function cargarReportes() {
 
             const rec = d.recibos || {};
             document.getElementById('kpiRecibos').textContent = fmtCents(parseInt(rec.total_cents ?? 0));
+
+            // Ticket, ganancia y margen
+            document.getElementById('kpiTicket').textContent = fmtCents(parseInt(d.ticket ?? 0));
+            const gan = d.ganancia || {};
+            const ganancia = parseInt(gan.ganancia_cents ?? 0);
+            const neto = parseInt(gan.neto_cents ?? 0);
+            document.getElementById('kpiGanancia').textContent = fmtCents(ganancia);
+            document.getElementById('kpiMargen').textContent = neto > 0 ? (ganancia / neto * 100).toFixed(1) + '%' : '—';
+
+            // Comparativas
+            const compBody = document.getElementById('compBody');
+            compBody.innerHTML = '';
+            const comp = d.comparativas || {};
+            const actual = comp.mesActual || {};
+            const filasComp = [
+                ['Mes actual', actual],
+                ['Mes anterior', comp.mesAnterior || {}],
+                ['Hace 1 año', comp.hace1Anio || {}],
+                ['Hace 2 años', comp.hace2Anios || {}],
+            ];
+            filasComp.forEach((f, i) => {
+                const nombre = f[0];
+                const r = f[1];
+                const rango = (r.desde && r.hasta) ? ' <span class="text-muted" style="font-size:11px">' + escHtml(r.desde) + ' al ' + escHtml(r.hasta) + '</span>' : '';
+                const varPct = i === 0 ? '—' : fmtPct(actual.total_cents, r.total_cents);
+                compBody.innerHTML += '<tr><td>' + escHtml(nombre) + rango + '</td><td class="text-end">' + parseInt(r.cantidad || 0) + '</td><td class="text-end">' + fmtCents(parseInt(r.total_cents || 0)) + '</td><td class="text-end">' + varPct + '</td></tr>';
+            });
 
             // Diarias chart
             const diarias = d.diarias || [];
@@ -205,6 +346,7 @@ function cargarReportes() {
             });
 
             // Forma de pago
+            const fpLabels = d.formasPagoLabels || {};
             const fpBody = document.getElementById('formaPagoBody');
             fpBody.innerHTML = '';
             const formas = d.porFormaPago || [];
@@ -212,7 +354,83 @@ function cargarReportes() {
                 fpBody.innerHTML = '<tr><td colspan="2" class="text-muted text-center">Sin datos</td></tr>';
             } else {
                 formas.forEach(f => {
-                    fpBody.innerHTML += '<tr><td>' + escHtml(f.forma_pago) + '</td><td class="text-end">' + fmtCents(parseInt(f.total_cents || 0)) + '</td></tr>';
+                    const nombre = fpLabels[f.forma_pago] || f.forma_pago;
+                    fpBody.innerHTML += '<tr><td>' + escHtml(nombre) + '</td><td class="text-end">' + fmtCents(parseInt(f.total_cents || 0)) + '</td></tr>';
+                });
+            }
+            if (formasChartInstance) formasChartInstance.destroy();
+            if (formas.length) {
+                formasChartInstance = new Chart(document.getElementById('formasChart').getContext('2d'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: formas.map(f => fpLabels[f.forma_pago] || f.forma_pago),
+                        datasets: [{ data: formas.map(f => parseInt(f.total_cents || 0) / 100), backgroundColor: chartColors(formas.length) }],
+                    },
+                    options: { responsive: true, plugins: { legend: { position: 'bottom' } } },
+                });
+            }
+
+            // Mensuales
+            if (mensualChartInstance) mensualChartInstance.destroy();
+            const mens = d.mensuales || [];
+            if (mens.length) {
+                mensualChartInstance = new Chart(document.getElementById('mensualChart').getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: mens.map(x => x.mes),
+                        datasets: [{ label: 'Ventas ($)', data: mens.map(x => parseInt(x.total_cents || 0) / 100), backgroundColor: 'rgba(216, 178, 90, 0.7)', borderColor: 'rgba(216, 178, 90, 1)', borderWidth: 1 }],
+                    },
+                    options: { responsive: true, plugins: { legend: { position: 'top' } }, scales: { y: { beginAtZero: true } } },
+                });
+            }
+
+            // Sucursales
+            const sucBody = document.getElementById('sucursalBody');
+            sucBody.innerHTML = '';
+            const sucs = d.porSucursal || [];
+            if (!sucs.length) {
+                sucBody.innerHTML = '<tr><td colspan="3" class="text-muted text-center">Sin datos</td></tr>';
+            } else {
+                sucs.forEach(s => {
+                    sucBody.innerHTML += '<tr><td>' + escHtml(s.sucursal) + '</td><td class="text-end">' + parseInt(s.cantidad || 0) + '</td><td class="text-end">' + fmtCents(parseInt(s.total_cents || 0)) + '</td></tr>';
+                });
+            }
+            if (sucursalChartInstance) sucursalChartInstance.destroy();
+            if (sucs.length) {
+                sucursalChartInstance = new Chart(document.getElementById('sucursalChart').getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: sucs.map(s => s.sucursal),
+                        datasets: [{ label: 'Ventas ($)', data: sucs.map(s => parseInt(s.total_cents || 0) / 100), backgroundColor: chartColors(sucs.length) }],
+                    },
+                    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
+                });
+            }
+
+            // Top ganancia
+            const tgBody = document.getElementById('topGananciaBody');
+            tgBody.innerHTML = '';
+            const tgs = d.topGanancia || [];
+            if (!tgs.length) {
+                tgBody.innerHTML = '<tr><td colspan="6" class="text-muted text-center">Sin datos</td></tr>';
+            } else {
+                tgs.forEach((p, i) => {
+                    tgBody.innerHTML += '<tr><td>' + (i + 1) + '</td><td>' + escHtml(p.producto) + '</td><td class="text-end">' + parseInt(p.qty_total || 0) + '</td><td class="text-end">' + fmtCents(parseInt(p.neto_cents || 0)) + '</td><td class="text-end">' + fmtCents(parseInt(p.costo_cents || 0)) + '</td><td class="text-end text-success">' + fmtCents(parseInt(p.ganancia_cents || 0)) + '</td></tr>';
+                });
+            }
+
+            // Margen por departamento
+            const mdBody = document.getElementById('margenDeptoBody');
+            mdBody.innerHTML = '';
+            const mds = d.margenDepto || [];
+            if (!mds.length) {
+                mdBody.innerHTML = '<tr><td colspan="5" class="text-muted text-center">Sin datos</td></tr>';
+            } else {
+                mds.forEach(dp => {
+                    const n = parseInt(dp.neto_cents || 0);
+                    const g = parseInt(dp.ganancia_cents || 0);
+                    const mg = n > 0 ? (g / n * 100).toFixed(1) + '%' : '—';
+                    mdBody.innerHTML += '<tr><td>' + escHtml(dp.departamento) + '</td><td class="text-end">' + parseInt(dp.qty_total || 0) + '</td><td class="text-end">' + fmtCents(n) + '</td><td class="text-end text-success">' + fmtCents(g) + '</td><td class="text-end">' + mg + '</td></tr>';
                 });
             }
 
@@ -305,6 +523,40 @@ function exportarCSV() {
             csv += 'Departamento,Cantidad,Total\n';
             (d.porDepartamento || []).forEach(dp => {
                 csv += (dp.departamento || '') + ',' + (dp.qty_total ?? 0) + ',' + (parseInt(dp.total_cents ?? 0) / 100).toFixed(2) + '\n';
+            });
+
+            csv += '\nComparativas\n';
+            csv += 'Periodo,Desde,Hasta,Facturas,Total\n';
+            const comp = d.comparativas || {};
+            [['Mes actual', comp.mesActual], ['Mes anterior', comp.mesAnterior], ['Hace 1 año', comp.hace1Anio], ['Hace 2 años', comp.hace2Anios]].forEach(pair => {
+                const r = pair[1] || {};
+                csv += pair[0] + ',' + (r.desde || '') + ',' + (r.hasta || '') + ',' + (r.cantidad ?? 0) + ',' + (parseInt(r.total_cents ?? 0) / 100).toFixed(2) + '\n';
+            });
+
+            csv += '\nVentas Mensuales\n';
+            csv += 'Mes,Facturas,Total\n';
+            (d.mensuales || []).forEach(x => {
+                csv += x.mes + ',' + (x.cantidad ?? 0) + ',' + (parseInt(x.total_cents ?? 0) / 100).toFixed(2) + '\n';
+            });
+
+            csv += '\nPor Sucursal\n';
+            csv += 'Sucursal,Facturas,Total\n';
+            (d.porSucursal || []).forEach(s => {
+                csv += (s.sucursal || '') + ',' + (s.cantidad ?? 0) + ',' + (parseInt(s.total_cents ?? 0) / 100).toFixed(2) + '\n';
+            });
+
+            const gan = d.ganancia || {};
+            csv += '\nGanancia\n';
+            csv += 'Neto sin IVA,' + (parseInt(gan.neto_cents ?? 0) / 100).toFixed(2) + '\n';
+            csv += 'Costo,' + (parseInt(gan.costo_cents ?? 0) / 100).toFixed(2) + '\n';
+            csv += 'Descuentos,' + (parseInt(gan.descuento_cents ?? 0) / 100).toFixed(2) + '\n';
+            csv += 'Ganancia,' + (parseInt(gan.ganancia_cents ?? 0) / 100).toFixed(2) + '\n';
+            csv += 'Ticket promedio,' + (parseInt(d.ticket ?? 0) / 100).toFixed(2) + '\n';
+
+            csv += '\nTop por Ganancia\n';
+            csv += 'Producto,Variedad,Cantidad,Neto,Costo,Ganancia\n';
+            (d.topGanancia || []).forEach(p => {
+                csv += (p.producto || '') + ',' + (p.variedad || '') + ',' + (p.qty_total ?? 0) + ',' + (parseInt(p.neto_cents ?? 0) / 100).toFixed(2) + ',' + (parseInt(p.costo_cents ?? 0) / 100).toFixed(2) + ',' + (parseInt(p.ganancia_cents ?? 0) / 100).toFixed(2) + '\n';
             });
 
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });

@@ -165,6 +165,194 @@ final class ReporteRepo
         return in_array('punto_venta', self::$recibosColumns, true);
     }
 
+    /** Ventas agrupadas por sucursal (todas, sin filtro de sesión). */
+    public function ventasPorSucursal(string $desde, string $hasta): array
+    {
+        try {
+            $st = Db::pdo()->prepare("
+                SELECT
+                    COALESCE(s.id, CONCAT('pv-', f.punto_venta)) AS sucursal_key,
+                    COALESCE(s.nomsuc, spv_suc.nomsuc, CONCAT('PV ', f.punto_venta)) AS sucursal,
+                    COUNT(*) AS cantidad,
+                    COALESCE(SUM(f.total_cents), 0) AS total_cents
+                FROM facturas f
+                LEFT JOIN admin_sucursales s ON s.id = f.sucursal_id
+                LEFT JOIN admin_sucursal_puntos_venta spv ON spv.punto_venta = f.punto_venta
+                LEFT JOIN admin_sucursales spv_suc ON spv_suc.id = spv.sucursal_id
+                WHERE f.estado = 'emitida'
+                  AND f.fecha BETWEEN :desde AND :hasta
+                GROUP BY sucursal_key
+                ORDER BY total_cents DESC
+            ");
+            $st->execute([':desde' => $desde, ':hasta' => $hasta]);
+            return $st->fetchAll();
+        } catch (\Throwable $e) {
+            error_log('ReporteRepo::ventasPorSucursal error: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /** Totales por mes calendario (mes = 'YYYY-MM'). */
+    public function ventasMensuales(string $desde, string $hasta, int $puntoVenta = 0): array
+    {
+        $params = [':desde' => $desde, ':hasta' => $hasta];
+        $pvWhere = '';
+        if ($puntoVenta > 0) {
+            $pvWhere = ' AND f.punto_venta = :pv';
+            $params[':pv'] = $puntoVenta;
+        }
+        $st = Db::pdo()->prepare("
+            SELECT DATE_FORMAT(f.fecha, '%Y-%m') AS mes,
+                   COUNT(*) AS cantidad,
+                   COALESCE(SUM(f.total_cents), 0) AS total_cents
+            FROM facturas f
+            WHERE f.estado = 'emitida'
+              AND f.fecha BETWEEN :desde AND :hasta
+              $pvWhere
+            GROUP BY mes
+            ORDER BY mes ASC
+        ");
+        $st->execute($params);
+        return $st->fetchAll();
+    }
+
+    private static ?array $facturasCols = null;
+
+    private function facturasTieneColumna(string $col): bool
+    {
+        if (self::$facturasCols === null) {
+            try {
+                $rows = Db::pdo()->query('SHOW COLUMNS FROM facturas')->fetchAll();
+                self::$facturasCols = array_column($rows, 'Field');
+            } catch (\Throwable $e) {
+                self::$facturasCols = [];
+            }
+        }
+        return in_array($col, self::$facturasCols, true);
+    }
+
+    /**
+     * Ganancia neta: neto vendido sin IVA menos descuentos y costo.
+     * Costo = snapshot costo_cents al facturar, o precomp actual si no hay.
+     */
+    public function ganancia(string $desde, string $hasta, int $puntoVenta = 0): array
+    {
+        $params = [':desde' => $desde, ':hasta' => $hasta];
+        $pvWhere = '';
+        if ($puntoVenta > 0) {
+            $pvWhere = ' AND f.punto_venta = :pv';
+            $params[':pv'] = $puntoVenta;
+        }
+        $st = Db::pdo()->prepare("
+            SELECT
+                COALESCE(SUM(fi.total_cents - fi.iva_cents), 0) AS neto_cents,
+                COALESCE(SUM(COALESCE(fi.costo_cents, ROUND(p.precomp * 100)) * fi.qty), 0) AS costo_cents
+            FROM factura_items fi
+            INNER JOIN facturas f ON f.id = fi.factura_id
+            LEFT JOIN producto p ON p.idprodu = fi.idprodu
+            WHERE f.estado = 'emitida'
+              AND f.fecha BETWEEN :desde AND :hasta
+              $pvWhere
+        ");
+        $st->execute($params);
+        $row = $st->fetch() ?: ['neto_cents' => 0, 'costo_cents' => 0];
+
+        $descuento = 0;
+        try {
+            $descCols = [];
+            if ($this->facturasTieneColumna('descuento_cents')) {
+                $descCols[] = 'COALESCE(SUM(f.descuento_cents), 0)';
+            }
+            if ($this->facturasTieneColumna('puntos_cents')) {
+                $descCols[] = 'COALESCE(SUM(f.puntos_cents), 0)';
+            }
+            if ($descCols) {
+                $std = Db::pdo()->prepare('
+                    SELECT ' . implode(' + ', $descCols) . ' AS descuento_cents
+                    FROM facturas f
+                    WHERE f.estado = \'emitida\'
+                      AND f.fecha BETWEEN :desde AND :hasta
+                      ' . ($puntoVenta > 0 ? ' AND f.punto_venta = :pv' : '') . '
+                ');
+                $std->execute($params);
+                $descuento = (int)($std->fetchColumn() ?: 0);
+            }
+        } catch (\Throwable $e) {
+            $descuento = 0;
+        }
+
+        $neto = (int)($row['neto_cents'] ?? 0) - $descuento;
+        $costo = (int)($row['costo_cents'] ?? 0);
+        return [
+            'neto_cents' => $neto,
+            'costo_cents' => $costo,
+            'descuento_cents' => $descuento,
+            'ganancia_cents' => $neto - $costo,
+        ];
+    }
+
+    /** Top productos ordenados por ganancia bruta (sin prorratear descuentos de factura). */
+    public function topGanancia(string $desde, string $hasta, int $limite = 15, int $puntoVenta = 0): array
+    {
+        $limite = max(1, min(50, $limite));
+        $params = [':desde' => $desde, ':hasta' => $hasta, ':lim' => $limite];
+        $pvWhere = '';
+        if ($puntoVenta > 0) {
+            $pvWhere = ' AND f.punto_venta = :pv';
+            $params[':pv'] = $puntoVenta;
+        }
+        $st = Db::pdo()->prepare("
+            SELECT
+                COALESCE(NULLIF(fi.producto, ''), '(sin nombre)') AS producto,
+                fi.variedad,
+                SUM(fi.qty) AS qty_total,
+                SUM(fi.total_cents - fi.iva_cents) AS neto_cents,
+                SUM(COALESCE(fi.costo_cents, ROUND(p.precomp * 100)) * fi.qty) AS costo_cents,
+                SUM(fi.total_cents - fi.iva_cents) - SUM(COALESCE(fi.costo_cents, ROUND(p.precomp * 100)) * fi.qty) AS ganancia_cents
+            FROM factura_items fi
+            INNER JOIN facturas f ON f.id = fi.factura_id
+            LEFT JOIN producto p ON p.idprodu = fi.idprodu
+            WHERE f.estado = 'emitida'
+              AND f.fecha BETWEEN :desde AND :hasta
+              $pvWhere
+            GROUP BY fi.producto, fi.variedad
+            ORDER BY ganancia_cents DESC
+            LIMIT :lim
+        ");
+        $st->execute($params);
+        return $st->fetchAll();
+    }
+
+    /** Margen por departamento (ganancia bruta, sin prorratear descuentos). */
+    public function margenPorDepartamento(string $desde, string $hasta, int $puntoVenta = 0): array
+    {
+        $params = [':desde' => $desde, ':hasta' => $hasta];
+        $pvWhere = '';
+        if ($puntoVenta > 0) {
+            $pvWhere = ' AND f.punto_venta = :pv';
+            $params[':pv'] = $puntoVenta;
+        }
+        $st = Db::pdo()->prepare("
+            SELECT
+                COALESCE(NULLIF(d.nomdepar, ''), 'Sin dep.') AS departamento,
+                SUM(fi.qty) AS qty_total,
+                SUM(fi.total_cents - fi.iva_cents) AS neto_cents,
+                SUM(COALESCE(fi.costo_cents, ROUND(p.precomp * 100)) * fi.qty) AS costo_cents,
+                SUM(fi.total_cents - fi.iva_cents) - SUM(COALESCE(fi.costo_cents, ROUND(p.precomp * 100)) * fi.qty) AS ganancia_cents
+            FROM factura_items fi
+            INNER JOIN facturas f ON f.id = fi.factura_id
+            LEFT JOIN producto p ON p.idprodu = fi.idprodu
+            LEFT JOIN departa d ON d.codepar = p.codepar
+            WHERE f.estado = 'emitida'
+              AND f.fecha BETWEEN :desde AND :hasta
+              $pvWhere
+            GROUP BY d.codepar
+            ORDER BY ganancia_cents DESC
+        ");
+        $st->execute($params);
+        return $st->fetchAll();
+    }
+
     public function facturasPorTipo(string $desde, string $hasta, int $puntoVenta = 0): array
     {
         $params = [':desde' => $desde, ':hasta' => $hasta];

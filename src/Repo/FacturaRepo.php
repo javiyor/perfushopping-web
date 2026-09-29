@@ -303,13 +303,36 @@ final class FacturaRepo
             $id = (int)$pdo->lastInsertId();
 
             $hasDtoCol = false;
+            $hasCostoCol = false;
             try {
                 $itemCols = $pdo->query('SHOW COLUMNS FROM factura_items')->fetchAll();
-                $hasDtoCol = in_array('descuento_pct', array_column($itemCols, 'Field'), true);
+                $itemFields = array_column($itemCols, 'Field');
+                $hasDtoCol = in_array('descuento_pct', $itemFields, true);
+                if (!in_array('costo_cents', $itemFields, true)) {
+                    $pdo->exec('ALTER TABLE factura_items ADD COLUMN costo_cents INT DEFAULT NULL');
+                }
+                $hasCostoCol = true;
+            } catch (\Throwable $e) {}
+            // Snapshot del costo vigente (precomp neto en pesos -> centavos por unidad)
+            $costos = [];
+            try {
+                $ids = [];
+                foreach ($items as $it) {
+                    $pid = (int)($it['idprodu'] ?? 0);
+                    if ($pid > 0) {
+                        $ids[$pid] = true;
+                    }
+                }
+                if ($ids) {
+                    $in = implode(',', array_keys($ids));
+                    foreach ($pdo->query("SELECT idprodu, precomp FROM producto WHERE idprodu IN ({$in})")->fetchAll() as $pr) {
+                        $costos[(int)$pr['idprodu']] = (int)round((float)($pr['precomp'] ?? 0) * 100);
+                    }
+                }
             } catch (\Throwable $e) {}
             $sti = $pdo->prepare('
-                INSERT INTO factura_items (factura_id, idprodu, idcodgusto, producto, variedad, qty, unit_price_cents, iva_rate, iva_cents, total_cents' . ($hasDtoCol ? ', descuento_pct' : '') . ')
-                VALUES (:fid, :idprodu, :idcodgusto, :producto, :variedad, :qty, :unit_price, :iva_rate, :iva_cents, :total' . ($hasDtoCol ? ', :dto' : '') . ')
+                INSERT INTO factura_items (factura_id, idprodu, idcodgusto, producto, variedad, qty, unit_price_cents, iva_rate, iva_cents, total_cents' . ($hasDtoCol ? ', descuento_pct' : '') . ($hasCostoCol ? ', costo_cents' : '') . ')
+                VALUES (:fid, :idprodu, :idcodgusto, :producto, :variedad, :qty, :unit_price, :iva_rate, :iva_cents, :total' . ($hasDtoCol ? ', :dto' : '') . ($hasCostoCol ? ', :costo' : '') . ')
             ');
             foreach ($items as $it) {
                 $itemParams = [
@@ -326,6 +349,10 @@ final class FacturaRepo
                 ];
                 if ($hasDtoCol) {
                     $itemParams[':dto'] = $it['descuento_pct'] ?? 0;
+                }
+                if ($hasCostoCol) {
+                    $pid = (int)($it['idprodu'] ?? 0);
+                    $itemParams[':costo'] = $costos[$pid] ?? null;
                 }
                 $sti->execute($itemParams);
             }
