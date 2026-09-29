@@ -5,9 +5,10 @@ $list = $list ?? [];
 $q = (string)($q ?? '');
 $estado = (string)($estado ?? '');
 $estados = ['' => 'Todos', 'emitido' => 'Emitido', 'anulado' => 'Anulado'];
-$formaPagoLabels = [
+$formaPagoLabels = ($formasPagoLabels ?? []) + [
     'efectivo'=>'Efectivo', 'transferencia'=>'Transferencia', 'tarjeta_credito'=>'Tarjeta crédito',
     'tarjeta_debito'=>'Tarjeta débito', 'mercadopago'=>'Mercado Pago', 'cuenta_corriente'=>'Cta. cte.',
+    'cheque'=>'Cheque',
 ];
 ?>
 <div class="d-flex justify-content-between align-items-start mb-3">

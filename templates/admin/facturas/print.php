@@ -11,10 +11,10 @@ if (!$factura) exit;
 $autoPrint = isset($_GET['auto']) && $_GET['auto'] === '1';
 
 $tipoLabels = ['FACT-A'=>'Factura A','FACT-B'=>'Factura B','FACT-C'=>'Factura C','NC'=>'Nota de Crédito','ND'=>'Nota de Débito'];
-$formaPagoLabels = [
+$formaPagoLabels = ($formasPagoLabels ?? []) + [
     'efectivo'=>'Efectivo', 'transferencia'=>'Transferencia', 'tarjeta_credito'=>'Tarjeta crédito',
-    'tarjeta_debito'=>'Tarjeta débito', 'mercadopago'=>'Mercado Pago', 'cuenta_corriente'=>'Cta. cte.',
-    'cheque'=>'Cheque',
+    'tarjeta_debito'=>'Tarjeta débito', 'tarjeta'=>'Tarjetas', 'mercadopago'=>'Mercado Pago',
+    'cuenta_corriente'=>'Cta. cte.', 'cheque'=>'Cheque',
 ];
 $discriminaIva = in_array($factura['tipo_comprobante'] ?? '', ['FACT-A', 'FACT-C']);
 $isTicket = $formato !== 'a4';
@@ -159,6 +159,7 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
         <?php if ($label === 'Cheque'): $label = 'Cheque' . ($pg['banco_nombre'] ?? $pg['cheque_banco'] ?? '' ? ' ' . htmlspecialchars($pg['banco_nombre'] ?? $pg['cheque_banco']) : '') . ($pg['numero_cheque'] ? ' N°' . htmlspecialchars($pg['numero_cheque']) : ''); endif; ?>
         <?php if ($pg['forma_pago'] === 'tarjeta_credito'): $label .= $pg['cupon_numero'] ? ' - Cupón N°' . htmlspecialchars($pg['cupon_numero']) : ''; endif; ?>
         <?php if ($pg['forma_pago'] === 'cuenta_corriente'): $label .= $pg['plazo_descripcion'] ? ' - ' . htmlspecialchars($pg['plazo_descripcion']) : ''; endif; ?>
+        <?php if (!empty($pg['moneda']) && (int)($pg['monto_moneda_cents'] ?? 0) > 0): $label .= ' (' . $pg['moneda'] . ' ' . number_format((int)$pg['monto_moneda_cents'] / 100, 2, ',', '.') . (!empty($pg['cotizacion']) ? ' · TC ' . number_format((float)$pg['cotizacion'], 2, ',', '.') : '') . ')'; endif; ?>
         <div class="row"><span><?= htmlspecialchars($label) ?>:</span><span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($pg['monto_cents'] ?? 0))) ?></span></div>
         <?php endforeach; ?>
     </div>

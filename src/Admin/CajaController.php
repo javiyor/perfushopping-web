@@ -105,6 +105,7 @@ final class CajaController
             'detalleTurno' => $detalleTurno,
             'totalesForma' => $totalesForma,
             'egresosTurno' => $egresosTurno,
+            'formasPagoLabels' => (new \Perfushopping\Web\Repo\FormaPagoRepo())->labels(),
             'ajustePendiente' => $ajustePendiente,
             'esAdmin' => $esAdmin,
             'ajustesPendientesCount' => $ajustesPendientesCount,

@@ -1,10 +1,21 @@
 <?php
 $csrfToken = $csrf ?? '';
-$formaPagoLabels = [
-    'efectivo'=>'Efectivo', 'transferencia'=>'Transferencia bancaria', 'tarjeta_credito'=>'Tarjeta de crédito',
-    'tarjeta_debito'=>'Tarjeta de débito', 'mercadopago'=>'Mercado Pago', 'cuenta_corriente'=>'Cuenta corriente',
-    'cheque'=>'Cheque de terceros',
-];
+$formasPagoDb = $formasPago ?? [];
+$formaPagoLabels = [];
+foreach ($formasPagoDb as $fp) {
+    // Los métodos en moneda extranjera requieren cotización (solo soportado en facturas por ahora).
+    if (($fp['tipo'] ?? '') === 'moneda') {
+        continue;
+    }
+    $formaPagoLabels[(string)$fp['codigo']] = (string)$fp['nombre'];
+}
+if (!$formaPagoLabels) {
+    $formaPagoLabels = [
+        'efectivo'=>'Efectivo', 'transferencia'=>'Transferencia bancaria', 'tarjeta_credito'=>'Tarjeta de crédito',
+        'tarjeta_debito'=>'Tarjeta de débito', 'mercadopago'=>'Mercado Pago', 'cuenta_corriente'=>'Cuenta corriente',
+        'cheque'=>'Cheque de terceros',
+    ];
+}
 ?>
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>

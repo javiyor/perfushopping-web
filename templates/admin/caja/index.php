@@ -11,7 +11,7 @@ $arqueos = $arqueos ?? [];
 $detalleTurno = $detalleTurno ?? [];
 $totalesForma = $totalesForma ?? [];
 $egresosTurno = (int)($egresosTurno ?? 0);
-$formaLabels = ['efectivo' => 'Efectivo', 'transferencia' => 'Transf.', 'mercadopago' => 'MercadoPago', 'debito' => 'Débito', 'credito' => 'Crédito', 'tarjeta' => 'Tarjeta', 'cheque' => 'Cheque', 'cuenta_corriente' => 'Cta. cte.'];
+$formaLabels = ($formasPagoLabels ?? []) + ['efectivo' => 'Efectivo', 'transferencia' => 'Transf.', 'mercadopago' => 'MercadoPago', 'debito' => 'Débito', 'credito' => 'Crédito', 'tarjeta' => 'Tarjeta', 'tarjeta_credito' => 'Tarj. crédito', 'tarjeta_debito' => 'Tarj. débito', 'cheque' => 'Cheque', 'cuenta_corriente' => 'Cta. cte.'];
 $tipoBadges = ['venta' => 'info', 'cobro' => 'primary', 'ingreso' => 'success', 'egreso' => 'danger'];
 $historial = $historial ?? [];
 $ventasPorPuntoVenta = $ventasPorPuntoVenta ?? [];

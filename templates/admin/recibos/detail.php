@@ -8,7 +8,7 @@ if (!$recibo):
     <div class="alert alert-warning">Recibo no encontrado.</div>
 <?php return; endif;
 
-$formaPagoLabels = [
+$formaPagoLabels = ($formasPagoLabels ?? []) + [
     'efectivo'=>'Efectivo', 'transferencia'=>'Transferencia', 'tarjeta_credito'=>'Tarjeta crédito',
     'tarjeta_debito'=>'Tarjeta débito', 'mercadopago'=>'Mercado Pago', 'cuenta_corriente'=>'Cta. cte.',
     'cheque'=>'Cheque',

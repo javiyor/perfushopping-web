@@ -29,6 +29,7 @@ final class ReciboController
             'list' => $list,
             'q' => $q,
             'estado' => $estado,
+            'formasPagoLabels' => (new \Perfushopping\Web\Repo\FormaPagoRepo())->labels(),
             'csrf' => Csrf::token(),
             'pageTitle' => 'Recibos',
         ]);
@@ -41,6 +42,7 @@ final class ReciboController
 
         echo View::adminPage('admin/recibos/form.php', [
             'adminUser' => $adminUser,
+            'formasPago' => (new \Perfushopping\Web\Repo\FormaPagoRepo())->findActivas(),
             'csrf' => Csrf::token(),
             'pageTitle' => 'Nuevo recibo',
         ]);
@@ -191,6 +193,7 @@ final class ReciboController
             'adminUser' => $adminUser,
             'recibo' => $recibo,
             'pagos' => $pagos,
+            'formasPagoLabels' => (new \Perfushopping\Web\Repo\FormaPagoRepo())->labels(),
             'csrf' => Csrf::token(),
             'pageTitle' => 'Recibo ' . ($recibo['codigo'] ?? ''),
         ]);
@@ -325,6 +328,7 @@ final class ReciboController
             'pagos' => $pagos,
             'formato' => $formato,
             'empresa' => $empresa,
+            'formasPagoLabels' => (new \Perfushopping\Web\Repo\FormaPagoRepo())->labels(),
         ]);
     }
 }

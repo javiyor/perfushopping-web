@@ -50,6 +50,7 @@ use Perfushopping\Web\Admin\ProveedorController as AdminProveedorController;
 use Perfushopping\Web\Admin\PresupuestoController as AdminPresupuestoController;
 use Perfushopping\Web\Admin\RemitoController as AdminRemitoController;
 use Perfushopping\Web\Admin\FacturaController as AdminFacturaController;
+use Perfushopping\Web\Admin\FormaPagoController as AdminFormaPagoController;
 use Perfushopping\Web\Admin\ReciboController as AdminReciboController;
 use Perfushopping\Web\Admin\CtaCteController as AdminCtaCteController;
 use Perfushopping\Web\Admin\SesionController as AdminSesionController;
@@ -348,6 +349,10 @@ $router->get('/admin/promo-tarjetas', [AdminPromoTarjetaController::class, 'inde
 $router->post('/admin/promo-tarjetas/save', [AdminPromoTarjetaController::class, 'save']);
 $router->post('/admin/promo-tarjetas/delete', [AdminPromoTarjetaController::class, 'delete']);
 $router->post('/admin/promo-tarjetas/delete-image', [AdminPromoTarjetaController::class, 'deleteImage']);
+$router->get('/admin/formas-pago', [AdminFormaPagoController::class, 'index']);
+$router->post('/admin/formas-pago/save', [AdminFormaPagoController::class, 'save']);
+$router->post('/admin/formas-pago/toggle', [AdminFormaPagoController::class, 'toggle']);
+$router->post('/admin/formas-pago/delete', [AdminFormaPagoController::class, 'delete']);
 $router->get('/admin/departamentos', [AdminDepartamentoController::class, 'index']);
 $router->post('/admin/departamentos/save', [AdminDepartamentoController::class, 'save']);
 $router->post('/admin/departamentos/delete', [AdminDepartamentoController::class, 'delete']);

@@ -132,6 +132,7 @@ final class FacturaController
             'tarjetas' => $this->tarjetas(),
             'equipos' => $this->equipos((int)$auth->getSucursalId()),
             'plazos' => $this->plazos(),
+            'formasPago' => (new \Perfushopping\Web\Repo\FormaPagoRepo())->findActivas(),
             'transferCuentaId' => $transferCuentaId,
             'tarjetaBancoMap' => $tarjetaBancoMap,
             'csrf' => Csrf::token(),
@@ -202,11 +203,26 @@ final class FacturaController
             $monto = (int)($pg['monto_cents'] ?? 0);
             if ($monto <= 0) continue;
             $formaPagoP = trim((string)($pg['forma_pago'] ?? 'efectivo'));
-            // Normalizar tarjetas unificadas
-            if (in_array($formaPagoP, ['tarjeta_credito','tarjeta_debito','tarjetas'], true)) $formaPagoP = 'tarjeta';
+            // Compatibilidad: el código viejo 'tarjetas' equivale a 'tarjeta'
+            if ($formaPagoP === 'tarjetas') $formaPagoP = 'tarjeta';
+            $tipoPago = \Perfushopping\Web\Repo\FormaPagoRepo::tipoDe($formaPagoP);
             $bancoId = null;
             $chequeId = null;
-            if ($formaPagoP === 'cheque' && !empty($pg['cheque'])) {
+            $moneda = null;
+            $montoMoneda = null;
+            $cotiz = null;
+            if ($tipoPago === 'moneda') {
+                $moneda = strtoupper(trim((string)($pg['moneda'] ?? '')));
+                $montoMoneda = (int)($pg['monto_moneda_cents'] ?? 0);
+                $cotiz = (float)($pg['cotizacion'] ?? 0);
+                if (!preg_match('/^[A-Z]{3}$/', (string)$moneda) || $montoMoneda <= 0 || $cotiz <= 0) {
+                    Response::json(['ok' => false, 'error' => 'Pago en moneda extranjera incompleto (monto y cotización).'], 422);
+                    return;
+                }
+                $monto = (int)round($montoMoneda * $cotiz / 100);
+                if ($monto <= 0) continue;
+            }
+            if ($tipoPago === 'cheque' && !empty($pg['cheque'])) {
                 $chq = $pg['cheque'];
                 $bancoId = (int)($chq['banco_id'] ?? 0) ?: null;
                 $bancoEmisor = trim((string)($chq['banco'] ?? ''));
@@ -232,13 +248,16 @@ final class FacturaController
                 'forma_pago' => $formaPagoP,
                 'monto_cents' => $monto,
                 'cheque_id' => $chequeId,
-                'cupon_numero' => $formaPagoP === 'tarjeta' ? trim((string)($pg['cupon_numero'] ?? '')) : null,
-                'cupon_monto_cents' => $formaPagoP === 'tarjeta' ? (int)($pg['cupon_monto_cents'] ?? 0) : null,
-                'idplazo' => $formaPagoP === 'cuenta_corriente' ? ((int)($pg['idplazo'] ?? 0) ?: null) : null,
+                'cupon_numero' => $tipoPago === 'tarjeta' ? trim((string)($pg['cupon_numero'] ?? '')) : null,
+                'cupon_monto_cents' => $tipoPago === 'tarjeta' ? (int)($pg['cupon_monto_cents'] ?? 0) : null,
+                'idplazo' => $tipoPago === 'ctacte' ? ((int)($pg['idplazo'] ?? 0) ?: null) : null,
                 'banco_id' => $bancoId,
-                'banco_cuenta_id' => $formaPagoP === 'transferencia' ? ((int)($pg['banco_cuenta_id'] ?? $pg['banco_id'] ?? 0) ?: null) : null,
-                'tarjeta_id' => $formaPagoP === 'tarjeta' ? ((int)($pg['tarjeta_id'] ?? $pg['idtarje'] ?? 0) ?: null) : null,
-                'equipo_id' => $formaPagoP === 'tarjeta' ? ((int)($pg['equipo_id'] ?? $pg['idequipo'] ?? 0) ?: null) : null,
+                'banco_cuenta_id' => $tipoPago === 'banco' ? ((int)($pg['banco_cuenta_id'] ?? $pg['banco_id'] ?? 0) ?: null) : null,
+                'tarjeta_id' => $tipoPago === 'tarjeta' ? ((int)($pg['tarjeta_id'] ?? $pg['idtarje'] ?? 0) ?: null) : null,
+                'equipo_id' => $tipoPago === 'tarjeta' ? ((int)($pg['equipo_id'] ?? $pg['idequipo'] ?? 0) ?: null) : null,
+                'moneda' => $moneda,
+                'monto_moneda_cents' => $montoMoneda,
+                'cotizacion' => $cotiz,
             ];
         }
 
@@ -520,6 +539,7 @@ final class FacturaController
             'pagos' => $pagos,
             'arcaComprobante' => $arcaComprobante,
             'qrUrl' => $qrUrl,
+            'formasPagoLabels' => (new \Perfushopping\Web\Repo\FormaPagoRepo())->labels(),
             'csrf' => Csrf::token(),
             'pageTitle' => 'Factura ' . ($factura['codigo'] ?? ''),
         ]);
@@ -955,6 +975,7 @@ final class FacturaController
             'qrUrl' => $qrUrl,
             'empresa' => $empresa,
             'sucursal' => $sucursal,
+            'formasPagoLabels' => (new \Perfushopping\Web\Repo\FormaPagoRepo())->labels(),
         ]);
     }
 

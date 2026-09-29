@@ -10,7 +10,7 @@ if (!$recibo) exit;
 $isTicket = $formato !== 'a4';
 $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
 
-$formaPagoLabels = [
+$formaPagoLabels = ($formasPagoLabels ?? []) + [
     'efectivo'=>'Efectivo', 'transferencia'=>'Transferencia', 'tarjeta_credito'=>'Tarjeta crédito',
     'tarjeta_debito'=>'Tarjeta débito', 'mercadopago'=>'Mercado Pago', 'cuenta_corriente'=>'Cta. cte.',
     'cheque'=>'Cheque',

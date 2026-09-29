@@ -127,10 +127,38 @@ final class CajaRepo
         return " AND NOT (f.entrega_tipo='envio' AND f.envio_estado IN ('pendiente','en_transito') AND fp.forma_pago='efectivo') ";
     }
 
+    /**
+     * Tipo de comportamiento de fp.forma_pago (fp = alias de factura_pagos).
+     * Usa la tabla formas_pago y cae a los códigos históricos si no existe.
+     */
+    private function formaPagoTipoSql(string $fpAlias = 'fp'): string
+    {
+        \Perfushopping\Web\Repo\FormaPagoRepo::ensureTable();
+        return "(SELECT fpm.tipo FROM formas_pago fpm WHERE fpm.codigo = {$fpAlias}.forma_pago LIMIT 1)";
+    }
+
+    private function formaPagoTipoLegacySql(string $fpAlias = 'fp'): string
+    {
+        return "CASE {$fpAlias}.forma_pago
+            WHEN 'efectivo' THEN 'efectivo'
+            WHEN 'transferencia' THEN 'banco' WHEN 'mercadopago' THEN 'banco'
+            WHEN 'debito' THEN 'banco' WHEN 'credito' THEN 'banco'
+            WHEN 'tarjeta' THEN 'tarjeta' WHEN 'tarjeta_credito' THEN 'tarjeta'
+            WHEN 'tarjeta_debito' THEN 'tarjeta' WHEN 'tarjetas' THEN 'tarjeta'
+            WHEN 'cheque' THEN 'cheque' WHEN 'cuenta_corriente' THEN 'ctacte'
+            ELSE 'otro' END";
+    }
+
+    private function formaPagoTipoExpr(string $fpAlias = 'fp'): string
+    {
+        return 'COALESCE(' . $this->formaPagoTipoSql($fpAlias) . ', ' . $this->formaPagoTipoLegacySql($fpAlias) . ')';
+    }
+
     public function totalVentasEfectivo(string $fecha, int $puntoVenta): int
     {
         try {
             $extra = $this->efectivoNoCajaWhere();
+            $tipo = $this->formaPagoTipoExpr('fp');
             $st = Db::pdo()->prepare("
                 SELECT COALESCE(SUM(fp.monto_cents), 0)
                 FROM factura_pagos fp
@@ -138,7 +166,7 @@ final class CajaRepo
                 WHERE f.estado = 'emitida'
                   AND f.fecha = :fec
                   AND f.punto_venta = :pv
-                  AND fp.forma_pago = 'efectivo'
+                  AND {$tipo} = 'efectivo'
                   {$extra}
             ");
             $st->execute([':fec' => $fecha, ':pv' => $puntoVenta]);
@@ -152,6 +180,7 @@ final class CajaRepo
     public function totalVentasTransferencia(string $fecha, int $puntoVenta): int
     {
         try {
+            $tipo = $this->formaPagoTipoExpr('fp');
             $st = Db::pdo()->prepare("
                 SELECT COALESCE(SUM(fp.monto_cents), 0)
                 FROM factura_pagos fp
@@ -159,7 +188,7 @@ final class CajaRepo
                 WHERE f.estado = 'emitida'
                   AND f.fecha = :fec
                   AND f.punto_venta = :pv
-                  AND fp.forma_pago IN ('transferencia', 'mercadopago', 'debito', 'credito')
+                  AND {$tipo} = 'banco'
             ");
             $st->execute([':fec' => $fecha, ':pv' => $puntoVenta]);
             return (int)$st->fetchColumn();
@@ -331,12 +360,13 @@ final class CajaRepo
     {
         try {
             $extraEfectivo = $this->facturasTieneEntrega() ? " AND NOT (f.entrega_tipo='envio' AND f.envio_estado IN ('pendiente','en_transito') AND fp.forma_pago='efectivo')" : "";
+            $tipo = $this->formaPagoTipoExpr('fp');
             // For total_efectivo we exclude pendiente efectivo envios; others count normally
             $st = Db::pdo()->prepare("
                 SELECT f.punto_venta, COALESCE(s.nomsuc, CONCAT('Punto ', f.punto_venta)) AS sucursal_nombre,
-                       COALESCE(SUM(CASE WHEN fp.forma_pago = 'efectivo' {$extraEfectivo} THEN fp.monto_cents ELSE 0 END), 0) AS total_efectivo,
-                       COALESCE(SUM(CASE WHEN fp.forma_pago IN ('transferencia','mercadopago','debito','credito') THEN fp.monto_cents ELSE 0 END), 0) AS total_transferencia,
-                       COALESCE(SUM(CASE WHEN fp.forma_pago='efectivo' {$extraEfectivo} THEN fp.monto_cents WHEN fp.forma_pago IN ('transferencia','mercadopago','debito','credito') THEN fp.monto_cents ELSE 0 END), 0) AS total
+                       COALESCE(SUM(CASE WHEN {$tipo} = 'efectivo' {$extraEfectivo} THEN fp.monto_cents ELSE 0 END), 0) AS total_efectivo,
+                       COALESCE(SUM(CASE WHEN {$tipo} = 'banco' THEN fp.monto_cents ELSE 0 END), 0) AS total_transferencia,
+                       COALESCE(SUM(CASE WHEN {$tipo} = 'efectivo' {$extraEfectivo} THEN fp.monto_cents WHEN {$tipo} = 'banco' THEN fp.monto_cents ELSE 0 END), 0) AS total
                 FROM facturas f
                 INNER JOIN factura_pagos fp ON fp.factura_id = f.id
                 LEFT JOIN sucursales s ON s.id = f.punto_venta
@@ -538,6 +568,7 @@ final class CajaRepo
         $this->ensureCajaColumnas();
         try {
             $extra = $this->efectivoNoCajaWhere();
+            $tipo = $this->formaPagoTipoExpr('fp');
             $st = Db::pdo()->prepare("
                 SELECT COALESCE(SUM(fp.monto_cents), 0)
                 FROM factura_pagos fp
@@ -546,7 +577,7 @@ final class CajaRepo
                   AND f.fecha = :fec
                   AND f.punto_venta = :pv
                   AND " . $this->turnoWhere('f') . "
-                  AND fp.forma_pago = 'efectivo'
+                  AND {$tipo} = 'efectivo'
                   {$extra}
             ");
             $st->execute([':fec' => $fecha, ':pv' => $puntoVenta, ':caja' => $cajaId, ':apCreada' => $aperturaCreada]);
@@ -561,6 +592,7 @@ final class CajaRepo
     {
         $this->ensureCajaColumnas();
         try {
+            $tipo = $this->formaPagoTipoExpr('fp');
             $st = Db::pdo()->prepare("
                 SELECT COALESCE(SUM(fp.monto_cents), 0)
                 FROM factura_pagos fp
@@ -569,7 +601,7 @@ final class CajaRepo
                   AND f.fecha = :fec
                   AND f.punto_venta = :pv
                   AND " . $this->turnoWhere('f') . "
-                  AND fp.forma_pago IN ('transferencia', 'mercadopago', 'debito', 'credito')
+                  AND {$tipo} = 'banco'
             ");
             $st->execute([':fec' => $fecha, ':pv' => $puntoVenta, ':caja' => $cajaId, ':apCreada' => $aperturaCreada]);
             return (int)$st->fetchColumn();

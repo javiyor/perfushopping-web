@@ -13,10 +13,10 @@ if (!$factura):
 $tipoLabels = ['FACT-A'=>'Factura A','FACT-B'=>'Factura B','FACT-C'=>'Factura C','NC'=>'Nota de Crédito','ND'=>'Nota de Débito'];
 $tipoBadges = ['FACT-A'=>'primary','FACT-B'=>'success','FACT-C'=>'secondary','NC'=>'warning','ND'=>'danger'];
 $estadoBadges = ['pendiente'=>'warning','emitida'=>'success','anulada'=>'secondary'];
-$formaPagoLabels = [
+$formaPagoLabels = ($formasPagoLabels ?? []) + [
     'efectivo'=>'Efectivo', 'transferencia'=>'Transferencia', 'tarjeta_credito'=>'Tarjeta crédito',
-    'tarjeta_debito'=>'Tarjeta débito', 'mercadopago'=>'Mercado Pago', 'cuenta_corriente'=>'Cta. cte.',
-    'cheque'=>'Cheque',
+    'tarjeta_debito'=>'Tarjeta débito', 'tarjeta'=>'Tarjetas', 'mercadopago'=>'Mercado Pago',
+    'cuenta_corriente'=>'Cta. cte.', 'cheque'=>'Cheque',
 ];
 
 // Gross price display for CF (B) and Mono (C); net for RI (A)
@@ -229,6 +229,9 @@ $discriminaIva = in_array($factura['tipo_comprobante'] ?? '', ['FACT-A']);
                             <?= htmlspecialchars($formaPagoLabels[$pg['forma_pago'] ?? ''] ?? $pg['forma_pago'] ?? '') ?>
                         <?php endif; ?>
                     </span>
+                    <?php if (!empty($pg['moneda']) && (int)($pg['monto_moneda_cents'] ?? 0) > 0): ?>
+                        <div class="text-muted" style="font-size:11px"><?= htmlspecialchars($pg['moneda']) ?> <?= htmlspecialchars(number_format((int)$pg['monto_moneda_cents'] / 100, 2, ',', '.')) ?><?= !empty($pg['cotizacion']) ? ' · TC ' . htmlspecialchars(number_format((float)$pg['cotizacion'], 2, ',', '.')) : '' ?></div>
+                    <?php endif; ?>
                     <span class="fw-bold"><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($pg['monto_cents'] ?? 0))) ?></span>
                 </div>
                 <?php endforeach; ?>

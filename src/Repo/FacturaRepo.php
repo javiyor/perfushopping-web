@@ -331,21 +331,31 @@ final class FacturaRepo
             }
 
             // Inserción compatible con columnas nuevas y viejas
-            $hasTarjeta = false; $hasEquipo = false; $hasBancoCuenta = false;
+            $hasTarjeta = false; $hasEquipo = false; $hasBancoCuenta = false; $hasMoneda = false;
             try {
                 $cols = $pdo->query('SHOW COLUMNS FROM factura_pagos')->fetchAll();
                 $fields = array_column($cols, 'Field');
                 $hasTarjeta = in_array('tarjeta_id', $fields, true);
                 $hasEquipo = in_array('equipo_id', $fields, true);
                 $hasBancoCuenta = in_array('banco_cuenta_id', $fields, true);
+                $needMoneda = ['moneda' => 'ADD COLUMN moneda CHAR(3) DEFAULT NULL',
+                    'monto_moneda_cents' => 'ADD COLUMN monto_moneda_cents INT DEFAULT NULL',
+                    'cotizacion' => 'ADD COLUMN cotizacion DECIMAL(18,6) DEFAULT NULL'];
+                foreach ($needMoneda as $col => $ddl) {
+                    if (!in_array($col, $fields, true)) {
+                        $pdo->exec("ALTER TABLE factura_pagos {$ddl}");
+                    }
+                }
+                $hasMoneda = true;
             } catch (\Throwable $e) {}
             if ($hasTarjeta && $hasEquipo && $hasBancoCuenta) {
-                $stp = $pdo->prepare('INSERT INTO factura_pagos (factura_id, forma_pago, cheque_id, monto_cents, cupon_numero, cupon_monto_cents, idplazo, banco_id, tarjeta_id, equipo_id, banco_cuenta_id) VALUES (:fid, :forma, :chq, :monto, :cupon, :cuponm, :plazo, :banco, :tarjeta, :equipo, :bancoCuenta)');
+                $monCols = $hasMoneda ? ', moneda, monto_moneda_cents, cotizacion' : '';
+                $monVals = $hasMoneda ? ', :moneda, :montoMoneda, :cotiz' : '';
+                $stp = $pdo->prepare('INSERT INTO factura_pagos (factura_id, forma_pago, cheque_id, monto_cents, cupon_numero, cupon_monto_cents, idplazo, banco_id, tarjeta_id, equipo_id, banco_cuenta_id' . $monCols . ') VALUES (:fid, :forma, :chq, :monto, :cupon, :cuponm, :plazo, :banco, :tarjeta, :equipo, :bancoCuenta' . $monVals . ')');
                 foreach ($pagos as $pg) {
-                    // Normalizar tarjetas unificadas
-                    $forma = $pg['forma_pago'];
-                    if (in_array($forma, ['tarjeta_credito','tarjeta_debito','tarjeta','tarjetas'], true)) $forma = 'tarjeta';
-                    $stp->execute([
+                    // Compatibilidad: el código viejo 'tarjetas' equivale a 'tarjeta'
+                    $forma = $pg['forma_pago'] === 'tarjetas' ? 'tarjeta' : $pg['forma_pago'];
+                    $params = [
                         ':fid' => $id,
                         ':forma' => $forma,
                         ':chq' => $pg['cheque_id'] ?? null,
@@ -357,13 +367,18 @@ final class FacturaRepo
                         ':tarjeta' => $pg['tarjeta_id'] ?? null,
                         ':equipo' => $pg['equipo_id'] ?? null,
                         ':bancoCuenta' => $pg['banco_cuenta_id'] ?? null,
-                    ]);
+                    ];
+                    if ($hasMoneda) {
+                        $params[':moneda'] = $pg['moneda'] ?? null;
+                        $params[':montoMoneda'] = $pg['monto_moneda_cents'] ?? null;
+                        $params[':cotiz'] = $pg['cotizacion'] ?? null;
+                    }
+                    $stp->execute($params);
                 }
             } else {
                 $stp = $pdo->prepare('INSERT INTO factura_pagos (factura_id, forma_pago, cheque_id, monto_cents, cupon_numero, cupon_monto_cents, idplazo, banco_id) VALUES (:fid, :forma, :chq, :monto, :cupon, :cuponm, :plazo, :banco)');
                 foreach ($pagos as $pg) {
-                    $forma = $pg['forma_pago'];
-                    if (in_array($forma, ['tarjeta_credito','tarjeta_debito','tarjeta','tarjetas'], true)) $forma = 'tarjeta';
+                    $forma = $pg['forma_pago'] === 'tarjetas' ? 'tarjeta' : $pg['forma_pago'];
                     $stp->execute([
                         ':fid' => $id,
                         ':forma' => $forma,

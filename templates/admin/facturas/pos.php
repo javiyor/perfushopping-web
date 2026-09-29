@@ -1111,14 +1111,30 @@ const EQUIPOS = <?= json_encode($equipos, JSON_UNESCAPED_UNICODE) ?>;
 const TRANSFER_CUENTA_ID = <?= json_encode($transferCuentaId ?? null) ?>;
 const TARJETA_BANCO_MAP = <?= json_encode($tarjetaBancoMap ?? []) ?>;
 const PLAZOS = <?= json_encode($plazos, JSON_UNESCAPED_UNICODE) ?>;
-const FORMAS_PAGO = [
-    ['efectivo', 'Efectivo'],
-    ['transferencia', 'Transferencia bancaria'],
-    ['tarjeta', 'Tarjetas'],
-    ['mercadopago', 'Mercado Pago'],
-    ['cuenta_corriente', 'Cuenta corriente'],
-    ['cheque', 'Cheque de terceros'],
-];
+const FORMAS_PAGO_RAW = <?= json_encode($formasPago ?? [], JSON_UNESCAPED_UNICODE) ?>;
+const FORMAS_PAGO = (FORMAS_PAGO_RAW.length ? FORMAS_PAGO_RAW : [
+    {codigo: 'efectivo', nombre: 'Efectivo', tipo: 'efectivo'},
+    {codigo: 'transferencia', nombre: 'Transferencia bancaria', tipo: 'banco'},
+    {codigo: 'tarjeta', nombre: 'Tarjetas', tipo: 'tarjeta'},
+    {codigo: 'mercadopago', nombre: 'Mercado Pago', tipo: 'banco'},
+    {codigo: 'cuenta_corriente', nombre: 'Cuenta corriente', tipo: 'ctacte'},
+    {codigo: 'cheque', nombre: 'Cheque de terceros', tipo: 'cheque'},
+]).map(f => [f.codigo, f.nombre]);
+const FORMAS_TIPO = {};
+const FORMAS_MONEDA = {};
+(FORMAS_PAGO_RAW.length ? FORMAS_PAGO_RAW : []).forEach(f => {
+    FORMAS_TIPO[f.codigo] = f.tipo;
+    if (f.moneda) FORMAS_MONEDA[f.codigo] = f.moneda;
+});
+function formaTipo(forma) {
+    if (FORMAS_TIPO[forma]) return FORMAS_TIPO[forma];
+    if (forma === 'efectivo') return 'efectivo';
+    if (['transferencia', 'mercadopago', 'debito', 'credito'].includes(forma)) return 'banco';
+    if (['tarjeta', 'tarjeta_credito', 'tarjeta_debito'].includes(forma)) return 'tarjeta';
+    if (forma === 'cheque') return 'cheque';
+    if (forma === 'cuenta_corriente') return 'ctacte';
+    return 'otro';
+}
 
 function addPagoLine(forma) {
     const container = document.getElementById('pagosContainer');
@@ -1154,7 +1170,10 @@ function onPagoFormaChange(sel) {
     const line = sel.closest('.pago-line');
     const extra = line.querySelector('.fp-extra');
     const forma = sel.value;
-    if (forma === 'tarjeta' || forma === 'tarjeta_credito' || forma === 'tarjeta_debito') {
+    const tipo = formaTipo(forma);
+    const montoInput = line.querySelector('.fp-monto');
+    if (montoInput && tipo !== 'moneda') montoInput.readOnly = false;
+    if (tipo === 'tarjeta') {
         let tarOpts = '<option value="">— Seleccionar tarjeta —</option>';
         TARJETAS.forEach(t => { tarOpts += `<option value="${t.idtarje}">${esc(t.nomtar)}</option>`; });
         let eqOpts = '<option value="">— Seleccionar equipo —</option>';
@@ -1165,7 +1184,7 @@ function onPagoFormaChange(sel) {
                 <div class="col-6"><label class="small text-muted">Equipo / POS</label><select class="form-select form-select-sm fp-equipo">${eqOpts}</select></div>
                 <div class="col-12"><label class="small text-muted">N° de cupón</label><input class="form-control form-control-sm fp-cupon" placeholder="N° de cupón" /></div>
             </div>`;
-    } else if (forma === 'transferencia') {
+    } else if (tipo === 'banco') {
         let bcOpts = '<option value="">— Seleccionar banco destino —</option>';
         BANCOS_CUENTAS.forEach(b => { bcOpts += `<option value="${b.id}">${esc(b.banco)} - ${esc(b.numero_cuenta||b.cbu||'')}</option>`; });
         if (BANCOS_CUENTAS.length===0) {
@@ -1181,7 +1200,7 @@ function onPagoFormaChange(sel) {
             sel.value = String(TRANSFER_CUENTA_ID);
             if (!sel.value && BANCOS_CUENTAS.length>0) sel.value = String(TRANSFER_CUENTA_ID);
         }
-    } else if (forma === 'cuenta_corriente') {
+    } else if (tipo === 'ctacte') {
         let opts = '<option value="">— Sin plazo —</option>';
         PLAZOS.forEach(p => { opts += `<option value="${p.idplazo}">${esc(p.descripcion)}</option>`; });
         extra.innerHTML = `
@@ -1190,7 +1209,7 @@ function onPagoFormaChange(sel) {
                     <select class="form-select form-select-sm fp-plazo">${opts}</select>
                 </div>
             </div>`;
-    } else if (forma === 'cheque') {
+    } else if (tipo === 'cheque') {
         let bopts = '<option value="">— Seleccionar banco —</option>';
         BANCOS.forEach(b => { bopts += `<option value="${b.idban}">${esc(b.nombanc)}</option>`; });
         extra.innerHTML = `
@@ -1201,6 +1220,23 @@ function onPagoFormaChange(sel) {
                 <div class="col-6"><label class="small text-muted">CUIT</label><input class="form-control form-control-sm fp-chequecuit" /></div>
                 <div class="col-6"><label class="small text-muted">Vencimiento</label><input class="form-control form-control-sm fp-chequevenc" type="date" /></div>
             </div>`;
+    } else if (tipo === 'moneda') {
+        const mon = FORMAS_MONEDA[forma] || '';
+        extra.innerHTML = `
+            <div class="row g-1">
+                <div class="col-4"><label class="small text-muted">Monto (${esc(mon)})</label><input class="form-control form-control-sm fp-monto-moneda" type="number" min="0" step="0.01" /></div>
+                <div class="col-4"><label class="small text-muted">Cotización $</label><input class="form-control form-control-sm fp-cotizacion" type="number" min="0" step="0.01" /></div>
+                <div class="col-4"><label class="small text-muted">= Pesos</label><input class="form-control form-control-sm" id="fpConvShow" readonly /></div>
+            </div>`;
+        const updConv = () => {
+            const mm = parseFloat(extra.querySelector('.fp-monto-moneda').value) || 0;
+            const cz = parseFloat(extra.querySelector('.fp-cotizacion').value) || 0;
+            const pesos = mm * cz;
+            extra.querySelector('#fpConvShow').value = pesos ? pesos.toFixed(2) : '';
+            if (montoInput) { montoInput.value = pesos ? pesos.toFixed(2) : 0; montoInput.readOnly = true; }
+            recalcTotals();
+        };
+        extra.querySelectorAll('.fp-monto-moneda,.fp-cotizacion').forEach(i => i.addEventListener('input', updConv));
     } else {
         extra.innerHTML = '';
     }
@@ -1224,8 +1260,9 @@ function updateEnvioCajaHint() {
     // check pagos to decide message
     let hasEfectivo = false, hasTransfer = false;
     document.querySelectorAll('#pagosContainer .fp-forma').forEach(sel => {
-        if (sel.value === 'efectivo') hasEfectivo = true;
-        if (['transferencia','mercadopago','tarjeta_credito','tarjeta_debito'].includes(sel.value)) hasTransfer = true;
+        const t = formaTipo(sel.value);
+        if (t === 'efectivo') hasEfectivo = true;
+        if (t !== 'efectivo') hasTransfer = true;
     });
     if (hasEfectivo && !hasTransfer) {
         hint.textContent = 'Envío con efectivo: quedará pendiente en Envíos hasta cobrar al entregar. No impacta caja aún.';
@@ -1267,24 +1304,27 @@ function submitFactura() {
     const pagos = [];
     document.querySelectorAll('#pagosContainer .pago-line').forEach(line => {
         const forma = line.querySelector('.fp-forma').value;
+        const tipo = formaTipo(forma);
         const monto = parseInt(parseFloat(line.querySelector('.fp-monto').value) * 100) || 0;
         if (monto <= 0) return;
-        // Normalizar forma tarjeta unificada
-        let formaNorm = forma;
-        if (forma === 'tarjeta_credito' || forma === 'tarjeta_debito') formaNorm = 'tarjeta';
-        const entry = { forma_pago: formaNorm, monto_cents: monto };
-        if (formaNorm === 'tarjeta') {
+        const entry = { forma_pago: forma, monto_cents: monto };
+        if (tipo === 'moneda') {
+            entry.moneda = FORMAS_MONEDA[forma] || '';
+            entry.monto_moneda_cents = Math.round((parseFloat(line.querySelector('.fp-monto-moneda')?.value) || 0) * 100);
+            entry.cotizacion = parseFloat(line.querySelector('.fp-cotizacion')?.value) || 0;
+        }
+        if (tipo === 'tarjeta') {
             entry.cupon_numero = (line.querySelector('.fp-cupon')?.value || '').trim();
             entry.cupon_monto_cents = monto || null;
             entry.tarjeta_id = parseInt(line.querySelector('.fp-tarjeta')?.value) || null;
             entry.equipo_id = parseInt(line.querySelector('.fp-equipo')?.value) || null;
-        } else if (formaNorm === 'transferencia') {
+        } else if (tipo === 'banco') {
             entry.banco_cuenta_id = parseInt(line.querySelector('.fp-banco-cuenta')?.value) || null;
             // fallback si usa bancos viejos
             if (!entry.banco_cuenta_id) entry.banco_id = parseInt(line.querySelector('.fp-banco-cuenta')?.value) || null;
-        } else if (formaNorm === 'cuenta_corriente') {
+        } else if (tipo === 'ctacte') {
             entry.idplazo = parseInt(line.querySelector('.fp-plazo').value) || null;
-        } else if (formaNorm === 'cheque') {
+        } else if (tipo === 'cheque') {
             const bancoSel = line.querySelector('.fp-banco');
             entry.cheque = {
                 banco_id: parseInt(bancoSel.value) || null,
