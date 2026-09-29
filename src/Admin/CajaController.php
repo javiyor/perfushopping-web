@@ -30,6 +30,10 @@ final class CajaController
         $totalRecibos = 0;
         $arqueos = [];
 
+        $detalleTurno = [];
+        $totalesForma = [];
+        $egresosTurno = 0;
+
         if ($apertura) {
             $movimientos = $repo->movimientos((int)$apertura['id']);
             $totalesMov = $repo->totalMovimientos((int)$apertura['id']);
@@ -37,6 +41,45 @@ final class CajaController
             $ventasTransferencia = $repo->totalVentasTransferencia($fecha, $puntoVenta);
             $totalRecibos = $repo->totalRecibos($fecha, $puntoVenta);
             $arqueos = $repo->arqueos((int)$apertura['id']);
+
+            foreach ($repo->ventasDetalle($fecha, $puntoVenta) as $v) {
+                $detalleTurno[] = [
+                    'hora' => (string)($v['created_at'] ?? ''),
+                    'tipo' => 'venta',
+                    'detalle' => 'Factura ' . ($v['codigo'] ?? '') . ' — ' . ($v['cliente_nombre'] ?? 'Consumidor Final'),
+                    'forma' => (string)($v['forma_pago'] ?? ''),
+                    'monto' => (int)($v['monto_cents'] ?? 0),
+                ];
+            }
+            foreach ($repo->recibosDetalle($fecha, $puntoVenta) as $r) {
+                $detalleTurno[] = [
+                    'hora' => (string)($r['created_at'] ?? ''),
+                    'tipo' => 'cobro',
+                    'detalle' => 'Recibo ' . ($r['codigo'] ?? '') . ' — ' . ($r['cliente_nombre'] ?? ''),
+                    'forma' => (string)($r['forma_pago'] ?? ''),
+                    'monto' => (int)($r['monto_cents'] ?? 0),
+                ];
+            }
+            foreach ($movimientos as $m) {
+                $monto = (int)($m['monto_cents'] ?? 0);
+                $detalleTurno[] = [
+                    'hora' => (string)($m['created_at'] ?? ''),
+                    'tipo' => (string)($m['tipo'] ?? 'ingreso'),
+                    'detalle' => (string)($m['concepto'] ?? ''),
+                    'forma' => '',
+                    'monto' => ($m['tipo'] ?? '') === 'egreso' ? -$monto : $monto,
+                ];
+            }
+            usort($detalleTurno, static fn($a, $b) => strcmp((string)$a['hora'], (string)$b['hora']));
+            $detalleTurno = array_slice($detalleTurno, 0, 300);
+
+            foreach ($detalleTurno as $d) {
+                if ($d['monto'] < 0) {
+                    $egresosTurno += -$d['monto'];
+                } elseif ($d['forma'] !== '') {
+                    $totalesForma[$d['forma']] = ($totalesForma[$d['forma']] ?? 0) + $d['monto'];
+                }
+            }
         }
 
         $historial = $repo->historial($sucursalId, 10);
@@ -53,6 +96,9 @@ final class CajaController
             'totalRecibos' => $totalRecibos,
             'ventasPorPuntoVenta' => $ventasPorPuntoVenta,
             'saldoGeneral' => $saldoGeneral,
+            'detalleTurno' => $detalleTurno,
+            'totalesForma' => $totalesForma,
+            'egresosTurno' => $egresosTurno,
             'arqueos' => $arqueos,
             'historial' => $historial,
             'csrf' => Csrf::token(),

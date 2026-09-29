@@ -8,6 +8,11 @@ $ventasEfectivo = (int)($ventasEfectivo ?? 0);
 $ventasTransferencia = (int)($ventasTransferencia ?? 0);
 $totalRecibos = (int)($totalRecibos ?? 0);
 $arqueos = $arqueos ?? [];
+$detalleTurno = $detalleTurno ?? [];
+$totalesForma = $totalesForma ?? [];
+$egresosTurno = (int)($egresosTurno ?? 0);
+$formaLabels = ['efectivo' => 'Efectivo', 'transferencia' => 'Transf.', 'mercadopago' => 'MercadoPago', 'debito' => 'Débito', 'credito' => 'Crédito', 'tarjeta' => 'Tarjeta', 'cheque' => 'Cheque', 'cuenta_corriente' => 'Cta. cte.'];
+$tipoBadges = ['venta' => 'info', 'cobro' => 'primary', 'ingreso' => 'success', 'egreso' => 'danger'];
 $historial = $historial ?? [];
 $ventasPorPuntoVenta = $ventasPorPuntoVenta ?? [];
 $saldoGeneral = (int)($saldoGeneral ?? 0);
@@ -100,33 +105,48 @@ $saldoEsperado = $montoInicial + $ventasEfectivo + (int)$totalesMov['total_ingre
 <div class="row g-3">
     <div class="col-lg-6">
         <div class="card shadow-sm">
-            <div class="card-header bg-white fw-semibold">Últimos movimientos</div>
-            <div class="table-responsive">
+            <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+                <span>Movimientos del turno</span>
+                <a class="btn btn-sm btn-outline-secondary py-0" href="/admin/caja/movimientos">Gestionar</a>
+            </div>
+            <div class="table-responsive" style="max-height:420px;overflow-y:auto">
                 <table class="table table-sm mb-0">
                     <thead>
                         <tr>
                             <th>Hora</th>
                             <th>Tipo</th>
-                            <th>Concepto</th>
+                            <th>Detalle</th>
+                            <th>Forma</th>
                             <th class="text-end">Monto</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if (!$movimientos): ?>
-                            <tr><td colspan="4" class="text-muted text-center small">Sin movimientos</td></tr>
+                        <?php if (!$detalleTurno): ?>
+                            <tr><td colspan="5" class="text-muted text-center small">Sin movimientos en el turno</td></tr>
                         <?php else: ?>
-                            <?php foreach (array_slice(array_reverse($movimientos), 0, 10) as $m): ?>
+                            <?php foreach ($detalleTurno as $d): ?>
                                 <tr>
-                                    <td class="small"><?= date('H:i', strtotime($m['created_at'] ?? '')) ?></td>
-                                    <td><span class="badge bg-<?= $m['tipo'] === 'ingreso' ? 'success' : 'danger' ?>"><?= htmlspecialchars($m['tipo']) ?></span></td>
-                                    <td class="small"><?= htmlspecialchars((string)($m['concepto'] ?? '')) ?></td>
-                                    <td class="text-end small"><?= Format::moneyFromCents((int)($m['monto_cents'] ?? 0)) ?></td>
+                                    <td class="small"><?= $d['hora'] !== '' ? date('H:i', strtotime($d['hora'])) : '—' ?></td>
+                                    <td><span class="badge bg-<?= $tipoBadges[$d['tipo']] ?? 'secondary' ?>"><?= htmlspecialchars($d['tipo']) ?></span></td>
+                                    <td class="small"><?= htmlspecialchars((string)$d['detalle']) ?></td>
+                                    <td class="small"><?= $d['forma'] !== '' ? htmlspecialchars($formaLabels[$d['forma']] ?? ucfirst(str_replace('_', ' ', $d['forma']))) : '—' ?></td>
+                                    <td class="text-end small <?= $d['monto'] < 0 ? 'text-danger' : 'text-success' ?>"><?= Format::moneyFromCents((int)$d['monto']) ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php endif; ?>
                     </tbody>
                 </table>
             </div>
+            <?php if ($totalesForma || $egresosTurno > 0): ?>
+            <div class="card-footer bg-white small text-muted">
+                <?php foreach ($totalesForma as $forma => $total): ?>
+                    <span class="me-2"><?= htmlspecialchars($formaLabels[$forma] ?? ucfirst(str_replace('_', ' ', $forma))) ?>: <strong><?= Format::moneyFromCents((int)$total) ?></strong></span>
+                <?php endforeach; ?>
+                <?php if ($egresosTurno > 0): ?>
+                    <span>Egresos: <strong class="text-danger">−<?= Format::moneyFromCents($egresosTurno) ?></strong></span>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
 

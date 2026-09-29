@@ -177,6 +177,57 @@ final class CajaRepo
         return (int)$st->fetchColumn();
     }
 
+    /** Pagos de facturas emitidas del día/punto de venta, con forma de pago (para el turno). */
+    public function ventasDetalle(string $fecha, int $puntoVenta): array
+    {
+        try {
+            $extra = $this->efectivoNoCajaWhere();
+            $st = Db::pdo()->prepare("
+                SELECT fp.id, f.codigo, f.cliente_nombre, f.created_at,
+                       fp.forma_pago, fp.monto_cents
+                FROM factura_pagos fp
+                INNER JOIN facturas f ON f.id = fp.factura_id
+                WHERE f.estado = 'emitida'
+                  AND f.fecha = :fec
+                  AND f.punto_venta = :pv
+                  {$extra}
+                ORDER BY f.created_at ASC, f.id ASC, fp.id ASC
+            ");
+            $st->execute([':fec' => $fecha, ':pv' => $puntoVenta]);
+            return $st->fetchAll();
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::ventasDetalle error: '.$e->getMessage());
+            return [];
+        }
+    }
+
+    /** Recibos emitidos del día/punto de venta (para el turno). */
+    public function recibosDetalle(string $fecha, int $puntoVenta): array
+    {
+        try {
+            $pvWhere = '';
+            $params = [':fec' => $fecha];
+            if ($this->recibosTienePuntoVenta()) {
+                $pvWhere = ' AND r.punto_venta = :pv';
+                $params[':pv'] = $puntoVenta;
+            }
+            $st = Db::pdo()->prepare("
+                SELECT r.id, r.codigo, r.cliente_nombre, r.created_at,
+                       r.forma_pago, r.monto_cents
+                FROM recibos r
+                WHERE r.estado = 'emitido'
+                  AND r.fecha = :fec
+                  $pvWhere
+                ORDER BY r.created_at ASC, r.id ASC
+            ");
+            $st->execute($params);
+            return $st->fetchAll();
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::recibosDetalle error: '.$e->getMessage());
+            return [];
+        }
+    }
+
     private static ?array $recibosColumns = null;
 
     private function recibosTienePuntoVenta(): bool
