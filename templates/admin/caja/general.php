@@ -62,9 +62,9 @@ $q = (string)($q ?? '');
                         <label class="form-label small fw-semibold">Monto</label>
                         <div class="input-group">
                             <span class="input-group-text">$</span>
-                            <input class="form-control" name="monto_cents" type="number" required min="1" step="1" />
+                            <input class="form-control" name="monto_cents" type="number" required min="0.01" step="0.01" />
                         </div>
-                        <div class="form-text">En centavos (ej: 20000 = $200,00)</div>
+                        <div class="form-text">En pesos (ej: 200 = $200,00)</div>
                     </div>
 
                     <button class="btn btn-accent" type="submit"><i class="bi bi-check-lg"></i> Registrar</button>

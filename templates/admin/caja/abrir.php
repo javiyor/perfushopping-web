@@ -132,7 +132,7 @@ function recalcTotal() {
         tr.querySelector('.subtotal-display').textContent = '$' + sub.toLocaleString('es-AR');
     });
     document.getElementById('totalDisplay').textContent = total.toLocaleString('es-AR');
-    document.getElementById('montoInicialCents').value = total;
+    document.getElementById('montoInicialCents').value = total * 100;
     document.getElementById('detalleEfectivo').value = JSON.stringify(getDetalle());
 }
 

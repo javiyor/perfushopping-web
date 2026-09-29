@@ -165,7 +165,7 @@ final class CajaController
 
         $tipo = (string)($_POST['tipo'] ?? '');
         $concepto = trim((string)($_POST['concepto'] ?? ''));
-        $monto = (int)($_POST['monto_cents'] ?? 0);
+        $monto = self::pesosACents($_POST['monto_cents'] ?? 0);
         $cajaDestino = (string)($_POST['caja_destino'] ?? 'chica');
 
         if (!in_array($tipo, ['ingreso', 'egreso'], true) || $concepto === '' || $monto <= 0) {
@@ -233,7 +233,7 @@ final class CajaController
 
         $tipo = (string)($_POST['tipo'] ?? '');
         $concepto = trim((string)($_POST['concepto'] ?? ''));
-        $monto = (int)($_POST['monto_cents'] ?? 0);
+        $monto = self::pesosACents($_POST['monto_cents'] ?? 0);
 
         if (!in_array($tipo, ['ingreso', 'egreso'], true) || $concepto === '' || $monto <= 0) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Completá todos los campos.'];
@@ -307,7 +307,7 @@ final class CajaController
         $adminUser = $auth->requirePermiso('caja_movimientos');
         Csrf::check($_POST['_csrf'] ?? null);
 
-        $totalCents = (int)($_POST['total_cents'] ?? 0);
+        $totalCents = self::pesosACents($_POST['total_cents'] ?? 0);
         $obs = trim((string)($_POST['observaciones'] ?? ''));
 
         if ($totalCents < 0) {
@@ -373,8 +373,8 @@ final class CajaController
         $adminUser = $auth->requirePermiso('caja_movimientos');
         Csrf::check($_POST['_csrf'] ?? null);
 
-        $montoCierre = (int)($_POST['monto_cierre_cents'] ?? 0);
-        $montoRetirado = (int)($_POST['monto_retirado_cents'] ?? 0);
+        $montoCierre = self::pesosACents($_POST['monto_cierre_cents'] ?? 0);
+        $montoRetirado = self::pesosACents($_POST['monto_retirado_cents'] ?? 0);
         if ($montoCierre < 0) $montoCierre = 0;
         if ($montoRetirado < 0) $montoRetirado = 0;
 
@@ -411,5 +411,23 @@ final class CajaController
         }
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => $msg];
         Response::redirect('/admin/caja');
+    }
+
+    /**
+     * Los formularios de caja trabajan en pesos; la DB guarda centavos.
+     * Acepta "43550", "43550.50" o "43.550,50".
+     */
+    private static function pesosACents(mixed $value): int
+    {
+        $s = trim((string)$value);
+        if ($s === '') {
+            return 0;
+        }
+        $s = str_replace(' ', '', $s);
+        if (str_contains($s, ',')) {
+            $s = str_replace('.', '', $s);
+            $s = str_replace(',', '.', $s);
+        }
+        return (int)round((float)$s * 100);
     }
 }

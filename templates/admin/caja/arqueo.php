@@ -25,9 +25,9 @@ $arqueos = $arqueos ?? [];
                         <label class="form-label small fw-semibold">Total contado (efectivo físico)</label>
                         <div class="input-group">
                             <span class="input-group-text">$</span>
-                            <input class="form-control" name="total_cents" type="number" required min="0" step="1" id="arqueoTotal" />
+                            <input class="form-control" name="total_cents" type="number" required min="0" step="0.01" id="arqueoTotal" />
                         </div>
-                        <div class="form-text">En centavos (ej: 150000 = $1.500,00)</div>
+                        <div class="form-text">En pesos (ej: 1500 = $1.500,00)</div>
                     </div>
 
                     <div class="mb-3">
@@ -117,7 +117,7 @@ $arqueos = $arqueos ?? [];
 
 <script>
 document.getElementById('arqueoTotal').addEventListener('input', function() {
-    const total = parseInt(this.value) || 0;
+    const total = Math.round((parseFloat(this.value) || 0) * 100);
     const esperado = <?= $esperado ?? 0 ?>;
     const dif = total - esperado;
     const el = document.getElementById('diferenciaLabel');
