@@ -472,6 +472,10 @@ $router->post('/admin/caja/cierre/guardar', [AdminCajaController::class, 'cierre
 $router->get('/admin/caja/general', [AdminCajaController::class, 'general']);
 $router->post('/admin/caja/general/guardar', [AdminCajaController::class, 'storeGeneralMovimiento']);
 $router->post('/admin/caja/general/controlar', [AdminCajaController::class, 'controlarMovimiento']);
+$router->get('/admin/caja/apertura/ajuste', [AdminCajaController::class, 'solicitarAjusteForm']);
+$router->post('/admin/caja/apertura/ajuste/guardar', [AdminCajaController::class, 'solicitarAjusteStore']);
+$router->get('/admin/caja/ajustes', [AdminCajaController::class, 'ajustes']);
+$router->post('/admin/caja/ajuste/resolver', [AdminCajaController::class, 'resolverAjusteStore']);
 $router->get('/admin/arca', [AdminArcaController::class, 'index']);
 $router->get('/admin/arca/config', [AdminArcaController::class, 'config']);
 $router->post('/admin/arca/config/guardar', [AdminArcaController::class, 'configSave']);

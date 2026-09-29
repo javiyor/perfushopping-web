@@ -86,6 +86,10 @@ final class CajaController
         $ventasPorPuntoVenta = $repo->ventasPorPuntoVenta($fecha);
         $saldoGeneral = $repo->saldoGeneral();
 
+        $ajustePendiente = $apertura ? $repo->ajustePendienteDeCaja((int)$apertura['id']) : null;
+        $esAdmin = ($adminUser['rol'] ?? '') === 'superadmin';
+        $ajustesPendientesCount = $esAdmin ? count($repo->ajustesPendientes()) : 0;
+
         echo View::adminPage('admin/caja/index.php', [
             'adminUser' => $adminUser,
             'apertura' => $apertura,
@@ -99,6 +103,9 @@ final class CajaController
             'detalleTurno' => $detalleTurno,
             'totalesForma' => $totalesForma,
             'egresosTurno' => $egresosTurno,
+            'ajustePendiente' => $ajustePendiente,
+            'esAdmin' => $esAdmin,
+            'ajustesPendientesCount' => $ajustesPendientesCount,
             'arqueos' => $arqueos,
             'historial' => $historial,
             'csrf' => Csrf::token(),
@@ -355,6 +362,24 @@ final class CajaController
 
         $totalCents = self::pesosACents($_POST['total_cents'] ?? 0);
         $obs = trim((string)($_POST['observaciones'] ?? ''));
+        $detalle = trim((string)($_POST['detalle_efectivo'] ?? ''));
+        if ($detalle !== '') {
+            $decoded = json_decode($detalle, true);
+            if (is_array($decoded) && count($decoded) > 0) {
+                $lines = [];
+                foreach ($decoded as $d) {
+                    $denom = (int)($d['denominacion'] ?? 0);
+                    $qty = (int)($d['cantidad'] ?? 0);
+                    if ($denom > 0 && $qty > 0) {
+                        $lines[] = '$' . number_format($denom, 0, ',', '.') . ' x ' . $qty . ' = $' . number_format($denom * $qty, 0, ',', '.');
+                    }
+                }
+                if ($lines) {
+                    $detalleStr = 'Detalle conteo: ' . implode(' | ', $lines);
+                    $obs = $obs ? $obs . "\n" . $detalleStr : $detalleStr;
+                }
+            }
+        }
 
         if ($totalCents < 0) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'El total debe ser mayor o igual a 0.'];
@@ -457,6 +482,109 @@ final class CajaController
         }
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => $msg];
         Response::redirect('/admin/caja');
+    }
+
+    public function solicitarAjusteForm(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requirePermiso('caja_movimientos');
+
+        $repo = new CajaRepo();
+        $apertura = $repo->aperturaActiva($auth->getSucursalId(), $auth->getTurno(), date('Y-m-d'));
+        if (!$apertura) {
+            $_SESSION['admin_flash'] = ['type' => 'warning', 'text' => 'No hay caja abierta.'];
+            Response::redirect('/admin/caja');
+        }
+        if ($repo->ajustePendienteDeCaja((int)$apertura['id'])) {
+            $_SESSION['admin_flash'] = ['type' => 'info', 'text' => 'Ya hay una corrección pendiente de aprobación para esta apertura.'];
+            Response::redirect('/admin/caja');
+        }
+
+        echo View::adminPage('admin/caja/ajuste.php', [
+            'adminUser' => $adminUser,
+            'apertura' => $apertura,
+            'csrf' => Csrf::token(),
+            'pageTitle' => 'Solicitar corrección de apertura',
+        ]);
+    }
+
+    public function solicitarAjusteStore(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requirePermiso('caja_movimientos');
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $repo = new CajaRepo();
+        $apertura = $repo->aperturaActiva($auth->getSucursalId(), $auth->getTurno(), date('Y-m-d'));
+        if (!$apertura || ($apertura['estado'] ?? '') !== 'abierta') {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No hay caja abierta para corregir.'];
+            Response::redirect('/admin/caja');
+        }
+        if ($repo->ajustePendienteDeCaja((int)$apertura['id'])) {
+            $_SESSION['admin_flash'] = ['type' => 'info', 'text' => 'Ya hay una corrección pendiente de aprobación.'];
+            Response::redirect('/admin/caja');
+        }
+
+        $nuevoCents = self::pesosACents($_POST['monto_nuevo_cents'] ?? 0);
+        $motivo = trim((string)($_POST['motivo'] ?? ''));
+        $actualCents = (int)($apertura['monto_inicial_cents'] ?? 0);
+
+        if ($nuevoCents < 0) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'El monto debe ser mayor o igual a 0.'];
+            Response::redirect('/admin/caja/apertura/ajuste');
+        }
+        if ($nuevoCents === $actualCents) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'El monto nuevo es igual al actual.'];
+            Response::redirect('/admin/caja/apertura/ajuste');
+        }
+        if (mb_strlen($motivo) < 10) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Describí el error (mínimo 10 caracteres).'];
+            Response::redirect('/admin/caja/apertura/ajuste');
+        }
+
+        $repo->solicitarAjusteApertura((int)$apertura['id'], $nuevoCents, $motivo, (int)$adminUser['id']);
+        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Corrección enviada. Queda pendiente hasta que un administrador la apruebe.'];
+        Response::redirect('/admin/caja');
+    }
+
+    public function ajustes(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requireRol('superadmin');
+
+        $repo = new CajaRepo();
+        echo View::adminPage('admin/caja/ajustes.php', [
+            'adminUser' => $adminUser,
+            'pendientes' => $repo->ajustesPendientes(),
+            'historial' => $repo->ajustesHistorial(20),
+            'csrf' => Csrf::token(),
+            'pageTitle' => 'Aprobación de correcciones de caja',
+        ]);
+    }
+
+    public function resolverAjusteStore(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requireRol('superadmin');
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $id = (int)($_POST['id'] ?? 0);
+        $accion = (string)($_POST['accion'] ?? '');
+        $nota = trim((string)($_POST['nota'] ?? '')) ?: null;
+        $estado = $accion === 'aprobar' ? 'aprobado' : ($accion === 'rechazar' ? 'rechazado' : '');
+
+        if ($id <= 0 || $estado === '') {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Solicitud inválida.'];
+            Response::redirect('/admin/caja/ajustes');
+        }
+
+        try {
+            (new CajaRepo())->resolverAjuste($id, $estado, (int)$adminUser['id'], $nota);
+            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => $estado === 'aprobado' ? 'Corrección aprobada y aplicada a la apertura.' : 'Corrección rechazada.'];
+        } catch (\Throwable $e) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => $e->getMessage()];
+        }
+        Response::redirect('/admin/caja/ajustes');
     }
 
     /**

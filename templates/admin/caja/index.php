@@ -16,6 +16,9 @@ $tipoBadges = ['venta' => 'info', 'cobro' => 'primary', 'ingreso' => 'success', 
 $historial = $historial ?? [];
 $ventasPorPuntoVenta = $ventasPorPuntoVenta ?? [];
 $saldoGeneral = (int)($saldoGeneral ?? 0);
+$ajustePendiente = $ajustePendiente ?? null;
+$esAdmin = (bool)($esAdmin ?? false);
+$ajustesPendientesCount = (int)($ajustesPendientesCount ?? 0);
 ?>
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
@@ -23,15 +26,35 @@ $saldoGeneral = (int)($saldoGeneral ?? 0);
         <p class="text-muted small">Gestión de caja del turno actual</p>
     </div>
     <div class="d-flex gap-2">
+        <?php if ($esAdmin && $ajustesPendientesCount > 0): ?>
+            <a class="btn btn-danger btn-sm" href="/admin/caja/ajustes"><i class="bi bi-exclamation-triangle"></i> Aprobaciones (<?= $ajustesPendientesCount ?>)</a>
+        <?php endif; ?>
         <?php if (!$apertura): ?>
             <a class="btn btn-accent btn-sm" href="/admin/caja/abrir"><i class="bi bi-cash-stack"></i> Abrir caja</a>
         <?php else: ?>
             <a class="btn btn-outline-primary btn-sm" href="/admin/caja/movimientos"><i class="bi bi-arrow-left-right"></i> Movimientos</a>
             <a class="btn btn-outline-info btn-sm" href="/admin/caja/arqueo"><i class="bi bi-calculator"></i> Arqueo</a>
             <a class="btn btn-outline-warning btn-sm" href="/admin/caja/cierre"><i class="bi bi-stop-fill"></i> Cerrar caja</a>
+            <?php if (!$ajustePendiente): ?>
+                <a class="btn btn-outline-secondary btn-sm" href="/admin/caja/apertura/ajuste"><i class="bi bi-pencil-square"></i> Solicitar corrección</a>
+            <?php endif; ?>
         <?php endif; ?>
     </div>
 </div>
+
+<?php if ($apertura && $ajustePendiente): ?>
+<div class="alert alert-warning d-flex justify-content-between align-items-center mb-3">
+    <div class="small">
+        <strong><i class="bi bi-clock-history"></i> Corrección pendiente de aprobación:</strong>
+        <?= Format::moneyFromCents((int)$ajustePendiente['valor_anterior_cents']) ?> → <?= Format::moneyFromCents((int)$ajustePendiente['valor_nuevo_cents']) ?>
+        <span class="text-muted">— <?= htmlspecialchars((string)($ajustePendiente['motivo'] ?? '')) ?></span>
+        <span class="text-muted">(<?= htmlspecialchars((string)($ajustePendiente['solicitado_por_nombre'] ?? '')) ?>)</span>
+    </div>
+    <?php if ($esAdmin): ?>
+        <a class="btn btn-warning btn-sm" href="/admin/caja/ajustes">Revisar</a>
+    <?php endif; ?>
+</div>
+<?php endif; ?>
 
 <?php if (!$apertura): ?>
 <div class="card shadow-sm">

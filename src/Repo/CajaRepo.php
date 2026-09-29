@@ -472,4 +472,142 @@ final class CajaRepo
             return 0;
         }
     }
+
+    // ── Ajustes de apertura con aprobación ──
+
+    private static ?bool $ajustesTableReady = null;
+
+    private function ensureAjustesTable(): void
+    {
+        if (self::$ajustesTableReady !== null) {
+            return;
+        }
+        self::$ajustesTableReady = true;
+        try {
+            Db::pdo()->exec("
+                CREATE TABLE IF NOT EXISTS caja_apertura_ajustes (
+                    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                    caja_id INT UNSIGNED NOT NULL,
+                    campo VARCHAR(50) NOT NULL DEFAULT 'monto_inicial_cents',
+                    valor_anterior_cents INT NOT NULL DEFAULT 0,
+                    valor_nuevo_cents INT NOT NULL DEFAULT 0,
+                    motivo TEXT NOT NULL,
+                    estado ENUM('pendiente','aprobado','rechazado') NOT NULL DEFAULT 'pendiente',
+                    solicitado_por INT UNSIGNED DEFAULT NULL,
+                    resuelto_por INT UNSIGNED DEFAULT NULL,
+                    nota_resolucion VARCHAR(255) DEFAULT NULL,
+                    created_at DATETIME DEFAULT NULL,
+                    resolved_at DATETIME DEFAULT NULL,
+                    PRIMARY KEY (id),
+                    KEY idx_caja (caja_id),
+                    KEY idx_estado (estado)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::ensureAjustesTable error: ' . $e->getMessage());
+        }
+    }
+
+    public function solicitarAjusteApertura(int $cajaId, int $nuevoCents, string $motivo, int $solicitadoPor): int
+    {
+        $this->ensureAjustesTable();
+        $apertura = $this->findById($cajaId);
+        if (!$apertura) {
+            throw new \RuntimeException('Apertura no encontrada.');
+        }
+        $st = Db::pdo()->prepare('
+            INSERT INTO caja_apertura_ajustes (caja_id, campo, valor_anterior_cents, valor_nuevo_cents, motivo, estado, solicitado_por, created_at)
+            VALUES (:caja, \'monto_inicial_cents\', :ant, :nuevo, :motivo, \'pendiente\', :sol, NOW())
+        ');
+        $st->execute([
+            ':caja' => $cajaId,
+            ':ant' => (int)($apertura['monto_inicial_cents'] ?? 0),
+            ':nuevo' => $nuevoCents,
+            ':motivo' => $motivo,
+            ':sol' => $solicitadoPor ?: null,
+        ]);
+        return (int)Db::pdo()->lastInsertId();
+    }
+
+    public function ajustePendienteDeCaja(int $cajaId): ?array
+    {
+        $this->ensureAjustesTable();
+        $st = Db::pdo()->prepare("
+            SELECT aj.*, s.nombre AS solicitado_por_nombre
+            FROM caja_apertura_ajustes aj
+            LEFT JOIN admin_users s ON s.id = aj.solicitado_por
+            WHERE aj.caja_id = :caja AND aj.estado = 'pendiente'
+            ORDER BY aj.id DESC LIMIT 1
+        ");
+        $st->execute([':caja' => $cajaId]);
+        return $st->fetch() ?: null;
+    }
+
+    public function ajustesPendientes(): array
+    {
+        $this->ensureAjustesTable();
+        $st = Db::pdo()->query("
+            SELECT aj.*, s.nombre AS solicitado_por_nombre,
+                   ca.fecha, ca.turno, ca.monto_inicial_cents, su.nomsuc AS sucursal_nombre
+            FROM caja_apertura_ajustes aj
+            INNER JOIN caja_aperturas ca ON ca.id = aj.caja_id
+            LEFT JOIN admin_users s ON s.id = aj.solicitado_por
+            LEFT JOIN admin_sucursales su ON su.id = ca.sucursal_id
+            WHERE aj.estado = 'pendiente'
+            ORDER BY aj.created_at ASC
+        ");
+        return $st->fetchAll();
+    }
+
+    public function ajustesHistorial(int $limit = 20): array
+    {
+        $this->ensureAjustesTable();
+        $limit = max(1, min(100, $limit));
+        $st = Db::pdo()->query("
+            SELECT aj.*, s.nombre AS solicitado_por_nombre, r.nombre AS resuelto_por_nombre,
+                   ca.fecha, ca.turno, su.nomsuc AS sucursal_nombre
+            FROM caja_apertura_ajustes aj
+            INNER JOIN caja_aperturas ca ON ca.id = aj.caja_id
+            LEFT JOIN admin_users s ON s.id = aj.solicitado_por
+            LEFT JOIN admin_users r ON r.id = aj.resuelto_por
+            LEFT JOIN admin_sucursales su ON su.id = ca.sucursal_id
+            ORDER BY aj.id DESC LIMIT {$limit}
+        ");
+        return $st->fetchAll();
+    }
+
+    public function resolverAjuste(int $id, string $estado, int $resueltoPor, ?string $nota): void
+    {
+        $this->ensureAjustesTable();
+        if (!in_array($estado, ['aprobado', 'rechazado'], true)) {
+            throw new \RuntimeException('Estado inválido.');
+        }
+        $pdo = Db::pdo();
+        $pdo->beginTransaction();
+        try {
+            $st = $pdo->prepare("SELECT * FROM caja_apertura_ajustes WHERE id = :i LIMIT 1 FOR UPDATE");
+            $st->execute([':i' => $id]);
+            $aj = $st->fetch() ?: null;
+            if (!$aj) {
+                throw new \RuntimeException('Solicitud no encontrada.');
+            }
+            if (($aj['estado'] ?? '') !== 'pendiente') {
+                throw new \RuntimeException('La solicitud ya fue resuelta.');
+            }
+            $pdo->prepare("
+                UPDATE caja_apertura_ajustes
+                SET estado = :est, resuelto_por = :res, nota_resolucion = :nota, resolved_at = NOW()
+                WHERE id = :i LIMIT 1
+            ")->execute([':est' => $estado, ':res' => $resueltoPor, ':nota' => $nota, ':i' => $id]);
+
+            if ($estado === 'aprobado') {
+                $pdo->prepare('UPDATE caja_aperturas SET monto_inicial_cents = :mon, updated_at = NOW() WHERE id = :caja LIMIT 1')
+                    ->execute([':mon' => (int)$aj['valor_nuevo_cents'], ':caja' => (int)$aj['caja_id']]);
+            }
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+    }
 }
