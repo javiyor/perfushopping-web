@@ -292,6 +292,10 @@ $discriminaIva = in_array($factura['tipo_comprobante'] ?? '', ['FACT-A']);
                     <dd class="col-sm-7"><strong><?= htmlspecialchars((string)($factura['codigo'] ?? '')) ?></strong></dd>
                     <dt class="col-sm-5">Fecha</dt>
                     <dd class="col-sm-7"><?= !empty($factura['fecha']) ? date('d/m/Y', strtotime($factura['fecha'])) : '-' ?></dd>
+                    <?php if (!empty($factura['caja_apertura_id'])): ?>
+                    <dt class="col-sm-5">Caja</dt>
+                    <dd class="col-sm-7"><span class="badge bg-secondary">Imputada al cierre #<?= (int)$factura['caja_apertura_id'] ?></span></dd>
+                    <?php endif; ?>
                     <?php if ($factura['remito_id']): ?>
                     <dt class="col-sm-5">Remito</dt>
                     <dd class="col-sm-7"><a href="/admin/remitos/<?= (int)$factura['remito_id'] ?>">#<?= (int)$factura['remito_id'] ?></a></dd>

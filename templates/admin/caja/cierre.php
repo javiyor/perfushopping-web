@@ -58,12 +58,21 @@ $esperadoEfectivo = (int)($esperadoEfectivo ?? 0);
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label small fw-semibold">Efectivo retirado a Caja General</label>
+                        <label class="form-label small fw-semibold">Pasaje a Caja General (solo efectivo)</label>
                         <div class="input-group">
                             <span class="input-group-text">$</span>
                             <input class="form-control" name="monto_retirado_cents" id="montoRetirado" type="number" value="0" min="0" step="0.01" />
                         </div>
-                        <div class="form-text">Monto que se transfiere a Caja General al cerrar, en pesos.</div>
+                        <div class="form-text">Solo efectivo. Máximo disponible: <?= Format::moneyFromCents($esperadoEfectivo) ?>.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Saldo para apertura del siguiente turno</label>
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            <input class="form-control" name="monto_proxima_cents" id="montoProxima" type="number" value="0" min="0" step="0.01" />
+                        </div>
+                        <div class="form-text">Efectivo que queda como fondo para la próxima apertura, en pesos.</div>
                     </div>
 
                     <div class="mb-3 bg-light p-3 rounded small">

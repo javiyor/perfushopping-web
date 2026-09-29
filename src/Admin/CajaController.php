@@ -35,14 +35,16 @@ final class CajaController
         $egresosTurno = 0;
 
         if ($apertura) {
-            $movimientos = $repo->movimientos((int)$apertura['id']);
-            $totalesMov = $repo->totalMovimientos((int)$apertura['id']);
-            $ventasEfectivo = $repo->totalVentasEfectivo($fecha, $puntoVenta);
-            $ventasTransferencia = $repo->totalVentasTransferencia($fecha, $puntoVenta);
-            $totalRecibos = $repo->totalRecibos($fecha, $puntoVenta);
-            $arqueos = $repo->arqueos((int)$apertura['id']);
+            $apId = (int)$apertura['id'];
+            $apCreada = (string)($apertura['created_at'] ?? $fecha . ' 00:00:00');
+            $movimientos = $repo->movimientos($apId);
+            $totalesMov = $repo->totalMovimientos($apId);
+            $ventasEfectivo = $repo->totalVentasEfectivoTurno($apId, $fecha, $puntoVenta, $apCreada);
+            $ventasTransferencia = $repo->totalVentasTransferenciaTurno($apId, $fecha, $puntoVenta, $apCreada);
+            $totalRecibos = $repo->totalRecibosTurno($apId, $fecha, $puntoVenta, $apCreada);
+            $arqueos = $repo->arqueos($apId);
 
-            foreach ($repo->ventasDetalle($fecha, $puntoVenta) as $v) {
+            foreach ($repo->ventasDetalleTurno($apId, $fecha, $puntoVenta, $apCreada) as $v) {
                 $detalleTurno[] = [
                     'hora' => (string)($v['created_at'] ?? ''),
                     'tipo' => 'venta',
@@ -51,7 +53,7 @@ final class CajaController
                     'monto' => (int)($v['monto_cents'] ?? 0),
                 ];
             }
-            foreach ($repo->recibosDetalle($fecha, $puntoVenta) as $r) {
+            foreach ($repo->recibosDetalleTurno($apId, $fecha, $puntoVenta, $apCreada) as $r) {
                 $detalleTurno[] = [
                     'hora' => (string)($r['created_at'] ?? ''),
                     'tipo' => 'cobro',
@@ -131,6 +133,7 @@ final class CajaController
 
         echo View::adminPage('admin/caja/abrir.php', [
             'adminUser' => $adminUser,
+            'saldoSugerido' => $repo->ultimoCierreConSaldo($sucursalId),
             'csrf' => Csrf::token(),
             'pageTitle' => 'Abrir caja',
         ]);
@@ -339,9 +342,11 @@ final class CajaController
         }
 
         $puntoVenta = $auth->getPuntoVenta();
-        $ventasEfectivo = $repo->totalVentasEfectivo(date('Y-m-d'), $puntoVenta);
-        $totalesMov = $repo->totalMovimientos((int)$apertura['id']);
-        $arqueos = $repo->arqueos((int)$apertura['id']);
+        $apId = (int)$apertura['id'];
+        $apCreada = (string)($apertura['created_at'] ?? date('Y-m-d') . ' 00:00:00');
+        $ventasEfectivo = $repo->totalVentasEfectivoTurno($apId, date('Y-m-d'), $puntoVenta, $apCreada);
+        $totalesMov = $repo->totalMovimientos($apId);
+        $arqueos = $repo->arqueos($apId);
 
         echo View::adminPage('admin/caja/arqueo.php', [
             'adminUser' => $adminUser,
@@ -417,10 +422,13 @@ final class CajaController
         }
 
         $puntoVenta = $auth->getPuntoVenta();
-        $ventasEfectivo = $repo->totalVentasEfectivo(date('Y-m-d'), $puntoVenta);
-        $ventasTransferencia = $repo->totalVentasTransferencia(date('Y-m-d'), $puntoVenta);
-        $totalRecibos = $repo->totalRecibos(date('Y-m-d'), $puntoVenta);
-        $totalesMov = $repo->totalMovimientos((int)$apertura['id']);
+        $apId = (int)$apertura['id'];
+        $apCreada = (string)($apertura['created_at'] ?? date('Y-m-d') . ' 00:00:00');
+        $fecha = date('Y-m-d');
+        $ventasEfectivo = $repo->totalVentasEfectivoTurno($apId, $fecha, $puntoVenta, $apCreada);
+        $ventasTransferencia = $repo->totalVentasTransferenciaTurno($apId, $fecha, $puntoVenta, $apCreada);
+        $totalRecibos = $repo->totalRecibosTurno($apId, $fecha, $puntoVenta, $apCreada);
+        $totalesMov = $repo->totalMovimientos($apId);
 
         $montoInicial = (int)$apertura['monto_inicial_cents'];
         $esperadoEfectivo = $montoInicial + $ventasEfectivo + (int)$totalesMov['total_ingresos'] - (int)$totalesMov['total_egresos'];
@@ -446,20 +454,41 @@ final class CajaController
 
         $montoCierre = self::pesosACents($_POST['monto_cierre_cents'] ?? 0);
         $montoRetirado = self::pesosACents($_POST['monto_retirado_cents'] ?? 0);
+        $proximaApertura = self::pesosACents($_POST['monto_proxima_cents'] ?? 0);
         if ($montoCierre < 0) $montoCierre = 0;
         if ($montoRetirado < 0) $montoRetirado = 0;
+        if ($proximaApertura < 0) $proximaApertura = 0;
 
         $repo = new CajaRepo();
         $sucursalId = $auth->getSucursalId();
         $turno = $auth->getTurno();
-        $apertura = $repo->aperturaActiva($sucursalId, $turno, date('Y-m-d'));
+        $fecha = date('Y-m-d');
+        $apertura = $repo->aperturaActiva($sucursalId, $turno, $fecha);
 
         if (!$apertura) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No hay caja abierta.'];
             Response::redirect('/admin/caja');
         }
 
-        $repo->cerrar((int)$apertura['id'], $montoCierre, (int)$adminUser['id'], $montoRetirado);
+        // Efectivo disponible del turno: solo efectivo puede pasar a Caja General.
+        $apId = (int)$apertura['id'];
+        $apCreada = (string)($apertura['created_at'] ?? $fecha . ' 00:00:00');
+        $puntoVenta = $auth->getPuntoVenta();
+        $ventasEfectivo = $repo->totalVentasEfectivoTurno($apId, $fecha, $puntoVenta, $apCreada);
+        $totalesMov = $repo->totalMovimientos($apId);
+        $efectivoDisponible = (int)$apertura['monto_inicial_cents'] + $ventasEfectivo
+            + (int)$totalesMov['total_ingresos'] - (int)$totalesMov['total_egresos'];
+
+        if ($montoRetirado > $efectivoDisponible) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'El pasaje a Caja General (solo efectivo) no puede superar el efectivo disponible: $' . number_format($efectivoDisponible / 100, 2, ',', '.') . '.'];
+            Response::redirect('/admin/caja/cierre');
+        }
+        if ($montoRetirado + $proximaApertura > $efectivoDisponible) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Pasaje + saldo para próxima apertura no pueden superar el efectivo disponible: $' . number_format($efectivoDisponible / 100, 2, ',', '.') . '.'];
+            Response::redirect('/admin/caja/cierre');
+        }
+
+        $repo->cerrar($apId, $montoCierre, (int)$adminUser['id'], $montoRetirado, $proximaApertura);
 
         // Register in caja general as ingreso from cierre
         if ($montoRetirado > 0) {
@@ -467,19 +496,26 @@ final class CajaController
             $repo->agregarMovimientoGeneral(
                 'ingreso',
                 'cierre_caja',
-                (int)$apertura['id'],
+                $apId,
                 'Retiro cierre caja ' . date('d/m/Y') . ' ' . ($turno === 'manana' ? 'Mañana' : 'Tarde'),
                 $montoRetirado,
                 (int)$adminUser['id']
             );
         }
 
+        // Marcar facturas y recibos del turno como imputados a este cierre.
+        $repo->marcarDocumentosCierre($apId, $fecha, $puntoVenta, $apCreada);
+
         unset($_SESSION['admin_caja_id']);
 
         $msg = 'Caja cerrada. Monto final: $' . number_format($montoCierre / 100, 2, ',', '.');
         if ($montoRetirado > 0) {
-            $msg .= ' | Retirado a Caja General: $' . number_format($montoRetirado / 100, 2, ',', '.');
+            $msg .= ' | Pasaje a Caja General (efectivo): $' . number_format($montoRetirado / 100, 2, ',', '.');
         }
+        if ($proximaApertura > 0) {
+            $msg .= ' | Saldo para próxima apertura: $' . number_format($proximaApertura / 100, 2, ',', '.');
+        }
+        $msg .= ' | Documentos del turno imputados al cierre #' . $apId . '.';
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => $msg];
         Response::redirect('/admin/caja');
     }

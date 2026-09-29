@@ -6,6 +6,14 @@
     <a class="btn btn-outline-secondary btn-sm" href="/admin/caja">Volver</a>
 </div>
 
+<?php $saldoSugerido = $saldoSugerido ?? null; ?>
+<?php if (!empty($saldoSugerido['monto_proxima_apertura_cents'])): ?>
+<div class="alert alert-info d-flex justify-content-between align-items-center">
+    <div class="small">El cierre anterior dejó <strong>$<?= number_format((int)$saldoSugerido['monto_proxima_apertura_cents'] / 100, 2, ',', '.') ?></strong> como saldo para esta apertura.</div>
+    <button class="btn btn-sm btn-outline-primary" type="button" onclick="addRow(<?= (int)round((int)$saldoSugerido['monto_proxima_apertura_cents'] / 100) ?>, 1)">Usar como fila</button>
+</div>
+<?php endif; ?>
+
 <div class="row g-3">
     <div class="col-lg-7">
         <div class="card shadow-sm">

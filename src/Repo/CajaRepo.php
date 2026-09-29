@@ -40,19 +40,30 @@ final class CajaRepo
         return (int)Db::pdo()->lastInsertId();
     }
 
-    public function cerrar(int $id, int $montoCierreCents, int $cerradaPor, int $montoRetiradoCents = 0): void
+    public function cerrar(int $id, int $montoCierreCents, int $cerradaPor, int $montoRetiradoCents = 0, int $proximaAperturaCents = 0): void
     {
+        $this->ensureCajaColumnas();
         $retSql = '';
         $params = [':mon' => $montoCierreCents, ':cp' => $cerradaPor, ':i' => $id];
         if ($this->aperturasTieneMontoRetirado()) {
             $retSql = ', monto_retirado_cents = :ret';
             $params[':ret'] = $montoRetiradoCents;
         }
-        $st = Db::pdo()->prepare("
-            UPDATE caja_aperturas SET estado = 'cerrada', monto_cierre_cents = :mon{$retSql}, cerrada_por = :cp, updated_at = NOW()
-            WHERE id = :i LIMIT 1
-        ");
-        $st->execute($params);
+        try {
+            $st = Db::pdo()->prepare("
+                UPDATE caja_aperturas SET estado = 'cerrada', monto_cierre_cents = :mon{$retSql}, monto_proxima_apertura_cents = :prox, cerrada_por = :cp, updated_at = NOW()
+                WHERE id = :i LIMIT 1
+            ");
+            $params[':prox'] = $proximaAperturaCents;
+            $st->execute($params);
+        } catch (\Throwable $e) {
+            unset($params[':prox']);
+            $st = Db::pdo()->prepare("
+                UPDATE caja_aperturas SET estado = 'cerrada', monto_cierre_cents = :mon{$retSql}, cerrada_por = :cp, updated_at = NOW()
+                WHERE id = :i LIMIT 1
+            ");
+            $st->execute($params);
+        }
     }
 
     public function agregarMovimiento(int $cajaId, string $tipo, string $concepto, int $montoCents, int $createdBy): int
@@ -474,6 +485,238 @@ final class CajaRepo
     }
 
     // ── Ajustes de apertura con aprobación ──
+
+    // ── Cierre por turno: imputación de documentos ──
+
+    private static ?bool $cajaColsReady = null;
+
+    private function ensureCajaColumnas(): void
+    {
+        if (self::$cajaColsReady !== null) {
+            return;
+        }
+        self::$cajaColsReady = true;
+        try {
+            $cols = Db::pdo()->query('SHOW COLUMNS FROM facturas')->fetchAll();
+            $fields = array_column($cols, 'Field');
+            if (!in_array('caja_apertura_id', $fields, true)) {
+                Db::pdo()->exec('ALTER TABLE facturas ADD COLUMN caja_apertura_id INT UNSIGNED DEFAULT NULL');
+                Db::pdo()->exec('ALTER TABLE facturas ADD KEY idx_caja_apertura (caja_apertura_id)');
+            }
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::ensureCajaColumnas facturas error: ' . $e->getMessage());
+        }
+        try {
+            $cols = Db::pdo()->query('SHOW COLUMNS FROM recibos')->fetchAll();
+            $fields = array_column($cols, 'Field');
+            if (!in_array('caja_apertura_id', $fields, true)) {
+                Db::pdo()->exec('ALTER TABLE recibos ADD COLUMN caja_apertura_id INT UNSIGNED DEFAULT NULL');
+                Db::pdo()->exec('ALTER TABLE recibos ADD KEY idx_caja_apertura (caja_apertura_id)');
+            }
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::ensureCajaColumnas recibos error: ' . $e->getMessage());
+        }
+        try {
+            $cols = Db::pdo()->query('SHOW COLUMNS FROM caja_aperturas')->fetchAll();
+            $fields = array_column($cols, 'Field');
+            if (!in_array('monto_proxima_apertura_cents', $fields, true)) {
+                Db::pdo()->exec('ALTER TABLE caja_aperturas ADD COLUMN monto_proxima_apertura_cents INT NOT NULL DEFAULT 0');
+            }
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::ensureCajaColumnas aperturas error: ' . $e->getMessage());
+        }
+    }
+
+    /** Documentos del turno: imputados a esta apertura o creados después de abrirla. */
+    private function turnoWhere(string $alias): string
+    {
+        return "({$alias}.caja_apertura_id = :caja OR ({$alias}.caja_apertura_id IS NULL AND {$alias}.created_at >= :apCreada))";
+    }
+
+    public function totalVentasEfectivoTurno(int $cajaId, string $fecha, int $puntoVenta, string $aperturaCreada): int
+    {
+        $this->ensureCajaColumnas();
+        try {
+            $extra = $this->efectivoNoCajaWhere();
+            $st = Db::pdo()->prepare("
+                SELECT COALESCE(SUM(fp.monto_cents), 0)
+                FROM factura_pagos fp
+                INNER JOIN facturas f ON f.id = fp.factura_id
+                WHERE f.estado = 'emitida'
+                  AND f.fecha = :fec
+                  AND f.punto_venta = :pv
+                  AND " . $this->turnoWhere('f') . "
+                  AND fp.forma_pago = 'efectivo'
+                  {$extra}
+            ");
+            $st->execute([':fec' => $fecha, ':pv' => $puntoVenta, ':caja' => $cajaId, ':apCreada' => $aperturaCreada]);
+            return (int)$st->fetchColumn();
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::totalVentasEfectivoTurno error: ' . $e->getMessage());
+            return 0;
+        }
+    }
+
+    public function totalVentasTransferenciaTurno(int $cajaId, string $fecha, int $puntoVenta, string $aperturaCreada): int
+    {
+        $this->ensureCajaColumnas();
+        try {
+            $st = Db::pdo()->prepare("
+                SELECT COALESCE(SUM(fp.monto_cents), 0)
+                FROM factura_pagos fp
+                INNER JOIN facturas f ON f.id = fp.factura_id
+                WHERE f.estado = 'emitida'
+                  AND f.fecha = :fec
+                  AND f.punto_venta = :pv
+                  AND " . $this->turnoWhere('f') . "
+                  AND fp.forma_pago IN ('transferencia', 'mercadopago', 'debito', 'credito')
+            ");
+            $st->execute([':fec' => $fecha, ':pv' => $puntoVenta, ':caja' => $cajaId, ':apCreada' => $aperturaCreada]);
+            return (int)$st->fetchColumn();
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::totalVentasTransferenciaTurno error: ' . $e->getMessage());
+            return 0;
+        }
+    }
+
+    public function totalRecibosTurno(int $cajaId, string $fecha, int $puntoVenta, string $aperturaCreada): int
+    {
+        $this->ensureCajaColumnas();
+        try {
+            $pvWhere = '';
+            $params = [':fec' => $fecha, ':caja' => $cajaId, ':apCreada' => $aperturaCreada];
+            if ($this->recibosTienePuntoVenta()) {
+                $pvWhere = ' AND r.punto_venta = :pv';
+                $params[':pv'] = $puntoVenta;
+            }
+            $st = Db::pdo()->prepare("
+                SELECT COALESCE(SUM(r.monto_cents), 0)
+                FROM recibos r
+                WHERE r.estado = 'emitido'
+                  AND r.fecha = :fec
+                  AND " . $this->turnoWhere('r') . "
+                  $pvWhere
+            ");
+            $st->execute($params);
+            return (int)$st->fetchColumn();
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::totalRecibosTurno error: ' . $e->getMessage());
+            return 0;
+        }
+    }
+
+    public function ventasDetalleTurno(int $cajaId, string $fecha, int $puntoVenta, string $aperturaCreada): array
+    {
+        $this->ensureCajaColumnas();
+        try {
+            $extra = $this->efectivoNoCajaWhere();
+            $st = Db::pdo()->prepare("
+                SELECT fp.id, f.codigo, f.cliente_nombre, f.created_at,
+                       fp.forma_pago, fp.monto_cents
+                FROM factura_pagos fp
+                INNER JOIN facturas f ON f.id = fp.factura_id
+                WHERE f.estado = 'emitida'
+                  AND f.fecha = :fec
+                  AND f.punto_venta = :pv
+                  AND " . $this->turnoWhere('f') . "
+                  {$extra}
+                ORDER BY f.created_at ASC, f.id ASC, fp.id ASC
+            ");
+            $st->execute([':fec' => $fecha, ':pv' => $puntoVenta, ':caja' => $cajaId, ':apCreada' => $aperturaCreada]);
+            return $st->fetchAll();
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::ventasDetalleTurno error: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function recibosDetalleTurno(int $cajaId, string $fecha, int $puntoVenta, string $aperturaCreada): array
+    {
+        $this->ensureCajaColumnas();
+        try {
+            $pvWhere = '';
+            $params = [':fec' => $fecha, ':caja' => $cajaId, ':apCreada' => $aperturaCreada];
+            if ($this->recibosTienePuntoVenta()) {
+                $pvWhere = ' AND r.punto_venta = :pv';
+                $params[':pv'] = $puntoVenta;
+            }
+            $st = Db::pdo()->prepare("
+                SELECT r.id, r.codigo, r.cliente_nombre, r.created_at,
+                       r.forma_pago, r.monto_cents
+                FROM recibos r
+                WHERE r.estado = 'emitido'
+                  AND r.fecha = :fec
+                  AND " . $this->turnoWhere('r') . "
+                  $pvWhere
+                ORDER BY r.created_at ASC, r.id ASC
+            ");
+            $st->execute($params);
+            return $st->fetchAll();
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::recibosDetalleTurno error: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /** Marca facturas y recibos del turno como imputados a este cierre. */
+    public function marcarDocumentosCierre(int $cajaId, string $fecha, int $puntoVenta, string $aperturaCreada): void
+    {
+        $this->ensureCajaColumnas();
+        try {
+            $st = Db::pdo()->prepare("
+                UPDATE facturas
+                SET caja_apertura_id = :caja
+                WHERE caja_apertura_id IS NULL
+                  AND estado = 'emitida'
+                  AND fecha = :fec
+                  AND punto_venta = :pv
+                  AND created_at >= :apCreada
+            ");
+            $st->execute([':caja' => $cajaId, ':fec' => $fecha, ':pv' => $puntoVenta, ':apCreada' => $aperturaCreada]);
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::marcarDocumentosCierre facturas error: ' . $e->getMessage());
+        }
+        try {
+            $pvWhere = $this->recibosTienePuntoVenta() ? ' AND punto_venta = :pv' : '';
+            $params = [':caja' => $cajaId, ':fec' => $fecha, ':apCreada' => $aperturaCreada];
+            if ($pvWhere !== '') {
+                $params[':pv'] = $puntoVenta;
+            }
+            $st = Db::pdo()->prepare("
+                UPDATE recibos
+                SET caja_apertura_id = :caja
+                WHERE caja_apertura_id IS NULL
+                  AND estado = 'emitido'
+                  AND fecha = :fec
+                  AND created_at >= :apCreada
+                  $pvWhere
+            ");
+            $st->execute($params);
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::marcarDocumentosCierre recibos error: ' . $e->getMessage());
+        }
+    }
+
+    /** Último cierre con saldo dejado para la próxima apertura. */
+    public function ultimoCierreConSaldo(int $sucursalId): ?array
+    {
+        $this->ensureCajaColumnas();
+        try {
+            $st = Db::pdo()->prepare("
+                SELECT id, fecha, turno, monto_proxima_apertura_cents
+                FROM caja_aperturas
+                WHERE sucursal_id = :suc
+                  AND estado = 'cerrada'
+                  AND monto_proxima_apertura_cents > 0
+                ORDER BY id DESC LIMIT 1
+            ");
+            $st->execute([':suc' => $sucursalId]);
+            return $st->fetch() ?: null;
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::ultimoCierreConSaldo error: ' . $e->getMessage());
+            return null;
+        }
+    }
 
     private static ?bool $ajustesTableReady = null;
 
