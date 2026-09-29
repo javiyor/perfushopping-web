@@ -13,18 +13,21 @@ final class PromoTarjetasController
 {
     public function index(array $params): void
     {
-        $promos = (new PromoTarjetaRepo())->findActivos();
+        $repo = new PromoTarjetaRepo();
+        $promos = $repo->findActivos();
+        $promosProx = $repo->findProximas(7);
 
         $shareByPromo = [];
-        foreach ($promos as $promo) {
+        foreach (array_merge($promos, $promosProx) as $promo) {
             $id = (int)($promo['id'] ?? 0);
-            if ($id > 0) {
+            if ($id > 0 && !isset($shareByPromo[$id])) {
                 $shareByPromo[$id] = $this->shareData($promo, $id);
             }
         }
 
         echo View::page('promo-tarjetas.php', [
             'promos' => $promos,
+            'promosProx' => $promosProx,
             'shareByPromo' => $shareByPromo,
             'pageTitle' => 'Promociones Bancarias Vigentes — Perfushopping',
         ]);

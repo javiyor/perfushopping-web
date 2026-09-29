@@ -1,7 +1,9 @@
 <?php
 /** @var array $promos */
+/** @var array $promosProx */
 /** @var array $shareByPromo */
 $promos = $promos ?? [];
+$promosProx = $promosProx ?? [];
 $shareByPromo = $shareByPromo ?? [];
 ?>
 
@@ -50,6 +52,61 @@ $shareByPromo = $shareByPromo ?? [];
                             Desde el <?= htmlspecialchars(date('d/m/Y', strtotime($desde))) ?>
                         <?php else: ?>
                             Hasta el <?= htmlspecialchars(date('d/m/Y', strtotime($hasta))) ?>
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
+                <?php if ($share): ?>
+                    <div class="card-share">
+                        <button class="share-btn sm gold" type="button" onclick="sharePromo(<?= $promoId ?>)" title="Compartir (abre el menú nativo del teléfono)"><i class="bi bi-share"></i></button>
+                        <a class="share-btn sm" href="<?= htmlspecialchars((string)$share['facebook']) ?>" target="_blank" rel="noopener" title="Compartir en Facebook"><i class="bi bi-facebook"></i></a>
+                        <a class="share-btn sm" href="<?= htmlspecialchars((string)$share['x']) ?>" target="_blank" rel="noopener" title="Compartir en X"><i class="bi bi-twitter-x"></i></a>
+                        <a class="share-btn sm" href="<?= htmlspecialchars((string)$share['whatsapp']) ?>" target="_blank" rel="noopener" title="Compartir en WhatsApp"><i class="bi bi-whatsapp"></i></a>
+                        <a class="share-btn sm" href="<?= htmlspecialchars((string)$share['telegram']) ?>" target="_blank" rel="noopener" title="Compartir en Telegram"><i class="bi bi-send"></i></a>
+                        <button class="share-btn sm" type="button" data-copy="<?= $promoId ?>" onclick="copyPromoLink(<?= $promoId ?>)" title="Copiar link + texto (pegá en TikTok, Instagram, etc.)"><i class="bi bi-link-45deg"></i></button>
+                    </div>
+                <?php endif; ?>
+            </div>
+        <?php endforeach; ?>
+    </div>
+<?php endif; ?>
+
+<?php if ($promosProx): ?>
+    <div class="promo-hero" style="margin-top:32px">
+        <h1>Próximamente</h1>
+        <p>Promociones que comienzan en los próximos 7 días</p>
+    </div>
+
+    <div class="promo-grid">
+        <?php foreach ($promosProx as $p):
+            $promoId = (int)($p['id'] ?? 0);
+            $esCredito = (string)($p['tipo_tarjeta'] ?? '') === 'credito';
+            $icono = $esCredito ? '💳' : '🏦';
+            $tipoLabel = $esCredito ? 'Crédito' : 'Débito';
+            $desde = (string)($p['fecha_desde'] ?? '');
+            $hasta = (string)($p['fecha_hasta'] ?? '');
+            $img = (string)($p['imagen'] ?? '');
+            $share = $shareByPromo[$promoId] ?? null;
+        ?>
+            <div class="promo-card" id="promo-<?= $promoId ?>">
+                <?php if ($img !== ''): ?>
+                    <div class="card-img-wrap">
+                        <img src="/upload/<?= htmlspecialchars($img) ?>" alt="<?= htmlspecialchars((string)($p['banco'] ?? '')) ?>" loading="lazy" />
+                    </div>
+                <?php else: ?>
+                    <div class="card-icon"><?= $icono ?></div>
+                <?php endif; ?>
+                <div class="card-banco"><?= htmlspecialchars((string)($p['banco'] ?? '')) ?></div>
+                <div class="card-tipo"><?= $tipoLabel ?></div>
+                <div class="card-descripcion"><?= nl2br(htmlspecialchars((string)($p['descripcion'] ?? ''))) ?></div>
+                <?php if (trim((string)($p['detalle_promo'] ?? '')) !== ''): ?>
+                    <div class="card-detalle"><?= nl2br(htmlspecialchars((string)($p['detalle_promo'] ?? ''))) ?></div>
+                <?php endif; ?>
+                <?php if ($desde !== ''): ?>
+                    <div class="card-vigencia">
+                        <i>📅</i>
+                        Comienza el <?= htmlspecialchars(date('d/m/Y', strtotime($desde))) ?>
+                        <?php if ($hasta !== ''): ?>
+                            · hasta el <?= htmlspecialchars(date('d/m/Y', strtotime($hasta))) ?>
                         <?php endif; ?>
                     </div>
                 <?php endif; ?>

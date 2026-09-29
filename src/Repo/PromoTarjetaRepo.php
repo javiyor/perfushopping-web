@@ -26,6 +26,22 @@ final class PromoTarjetaRepo
         return $st->fetchAll();
     }
 
+    /** Promociones publicadas que comienzan dentro de los próximos $dias días. */
+    public function findProximas(int $dias = 7): array
+    {
+        $dias = max(1, min(60, $dias));
+        $st = Db::pdo()->prepare("
+            SELECT * FROM promo_tarjetas
+            WHERE publicado = 1
+              AND fecha_desde IS NOT NULL
+              AND fecha_desde > CURDATE()
+              AND fecha_desde <= DATE_ADD(CURDATE(), INTERVAL {$dias} DAY)
+            ORDER BY fecha_desde ASC, banco ASC
+        ");
+        $st->execute();
+        return $st->fetchAll();
+    }
+
     public function findById(int $id): ?array
     {
         $st = Db::pdo()->prepare('SELECT * FROM promo_tarjetas WHERE id = :id LIMIT 1');
