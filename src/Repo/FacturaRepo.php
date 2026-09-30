@@ -147,26 +147,30 @@ final class FacturaRepo
             return;
         }
         self::$facturasEntregaChecked = true;
+        // Columna por columna: si una falla (ej. ya existe), igual se crean las demás.
+        $ddls = [
+            'entrega_tipo' => "ADD COLUMN entrega_tipo ENUM('local','envio') NOT NULL DEFAULT 'local'",
+            'transporte' => "ADD COLUMN transporte ENUM('propio','delivery','correo_argentino') DEFAULT NULL",
+            'envio_estado' => "ADD COLUMN envio_estado ENUM('pendiente','en_transito','entregado','cancelado') DEFAULT NULL",
+            'envio_direccion' => 'ADD COLUMN envio_direccion VARCHAR(255) DEFAULT NULL',
+            'envio_observacion' => 'ADD COLUMN envio_observacion TEXT DEFAULT NULL',
+        ];
         try {
             $cols = Db::pdo()->query('SHOW COLUMNS FROM facturas')->fetchAll();
             $fields = array_column($cols, 'Field');
-            $has = in_array('entrega_tipo', $fields, true);
-            if (!$has) {
-                Db::pdo()->exec("ALTER TABLE facturas ADD COLUMN entrega_tipo ENUM('local','envio') NOT NULL DEFAULT 'local' AFTER forma_pago");
-                Db::pdo()->exec("ALTER TABLE facturas ADD COLUMN transporte ENUM('propio','delivery','correo_argentino') DEFAULT NULL AFTER entrega_tipo");
-                Db::pdo()->exec("ALTER TABLE facturas ADD COLUMN envio_estado ENUM('pendiente','en_transito','entregado','cancelado') DEFAULT NULL AFTER transporte");
-                Db::pdo()->exec("ALTER TABLE facturas ADD COLUMN envio_direccion VARCHAR(255) DEFAULT NULL AFTER envio_estado");
-                Db::pdo()->exec("ALTER TABLE facturas ADD COLUMN envio_observacion TEXT DEFAULT NULL AFTER envio_direccion");
+            foreach ($ddls as $col => $ddl) {
+                if (!in_array($col, $fields, true)) {
+                    try {
+                        Db::pdo()->exec("ALTER TABLE facturas {$ddl}");
+                    } catch (\Throwable $e) {
+                        error_log('FacturaRepo::ensureEntregaColumns ' . $col . ': ' . $e->getMessage());
+                    }
+                }
             }
-            self::$facturasEntregaHasCols = true;
+            $cols = Db::pdo()->query('SHOW COLUMNS FROM facturas')->fetchAll();
+            self::$facturasEntregaHasCols = in_array('entrega_tipo', array_column($cols, 'Field'), true);
         } catch (\Throwable $e) {
-            try {
-                $cols = Db::pdo()->query('SHOW COLUMNS FROM facturas')->fetchAll();
-                $fields = array_column($cols, 'Field');
-                self::$facturasEntregaHasCols = in_array('entrega_tipo', $fields, true);
-            } catch (\Throwable $e2) {
-                self::$facturasEntregaHasCols = false;
-            }
+            self::$facturasEntregaHasCols = false;
         }
     }
 
