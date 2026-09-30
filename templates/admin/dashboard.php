@@ -6,6 +6,7 @@ $abandonedCarts = $abandonedCarts ?? [];
 $topProducts = $topProducts ?? [];
 $adminRol = $adminUser['rol'] ?? '';
 $isSuper = $adminRol === 'superadmin';
+$can = $can ?? function () { return false; };
 ?>
 
 <div class="d-flex justify-content-between align-items-start mb-4">
@@ -102,6 +103,22 @@ $isSuper = $adminRol === 'superadmin';
             <div class="card-body">
                 <div class="d-flex flex-wrap gap-2">
                     <a class="btn btn-accent" href="/admin/prepare"><i class="bi bi-box"></i> Preparar pedidos</a>
+                    <?php if ($can('facturacion')): ?>
+                    <a class="btn btn-accent" href="/admin/facturas"><i class="bi bi-receipt-cutoff"></i> Facturación</a>
+                    <?php endif; ?>
+                    <?php if ($can('compras') || $can('caja_movimientos')): ?>
+                    <a class="btn btn-outline-secondary" href="/admin/gastos"><i class="bi bi-cash-coin"></i> Gastos</a>
+                    <?php endif; ?>
+                    <?php if ($can('compras')): ?>
+                    <a class="btn btn-outline-secondary" href="/admin/compras"><i class="bi bi-receipt"></i> Facturas compra</a>
+                    <?php endif; ?>
+                    <?php if ($can('productos')): ?>
+                    <a class="btn btn-outline-secondary" href="/admin/stock"><i class="bi bi-boxes"></i> Stock</a>
+                    <?php endif; ?>
+                    <?php if ($isSuper): ?>
+                    <a class="btn btn-outline-secondary" href="/admin/caja/general"><i class="bi bi-piggy-bank"></i> Caja General</a>
+                    <a class="btn btn-outline-secondary" href="/admin/reportes"><i class="bi bi-graph-up"></i> Reportes</a>
+                    <?php endif; ?>
                     <a class="btn btn-outline-secondary" href="/admin/orders"><i class="bi bi-cart"></i> Todos los pedidos</a>
                     <a class="btn btn-outline-secondary" href="/admin/productos"><i class="bi bi-box-seam"></i> Productos</a>
                     <a class="btn btn-outline-secondary" href="/admin/clientes"><i class="bi bi-people"></i> Clientes</a>

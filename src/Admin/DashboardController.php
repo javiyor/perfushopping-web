@@ -86,8 +86,14 @@ final class DashboardController
         }
         $stats = array_merge($stats, $webStatsBlock);
 
+        $authSvc = new AdminAuthService();
+        $can = static function (string $p) use ($authSvc): bool {
+            return ($authSvc->user()['rol'] ?? '') === 'superadmin' || $authSvc->checkPermiso($p);
+        };
+
         echo View::adminPage('admin/dashboard.php', [
             'adminUser' => $adminUser,
+            'can' => $can,
             'stats' => $stats,
             'pendingOrders' => $pendingOrders,
             'paidOrders' => $paidOrders,
