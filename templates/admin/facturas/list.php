@@ -75,7 +75,7 @@ $tipoBadges = ['FACT-A' => 'primary', 'FACT-B' => 'success', 'FACT-C' => 'second
                     <th>Pago</th>
                     <th>Vendedor</th>
                     <th>Creado por</th>
-                    <th style="width:50px"></th>
+                    <th style="width:130px"></th>
                 </tr>
             </thead>
             <tbody>
@@ -118,13 +118,43 @@ $tipoBadges = ['FACT-A' => 'primary', 'FACT-B' => 'success', 'FACT-C' => 'second
                             <td class="small"><?= htmlspecialchars((string)($f['forma_pago'] ?? '-')) ?></td>
                             <td class="small"><?= htmlspecialchars((string)($f['vendedor_nombre'] ?? '-')) ?></td>
                             <td class="small text-muted"><?= htmlspecialchars((string)($f['created_by_nombre'] ?? '-')) ?></td>
-                            <td><a class="btn btn-sm btn-outline-secondary" href="/admin/facturas/<?= (int)($f['id'] ?? 0) ?>"><i class="bi bi-eye"></i></a></td>
+                            <td style="white-space:nowrap">
+                                <a class="btn btn-sm btn-outline-secondary py-0 px-1" title="Ver" href="/admin/facturas/<?= (int)($f['id'] ?? 0) ?>"><i class="bi bi-eye"></i></a>
+                                <a class="btn btn-sm btn-outline-secondary py-0 px-1" title="Imprimir" target="_blank" href="/admin/facturas/imprimir/<?= (int)($f['id'] ?? 0) ?>"><i class="bi bi-printer"></i></a>
+                                <?php
+                                $waTel = preg_replace('/\D/', '', (string)($f['cliente_tele'] ?? ''));
+                                if ($waTel !== ''):
+                                    $waText = 'Hola ' . ($f['cliente_nombre'] ?? '') . ', le enviamos su comprobante ' . ($f['codigo'] ?? '') . ' por un total de ' . Format::moneyFromCents((int)($f['total_cents'] ?? 0)) . '. ¡Gracias por su compra!';
+                                ?>
+                                <a class="btn btn-sm btn-outline-success py-0 px-1" title="Enviar por WhatsApp" target="_blank" href="https://wa.me/<?= htmlspecialchars($waTel) ?>?text=<?= urlencode($waText) ?>"><i class="bi bi-whatsapp"></i></a>
+                                <?php endif; ?>
+                                <?php if (trim((string)($f['cliente_mail'] ?? '')) !== ''): ?>
+                                <button class="btn btn-sm btn-outline-primary py-0 px-1" title="Enviar por email" type="button" onclick="enviarComprobanteEmail(<?= (int)($f['id'] ?? 0) ?>, this)"><i class="bi bi-envelope"></i></button>
+                                <?php endif; ?>
+                            </td>
                         </tr>
                     <?php endforeach; ?>
                 <?php endif; ?>
             </tbody>
         </table>
     </div>
+    <script>
+    function enviarComprobanteEmail(id, btn) {
+        if (!confirm('¿Enviar el comprobante por email al cliente?')) return;
+        btn.disabled = true;
+        fetch('/admin/facturas/' + id + '/enviar-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: '_csrf=' + encodeURIComponent('<?= htmlspecialchars($csrf ?? '') ?>'),
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            alert(d.ok ? 'Email enviado.' : ('Error: ' + (d.error || 'desconocido')));
+        })
+        .catch(function() { alert('Error de conexión.'); })
+        .finally(function() { btn.disabled = false; });
+    }
+    </script>
     <?php if ($pages > 1): ?>
     <div class="card-footer bg-white d-flex justify-content-between align-items-center">
         <span class="small text-muted"><?= $total ?> comprobantes · Página <?= $page ?> de <?= $pages ?></span>
