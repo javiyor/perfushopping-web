@@ -505,32 +505,79 @@
         }
     })();
     </script>
+    <div id="locationBlock" style="display:none;position:fixed;inset:0;z-index:99999;background:#121418;color:#f6f4ef;text-align:center;padding:40px 20px;overflow-y:auto">
+        <div style="max-width:420px;margin:8vh auto">
+            <div style="font-size:48px">📍</div>
+            <h4 class="mt-2">Ubicación obligatoria</h4>
+            <p id="locationBlockText" class="text-muted">Para usar el sistema debés compartir tu ubicación. Solo la ve el administrador.</p>
+            <button id="btnEnableLocation" class="btn btn-accent" type="button">Activar ubicación</button>
+            <div id="locationBlockMsg" class="small mt-3"></div>
+        </div>
+    </div>
     <script>
-    // Compartir ubicación cada 5 minutos (solo la ve el superadmin).
+    // Ubicación automática y obligatoria cada 5 minutos (solo la ve el superadmin).
+    // El superadmin está exento del bloqueo para no trabar el acceso de escritorio.
     (function() {
-        var KEY = 'ps_share_location';
+        var KEY = 'ps_share_location_off';
         var LAST = 'ps_share_location_last';
+        var DENIED = 'ps_share_location_denied';
         var INTERVAL = 5 * 60 * 1000;
+        var GRACE = 15000;
         var btn = document.getElementById('btnLocation');
+        if (!btn) return;
+        var isAdmin = (typeof isSuperadmin !== 'undefined') && !!isSuperadmin;
         var csrf = <?= json_encode(\Perfushopping\Web\Support\Csrf::token()) ?>;
 
+        function lastSend() {
+            try { return parseInt(localStorage.getItem(LAST) || '0', 10) || 0; } catch (e) { return 0; }
+        }
+
+        function denied() {
+            try { return sessionStorage.getItem(DENIED) === '1'; } catch (e) { return false; }
+        }
+
         function enabled() {
-            try { return localStorage.getItem(KEY) === '1'; } catch (e) { return false; }
+            if (denied()) return false;
+            try { return localStorage.getItem(KEY) !== '0'; } catch (e) { return true; }
+        }
+
+        function needsBlock() {
+            if (isAdmin) return false;
+            if (!enabled()) return true;
+            return (Date.now() - lastSend()) >= INTERVAL;
         }
 
         function paint() {
-            if (!btn) return;
             var on = enabled();
             btn.classList.toggle('btn-success', on);
             btn.classList.toggle('btn-outline-info', !on);
-            btn.title = on ? 'Dejar de compartir mi ubicación' : 'Compartir mi ubicación cada 5 minutos';
+            btn.title = on ? 'Ubicación activada (obligatoria)' : 'Activar ubicación (obligatoria)';
+        }
+
+        function paintBlock() {
+            var b = document.getElementById('locationBlock');
+            if (b) b.style.display = needsBlock() ? '' : 'none';
+        }
+
+        function blockMsg(t) {
+            var m = document.getElementById('locationBlockMsg');
+            if (m) m.textContent = t || '';
         }
 
         function send() {
-            if (!enabled() || !('geolocation' in navigator)) return;
+            if (!enabled()) { paintBlock(); return; }
+            if (!('geolocation' in navigator)) {
+                blockMsg('Este dispositivo no soporta geolocalización.');
+                paintBlock();
+                return;
+            }
             try {
                 navigator.geolocation.getCurrentPosition(function(pos) {
-                    try { localStorage.setItem(LAST, String(Date.now())); } catch (e) {}
+                    try {
+                        localStorage.setItem(LAST, String(Date.now()));
+                        sessionStorage.removeItem(DENIED);
+                    } catch (e) {}
+                    paintBlock();
                     fetch('/admin/ubicacion/guardar', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -541,33 +588,58 @@
                             accuracy: Math.round(pos.coords.accuracy || 0),
                         }),
                     }).catch(function() {});
-                }, function() {}, { enableHighAccuracy: false, timeout: 20000, maximumAge: 60000 });
+                }, function(err) {
+                    if (err && err.code === 1) {
+                        try { sessionStorage.setItem(DENIED, '1'); } catch (e) {}
+                        blockMsg('Permiso denegado. Activalo en los ajustes del navegador para este sitio y reintentá.');
+                    } else {
+                        blockMsg('No se pudo obtener tu ubicación. Verificá el GPS y la conexión, y reintentá.');
+                    }
+                    paint();
+                    paintBlock();
+                }, { enableHighAccuracy: false, timeout: 20000, maximumAge: 60000 });
             } catch (e) {}
         }
 
-        if (btn) {
+        paint();
+        btn.addEventListener('click', function() {
+            if (!('geolocation' in navigator)) {
+                alert('Este dispositivo no soporta geolocalización.');
+                return;
+            }
+            var on = !enabled();
+            try {
+                localStorage.setItem(KEY, on ? '1' : '0');
+                if (on) sessionStorage.removeItem(DENIED);
+            } catch (e) {}
+            blockMsg('');
             paint();
-            btn.addEventListener('click', function() {
-                var on = !enabled();
-                if (on && !('geolocation' in navigator)) {
-                    alert('Este dispositivo no soporta geolocalización.');
-                    return;
-                }
-                try { localStorage.setItem(KEY, on ? '1' : '0'); } catch (e) {}
+            if (on) send();
+            else paintBlock();
+        });
+
+        var enableBtn = document.getElementById('btnEnableLocation');
+        if (enableBtn) {
+            enableBtn.addEventListener('click', function() {
+                try {
+                    localStorage.setItem(KEY, '1');
+                    sessionStorage.removeItem(DENIED);
+                } catch (e) {}
+                blockMsg('');
                 paint();
-                if (on) send();
+                send();
             });
         }
 
-        if (enabled()) {
-            send();
+        send();
+        if (!isAdmin) {
+            setTimeout(paintBlock, GRACE);
         }
         setInterval(send, INTERVAL);
         document.addEventListener('visibilitychange', function() {
             if (document.visibilityState !== 'visible') return;
-            var last = 0;
-            try { last = parseInt(localStorage.getItem(LAST) || '0', 10) || 0; } catch (e) {}
-            if (Date.now() - last >= INTERVAL) send();
+            if (Date.now() - lastSend() >= INTERVAL) send();
+            paintBlock();
         });
     })();
     </script>
