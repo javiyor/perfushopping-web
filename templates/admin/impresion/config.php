@@ -10,7 +10,11 @@ $formatos = [
         <h4 class="fw-bold mb-1">Configuración de impresión</h4>
         <p class="text-muted small">Elegí el formato por defecto para cada tipo de documento</p>
     </div>
-    <a class="btn btn-outline-secondary btn-sm" href="/admin/caja">Volver</a>
+    <div class="d-flex gap-2">
+        <a class="btn btn-accent btn-sm" href="/admin/impresion/spooler"><i class="bi bi-printer"></i> Spooler de tickets</a>
+        <a class="btn btn-outline-secondary btn-sm" href="/admin/impresion/impresoras"><i class="bi bi-hdd-network"></i> Impresoras</a>
+        <a class="btn btn-outline-secondary btn-sm" href="/admin/caja">Volver</a>
+    </div>
 </div>
 
 <div class="row g-3">

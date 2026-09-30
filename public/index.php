@@ -455,6 +455,15 @@ $router->get('/admin/nota-pedido/buscar-proveedores', [AdminNotaPedidoController
 
 // Admin - Configuración de impresión
 $router->get('/admin/impresion/config', [AdminPrintConfigController::class, 'index']);
+$router->get('/admin/impresion/impresoras', [AdminPrintConfigController::class, 'impresoras']);
+$router->post('/admin/impresion/impresora/guardar', [AdminPrintConfigController::class, 'impresoraSave']);
+$router->post('/admin/impresion/impresora/toggle', [AdminPrintConfigController::class, 'impresoraToggle']);
+$router->post('/admin/impresion/impresora/eliminar', [AdminPrintConfigController::class, 'impresoraDelete']);
+$router->get('/admin/impresion/spooler', [AdminPrintConfigController::class, 'spooler']);
+$router->get('/admin/impresion/cola', [AdminPrintConfigController::class, 'colaData']);
+$router->post('/admin/impresion/cola/ack', [AdminPrintConfigController::class, 'colaAck']);
+$router->get('/api/print/jobs', [AdminPrintConfigController::class, 'apiJobs']);
+$router->post('/api/print/ack', [AdminPrintConfigController::class, 'apiAck']);
 $router->get('/admin/ordenes-compra', [AdminOrdenCompraController::class, 'index']);
 $router->get('/admin/ordenes-compra/nueva', [AdminOrdenCompraController::class, 'create']);
 $router->post('/admin/ordenes-compra/guardar', [AdminOrdenCompraController::class, 'store']);

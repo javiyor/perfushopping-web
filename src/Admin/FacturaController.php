@@ -429,7 +429,9 @@ final class FacturaController
             $cobroRepo = new \Perfushopping\Web\Repo\CobroCuentaRepo();
             foreach ($pagos as $pg) {
                 $fp = $pg['forma_pago'];
-                if ($fp === 'transferencia') {
+                $fpTipo = \Perfushopping\Web\Repo\FormaPagoRepo::tipoDe((string)$fp);
+                $esBancoNuevo = $fpTipo === 'banco' && !in_array($fp, ['transferencia', 'mercadopago', 'debito', 'credito'], true);
+                if ($fp === 'transferencia' || $esBancoNuevo) {
                     $bancoCuentaId = $pg['banco_cuenta_id'] ?? null;
                     if (!$bancoCuentaId) $bancoCuentaId = $cobroRepo->getTransferenciaCuentaId();
                     if ($bancoCuentaId) {
@@ -447,6 +449,15 @@ final class FacturaController
                 }
             }
         } catch (\Throwable $e) { error_log('BancoMov factura: '.$e->getMessage()); }
+
+        // Encolar impresión en tickets para la impresora del punto de venta.
+        try {
+            (new \Perfushopping\Web\Repo\PrintJobRepo())->encolar(
+                $id,
+                (int)$auth->getPuntoVenta(),
+                $auth->getSucursalId() > 0 ? $auth->getSucursalId() : null
+            );
+        } catch (\Throwable $e) { error_log('PrintJob encolar: '.$e->getMessage()); }
 
         // Auto-post to current account if forma_pago = cuenta_corriente
         if ($clienteId && $formaPago === 'cuenta_corriente') {

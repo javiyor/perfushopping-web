@@ -74,7 +74,7 @@ final class ReporteRepo
               $pvWhere
             GROUP BY fi.producto, fi.variedad
             ORDER BY qty_total DESC
-            LIMIT ' . $limite . '
+            LIMIT " . $limite . "
         ");
         $st->execute($params);
         return $st->fetchAll();
@@ -353,7 +353,7 @@ final class ReporteRepo
                   $pvWhere
                 GROUP BY fi.producto, fi.variedad
                 ORDER BY ganancia_cents DESC
-                LIMIT ' . $limite . '
+                LIMIT " . $limite . "
             ");
             $st->execute($params);
             return $st->fetchAll();

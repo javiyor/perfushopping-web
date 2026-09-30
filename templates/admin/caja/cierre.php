@@ -49,12 +49,31 @@ $esperadoEfectivo = (int)($esperadoEfectivo ?? 0);
                     <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
 
                     <div class="mb-3">
+                        <label class="form-label small fw-semibold">Detalle por billete (opcional)</label>
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-sm align-middle mb-2" id="detalleTable">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width:40%">Denominación</th>
+                                        <th style="width:25%">Cantidad</th>
+                                        <th style="width:30%">Subtotal</th>
+                                        <th style="width:5%"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="detalleBody">
+                                </tbody>
+                            </table>
+                        </div>
+                        <button class="btn btn-sm btn-outline-primary" type="button" onclick="addRow()">Agregar fila</button>
+                    </div>
+
+                    <div class="mb-3">
                         <label class="form-label small fw-semibold">Monto final de cierre</label>
                         <div class="input-group">
                             <span class="input-group-text">$</span>
                             <input class="form-control" name="monto_cierre_cents" id="montoCierre" type="number" value="<?= (int)round($esperadoEfectivo / 100) ?>" min="0" step="0.01" />
                         </div>
-                        <div class="form-text">Efectivo físico contado al cierre, en pesos.</div>
+                        <div class="form-text">Efectivo físico contado al cierre, en pesos. Se completa solo con el detalle.</div>
                     </div>
 
                     <div class="mb-3">
@@ -91,8 +110,88 @@ $esperadoEfectivo = (int)($esperadoEfectivo ?? 0);
                     <button class="btn btn-warning w-100" type="submit"><i class="bi bi-stop-fill"></i> Cerrar caja</button>
 
 <script>
+const DENOMINACIONES_SUGERIDAS = [20000, 10000, 5000, 2000, 1000, 500, 200, 100];
+
+function addRow(denom, qty) {
+    const tbody = document.getElementById('detalleBody');
+    const tr = document.createElement('tr');
+
+    const tdDenom = document.createElement('td');
+    const denomInput = document.createElement('input');
+    denomInput.type = 'number';
+    denomInput.className = 'form-control form-control-sm denom-input';
+    denomInput.value = denom || '';
+    denomInput.placeholder = 'Ej: 20000';
+    denomInput.min = '1';
+    denomInput.step = '1';
+    denomInput.oninput = recalcDetalle;
+    tdDenom.appendChild(denomInput);
+
+    const tdQty = document.createElement('td');
+    const qtyInput = document.createElement('input');
+    qtyInput.type = 'number';
+    qtyInput.className = 'form-control form-control-sm qty-input';
+    qtyInput.value = qty || '';
+    qtyInput.placeholder = '0';
+    qtyInput.min = '0';
+    qtyInput.step = '1';
+    qtyInput.oninput = recalcDetalle;
+    tdQty.appendChild(qtyInput);
+
+    const tdSub = document.createElement('td');
+    const subSpan = document.createElement('span');
+    subSpan.className = 'subtotal-display';
+    subSpan.textContent = '$0';
+    tdSub.appendChild(subSpan);
+
+    const tdDel = document.createElement('td');
+    tdDel.className = 'text-center';
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'btn btn-sm btn-outline-danger border-0';
+    delBtn.innerHTML = '<i class="bi bi-x"></i>';
+    delBtn.onclick = function() {
+        tr.remove();
+        recalcDetalle();
+    };
+    tdDel.appendChild(delBtn);
+
+    tr.appendChild(tdDenom);
+    tr.appendChild(tdQty);
+    tr.appendChild(tdSub);
+    tr.appendChild(tdDel);
+    tbody.appendChild(tr);
+
+    recalcDetalle();
+}
+
+function recalcDetalle() {
+    let total = 0;
+    const rows = document.querySelectorAll('#detalleBody tr');
+    rows.forEach(tr => {
+        const denom = parseInt(tr.querySelector('.denom-input').value) || 0;
+        const qty = parseInt(tr.querySelector('.qty-input').value) || 0;
+        const sub = denom * qty;
+        total += sub;
+        tr.querySelector('.subtotal-display').textContent = '$' + sub.toLocaleString('es-AR');
+    });
+    let hasData = false;
+    rows.forEach(tr => {
+        const denom = parseInt(tr.querySelector('.denom-input').value) || 0;
+        const qty = parseInt(tr.querySelector('.qty-input').value) || 0;
+        if (denom > 0 && qty > 0) hasData = true;
+    });
+    if (hasData) {
+        document.getElementById('montoCierre').value = total;
+    }
+    calcQueda();
+}
+
 document.getElementById('montoCierre').addEventListener('input', calcQueda);
 document.getElementById('montoRetirado').addEventListener('input', calcQueda);
+document.addEventListener('DOMContentLoaded', function() {
+    DENOMINACIONES_SUGERIDAS.forEach(d => addRow(d, 0));
+});
 function calcQueda() {
     const cierre = Math.round((parseFloat(document.getElementById('montoCierre').value) || 0) * 100);
     const retiro = Math.round((parseFloat(document.getElementById('montoRetirado').value) || 0) * 100);
