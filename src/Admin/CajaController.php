@@ -592,6 +592,81 @@ final class CajaController
         Response::redirect('/admin/caja');
     }
 
+    public function solicitarAjusteCierreForm(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requirePermiso('caja_movimientos');
+
+        $cajaId = (int)($params['id'] ?? 0);
+        $repo = new CajaRepo();
+        $caja = $cajaId > 0 ? $repo->findById($cajaId) : null;
+        if (!$caja || ($caja['estado'] ?? '') !== 'cerrada') {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Solo se puede corregir un cierre ya realizado.'];
+            Response::redirect('/admin/caja');
+        }
+
+        echo View::adminPage('admin/caja/ajuste-cierre.php', [
+            'adminUser' => $adminUser,
+            'caja' => $caja,
+            'campos' => CajaRepo::CAMPOS_AJUSTE_CIERRE,
+            'csrf' => Csrf::token(),
+            'pageTitle' => 'Solicitar corrección de cierre',
+        ]);
+    }
+
+    public function solicitarAjusteCierreStore(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requirePermiso('caja_movimientos');
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $cajaId = (int)($_POST['caja_id'] ?? 0);
+        $repo = new CajaRepo();
+        $caja = $cajaId > 0 ? $repo->findById($cajaId) : null;
+        if (!$caja || ($caja['estado'] ?? '') !== 'cerrada') {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Solo se puede corregir un cierre ya realizado.'];
+            Response::redirect('/admin/caja');
+        }
+
+        $motivo = trim((string)($_POST['motivo'] ?? ''));
+        if (mb_strlen($motivo) < 10) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Describí el error (mínimo 10 caracteres).'];
+            Response::redirect('/admin/caja/cierre/' . $cajaId . '/ajuste');
+        }
+
+        $creadas = 0;
+        foreach (CajaRepo::CAMPOS_AJUSTE_CIERRE as $campo => $label) {
+            if (!isset($_POST[$campo])) {
+                continue;
+            }
+            $nuevo = self::pesosACents($_POST[$campo]);
+            if ($nuevo < 0) {
+                continue;
+            }
+            $actual = (int)($caja[$campo] ?? 0);
+            if ($nuevo === $actual) {
+                continue;
+            }
+            if ($repo->ajustePendienteDeCajaPorCampo($cajaId, $campo)) {
+                continue;
+            }
+            try {
+                $repo->solicitarAjusteCierre($cajaId, $campo, $nuevo, $motivo, (int)$adminUser['id']);
+                $creadas++;
+            } catch (\Throwable $e) {
+                $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => $e->getMessage()];
+                Response::redirect('/admin/caja');
+            }
+        }
+
+        if ($creadas > 0) {
+            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Corrección enviada. Queda pendiente hasta que un administrador la apruebe.'];
+        } else {
+            $_SESSION['admin_flash'] = ['type' => 'info', 'text' => 'No hay cambios respecto a los valores actuales o ya hay solicitudes pendientes.'];
+        }
+        Response::redirect('/admin/caja');
+    }
+
     public function ajustes(array $params): void
     {
         $auth = new AdminAuthService();

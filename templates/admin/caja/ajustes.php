@@ -3,6 +3,12 @@ use Perfushopping\Web\Support\Format;
 
 $pendientes = $pendientes ?? [];
 $historial = $historial ?? [];
+$camposAjuste = [
+    'monto_inicial_cents' => 'Apertura',
+    'monto_cierre_cents' => 'Cierre',
+    'monto_retirado_cents' => 'Pasaje',
+    'monto_proxima_apertura_cents' => 'Saldo próx.',
+];
 ?>
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
@@ -20,6 +26,7 @@ $historial = $historial ?? [];
                 <tr>
                     <th>Solicitada</th>
                     <th>Sucursal / Turno</th>
+                    <th>Campo</th>
                     <th>Por</th>
                     <th class="text-end">Actual</th>
                     <th class="text-end">Propuesto</th>
@@ -29,12 +36,13 @@ $historial = $historial ?? [];
             </thead>
             <tbody>
                 <?php if (!$pendientes): ?>
-                    <tr><td colspan="7" class="text-muted text-center small">Sin solicitudes pendientes.</td></tr>
+                    <tr><td colspan="8" class="text-muted text-center small">Sin solicitudes pendientes.</td></tr>
                 <?php else: ?>
                     <?php foreach ($pendientes as $p): ?>
                         <tr>
                             <td class="small"><?= htmlspecialchars(mb_substr((string)($p['created_at'] ?? ''), 0, 16)) ?></td>
                             <td class="small"><?= htmlspecialchars((string)($p['sucursal_nombre'] ?? '')) ?> · <?= htmlspecialchars((string)($p['fecha'] ?? '')) ?> · <?= htmlspecialchars((string)($p['turno'] ?? '')) ?></td>
+                            <td><span class="badge bg-info"><?= htmlspecialchars($camposAjuste[$p['campo'] ?? ''] ?? ($p['campo'] ?? '')) ?></span></td>
                             <td class="small"><?= htmlspecialchars((string)($p['solicitado_por_nombre'] ?? '')) ?></td>
                             <td class="text-end small"><?= Format::moneyFromCents((int)($p['valor_anterior_cents'] ?? 0)) ?></td>
                             <td class="text-end small fw-bold"><?= Format::moneyFromCents((int)($p['valor_nuevo_cents'] ?? 0)) ?></td>
@@ -45,7 +53,7 @@ $historial = $historial ?? [];
                                         <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
                                         <input type="hidden" name="id" value="<?= (int)$p['id'] ?>" />
                                         <input type="hidden" name="accion" value="aprobar" />
-                                        <button type="submit" class="btn btn-sm btn-success" onclick="return confirm('¿Aprobar y aplicar esta corrección a la apertura?')">Aprobar</button>
+                                        <button type="submit" class="btn btn-sm btn-success" onclick="return confirm('¿Aprobar y aplicar esta corrección?')">Aprobar</button>
                                     </form>
                                     <form method="post" action="/admin/caja/ajuste/resolver" class="d-inline">
                                         <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
@@ -71,6 +79,7 @@ $historial = $historial ?? [];
                 <tr>
                     <th>Fecha</th>
                     <th>Estado</th>
+                    <th>Campo</th>
                     <th class="text-end">De</th>
                     <th class="text-end">A</th>
                     <th>Motivo</th>
@@ -79,12 +88,13 @@ $historial = $historial ?? [];
             </thead>
             <tbody>
                 <?php if (!$historial): ?>
-                    <tr><td colspan="6" class="text-muted text-center small">Sin solicitudes.</td></tr>
+                    <tr><td colspan="7" class="text-muted text-center small">Sin solicitudes.</td></tr>
                 <?php else: ?>
                     <?php foreach ($historial as $h): ?>
                         <tr>
                             <td class="small"><?= htmlspecialchars(mb_substr((string)($h['created_at'] ?? ''), 0, 16)) ?></td>
                             <td><span class="badge bg-<?= ($h['estado'] ?? '') === 'aprobado' ? 'success' : (($h['estado'] ?? '') === 'rechazado' ? 'danger' : 'warning') ?>"><?= htmlspecialchars($h['estado'] ?? '') ?></span></td>
+                            <td><span class="badge bg-info"><?= htmlspecialchars($camposAjuste[$h['campo'] ?? ''] ?? ($h['campo'] ?? '')) ?></span></td>
                             <td class="text-end small"><?= Format::moneyFromCents((int)($h['valor_anterior_cents'] ?? 0)) ?></td>
                             <td class="text-end small"><?= Format::moneyFromCents((int)($h['valor_nuevo_cents'] ?? 0)) ?></td>
                             <td class="small text-muted"><?= htmlspecialchars(mb_substr((string)($h['motivo'] ?? ''), 0, 60)) ?></td>

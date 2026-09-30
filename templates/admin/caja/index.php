@@ -220,6 +220,7 @@ $saldoEsperado = $montoInicial + $ventasEfectivo + (int)$totalesMov['total_ingre
                             <th class="text-end">Cierre</th>
                             <th class="text-end">Retirado</th>
                             <th>Estado</th>
+                            <th style="width:50px"></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -231,6 +232,11 @@ $saldoEsperado = $montoInicial + $ventasEfectivo + (int)$totalesMov['total_ingre
                                 <td class="text-end small"><?= Format::moneyFromCents((int)($h['monto_cierre_cents'] ?? 0)) ?></td>
                                 <td class="text-end small"><?= Format::moneyFromCents((int)($h['monto_retirado_cents'] ?? 0)) ?></td>
                                 <td><span class="badge bg-<?= ($h['estado'] ?? '') === 'cerrada' ? 'secondary' : 'success' ?>"><?= htmlspecialchars($h['estado'] ?? '') ?></span></td>
+                                <td>
+                                    <?php if (($h['estado'] ?? '') === 'cerrada'): ?>
+                                    <a class="btn btn-sm btn-outline-secondary py-0 px-1" title="Solicitar corrección del cierre" href="/admin/caja/cierre/<?= (int)$h['id'] ?>/ajuste"><i class="bi bi-pencil-square"></i></a>
+                                    <?php endif; ?>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>

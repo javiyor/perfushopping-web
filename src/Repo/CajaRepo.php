@@ -841,6 +841,80 @@ final class CajaRepo
         return $st->fetch() ?: null;
     }
 
+    public const CAMPOS_AJUSTE_CIERRE = [
+        'monto_cierre_cents' => 'Monto de cierre',
+        'monto_retirado_cents' => 'Pasaje a Caja General',
+        'monto_proxima_apertura_cents' => 'Saldo próxima apertura',
+    ];
+
+    public function solicitarAjusteCierre(int $cajaId, string $campo, int $nuevoCents, string $motivo, int $solicitadoPor): int
+    {
+        $this->ensureAjustesTable();
+        if (!isset(self::CAMPOS_AJUSTE_CIERRE[$campo])) {
+            throw new \RuntimeException('Campo inválido.');
+        }
+        $apertura = $this->findById($cajaId);
+        if (!$apertura) {
+            throw new \RuntimeException('Cierre no encontrado.');
+        }
+        if (($apertura['estado'] ?? '') !== 'cerrada') {
+            throw new \RuntimeException('Solo se puede corregir un cierre ya realizado.');
+        }
+        $st = Db::pdo()->prepare('
+            INSERT INTO caja_apertura_ajustes (caja_id, campo, valor_anterior_cents, valor_nuevo_cents, motivo, estado, solicitado_por, created_at)
+            VALUES (:caja, :campo, :ant, :nuevo, :motivo, \'pendiente\', :sol, NOW())
+        ');
+        $st->execute([
+            ':caja' => $cajaId,
+            ':campo' => $campo,
+            ':ant' => (int)($apertura[$campo] ?? 0),
+            ':nuevo' => $nuevoCents,
+            ':motivo' => $motivo,
+            ':sol' => $solicitadoPor ?: null,
+        ]);
+        return (int)Db::pdo()->lastInsertId();
+    }
+
+    public function ajustePendienteDeCajaPorCampo(int $cajaId, string $campo): ?array
+    {
+        $this->ensureAjustesTable();
+        $st = Db::pdo()->prepare("
+            SELECT aj.*, s.nombre AS solicitado_por_nombre
+            FROM caja_apertura_ajustes aj
+            LEFT JOIN admin_users s ON s.id = aj.solicitado_por
+            WHERE aj.caja_id = :caja AND aj.campo = :campo AND aj.estado = 'pendiente'
+            ORDER BY aj.id DESC LIMIT 1
+        ");
+        $st->execute([':caja' => $cajaId, ':campo' => $campo]);
+        return $st->fetch() ?: null;
+    }
+
+    public function movimientoGeneralPorOrigen(string $origen, int $origenId): ?array
+    {
+        try {
+            $st = Db::pdo()->prepare('
+                SELECT * FROM caja_general_movimientos
+                WHERE origen = :o AND origen_id = :oid LIMIT 1
+            ');
+            $st->execute([':o' => $origen, ':oid' => $origenId]);
+            return $st->fetch() ?: null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    public function actualizarMontoGeneral(int $id, int $montoCents): void
+    {
+        Db::pdo()->prepare('UPDATE caja_general_movimientos SET monto_cents = :m WHERE id = :i LIMIT 1')
+            ->execute([':m' => $montoCents, ':i' => $id]);
+    }
+
+    public function eliminarMovimientoGeneral(int $id): void
+    {
+        Db::pdo()->prepare('DELETE FROM caja_general_movimientos WHERE id = :i LIMIT 1')
+            ->execute([':i' => $id]);
+    }
+
     public function ajustesPendientes(): array
     {
         $this->ensureAjustesTable();
@@ -877,6 +951,7 @@ final class CajaRepo
     public function resolverAjuste(int $id, string $estado, int $resueltoPor, ?string $nota): void
     {
         $this->ensureAjustesTable();
+        $this->ensureCajaColumnas();
         if (!in_array($estado, ['aprobado', 'rechazado'], true)) {
             throw new \RuntimeException('Estado inválido.');
         }
@@ -892,16 +967,43 @@ final class CajaRepo
             if (($aj['estado'] ?? '') !== 'pendiente') {
                 throw new \RuntimeException('La solicitud ya fue resuelta.');
             }
+            $campo = (string)($aj['campo'] ?? 'monto_inicial_cents');
+            $cajaId = (int)$aj['caja_id'];
+            $nuevo = (int)$aj['valor_nuevo_cents'];
+            if ($estado === 'aprobado') {
+                $stCaja = $pdo->prepare('SELECT * FROM caja_aperturas WHERE id = :caja LIMIT 1 FOR UPDATE');
+                $stCaja->execute([':caja' => $cajaId]);
+                $caja = $stCaja->fetch() ?: null;
+                if (!$caja) {
+                    throw new \RuntimeException('Caja no encontrada.');
+                }
+                if ($campo === 'monto_inicial_cents' && ($caja['estado'] ?? '') !== 'abierta') {
+                    throw new \RuntimeException('La caja ya se cerró; la corrección de apertura ya no aplica.');
+                }
+                if (!in_array($campo, ['monto_inicial_cents', 'monto_cierre_cents', 'monto_retirado_cents', 'monto_proxima_apertura_cents'], true)) {
+                    throw new \RuntimeException('Campo inválido.');
+                }
+                $pdo->prepare("UPDATE caja_aperturas SET {$campo} = :mon, updated_at = NOW() WHERE id = :caja LIMIT 1")
+                    ->execute([':mon' => $nuevo, ':caja' => $cajaId]);
+
+                // Sincronizar el pasaje a Caja General si se corrigió el retiro.
+                if ($campo === 'monto_retirado_cents') {
+                    $mov = $this->movimientoGeneralPorOrigen('cierre_caja', $cajaId);
+                    if ($mov && $nuevo > 0) {
+                        $this->actualizarMontoGeneral((int)$mov['id'], $nuevo);
+                    } elseif ($mov && $nuevo <= 0) {
+                        $this->eliminarMovimientoGeneral((int)$mov['id']);
+                    } elseif (!$mov && $nuevo > 0) {
+                        $this->agregarMovimientoGeneral('ingreso', 'cierre_caja', $cajaId,
+                            'Retiro cierre caja (corrección)', $nuevo, $resueltoPor);
+                    }
+                }
+            }
             $pdo->prepare("
                 UPDATE caja_apertura_ajustes
                 SET estado = :est, resuelto_por = :res, nota_resolucion = :nota, resolved_at = NOW()
                 WHERE id = :i LIMIT 1
             ")->execute([':est' => $estado, ':res' => $resueltoPor, ':nota' => $nota, ':i' => $id]);
-
-            if ($estado === 'aprobado') {
-                $pdo->prepare('UPDATE caja_aperturas SET monto_inicial_cents = :mon, updated_at = NOW() WHERE id = :caja LIMIT 1')
-                    ->execute([':mon' => (int)$aj['valor_nuevo_cents'], ':caja' => (int)$aj['caja_id']]);
-            }
             $pdo->commit();
         } catch (\Throwable $e) {
             $pdo->rollBack();
