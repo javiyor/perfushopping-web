@@ -27,8 +27,11 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
     <meta charset="utf-8" />
     <title><?= htmlspecialchars($factura['codigo'] ?? '') ?></title>
     <style>
-        @page { margin:<?= $isTicket ? '10mm 5mm' : '20mm 15mm' ?>; }
+        @page { <?= $isTicket ? ('size:' . $bodyWidth . ' auto; margin:3mm 4mm;') : 'margin:20mm 15mm;' ?> }
         * { box-sizing:border-box; }
+        <?php if ($isTicket): ?>
+        .cut-space { display:none; }
+        <?php endif; ?>
         body {
             font-family:<?= $isTicket ? "'Courier New',Courier,monospace" : "'Segoe UI',Arial,sans-serif" ?>;
             font-size:<?= $bodyFontSize ?>; line-height:1.4; color:#000;
@@ -57,8 +60,11 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
         .cliente-box { background:#f9f9f9; padding:8px 12px; border-radius:4px; <?= $formato === 'a4' ? 'margin-bottom:8px;' : '' ?> }
         <?php endif; ?>
         @media print {
-            body { margin:0; padding:0; width:100%; }
+            html, body { margin:0; padding:0; width:100%; }
             .no-print { display:none; }
+            <?php if ($isTicket): ?>
+            .cut-space { display:block; height:10mm; }
+            <?php endif; ?>
         }
     </style>
 </head>
@@ -175,6 +181,7 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
         <p>Gracias por su compra</p>
         <p><?= htmlspecialchars($empresa['nomemp'] ?? 'Perfushopping') ?> — www.perfushopping.com</p>
     </div>
+    <?php if ($isTicket): ?><div class="cut-space"></div><?php endif; ?>
 
     <div class="no-print" style="text-align:center;margin-top:20px">
         <button onclick="window.print()" style="padding:8px 24px;font-size:14px;cursor:pointer">🖨 Imprimir</button>

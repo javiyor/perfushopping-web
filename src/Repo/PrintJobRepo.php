@@ -169,7 +169,8 @@ final class PrintJobRepo
         $limite = max(1, min(50, $limite));
         try {
             $st = Db::pdo()->prepare("
-                SELECT j.*, f.codigo AS factura_codigo
+                SELECT j.*, f.codigo AS factura_codigo,
+                       f.cliente_nombre, f.cliente_tele, f.total_cents
                 FROM print_jobs j
                 LEFT JOIN facturas f ON f.id = j.factura_id
                 WHERE j.punto_venta = :pv AND j.estado = 'pendiente'

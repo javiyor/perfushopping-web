@@ -51,8 +51,9 @@ $impresora = $impresora ?? null;
                 <tr>
                     <th>#</th>
                     <th>Factura</th>
+                    <th>Cliente</th>
                     <th>Encolado</th>
-                    <th style="width:60px"></th>
+                    <th style="width:100px"></th>
                 </tr>
             </thead>
             <tbody id="spoolerQueue">
@@ -82,6 +83,17 @@ $impresora = $impresora ?? null;
 
     function setStatus(t) {
         document.getElementById('spoolerStatus').textContent = t;
+    }
+
+    function escSpooler(s) {
+        var d = document.createElement('div');
+        d.textContent = s || '';
+        return d.innerHTML;
+    }
+
+    function whatsappText(j) {
+        var total = (parseInt(j.total_cents || 0, 10) / 100).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return 'Hola ' + (j.cliente_nombre || '') + ', le enviamos su comprobante ' + (j.factura_codigo || ('#' + j.factura_id)) + ' por un total de $' + total + '. ¡Gracias por su compra!';
     }
 
     function stamp() {
@@ -128,16 +140,24 @@ $impresora = $impresora ?? null;
         var tb = document.getElementById('spoolerQueue');
         document.getElementById('spoolerPending').textContent = jobs.length;
         if (!jobs.length) {
-            tb.innerHTML = '<tr><td colspan="4" class="text-muted text-center small">Sin pendientes</td></tr>';
+            tb.innerHTML = '<tr><td colspan="5" class="text-muted text-center small">Sin pendientes</td></tr>';
             return;
         }
         tb.innerHTML = '';
         jobs.forEach(function(j) {
             var tr = document.createElement('tr');
+            var phone = String(j.cliente_tele || '').replace(/\D/g, '');
+            var waBtn = phone
+                ? '<a class="btn btn-sm btn-outline-success py-0 px-1" target="_blank" title="Enviar por WhatsApp" href="https://wa.me/' + phone + '?text=' + encodeURIComponent(whatsappText(j)) + '"><i class="bi bi-whatsapp"></i></a>'
+                : '<button class="btn btn-sm btn-outline-secondary py-0 px-1" type="button" disabled title="Sin teléfono"><i class="bi bi-whatsapp"></i></button>';
             tr.innerHTML = '<td class="small">#' + j.id + '</td>'
                 + '<td><strong>' + (j.factura_codigo || ('#' + j.factura_id)) + '</strong></td>'
+                + '<td class="small">' + escSpooler(j.cliente_nombre || '') + '</td>'
                 + '<td class="small text-muted">' + (j.created_at || '') + '</td>'
-                + '<td><a class="btn btn-sm btn-outline-secondary py-0 px-1" target="_blank" href="/admin/facturas/imprimir/' + j.factura_id + '?formato=80mm"><i class="bi bi-printer"></i></a></td>';
+                + '<td><div class="d-flex gap-1">'
+                + '<a class="btn btn-sm btn-outline-secondary py-0 px-1" target="_blank" title="Imprimir" href="/admin/facturas/imprimir/' + j.factura_id + '?formato=80mm"><i class="bi bi-printer"></i></a>'
+                + waBtn
+                + '</div></td>';
             tb.appendChild(tr);
         });
     }

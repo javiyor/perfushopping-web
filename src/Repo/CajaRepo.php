@@ -115,7 +115,8 @@ final class CajaRepo
         try {
             $cols = Db::pdo()->query('SHOW COLUMNS FROM facturas')->fetchAll();
             $fields = array_column($cols, 'Field');
-            $has = in_array('entrega_tipo', $fields, true);
+            // El filtro usa ambas columnas; si falta alguna, no se aplica.
+            $has = in_array('entrega_tipo', $fields, true) && in_array('envio_estado', $fields, true);
         } catch (\Throwable $e) { $has = false; }
         return $has;
     }
