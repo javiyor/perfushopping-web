@@ -50,6 +50,7 @@ use Perfushopping\Web\Admin\ProveedorController as AdminProveedorController;
 use Perfushopping\Web\Admin\PresupuestoController as AdminPresupuestoController;
 use Perfushopping\Web\Admin\RemitoController as AdminRemitoController;
 use Perfushopping\Web\Admin\FacturaController as AdminFacturaController;
+use Perfushopping\Web\Admin\UbicacionController as AdminUbicacionController;
 use Perfushopping\Web\Admin\FormaPagoController as AdminFormaPagoController;
 use Perfushopping\Web\Admin\ReciboController as AdminReciboController;
 use Perfushopping\Web\Admin\CtaCteController as AdminCtaCteController;
@@ -488,6 +489,9 @@ $router->get('/admin/arca/diagnostico', [AdminArcaController::class, 'diagnostic
 $router->get('/admin/arca/diagnostico-wsfe', [AdminArcaController::class, 'diagnosticoWsfe']);
 $router->post('/admin/arca/test', [AdminArcaController::class, 'testConnection']);
 $router->post('/admin/arca/reenviar', [AdminArcaController::class, 'reenviar']);
+$router->post('/admin/ubicacion/guardar', [AdminUbicacionController::class, 'guardar']);
+$router->get('/admin/ubicaciones', [AdminUbicacionController::class, 'index']);
+$router->get('/admin/ubicaciones/data', [AdminUbicacionController::class, 'data']);
 $router->post('/admin/arca/generar-csr', [AdminArcaController::class, 'generarCsr']);
 $router->post('/admin/arca/cargar-certificado', [AdminArcaController::class, 'cargarCertificado']);
 $router->get('/admin/arca/certificado', [AdminArcaController::class, 'descargarCertificado']);

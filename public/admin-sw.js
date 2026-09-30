@@ -19,17 +19,24 @@ function offlineHtmlResponse() {
   );
 }
 
+function precache(cache) {
+  const reqs = PRECACHE_URLS.map((url) => new Request(url, { cache: 'reload' }));
+  return cache.addAll(reqs).catch(() => Promise.resolve());
+}
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS)).catch(() => Promise.resolve())
+    caches.open(CACHE_NAME).then((cache) => precache(cache))
   );
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))
-    ).then(() => self.clients.claim())
+    caches.keys()
+      .then((keys) => Promise.all(keys.map((key) => caches.delete(key))))
+      .then(() => caches.open(CACHE_NAME))
+      .then((cache) => precache(cache))
+      .then(() => self.clients.claim())
   );
 });
 

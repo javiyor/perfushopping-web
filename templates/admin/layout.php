@@ -220,6 +220,7 @@
             <?php if ($can('caja_movimientos')): ?><a href="/admin/impresion/config" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Configuración de impresión de tickets"><i class="bi bi-printer"></i>Impresión</a><?php endif; ?>
             <?php if ($can('arca')): ?><a href="/admin/arca" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Factura electrónica ARCA / AFIP"><i class="bi bi-cloud-check"></i>ARCA</a><?php endif; ?>
             <?php if (($adminRol ?? '') === 'superadmin'): ?><a href="/admin/reportes" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Reportes de ventas y estadísticas"><i class="bi bi-graph-up"></i>Reportes</a><?php endif; ?>
+            <?php if (($adminRol ?? '') === 'superadmin'): ?><a href="/admin/ubicaciones" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Ubicación del personal en tiempo real"><i class="bi bi-geo-alt"></i>Ubicaciones</a><?php endif; ?>
 
             <?php if ($can('productos')): ?><div class="nav-section">Productos</div><?php endif; ?>
             <?php if ($can('productos')): ?><a href="/admin/portada" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Productos destacados en la portada web"><i class="bi bi-easel"></i>Portada</a><?php endif; ?>
@@ -302,6 +303,9 @@
                     </button>
                     <button class="btn btn-sm btn-warning" id="btnUpdateApp" type="button" style="display:none" title="Actualizar app">
                         <i class="bi bi-arrow-repeat"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-info" id="btnLocation" type="button" title="Compartir mi ubicación cada 5 minutos">
+                        <i class="bi bi-geo-alt"></i>
                     </button>
                     <form method="post" action="/admin/logout" style="margin:0">
                         <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\Perfushopping\Web\Support\Csrf::token()) ?>" />
@@ -427,19 +431,24 @@
             installBtn.title = 'Instalar app';
         }
 
-        function showUpdate(reg) {
+        function applyUpdate(reg) {
             if (reg && reg.waiting) {
                 waitingWorker = reg.waiting;
             }
-            if (updateBtn && waitingWorker) {
-                updateBtn.style.display = '';
+            // Auto-actualizar a la última versión sin pedir confirmación.
+            if (waitingWorker) {
+                try {
+                    waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+                } catch (e) {
+                    if (updateBtn) updateBtn.style.display = '';
+                }
             }
         }
 
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/admin-sw.js', { scope: '/admin/', updateViaCache: 'none' }).then(function(reg) {
                 if (reg.waiting) {
-                    showUpdate(reg);
+                    applyUpdate(reg);
                 }
 
                 reg.addEventListener('updatefound', function() {
@@ -447,8 +456,7 @@
                     if (!newWorker) return;
                     newWorker.addEventListener('statechange', function() {
                         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                            waitingWorker = newWorker;
-                            if (updateBtn) updateBtn.style.display = '';
+                            applyUpdate(reg);
                         }
                     });
                 });
@@ -495,6 +503,72 @@
                 installBtn.style.display = 'none';
             });
         }
+    })();
+    </script>
+    <script>
+    // Compartir ubicación cada 5 minutos (solo la ve el superadmin).
+    (function() {
+        var KEY = 'ps_share_location';
+        var LAST = 'ps_share_location_last';
+        var INTERVAL = 5 * 60 * 1000;
+        var btn = document.getElementById('btnLocation');
+        var csrf = <?= json_encode(\Perfushopping\Web\Support\Csrf::token()) ?>;
+
+        function enabled() {
+            try { return localStorage.getItem(KEY) === '1'; } catch (e) { return false; }
+        }
+
+        function paint() {
+            if (!btn) return;
+            var on = enabled();
+            btn.classList.toggle('btn-success', on);
+            btn.classList.toggle('btn-outline-info', !on);
+            btn.title = on ? 'Dejar de compartir mi ubicación' : 'Compartir mi ubicación cada 5 minutos';
+        }
+
+        function send() {
+            if (!enabled() || !('geolocation' in navigator)) return;
+            try {
+                navigator.geolocation.getCurrentPosition(function(pos) {
+                    try { localStorage.setItem(LAST, String(Date.now())); } catch (e) {}
+                    fetch('/admin/ubicacion/guardar', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            _csrf: csrf,
+                            lat: pos.coords.latitude,
+                            lng: pos.coords.longitude,
+                            accuracy: Math.round(pos.coords.accuracy || 0),
+                        }),
+                    }).catch(function() {});
+                }, function() {}, { enableHighAccuracy: false, timeout: 20000, maximumAge: 60000 });
+            } catch (e) {}
+        }
+
+        if (btn) {
+            paint();
+            btn.addEventListener('click', function() {
+                var on = !enabled();
+                if (on && !('geolocation' in navigator)) {
+                    alert('Este dispositivo no soporta geolocalización.');
+                    return;
+                }
+                try { localStorage.setItem(KEY, on ? '1' : '0'); } catch (e) {}
+                paint();
+                if (on) send();
+            });
+        }
+
+        if (enabled()) {
+            send();
+        }
+        setInterval(send, INTERVAL);
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState !== 'visible') return;
+            var last = 0;
+            try { last = parseInt(localStorage.getItem(LAST) || '0', 10) || 0; } catch (e) {}
+            if (Date.now() - last >= INTERVAL) send();
+        });
     })();
     </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
