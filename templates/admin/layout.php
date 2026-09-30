@@ -185,7 +185,7 @@
     }
 
     $empresa = (new \Perfushopping\Web\Repo\EmpresaRepo())->getDefault();
-    $empresaLogo = !empty($empresa['logo']) ? '/uploads/' . ltrim($empresa['logo'], '/') : '/assets/brand/logo-header.png';
+    $empresaLogo = !empty($empresa['logo']) ? \Perfushopping\Web\Support\Format::uploadUrl((string)$empresa['logo']) : '/assets/brand/logo-header.png';
     $empresaNombre = htmlspecialchars($empresa['nomemp'] ?? 'Perfushopping');
 
     $flash = $_SESSION['admin_flash'] ?? null;

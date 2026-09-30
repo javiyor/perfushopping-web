@@ -1005,7 +1005,7 @@ final class FacturaController
         $empresa = $empresaRepo->getDefault();
         $empresaNombre = htmlspecialchars($empresa['nomemp'] ?? 'Perfushopping');
         $empresaWeb = htmlspecialchars($empresa['web'] ?? 'www.perfushopping.com');
-        $empresaLogoUrl = !empty($empresa['logo']) ? '/uploads/' . ltrim($empresa['logo'], '/') : '/assets/brand/logo-header.png';
+        $empresaLogoUrl = !empty($empresa['logo']) ? \Perfushopping\Web\Support\Format::uploadUrl((string)$empresa['logo']) : '/assets/brand/logo-header.png';
         $baseUrl = (isset($_SERVER['REQUEST_SCHEME']) ? $_SERVER['REQUEST_SCHEME'] : 'https') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
 
         $tipoLabels = ['FACT-A'=>'Factura A','FACT-B'=>'Factura B','FACT-C'=>'Factura C','NC'=>'Nota de Crédito','ND'=>'Nota de Débito'];

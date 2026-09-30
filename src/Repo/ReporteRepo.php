@@ -217,6 +217,7 @@ final class ReporteRepo
     }
 
     private static ?array $facturasCols = null;
+    private static ?array $facturaItemsCols = null;
 
     private function facturasTieneColumna(string $col): bool
     {
@@ -231,6 +232,28 @@ final class ReporteRepo
         return in_array($col, self::$facturasCols, true);
     }
 
+    private function facturaItemsTieneColumna(string $col): bool
+    {
+        if (self::$facturaItemsCols === null) {
+            try {
+                $rows = Db::pdo()->query('SHOW COLUMNS FROM factura_items')->fetchAll();
+                self::$facturaItemsCols = array_column($rows, 'Field');
+            } catch (\Throwable $e) {
+                self::$facturaItemsCols = [];
+            }
+        }
+        return in_array($col, self::$facturaItemsCols, true);
+    }
+
+    /** Expresión del costo unitario: snapshot al facturar o precomp actual. */
+    private function costoUnitExpr(): string
+    {
+        if ($this->facturaItemsTieneColumna('costo_cents')) {
+            return 'COALESCE(fi.costo_cents, ROUND(p.precomp * 100))';
+        }
+        return 'ROUND(p.precomp * 100)';
+    }
+
     /**
      * Ganancia neta: neto vendido sin IVA menos descuentos y costo.
      * Costo = snapshot costo_cents al facturar, o precomp actual si no hay.
@@ -243,19 +266,25 @@ final class ReporteRepo
             $pvWhere = ' AND f.punto_venta = :pv';
             $params[':pv'] = $puntoVenta;
         }
-        $st = Db::pdo()->prepare("
-            SELECT
-                COALESCE(SUM(fi.total_cents - fi.iva_cents), 0) AS neto_cents,
-                COALESCE(SUM(COALESCE(fi.costo_cents, ROUND(p.precomp * 100)) * fi.qty), 0) AS costo_cents
-            FROM factura_items fi
-            INNER JOIN facturas f ON f.id = fi.factura_id
-            LEFT JOIN producto p ON p.idprodu = fi.idprodu
-            WHERE f.estado = 'emitida'
-              AND f.fecha BETWEEN :desde AND :hasta
-              $pvWhere
-        ");
-        $st->execute($params);
-        $row = $st->fetch() ?: ['neto_cents' => 0, 'costo_cents' => 0];
+        $row = ['neto_cents' => 0, 'costo_cents' => 0];
+        try {
+            $costo = $this->costoUnitExpr();
+            $st = Db::pdo()->prepare("
+                SELECT
+                    COALESCE(SUM(fi.total_cents - fi.iva_cents), 0) AS neto_cents,
+                    COALESCE(SUM({$costo} * fi.qty), 0) AS costo_cents
+                FROM factura_items fi
+                INNER JOIN facturas f ON f.id = fi.factura_id
+                LEFT JOIN producto p ON p.idprodu = fi.idprodu
+                WHERE f.estado = 'emitida'
+                  AND f.fecha BETWEEN :desde AND :hasta
+                  $pvWhere
+            ");
+            $st->execute($params);
+            $row = $st->fetch() ?: $row;
+        } catch (\Throwable $e) {
+            error_log('ReporteRepo::ganancia error: ' . $e->getMessage());
+        }
 
         $descuento = 0;
         try {
@@ -301,26 +330,32 @@ final class ReporteRepo
             $pvWhere = ' AND f.punto_venta = :pv';
             $params[':pv'] = $puntoVenta;
         }
-        $st = Db::pdo()->prepare("
-            SELECT
-                COALESCE(NULLIF(fi.producto, ''), '(sin nombre)') AS producto,
-                fi.variedad,
-                SUM(fi.qty) AS qty_total,
-                SUM(fi.total_cents - fi.iva_cents) AS neto_cents,
-                SUM(COALESCE(fi.costo_cents, ROUND(p.precomp * 100)) * fi.qty) AS costo_cents,
-                SUM(fi.total_cents - fi.iva_cents) - SUM(COALESCE(fi.costo_cents, ROUND(p.precomp * 100)) * fi.qty) AS ganancia_cents
-            FROM factura_items fi
-            INNER JOIN facturas f ON f.id = fi.factura_id
-            LEFT JOIN producto p ON p.idprodu = fi.idprodu
-            WHERE f.estado = 'emitida'
-              AND f.fecha BETWEEN :desde AND :hasta
-              $pvWhere
-            GROUP BY fi.producto, fi.variedad
-            ORDER BY ganancia_cents DESC
-            LIMIT :lim
-        ");
-        $st->execute($params);
-        return $st->fetchAll();
+        try {
+            $costo = $this->costoUnitExpr();
+            $st = Db::pdo()->prepare("
+                SELECT
+                    COALESCE(NULLIF(fi.producto, ''), '(sin nombre)') AS producto,
+                    fi.variedad,
+                    SUM(fi.qty) AS qty_total,
+                    SUM(fi.total_cents - fi.iva_cents) AS neto_cents,
+                    SUM({$costo} * fi.qty) AS costo_cents,
+                    SUM(fi.total_cents - fi.iva_cents) - SUM({$costo} * fi.qty) AS ganancia_cents
+                FROM factura_items fi
+                INNER JOIN facturas f ON f.id = fi.factura_id
+                LEFT JOIN producto p ON p.idprodu = fi.idprodu
+                WHERE f.estado = 'emitida'
+                  AND f.fecha BETWEEN :desde AND :hasta
+                  $pvWhere
+                GROUP BY fi.producto, fi.variedad
+                ORDER BY ganancia_cents DESC
+                LIMIT :lim
+            ");
+            $st->execute($params);
+            return $st->fetchAll();
+        } catch (\Throwable $e) {
+            error_log('ReporteRepo::topGanancia error: ' . $e->getMessage());
+            return [];
+        }
     }
 
     /** Margen por departamento (ganancia bruta, sin prorratear descuentos). */
@@ -332,25 +367,31 @@ final class ReporteRepo
             $pvWhere = ' AND f.punto_venta = :pv';
             $params[':pv'] = $puntoVenta;
         }
-        $st = Db::pdo()->prepare("
-            SELECT
-                COALESCE(NULLIF(d.nomdepar, ''), 'Sin dep.') AS departamento,
-                SUM(fi.qty) AS qty_total,
-                SUM(fi.total_cents - fi.iva_cents) AS neto_cents,
-                SUM(COALESCE(fi.costo_cents, ROUND(p.precomp * 100)) * fi.qty) AS costo_cents,
-                SUM(fi.total_cents - fi.iva_cents) - SUM(COALESCE(fi.costo_cents, ROUND(p.precomp * 100)) * fi.qty) AS ganancia_cents
-            FROM factura_items fi
-            INNER JOIN facturas f ON f.id = fi.factura_id
-            LEFT JOIN producto p ON p.idprodu = fi.idprodu
-            LEFT JOIN departa d ON d.codepar = p.codepar
-            WHERE f.estado = 'emitida'
-              AND f.fecha BETWEEN :desde AND :hasta
-              $pvWhere
-            GROUP BY d.codepar
-            ORDER BY ganancia_cents DESC
-        ");
-        $st->execute($params);
-        return $st->fetchAll();
+        try {
+            $costo = $this->costoUnitExpr();
+            $st = Db::pdo()->prepare("
+                SELECT
+                    COALESCE(NULLIF(d.nomdepar, ''), 'Sin dep.') AS departamento,
+                    SUM(fi.qty) AS qty_total,
+                    SUM(fi.total_cents - fi.iva_cents) AS neto_cents,
+                    SUM({$costo} * fi.qty) AS costo_cents,
+                    SUM(fi.total_cents - fi.iva_cents) - SUM({$costo} * fi.qty) AS ganancia_cents
+                FROM factura_items fi
+                INNER JOIN facturas f ON f.id = fi.factura_id
+                LEFT JOIN producto p ON p.idprodu = fi.idprodu
+                LEFT JOIN departa d ON d.codepar = p.codepar
+                WHERE f.estado = 'emitida'
+                  AND f.fecha BETWEEN :desde AND :hasta
+                  $pvWhere
+                GROUP BY d.codepar
+                ORDER BY ganancia_cents DESC
+            ");
+            $st->execute($params);
+            return $st->fetchAll();
+        } catch (\Throwable $e) {
+            error_log('ReporteRepo::margenPorDepartamento error: ' . $e->getMessage());
+            return [];
+        }
     }
 
     public function facturasPorTipo(string $desde, string $hasta, int $puntoVenta = 0): array
