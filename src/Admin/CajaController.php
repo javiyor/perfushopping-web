@@ -703,6 +703,34 @@ final class CajaController
             echo "imputacion: ERROR " . $e->getMessage() . "\n";
         }
 
+        $base = "
+            FROM factura_pagos fp
+            INNER JOIN facturas f ON f.id = fp.factura_id
+            WHERE f.estado = 'emitida' AND f.fecha = :fec AND f.punto_venta = :pv
+              AND fp.forma_pago = 'efectivo'
+        ";
+        $prms = [':fec' => $fecha, ':pv' => $puntoVenta];
+        $variantes = [
+            'V1 base' => '',
+            'V2 +extra entrega' => " AND NOT (f.entrega_tipo='envio' AND f.envio_estado IN ('pendiente','en_transito') AND fp.forma_pago='efectivo')",
+            'V3 +tipo' => " AND COALESCE((SELECT fpm.tipo FROM formas_pago fpm WHERE fpm.codigo = fp.forma_pago LIMIT 1), 'efectivo') = 'efectivo'",
+            'V4 +turno' => " AND (f.caja_apertura_id = :caja OR (f.caja_apertura_id IS NULL AND f.created_at >= :apCreada))",
+        ];
+        foreach ($variantes as $nombre => $w) {
+            try {
+                $st = $pdo->prepare("SELECT COALESCE(SUM(fp.monto_cents), 0) " . $base . $w);
+                $p = $prms;
+                if (str_contains($w, ':caja')) {
+                    $p[':caja'] = $apId;
+                    $p[':apCreada'] = $apCreada;
+                }
+                $st->execute($p);
+                echo "{$nombre}: " . $st->fetchColumn() . "\n";
+            } catch (\Throwable $e) {
+                echo "{$nombre}: ERROR " . $e->getMessage() . "\n";
+            }
+        }
+
         echo "ventasEfectivoTurno: " . $repo->totalVentasEfectivoTurno($apId, $fecha, $puntoVenta, $apCreada) . "\n";
         echo "ventasTransferenciaTurno: " . $repo->totalVentasTransferenciaTurno($apId, $fecha, $puntoVenta, $apCreada) . "\n";
 
