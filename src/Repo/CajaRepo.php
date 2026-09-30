@@ -135,7 +135,8 @@ final class CajaRepo
     private function formaPagoTipoSql(string $fpAlias = 'fp'): string
     {
         \Perfushopping\Web\Repo\FormaPagoRepo::ensureTable();
-        return "(SELECT fpm.tipo FROM formas_pago fpm WHERE fpm.codigo = {$fpAlias}.forma_pago LIMIT 1)";
+        // COLLATE explícito: formas_pago puede estar en uca1400 y factura_pagos en unicode_ci.
+        return "(SELECT fpm.tipo FROM formas_pago fpm WHERE fpm.codigo = {$fpAlias}.forma_pago COLLATE utf8mb4_unicode_ci LIMIT 1)";
     }
 
     private function formaPagoTipoLegacySql(string $fpAlias = 'fp'): string

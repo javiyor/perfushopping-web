@@ -38,8 +38,15 @@ final class FormaPagoRepo
                     updated_at DATETIME DEFAULT NULL,
                     PRIMARY KEY (id),
                     UNIQUE KEY uq_codigo (codigo)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             ");
+            $coll = Db::pdo()->query("
+                SELECT TABLE_COLLATION FROM information_schema.TABLES
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'formas_pago'
+            ")->fetchColumn();
+            if ($coll !== false && $coll !== null && (string)$coll !== 'utf8mb4_unicode_ci') {
+                Db::pdo()->exec('ALTER TABLE formas_pago CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+            }
             $count = (int)Db::pdo()->query('SELECT COUNT(*) FROM formas_pago')->fetchColumn();
             if ($count === 0) {
                 $seed = [
