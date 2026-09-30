@@ -195,6 +195,7 @@ $plazos = $plazos ?? [];
     <input type="hidden" id="clienteId" value="0" />
     <input type="hidden" id="clienteErpId" value="0" />
     <span id="clienteNombre" class="fw-semibold small">Consumidor Final</span>
+    <span id="clienteCatBadge" class="badge bg-warning text-dark" style="display:none;font-size:10px">Precios mayoristas</span>
     <span id="clienteCuit" class="text-muted small"></span>
     <input type="hidden" id="clienteCondIva" value="consumidor_final" />
     <button class="btn btn-sm btn-outline-secondary" type="button" onclick="clearCliente()" title="Consumidor Final"><i class="bi bi-person-x"></i></button>
@@ -458,6 +459,27 @@ function getDisplayPrice(netCents, ivaRate) {
     return netCents;
 }
 
+// Precios mayoristas: si el cliente es mayorista, o profesional con flag,
+// se usa precio1 (cuando existe) en lugar del precio normal.
+var clienteMayorista = false;
+
+function precioVigenteCents(p) {
+    const normal = p.precio ? Math.round(parseFloat(p.precio) * 100) : 0;
+    const mayor = p.precio1 ? Math.round(parseFloat(p.precio1) * 100) : 0;
+    if (clienteMayorista && mayor > 0) return mayor;
+    return normal;
+}
+
+function precioActivo(item) {
+    if (clienteMayorista && (item.precio1_cents || 0) > 0) return item.precio1_cents;
+    return item.net_price_cents || 0;
+}
+
+function actualizarBadgeMayorista() {
+    const badge = document.getElementById('clienteCatBadge');
+    if (badge) badge.style.display = clienteMayorista ? '' : 'none';
+}
+
 // ── Load remito items if present ──
 <?php if ($remitoItems): ?>
 <?php foreach ($remitoItems as $ri): ?>
@@ -517,7 +539,8 @@ function searchProd(q) {
                 return;
             }
             data.forEach(p => {
-                const priceCents = p.precio ? Math.round(parseFloat(p.precio) * 100) : 0;
+                const priceCents = precioVigenteCents(p);
+                const precio1Cents = p.precio1 ? Math.round(parseFloat(p.precio1) * 100) : 0;
                 const ivaRate = p.tiva || 21;
                 const displayPrice = getDisplayPrice(priceCents, ivaRate);
                 const stockDep = p.stock_deposito ?? 0;
@@ -533,6 +556,7 @@ function searchProd(q) {
                         variedad: mv.nomgusto,
                         qty: 1,
                         unit_price_cents: priceCents,
+                        precio1_cents: precio1Cents,
                         iva_rate: ivaRate,
                     });
                     prodResults.style.display = 'none';
@@ -558,7 +582,7 @@ function searchProd(q) {
                 div.addEventListener('mousedown', function(e) {
                     e.preventDefault();
                     if (p.variants && p.variants.length > 0) {
-                        showVariantPicker(p, priceCents, ivaRate);
+                        showVariantPicker(p, priceCents, precio1Cents, ivaRate);
                     } else {
                         addToCart({
                             idprodu: p.idprodu,
@@ -567,6 +591,7 @@ function searchProd(q) {
                             variedad: '',
                             qty: 1,
                             unit_price_cents: priceCents,
+                            precio1_cents: precio1Cents,
                             iva_rate: ivaRate,
                         });
                         prodResults.style.display = 'none';
@@ -580,7 +605,7 @@ function searchProd(q) {
         });
 }
 
-function showVariantPicker(p, priceCents, ivaRate) {
+function showVariantPicker(p, priceCents, precio1Cents, ivaRate) {
     let html = '<div class="pos-result-item" style="flex-direction:column;align-items:stretch;cursor:default">';
     html += '<div class="fw-bold mb-2">' + esc(p.produ) + ' — elegí variedad:</div>';
     html += '<input type="text" id="variantFilter" placeholder="Filtrar por nombre o id (ej: saro, 123)" class="form-control form-control-sm mb-2" oninput="filterVariantPicker(this.value)" />';
@@ -611,6 +636,7 @@ function showVariantPicker(p, priceCents, ivaRate) {
                 variedad: nom,
                 qty: 1,
                 unit_price_cents: priceCents,
+                precio1_cents: precio1Cents,
                 iva_rate: ivaRate,
             });
             prodResults.style.display = 'none';
@@ -651,6 +677,7 @@ function addToCart(item) {
             variedad: item.variedad || '',
             qty: item.qty || 1,
             net_price_cents: netPrice,
+            precio1_cents: item.precio1_cents || 0,
             dto: dto,
             iva_rate: item.iva_rate || 21,
         });
@@ -673,7 +700,7 @@ function renderCart() {
     count.textContent = cart.length + ' item(s)';
     container.innerHTML = cart.map((item, idx) => {
         const dto = lineDto(item.dto);
-        const displayPrice = getDisplayPrice(item.net_price_cents, item.iva_rate);
+        const displayPrice = getDisplayPrice(precioActivo(item), item.iva_rate);
         const total = item.qty * displayPrice * (1 - dto / 100);
         return `
             <div class="pos-cart-item" data-idx="${idx}">
@@ -710,7 +737,7 @@ function removeItem(idx) {
 function recalcTotals() {
     let subtotal = 0, iva = 0, total = 0;
     cart.forEach(item => {
-        const netLine = Math.round(item.qty * item.net_price_cents * (1 - lineDto(item.dto) / 100));
+        const netLine = Math.round(item.qty * precioActivo(item) * (1 - lineDto(item.dto) / 100));
         const lineIva = item.iva_rate > 0 ? Math.round(netLine * item.iva_rate / 100) : 0;
         subtotal += netLine;
         iva += lineIva;
@@ -789,6 +816,9 @@ function selectCliente(c) {
     document.getElementById('clienteNombre').textContent = c.name || 'Consumidor Final';
     document.getElementById('clienteCuit').textContent = c.cuit || '';
     document.getElementById('clienteCondIva').value = c.condicion_iva || 'consumidor_final';
+    const cat = c.categoria || 'minorista';
+    clienteMayorista = cat === 'mayorista' || (cat === 'profesional' && parseInt(c.precio_mayorista) > 0);
+    actualizarBadgeMayorista();
     const displayName = (c.name || 'Consumidor Final') + (c.cuit ? ' - ' + c.cuit : '') + categoriaBadge(c);
     document.getElementById('clienteNombre').textContent = displayName;
     cliInput.value = c.name || '';
@@ -840,6 +870,8 @@ function clearCliente() {
     document.getElementById('clienteNombre').textContent = 'Consumidor Final';
     document.getElementById('clienteCuit').textContent = '';
     document.getElementById('clienteCondIva').value = 'consumidor_final';
+    clienteMayorista = false;
+    actualizarBadgeMayorista();
     cliInput.value = '';
     cliSuggestions.innerHTML = '';
     loadPuntosSaldo(0);
@@ -1295,7 +1327,7 @@ function submitFactura() {
 
     const descPct = parseInt(document.getElementById('posDescuento').value) || 0;
     const totalBruto = cart.reduce((sum, item) => {
-        const netLine = Math.round(item.qty * item.net_price_cents * (1 - lineDto(item.dto) / 100));
+        const netLine = Math.round(item.qty * precioActivo(item) * (1 - lineDto(item.dto) / 100));
         const lineIva = item.iva_rate > 0 ? Math.round(netLine * item.iva_rate / 100) : 0;
         return sum + netLine + lineIva;
     }, 0);
@@ -1388,7 +1420,7 @@ function submitFactura() {
             producto: item.producto,
             variedad: item.variedad,
             qty: item.qty,
-            unit_price_cents: item.net_price_cents,
+            unit_price_cents: precioActivo(item),
             iva_rate: item.iva_rate,
             descuento_pct: lineDto(item.dto),
         })),
