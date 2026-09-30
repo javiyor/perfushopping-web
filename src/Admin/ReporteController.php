@@ -29,6 +29,16 @@ final class ReporteController
         ]);
     }
 
+    private static function formasPagoLabels(): array
+    {
+        try {
+            return (new \Perfushopping\Web\Repo\FormaPagoRepo())->labels();
+        } catch (\Throwable $e) {
+            error_log('ReporteController::formasPagoLabels error: ' . $e->getMessage());
+            return [];
+        }
+    }
+
     public function data(array $params): void
     {
         $auth = new AdminAuthService();
@@ -105,7 +115,7 @@ final class ReporteController
             'topGanancia' => $topGanancia,
             'margenDepto' => $margenDepto,
             'ticket' => $ticket,
-            'formasPagoLabels' => (new \Perfushopping\Web\Repo\FormaPagoRepo())->labels(),
+            'formasPagoLabels' => self::formasPagoLabels(),
         ]);
     }
 }

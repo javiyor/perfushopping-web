@@ -195,25 +195,30 @@ final class ReporteRepo
     /** Totales por mes calendario (mes = 'YYYY-MM'). */
     public function ventasMensuales(string $desde, string $hasta, int $puntoVenta = 0): array
     {
-        $params = [':desde' => $desde, ':hasta' => $hasta];
-        $pvWhere = '';
-        if ($puntoVenta > 0) {
-            $pvWhere = ' AND f.punto_venta = :pv';
-            $params[':pv'] = $puntoVenta;
+        try {
+            $params = [':desde' => $desde, ':hasta' => $hasta];
+            $pvWhere = '';
+            if ($puntoVenta > 0) {
+                $pvWhere = ' AND f.punto_venta = :pv';
+                $params[':pv'] = $puntoVenta;
+            }
+            $st = Db::pdo()->prepare("
+                SELECT DATE_FORMAT(f.fecha, '%Y-%m') AS mes,
+                       COUNT(*) AS cantidad,
+                       COALESCE(SUM(f.total_cents), 0) AS total_cents
+                FROM facturas f
+                WHERE f.estado = 'emitida'
+                  AND f.fecha BETWEEN :desde AND :hasta
+                  $pvWhere
+                GROUP BY mes
+                ORDER BY mes ASC
+            ");
+            $st->execute($params);
+            return $st->fetchAll();
+        } catch (\Throwable $e) {
+            error_log('ReporteRepo::ventasMensuales error: ' . $e->getMessage());
+            return [];
         }
-        $st = Db::pdo()->prepare("
-            SELECT DATE_FORMAT(f.fecha, '%Y-%m') AS mes,
-                   COUNT(*) AS cantidad,
-                   COALESCE(SUM(f.total_cents), 0) AS total_cents
-            FROM facturas f
-            WHERE f.estado = 'emitida'
-              AND f.fecha BETWEEN :desde AND :hasta
-              $pvWhere
-            GROUP BY mes
-            ORDER BY mes ASC
-        ");
-        $st->execute($params);
-        return $st->fetchAll();
     }
 
     private static ?array $facturasCols = null;
