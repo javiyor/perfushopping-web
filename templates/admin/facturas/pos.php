@@ -1372,7 +1372,7 @@ function submitFactura() {
         pedido_id: parseInt((document.getElementById('pedidoId') || {}).value) || 0,
         vendedor_id: vendedorEl ? parseInt(vendedorEl.value) || null : null,
         notas: notas,
-        fecha: new Date().toISOString().slice(0,10),
+        fecha: (function() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })(),
         descuento_cents: descuentoCents,
         puntos_usados: parseInt(document.getElementById('posPuntosUsar').value) || 0,
         cliente: {

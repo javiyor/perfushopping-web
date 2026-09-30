@@ -624,6 +624,106 @@ final class CajaController
         Response::redirect('/admin/caja/ajustes');
     }
 
+    public function diagnostico(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $auth->requirePermiso('caja_movimientos');
+
+        header('Content-Type: text/plain; charset=utf-8');
+
+        $repo = new CajaRepo();
+        $sucursalId = $auth->getSucursalId();
+        $turno = $auth->getTurno();
+        $fecha = date('Y-m-d');
+        $puntoVenta = $auth->getPuntoVenta();
+
+        echo "fecha PHP: {$fecha} " . date('H:i:s') . "\n";
+        echo "punto_venta sesion: {$puntoVenta} | sucursal: {$sucursalId} | turno: {$turno}\n\n";
+
+        $apertura = $repo->aperturaActiva($sucursalId, $turno, $fecha);
+        if (!$apertura) {
+            echo "SIN APERTURA ACTIVA\n";
+            return;
+        }
+        $apId = (int)$apertura['id'];
+        $apCreada = (string)($apertura['created_at'] ?? '');
+        echo "apertura id: {$apId} | estado: " . ($apertura['estado'] ?? '') . " | created_at: {$apCreada}\n";
+        echo "monto_inicial_cents: " . ($apertura['monto_inicial_cents'] ?? '?') . "\n\n";
+
+        $pdo = \Perfushopping\Web\Infra\Db::pdo();
+        try {
+            $n = $pdo->query('SELECT COUNT(*) FROM formas_pago')->fetchColumn();
+            echo "formas_pago: existe, filas = {$n}\n";
+        } catch (\Throwable $e) {
+            echo "formas_pago: NO EXISTE (" . $e->getMessage() . ")\n";
+        }
+
+        try {
+            $st = $pdo->prepare("
+                SELECT COUNT(*), COALESCE(SUM(total_cents), 0)
+                FROM facturas
+                WHERE estado = 'emitida' AND fecha = :fec AND punto_venta = :pv
+            ");
+            $st->execute([':fec' => $fecha, ':pv' => $puntoVenta]);
+            $r = $st->fetchAll();
+            echo "facturas hoy+PV: cant = {$r[0][0]}, total = {$r[0][1]}\n";
+        } catch (\Throwable $e) {
+            echo "facturas hoy+PV: ERROR " . $e->getMessage() . "\n";
+        }
+
+        try {
+            $st = $pdo->prepare("
+                SELECT fp.forma_pago, COUNT(*), COALESCE(SUM(fp.monto_cents), 0)
+                FROM factura_pagos fp
+                INNER JOIN facturas f ON f.id = fp.factura_id
+                WHERE f.estado = 'emitida' AND f.fecha = :fec AND f.punto_venta = :pv
+                GROUP BY fp.forma_pago
+            ");
+            $st->execute([':fec' => $fecha, ':pv' => $puntoVenta]);
+            echo "--- por forma_pago ---\n";
+            foreach ($st->fetchAll() as $x) {
+                echo "  {$x[0]}: cant={$x[1]} suma={$x[2]}\n";
+            }
+        } catch (\Throwable $e) {
+            echo "por forma_pago: ERROR " . $e->getMessage() . "\n";
+        }
+
+        try {
+            $st = $pdo->prepare("
+                SELECT
+                    SUM(CASE WHEN caja_apertura_id IS NULL THEN 1 ELSE 0 END),
+                    SUM(CASE WHEN caja_apertura_id = :caja THEN 1 ELSE 0 END)
+                FROM facturas
+                WHERE estado = 'emitida' AND fecha = :fec AND punto_venta = :pv
+            ");
+            $st->execute([':caja' => $apId, ':fec' => $fecha, ':pv' => $puntoVenta]);
+            $r = $st->fetchAll();
+            echo "sin imputar: {$r[0][0]} | imputadas a este cierre: {$r[0][1]}\n";
+        } catch (\Throwable $e) {
+            echo "imputacion: ERROR " . $e->getMessage() . "\n";
+        }
+
+        echo "ventasEfectivoTurno: " . $repo->totalVentasEfectivoTurno($apId, $fecha, $puntoVenta, $apCreada) . "\n";
+        echo "ventasTransferenciaTurno: " . $repo->totalVentasTransferenciaTurno($apId, $fecha, $puntoVenta, $apCreada) . "\n";
+
+        try {
+            $st = $pdo->prepare("
+                SELECT id, codigo, fecha, created_at, punto_venta, caja_apertura_id, total_cents
+                FROM facturas
+                WHERE estado = 'emitida' AND fecha = :fec AND punto_venta = :pv
+                ORDER BY id DESC LIMIT 5
+            ");
+            $st->execute([':fec' => $fecha, ':pv' => $puntoVenta]);
+            echo "--- ultimas 5 ---\n";
+            foreach ($st->fetchAll() as $x) {
+                echo "  id={$x[0]} cod={$x[1]} fecha={$x[2]} created={$x[3]} pv={$x[4]} caja=" . ($x[5] ?? 'NULL') . " total={$x[6]}\n";
+            }
+        } catch (\Throwable $e) {
+            echo "ultimas: ERROR " . $e->getMessage() . "\n";
+        }
+        exit;
+    }
+
     /**
      * Los formularios de caja trabajan en pesos; la DB guarda centavos.
      * Acepta "43550", "43550.50" o "43.550,50".

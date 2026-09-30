@@ -476,6 +476,7 @@ $router->post('/admin/ordenes-compra/guardar-recepcion', [AdminOrdenCompraContro
 $router->get('/admin/ordenes-compra/fletes', [AdminOrdenCompraController::class, 'fletes']);
 $router->get('/admin/ordenes-compra/descargar-comprobante/(?P<id>\d+)', [AdminOrdenCompraController::class, 'descargarComprobante']);
 $router->get('/admin/caja', [AdminCajaController::class, 'index']);
+$router->get('/admin/caja/diagnostico', [AdminCajaController::class, 'diagnostico']);
 $router->get('/admin/caja/abrir', [AdminCajaController::class, 'abrirForm']);
 $router->post('/admin/caja/abrir/guardar', [AdminCajaController::class, 'abrirStore']);
 $router->get('/admin/caja/movimientos', [AdminCajaController::class, 'movimientos']);

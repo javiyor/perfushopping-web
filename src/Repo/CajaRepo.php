@@ -149,9 +149,30 @@ final class CajaRepo
             ELSE 'otro' END";
     }
 
+    private static ?bool $formasPagoTableExists = null;
+
+    private function tieneTablaFormasPago(): bool
+    {
+        if (self::$formasPagoTableExists !== null) {
+            return self::$formasPagoTableExists;
+        }
+        self::$formasPagoTableExists = false;
+        try {
+            \Perfushopping\Web\Repo\FormaPagoRepo::ensureTable();
+            Db::pdo()->query('SELECT 1 FROM formas_pago LIMIT 1');
+            self::$formasPagoTableExists = true;
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::tieneTablaFormasPago: ' . $e->getMessage());
+        }
+        return self::$formasPagoTableExists;
+    }
+
     private function formaPagoTipoExpr(string $fpAlias = 'fp'): string
     {
-        return 'COALESCE(' . $this->formaPagoTipoSql($fpAlias) . ', ' . $this->formaPagoTipoLegacySql($fpAlias) . ')';
+        if ($this->tieneTablaFormasPago()) {
+            return 'COALESCE(' . $this->formaPagoTipoSql($fpAlias) . ', ' . $this->formaPagoTipoLegacySql($fpAlias) . ')';
+        }
+        return $this->formaPagoTipoLegacySql($fpAlias);
     }
 
     public function totalVentasEfectivo(string $fecha, int $puntoVenta): int
