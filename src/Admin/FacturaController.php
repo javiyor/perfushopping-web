@@ -507,7 +507,7 @@ final class FacturaController
                 if (!empty($resultado['cae']) && !empty($resultado['codigo_emision']) && !empty($resultado['punto_venta_arca'])) {
                     $pv = (int)$resultado['punto_venta_arca'];
                     $nro = (int)$resultado['codigo_emision'];
-                    $nuevoCodigo = sprintf('%04d-%08d', $pv, $nro);
+                    $nuevoCodigo = sprintf('%05d-%08d', $pv, $nro);
                     $repo->actualizarCodigo($id, $nuevoCodigo);
                     $codigo = $nuevoCodigo;
                 }

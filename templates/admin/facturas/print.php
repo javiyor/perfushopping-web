@@ -87,9 +87,10 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
         <?php endif; ?>
         <hr />
         <h1><?= htmlspecialchars($tipoLabels[$factura['tipo_comprobante'] ?? 'FACT-B'] ?? $factura['tipo_comprobante'] ?? '') ?></h1>
-        <div class="data">Código: <strong><?= htmlspecialchars($factura['codigo'] ?? '') ?></strong></div>
+        <?php $esCodigoArca = (bool)preg_match('/^\d{4,5}-\d{8}$/', (string)($factura['codigo'] ?? '')); ?>
+        <div class="data"><?= $esCodigoArca ? 'Comprobante' : 'Código' ?>: <strong><?= htmlspecialchars($factura['codigo'] ?? '') ?></strong></div>
         <div class="data">Fecha: <?= !empty($factura['fecha']) ? date('d/m/Y', strtotime($factura['fecha'])) : '' ?></div>
-        <?php if ($factura['punto_venta'] ?? 0): ?>
+        <?php if (!$esCodigoArca && ($factura['punto_venta'] ?? 0)): ?>
         <div class="data">Punto de venta: <?= (int)$factura['punto_venta'] ?></div>
         <?php endif; ?>
         <?php if ($factura['cae'] ?? ''): ?>
