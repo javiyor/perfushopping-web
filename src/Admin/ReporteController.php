@@ -50,14 +50,23 @@ final class ReporteController
 
         $repo = new ReporteRepo();
 
-        $resumen = $repo->resumenVentas($desde, $hasta, $puntoVenta);
-        $diarias = $repo->ventasDiarias($desde, $hasta, $puntoVenta);
-        $topProductos = $repo->topProductos($desde, $hasta, 15, $puntoVenta);
-        $porDepartamento = $repo->ventasPorDepartamento($desde, $hasta, $puntoVenta);
-        $porFormaPago = $repo->ventasPorFormaPago($desde, $hasta, $puntoVenta);
-        $recibos = $repo->resumenRecibos($desde, $hasta, $puntoVenta);
-        $porTipo = $repo->facturasPorTipo($desde, $hasta, $puntoVenta);
-        $porSucursal = $repo->ventasPorSucursal($desde, $hasta);
+        try {
+            $step = 'resumen';
+            $resumen = $repo->resumenVentas($desde, $hasta, $puntoVenta);
+            $step = 'diarias';
+            $diarias = $repo->ventasDiarias($desde, $hasta, $puntoVenta);
+            $step = 'topProductos';
+            $topProductos = $repo->topProductos($desde, $hasta, 15, $puntoVenta);
+            $step = 'porDepartamento';
+            $porDepartamento = $repo->ventasPorDepartamento($desde, $hasta, $puntoVenta);
+            $step = 'porFormaPago';
+            $porFormaPago = $repo->ventasPorFormaPago($desde, $hasta, $puntoVenta);
+            $step = 'recibos';
+            $recibos = $repo->resumenRecibos($desde, $hasta, $puntoVenta);
+            $step = 'porTipo';
+            $porTipo = $repo->facturasPorTipo($desde, $hasta, $puntoVenta);
+            $step = 'porSucursal';
+            $porSucursal = $repo->ventasPorSucursal($desde, $hasta);
 
         // Comparativas tomando como referencia el mes de la fecha "hasta".
         // Se compara del día 1 al mismo día N en cada período para que sean equivalentes.
@@ -79,6 +88,7 @@ final class ReporteController
         ];
         $comparativas = [];
         foreach ($periodos as $key => [$d, $h]) {
+            $step = 'comparativas:' . $key;
             $r = $repo->resumenVentas($d, $h, $puntoVenta);
             $comparativas[$key] = [
                 'desde' => $d,
@@ -89,18 +99,24 @@ final class ReporteController
         }
 
         // Serie mensual de 24 meses para el comparativo interanual.
+        $step = 'mensuales';
         $desde24 = (clone $ref)->modify('first day of this month')->modify('-23 months')->format('Y-m-d');
         $mensuales = $repo->ventasMensuales($desde24, $ref->format('Y-m-t'), $puntoVenta);
 
+        $step = 'ganancia';
         $ganancia = $repo->ganancia($desde, $hasta, $puntoVenta);
+        $step = 'topGanancia';
         $topGanancia = $repo->topGanancia($desde, $hasta, 15, $puntoVenta);
+        $step = 'margenDepto';
         $margenDepto = $repo->margenPorDepartamento($desde, $hasta, $puntoVenta);
 
+        $step = 'total';
         $ticket = ((int)($resumen['cantidad'] ?? 0) > 0)
             ? (int)round((int)($resumen['total_cents'] ?? 0) / (int)$resumen['cantidad'])
             : 0;
 
         Response::json([
+            'ok' => true,
             'resumen' => $resumen,
             'diarias' => $diarias,
             'topProductos' => $topProductos,
@@ -117,5 +133,9 @@ final class ReporteController
             'ticket' => $ticket,
             'formasPagoLabels' => self::formasPagoLabels(),
         ]);
+        } catch (\Throwable $e) {
+            error_log('ReporteController::data error en paso ' . ($step ?? '?') . ': ' . $e->getMessage());
+            Response::json(['ok' => false, 'step' => $step ?? '?', 'error' => $e->getMessage()], 500);
+        }
     }
 }

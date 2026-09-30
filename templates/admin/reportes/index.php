@@ -269,6 +269,10 @@ function cargarReportes() {
     fetch('/admin/reportes/data?' + params.toString())
         .then(r => r.json())
         .then(d => {
+            if (d && d.ok === false) {
+                alert('Error en reportes (' + (d.step || '?') + '): ' + (d.error || 'desconocido'));
+                throw new Error(d.error || 'reportes');
+            }
             const res = d.resumen || {};
             document.getElementById('kpiFacturas').textContent = (res.cantidad ?? 0);
             document.getElementById('kpiTotal').textContent = fmtCents(parseInt(res.total_cents ?? 0));
