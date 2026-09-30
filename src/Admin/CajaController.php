@@ -426,6 +426,10 @@ final class CajaController
         $apId = (int)$apertura['id'];
         $apCreada = (string)($apertura['created_at'] ?? date('Y-m-d') . ' 00:00:00');
         $fecha = date('Y-m-d');
+        if (!$repo->arqueos($apId)) {
+            $_SESSION['admin_flash'] = ['type' => 'warning', 'text' => 'Hacé un arqueo antes de cerrar la caja.'];
+            Response::redirect('/admin/caja/arqueo');
+        }
         $ventasEfectivo = $repo->totalVentasEfectivoTurno($apId, $fecha, $puntoVenta, $apCreada);
         $ventasTransferencia = $repo->totalVentasTransferenciaTurno($apId, $fecha, $puntoVenta, $apCreada);
         $totalRecibos = $repo->totalRecibosTurno($apId, $fecha, $puntoVenta, $apCreada);
@@ -469,6 +473,10 @@ final class CajaController
         if (!$apertura) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No hay caja abierta.'];
             Response::redirect('/admin/caja');
+        }
+        if (!$repo->arqueos((int)$apertura['id'])) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se puede cerrar sin arqueo. Registrá un arqueo primero.'];
+            Response::redirect('/admin/caja/arqueo');
         }
 
         // Efectivo disponible del turno: solo efectivo puede pasar a Caja General.
