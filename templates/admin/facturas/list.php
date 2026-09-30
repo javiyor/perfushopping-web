@@ -4,7 +4,19 @@ use Perfushopping\Web\Support\Format;
 $list = $list ?? [];
 $q = (string)($q ?? '');
 $estado = (string)($estado ?? '');
+$desde = (string)($desde ?? '');
+$hasta = (string)($hasta ?? '');
+$page = max(1, (int)($page ?? 1));
+$pages = max(1, (int)($pages ?? 1));
+$total = (int)($total ?? count($list));
 $estados = ['' => 'Todos', 'pendiente' => 'Pendiente', 'emitida' => 'Emitida', 'anulada' => 'Anulada'];
+$queryBase = http_build_query(array_filter(['q' => $q, 'estado' => $estado, 'desde' => $desde, 'hasta' => $hasta], function($v) { return $v !== ''; }));
+$pageUrl = function($p) use ($queryBase) {
+    return '/admin/facturas/comprobantes?page=' . $p . ($queryBase !== '' ? '&' . $queryBase : '');
+};
+$winStart = max(1, min($page - 3, $pages - 6));
+$winEnd = min($pages, $winStart + 6);
+$winStart = max(1, $winEnd - 6);
 $tipoLabels = ['FACT-A' => 'Factura A', 'FACT-B' => 'Factura B', 'FACT-C' => 'Factura C', 'NC' => 'Nota Crédito', 'ND' => 'Nota Débito'];
 $tipoBadges = ['FACT-A' => 'primary', 'FACT-B' => 'success', 'FACT-C' => 'secondary', 'NC' => 'warning', 'ND' => 'danger'];
 ?>
@@ -18,8 +30,8 @@ $tipoBadges = ['FACT-A' => 'primary', 'FACT-B' => 'success', 'FACT-C' => 'second
 
 <div class="card shadow-sm mb-3">
     <div class="card-body">
-        <form method="get" action="/admin/facturas" class="row g-2">
-            <div class="col-lg-6">
+        <form method="get" action="/admin/facturas/comprobantes" class="row g-2">
+            <div class="col-lg-4">
                 <input class="form-control form-control-sm" name="q" value="<?= htmlspecialchars($q) ?>" placeholder="Buscar por código, cliente o CUIT" />
             </div>
             <div class="col-lg-2">
@@ -30,11 +42,17 @@ $tipoBadges = ['FACT-A' => 'primary', 'FACT-B' => 'success', 'FACT-C' => 'second
                 </select>
             </div>
             <div class="col-lg-2">
-                <button class="btn btn-accent btn-sm w-100" type="submit"><i class="bi bi-search"></i> Buscar</button>
+                <input class="form-control form-control-sm" type="date" name="desde" value="<?= htmlspecialchars($desde) ?>" title="Desde" />
             </div>
             <div class="col-lg-2">
-                <?php if ($q !== '' || $estado !== ''): ?>
-                    <a class="btn btn-outline-secondary btn-sm w-100" href="/admin/facturas">Limpiar</a>
+                <input class="form-control form-control-sm" type="date" name="hasta" value="<?= htmlspecialchars($hasta) ?>" title="Hasta" />
+            </div>
+            <div class="col-lg-1">
+                <button class="btn btn-accent btn-sm w-100" type="submit"><i class="bi bi-search"></i></button>
+            </div>
+            <div class="col-lg-1">
+                <?php if ($q !== '' || $estado !== '' || $desde !== '' || $hasta !== ''): ?>
+                    <a class="btn btn-outline-secondary btn-sm w-100" href="/admin/facturas/comprobantes">Limpiar</a>
                 <?php endif; ?>
             </div>
         </form>
@@ -107,4 +125,24 @@ $tipoBadges = ['FACT-A' => 'primary', 'FACT-B' => 'success', 'FACT-C' => 'second
             </tbody>
         </table>
     </div>
+    <?php if ($pages > 1): ?>
+    <div class="card-footer bg-white d-flex justify-content-between align-items-center">
+        <span class="small text-muted"><?= $total ?> comprobantes · Página <?= $page ?> de <?= $pages ?></span>
+        <nav>
+            <ul class="pagination pagination-sm mb-0">
+                <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
+                    <a class="page-link" href="<?= $page <= 1 ? '#' : htmlspecialchars($pageUrl($page - 1)) ?>">‹</a>
+                </li>
+                <?php for ($p = $winStart; $p <= $winEnd; $p++): ?>
+                <li class="page-item <?= $p === $page ? 'active' : '' ?>">
+                    <a class="page-link" href="<?= htmlspecialchars($pageUrl($p)) ?>"><?= $p ?></a>
+                </li>
+                <?php endfor; ?>
+                <li class="page-item <?= $page >= $pages ? 'disabled' : '' ?>">
+                    <a class="page-link" href="<?= $page >= $pages ? '#' : htmlspecialchars($pageUrl($page + 1)) ?>">›</a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+    <?php endif; ?>
 </div>

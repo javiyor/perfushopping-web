@@ -26,13 +26,29 @@ final class FacturaController
 
         $q = trim((string)($_GET['q'] ?? ''));
         $estado = trim((string)($_GET['estado'] ?? ''));
-        $list = (new FacturaRepo())->search($q, $estado);
+        $desde = trim((string)($_GET['desde'] ?? ''));
+        $hasta = trim((string)($_GET['hasta'] ?? ''));
+        $page = max(1, (int)($_GET['page'] ?? 1));
+        $perPage = 60;
+
+        $repo = new FacturaRepo();
+        $total = $repo->countSearch($q, $estado, $desde, $hasta);
+        $pages = max(1, (int)ceil($total / $perPage));
+        if ($page > $pages) {
+            $page = $pages;
+        }
+        $list = $repo->search($q, $estado, $perPage, ($page - 1) * $perPage, $desde, $hasta);
 
         echo View::adminPage('admin/facturas/list.php', [
             'adminUser' => $adminUser,
             'list' => $list,
             'q' => $q,
             'estado' => $estado,
+            'desde' => $desde,
+            'hasta' => $hasta,
+            'page' => $page,
+            'pages' => $pages,
+            'total' => $total,
             'csrf' => Csrf::token(),
             'pageTitle' => 'Facturación',
         ]);

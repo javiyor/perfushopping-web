@@ -24,15 +24,9 @@ final class FacturaRepo
         return $map[$normalized] ?? $normalized ?: 'consumidor_final';
     }
 
-    public function search(string $q = '', string $estado = '', int $limit = 60): array
+    private function searchWhere(string $q, string $estado, string $desde, string $hasta, array &$params): array
     {
-        $this->ensureEntregaColumns();
-        $limit = max(1, min(200, $limit));
-        $q = trim($q);
-        $estado = trim($estado);
-        $params = [];
         $where = [];
-
         if ($q !== '') {
             $where[] = '(f.codigo LIKE :like OR f.cliente_nombre LIKE :like OR f.cliente_cuit LIKE :like)';
             $params[':like'] = '%' . $q . '%';
@@ -41,6 +35,26 @@ final class FacturaRepo
             $where[] = 'f.estado = :estado';
             $params[':estado'] = $estado;
         }
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $desde)) {
+            $where[] = 'f.fecha >= :desde';
+            $params[':desde'] = $desde;
+        }
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $hasta)) {
+            $where[] = 'f.fecha <= :hasta';
+            $params[':hasta'] = $hasta;
+        }
+        return $where;
+    }
+
+    public function search(string $q = '', string $estado = '', int $limit = 60, int $offset = 0, string $desde = '', string $hasta = ''): array
+    {
+        $this->ensureEntregaColumns();
+        $limit = max(1, min(200, $limit));
+        $offset = max(0, $offset);
+        $q = trim($q);
+        $estado = trim($estado);
+        $params = [];
+        $where = $this->searchWhere($q, $estado, $desde, $hasta, $params);
 
         $sql = '
             SELECT f.*, a.nombre AS created_by_nombre, v.nombre AS vendedor_nombre, COUNT(fi.id) AS items_count,
@@ -62,11 +76,27 @@ final class FacturaRepo
         if ($where) {
             $sql .= ' WHERE ' . implode(' AND ', $where);
         }
-        $sql .= ' GROUP BY f.id ORDER BY f.created_at DESC, f.id DESC LIMIT ' . $limit;
+        $sql .= ' GROUP BY f.id ORDER BY f.created_at DESC, f.id DESC LIMIT ' . $limit . ' OFFSET ' . $offset;
 
         $st = Db::pdo()->prepare($sql);
         $st->execute($params);
         return $st->fetchAll();
+    }
+
+    public function countSearch(string $q = '', string $estado = '', string $desde = '', string $hasta = ''): int
+    {
+        $q = trim($q);
+        $estado = trim($estado);
+        $params = [];
+        $where = $this->searchWhere($q, $estado, $desde, $hasta, $params);
+
+        $sql = 'SELECT COUNT(*) FROM facturas f';
+        if ($where) {
+            $sql .= ' WHERE ' . implode(' AND ', $where);
+        }
+        $st = Db::pdo()->prepare($sql);
+        $st->execute($params);
+        return (int)$st->fetchColumn();
     }
 
     private static ?bool $facturasEntregaChecked = null;
