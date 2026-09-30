@@ -665,8 +665,8 @@ final class CajaController
                 WHERE estado = 'emitida' AND fecha = :fec AND punto_venta = :pv
             ");
             $st->execute([':fec' => $fecha, ':pv' => $puntoVenta]);
-            $r = $st->fetchAll();
-            echo "facturas hoy+PV: cant = {$r[0][0]}, total = {$r[0][1]}\n";
+            $r = $st->fetch(\PDO::FETCH_NUM) ?: [0, 0];
+            echo "facturas hoy+PV: cant = {$r[0]}, total = {$r[1]}\n";
         } catch (\Throwable $e) {
             echo "facturas hoy+PV: ERROR " . $e->getMessage() . "\n";
         }
@@ -681,7 +681,7 @@ final class CajaController
             ");
             $st->execute([':fec' => $fecha, ':pv' => $puntoVenta]);
             echo "--- por forma_pago ---\n";
-            foreach ($st->fetchAll() as $x) {
+            foreach ($st->fetchAll(\PDO::FETCH_NUM) as $x) {
                 echo "  {$x[0]}: cant={$x[1]} suma={$x[2]}\n";
             }
         } catch (\Throwable $e) {
@@ -697,8 +697,8 @@ final class CajaController
                 WHERE estado = 'emitida' AND fecha = :fec AND punto_venta = :pv
             ");
             $st->execute([':caja' => $apId, ':fec' => $fecha, ':pv' => $puntoVenta]);
-            $r = $st->fetchAll();
-            echo "sin imputar: {$r[0][0]} | imputadas a este cierre: {$r[0][1]}\n";
+            $r = $st->fetch(\PDO::FETCH_NUM) ?: [0, 0];
+            echo "sin imputar: {$r[0]} | imputadas a este cierre: {$r[1]}\n";
         } catch (\Throwable $e) {
             echo "imputacion: ERROR " . $e->getMessage() . "\n";
         }
@@ -715,7 +715,7 @@ final class CajaController
             ");
             $st->execute([':fec' => $fecha, ':pv' => $puntoVenta]);
             echo "--- ultimas 5 ---\n";
-            foreach ($st->fetchAll() as $x) {
+            foreach ($st->fetchAll(\PDO::FETCH_NUM) as $x) {
                 echo "  id={$x[0]} cod={$x[1]} fecha={$x[2]} created={$x[3]} pv={$x[4]} caja=" . ($x[5] ?? 'NULL') . " total={$x[6]}\n";
             }
         } catch (\Throwable $e) {
