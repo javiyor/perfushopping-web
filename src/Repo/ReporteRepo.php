@@ -54,7 +54,7 @@ final class ReporteRepo
     public function topProductos(string $desde, string $hasta, int $limite = 10, int $puntoVenta = 0): array
     {
         $limite = max(1, min(50, $limite));
-        $params = [':desde' => $desde, ':hasta' => $hasta, ':lim' => $limite];
+        $params = [':desde' => $desde, ':hasta' => $hasta];
         $pvWhere = '';
         if ($puntoVenta > 0) {
             $pvWhere = ' AND f.punto_venta = :pv';
@@ -74,7 +74,7 @@ final class ReporteRepo
               $pvWhere
             GROUP BY fi.producto, fi.variedad
             ORDER BY qty_total DESC
-            LIMIT :lim
+            LIMIT ' . $limite . '
         ");
         $st->execute($params);
         return $st->fetchAll();
@@ -329,7 +329,7 @@ final class ReporteRepo
     public function topGanancia(string $desde, string $hasta, int $limite = 15, int $puntoVenta = 0): array
     {
         $limite = max(1, min(50, $limite));
-        $params = [':desde' => $desde, ':hasta' => $hasta, ':lim' => $limite];
+        $params = [':desde' => $desde, ':hasta' => $hasta];
         $pvWhere = '';
         if ($puntoVenta > 0) {
             $pvWhere = ' AND f.punto_venta = :pv';
@@ -353,7 +353,7 @@ final class ReporteRepo
                   $pvWhere
                 GROUP BY fi.producto, fi.variedad
                 ORDER BY ganancia_cents DESC
-                LIMIT :lim
+                LIMIT ' . $limite . '
             ");
             $st->execute($params);
             return $st->fetchAll();
