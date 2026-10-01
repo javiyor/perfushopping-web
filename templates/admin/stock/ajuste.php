@@ -202,7 +202,9 @@ const ajusteForm = document.getElementById('ajusteForm');
 function buildVariantOptions(variants) {
     let html = '<option value="0">Todas (producto base)</option>';
     (variants || []).forEach(v => {
-        html += '<option value="' + (v.idcodgusto || 0) + '">' + escHtml(v.nomgusto || '') + '</option>';
+        const nombre = escHtml(v.nomgusto || '');
+        const barra = v.codscan ? ' · BAR: ' + escHtml(v.codscan) : '';
+        html += '<option value="' + (v.idcodgusto || 0) + '">' + nombre + barra + '</option>';
     });
     return html;
 }
