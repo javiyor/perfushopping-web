@@ -67,7 +67,7 @@ $tipoBadges = ['FACT-A' => 'primary', 'FACT-B' => 'success', 'FACT-C' => 'second
                     <th>Código</th>
                     <th>Tipo</th>
                     <th>Cliente</th>
-                    <th>Fecha</th>
+                    <th>Fecha / hora</th>
                     <th>Items</th>
                     <th class="text-end">Total</th>
                     <th>Estado</th>
@@ -87,7 +87,12 @@ $tipoBadges = ['FACT-A' => 'primary', 'FACT-B' => 'success', 'FACT-C' => 'second
                             <td><strong><?= htmlspecialchars((string)($f['codigo'] ?? '')) ?></strong></td>
                             <td><span class="badge bg-<?= $tipoBadges[$f['tipo_comprobante'] ?? 'FACT-B'] ?? 'secondary' ?>"><?= htmlspecialchars($tipoLabels[$f['tipo_comprobante'] ?? 'FACT-B'] ?? $f['tipo_comprobante'] ?? '') ?></span></td>
                             <td><?= htmlspecialchars((string)($f['cliente_nombre'] ?? '-')) ?></td>
-                            <td class="small"><?= !empty($f['fecha']) ? date('d/m/Y', strtotime($f['fecha'])) : '-' ?></td>
+                            <td class="small">
+                                <?= !empty($f['fecha']) ? date('d/m/Y', strtotime($f['fecha'])) : '-' ?>
+                                <?php if (!empty($f['created_at'])): ?>
+                                    <div class="text-muted" title="Hora de emisión"><?= date('H:i', strtotime($f['created_at'])) ?></div>
+                                <?php endif; ?>
+                            </td>
                             <td class="text-center"><?= (int)($f['items_count'] ?? 0) ?></td>
                             <td class="text-end fw-bold"><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($f['total_cents'] ?? 0))) ?></td>
                             <td>
