@@ -28,6 +28,10 @@ final class FacturaController
         $estado = trim((string)($_GET['estado'] ?? ''));
         $desde = trim((string)($_GET['desde'] ?? ''));
         $hasta = trim((string)($_GET['hasta'] ?? ''));
+        // Por defecto, el primer ingreso muestra solo las facturas del día de hoy.
+        if (empty($_GET)) {
+            $desde = $hasta = date('Y-m-d');
+        }
         $page = max(1, (int)($_GET['page'] ?? 1));
         $perPage = 60;
 
@@ -1523,7 +1527,77 @@ final class FacturaController
             'empresa' => $empresa,
             'sucursal' => $sucursal,
             'formasPagoLabels' => (new \Perfushopping\Web\Repo\FormaPagoRepo())->labels(),
+            'puntosObtenidos' => (new \Perfushopping\Web\Repo\PuntosRepo())->acumulacionFactura($id),
+            'puntosTotales' => (new \Perfushopping\Web\Repo\PuntosRepo())->saldo((int)($factura['idclien'] ?? 0)),
         ]);
+    }
+
+    public function puntos(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $auth->requirePermiso('facturacion');
+
+        $id = (int)($params['id'] ?? 0);
+        $factura = (new FacturaRepo())->findById($id);
+        if (!$factura) {
+            Response::json(['obtenidos' => 0, 'totales' => 0]);
+            return;
+        }
+
+        $p = (new \Perfushopping\Web\Repo\PuntosRepo())->puntosDeFactura($id, (int)($factura['idclien'] ?? 0));
+        Response::json($p);
+    }
+
+    public function pdf(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $auth->requirePermiso('facturacion');
+
+        $id = (int)($params['id'] ?? 0);
+        $repo = new FacturaRepo();
+        $factura = $repo->findById($id);
+        if (!$factura) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Factura no encontrada.'];
+            Response::redirect('/admin/facturas');
+        }
+
+        $items = $repo->items($id);
+        $empresa = (new \Perfushopping\Web\Repo\EmpresaRepo())->getDefault();
+        $money = static fn (int $cents): string => number_format($cents / 100, 2, ',', '.');
+
+        $lines = [];
+        $lines[] = ['text' => (string)($empresa['razon_emp'] ?? 'PERFUSHOPPING S.R.L.'), 'bold' => true, 'size' => 14];
+        $lines[] = ['text' => 'Comprobante ' . (string)($factura['codigo'] ?? '') . ' - ' . (string)($factura['tipo_comprobante'] ?? ''), 'bold' => true, 'size' => 12];
+        $lines[] = ['text' => 'Fecha: ' . date('d/m/Y', strtotime((string)($factura['fecha'] ?? '')))];
+        $lines[] = ['text' => 'Cliente: ' . (string)($factura['cliente_nombre'] ?? '')];
+        if (!empty($factura['cliente_cuit'])) {
+            $lines[] = ['text' => 'CUIT/CUIL: ' . (string)$factura['cliente_cuit']];
+        }
+        $lines[] = ['text' => 'Condicion IVA: ' . (string)($factura['cliente_condicion_iva'] ?? '')];
+        $lines[] = ['text' => ''];
+        $lines[] = ['text' => 'Productos', 'bold' => true, 'size' => 11];
+        foreach ($items as $it) {
+            $lines[] = ['text' => sprintf('%s x%s  $%s', (string)($it['producto'] ?? ''), (float)($it['qty'] ?? 0), $money((int)($it['total_cents'] ?? 0)))];
+        }
+        $lines[] = ['text' => ''];
+        $lines[] = ['text' => 'Subtotal: $' . $money((int)($factura['subtotal_cents'] ?? 0))];
+        $lines[] = ['text' => 'IVA: $' . $money((int)($factura['iva_cents'] ?? 0))];
+        if ((int)($factura['descuento_cents'] ?? 0) > 0) {
+            $lines[] = ['text' => 'Descuento: $' . $money((int)$factura['descuento_cents'])];
+        }
+        $lines[] = ['text' => 'TOTAL: $' . $money((int)($factura['total_cents'] ?? 0)), 'bold' => true, 'size' => 13];
+        $lines[] = ['text' => 'Estado: ' . (string)($factura['estado'] ?? '')];
+        if (!empty($factura['cae'])) {
+            $lines[] = ['text' => 'CAE: ' . (string)$factura['cae']];
+        }
+        $lines[] = ['text' => ''];
+        $lines[] = ['text' => 'www.perfushopping.com.ar'];
+
+        ob_start();
+        ob_end_clean();
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: attachment; filename="comprobante-' . preg_replace('/[^A-Za-z0-9-]/', '', (string)($factura['codigo'] ?? (string)$id)) . '.pdf"');
+        echo \Perfushopping\Web\Support\Pdf::render($lines);
     }
 
     public function sendEmail(array $params): void
@@ -1593,6 +1667,15 @@ final class FacturaController
         $desc = (int)($factura['descuento_cents'] ?? 0);
         if ($desc > 0) $attachmentHtml .= '<p style="color:#dc3545">Descuento: -' . Format::moneyRoundedFromCents($desc) . '</p>';
         $attachmentHtml .= '<p class="total">TOTAL: ' . Format::moneyRoundedFromCents((int)($factura['total_cents'] ?? 0)) . '</p></div>';
+        $puntosObtenidos = (new \Perfushopping\Web\Repo\PuntosRepo())->acumulacionFactura($id);
+        $puntosTotales = (new \Perfushopping\Web\Repo\PuntosRepo())->saldo((int)($factura['idclien'] ?? 0));
+        if ($puntosObtenidos > 0) {
+            $attachmentHtml .= '<p style="color:#b8860b"><strong>Puntos sumados en esta compra:</strong> ' . $puntosObtenidos . ' pts<br/>';
+            if ($puntosTotales > 0) {
+                $attachmentHtml .= '<strong>Total de puntos acumulados:</strong> ' . $puntosTotales . ' pts<br/>';
+            }
+            $attachmentHtml .= '</p><hr style="border:none;border-top:1px solid #ddd" />';
+        }
         $attachmentHtml .= '<hr style="border:none;border-top:1px solid #ddd" />';
         $attachmentHtml .= '<div class="footer"><p>Gracias por su compra</p><p>' . $empresaNombre . ' — ' . $empresaWeb . '</p></div>';
         $attachmentHtml .= '<p style="text-align:center;font-size:11px;color:#999">Versión imprimible: <a href="' . $baseUrl . '/admin/facturas/imprimir/' . $id . '">' . $baseUrl . '/admin/facturas/imprimir/' . $id . '</a></p>';

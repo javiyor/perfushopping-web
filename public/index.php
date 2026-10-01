@@ -405,6 +405,8 @@ $router->get('/admin/facturas/buscar-remitos', [AdminFacturaController::class, '
 $router->get('/admin/facturas/buscar-presupuestos', [AdminFacturaController::class, 'searchPresupuestos']);
 $router->get('/admin/facturas/buscar-pedidos', [AdminFacturaController::class, 'searchPedidos']);
 $router->get('/admin/facturas/imprimir/(?P<id>\d+)', [AdminFacturaController::class, 'print']);
+$router->get('/admin/facturas/pdf/(?P<id>\d+)', [AdminFacturaController::class, 'pdf']);
+$router->get('/admin/facturas/puntos/(?P<id>\d+)', [AdminFacturaController::class, 'puntos']);
 $router->post('/admin/facturas/(?P<id>\d+)/enviar-email', [AdminFacturaController::class, 'sendEmail']);
 $router->get('/admin/envios', [AdminEnvioController::class, 'index']);
 $router->post('/admin/envios/entregar', [AdminEnvioController::class, 'entregar']);

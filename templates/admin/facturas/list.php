@@ -30,29 +30,29 @@ $tipoBadges = ['FACT-A' => 'primary', 'FACT-B' => 'success', 'FACT-C' => 'second
 
 <div class="card shadow-sm mb-3">
     <div class="card-body">
-        <form method="get" action="/admin/facturas/comprobantes" class="row g-2">
+        <form method="get" action="/admin/facturas/comprobantes" class="row g-2" id="filtroForm">
             <div class="col-lg-4">
-                <input class="form-control form-control-sm" name="q" value="<?= htmlspecialchars($q) ?>" placeholder="Buscar por código, cliente o CUIT" />
+                <input class="form-control form-control-sm" id="filtroQ" name="q" value="<?= htmlspecialchars($q) ?>" placeholder="Buscar por código, cliente o CUIT" />
             </div>
             <div class="col-lg-2">
-                <select class="form-select form-select-sm" name="estado">
+                <select class="form-select form-select-sm" id="filtroEstado" name="estado">
                     <?php foreach ($estados as $v => $l): ?>
                         <option value="<?= htmlspecialchars($v) ?>" <?= $estado === $v ? 'selected' : '' ?>><?= htmlspecialchars($l) ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
             <div class="col-lg-2">
-                <input class="form-control form-control-sm" type="date" name="desde" value="<?= htmlspecialchars($desde) ?>" title="Desde" />
+                <input class="form-control form-control-sm" id="filtroDesde" type="date" name="desde" value="<?= htmlspecialchars($desde) ?>" title="Desde" />
             </div>
             <div class="col-lg-2">
-                <input class="form-control form-control-sm" type="date" name="hasta" value="<?= htmlspecialchars($hasta) ?>" title="Hasta" />
+                <input class="form-control form-control-sm" id="filtroHasta" type="date" name="hasta" value="<?= htmlspecialchars($hasta) ?>" title="Hasta" />
             </div>
             <div class="col-lg-1">
                 <button class="btn btn-accent btn-sm w-100" type="submit"><i class="bi bi-search"></i></button>
             </div>
             <div class="col-lg-1">
                 <?php if ($q !== '' || $estado !== '' || $desde !== '' || $hasta !== ''): ?>
-                    <a class="btn btn-outline-secondary btn-sm w-100" href="/admin/facturas/comprobantes">Limpiar</a>
+                    <button class="btn btn-outline-secondary btn-sm w-100" type="button" onclick="limpiarFiltros()" title="Limpiar filtros">Limpiar</button>
                 <?php endif; ?>
             </div>
         </form>
@@ -181,6 +181,15 @@ $tipoBadges = ['FACT-A' => 'primary', 'FACT-B' => 'success', 'FACT-C' => 'second
         })
         .catch(function() { alert('Error de conexión.'); })
         .finally(function() { btn.disabled = false; });
+    }
+    </script>
+    <script>
+    function limpiarFiltros() {
+        document.getElementById('filtroQ').value = '';
+        document.getElementById('filtroEstado').value = '';
+        document.getElementById('filtroDesde').value = '';
+        document.getElementById('filtroHasta').value = '';
+        document.getElementById('filtroForm').submit();
     }
     </script>
     <?php if ($pages > 1): ?>

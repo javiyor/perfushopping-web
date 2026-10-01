@@ -192,17 +192,26 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
         <div class="row"><span><?= htmlspecialchars($label) ?>:</span><span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($pg['monto_cents'] ?? 0))) ?></span></div>
         <?php endforeach; ?>
     </div>
-    <?php endif; ?>
+        <?php endif; ?>
 
-    <hr />
-    <?php if ($qrUrl ?? null): ?>
+        <?php if (($puntosObtenidos ?? 0) > 0): ?>
+        <div class="totals">
+            <div class="row" style="color:#b8860b"><span>Puntos sumados en esta compra:</span><span><?= (int)$puntosObtenidos ?> pts</span></div>
+            <?php if (($puntosTotales ?? 0) > 0): ?>
+            <div class="row" style="color:#b8860b"><span>Total de puntos acumulados:</span><span><?= (int)$puntosTotales ?> pts</span></div>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
+        <hr />
+        <?php if ($qrUrl ?? null): ?>
     <div style="text-align:center;margin:8px 0">
         <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=<?= urlencode($qrUrl) ?>" alt="Código QR AFIP" style="width:120px;height:120px" />
     </div>
     <?php endif; ?>
     <div class="footer">
         <p>Gracias por su compra</p>
-        <p><?= htmlspecialchars($empresa['nomemp'] ?? 'Perfushopping') ?> — www.perfushopping.com</p>
+        <p>www.perfushopping.com.ar</p>
     </div>
     <?php if ($isTicket): ?><div class="cut-space"></div><?php endif; ?>
 

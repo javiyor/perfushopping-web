@@ -15,7 +15,7 @@
             </div>
             <div class="modal-body text-center">
                 <div class="alert alert-info py-1 px-2 small mb-2 text-start">
-                    1) Copiá la imagen del ticket &middot; 2) Abrí WhatsApp &middot; 3) Pegala en el chat (Ctrl+V).
+                    1) Descarg&aacute; el PDF del comprobante &middot; 2) Abr&iacute; WhatsApp &middot; 3) Adjuntalo en el chat.
                 </div>
                 <div id="waEnvioPreview" style="min-height:120px">
                     <div class="spinner-border text-success" role="status"></div>
@@ -24,9 +24,10 @@
                 <div id="waEnvioMsg" class="small mt-2"></div>
             </div>
             <div class="modal-footer py-2 flex-nowrap">
-                <button type="button" class="btn btn-outline-secondary btn-sm text-nowrap" id="waBtnCopiar" disabled><i class="bi bi-clipboard"></i> Copiar imagen</button>
-                <button type="button" class="btn btn-outline-secondary btn-sm text-nowrap" id="waBtnCompartir" style="display:none"><i class="bi bi-share"></i> Compartir…</button>
-                <button type="button" class="btn btn-success btn-sm text-nowrap" id="waBtnAbrir"><i class="bi bi-whatsapp"></i> Abrir WhatsApp</button>
+                <a class="btn btn-danger btn-sm text-nowrap" id="waBtnPdf" href="#" download><i class="bi bi-file-earmark-pdf"></i> PDF</a>
+                <button class="btn btn-outline-secondary btn-sm text-nowrap" id="waBtnCopiar" disabled><i class="bi bi-clipboard"></i> Copiar imagen</button>
+                <button class="btn btn-outline-secondary btn-sm text-nowrap" id="waBtnCompartir" style="display:none"><i class="bi bi-share"></i> Compartir.</button>
+                <button class="btn btn-success btn-sm text-nowrap" id="waBtnAbrir"><i class="bi bi-whatsapp"></i> Abrir WhatsApp</button>
             </div>
         </div>
     </div>
@@ -118,19 +119,54 @@
         msgEl.textContent = 'Podés abrir igual y enviar el mensaje de texto.';
     }
 
+    function cargarPuntos(id) {
+        fetch('/admin/facturas/puntos/' + id)
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (!d) return;
+                var extra = '';
+                if (d.obtenidos > 0 && d.totales > 0) {
+                    extra = ' Sumaste ' + d.obtenidos + ' puntos. Total acumulado: ' + d.totales + ' puntos.';
+                } else if (d.obtenidos > 0) {
+                    extra = ' Sumaste ' + d.obtenidos + ' puntos.';
+                }
+                if (extra) state.text += extra;
+            })
+            .catch(function() {});
+    }
+
+    function cargarPdf(id) {
+        var btn = $('waBtnPdf');
+        if (btn) btn.href = '#';
+        fetch('/admin/facturas/pdf/' + id)
+            .then(function(r) { return r.blob(); })
+            .then(function(b) {
+                if (!b) return;
+                state.pdfFile = new File([b], 'comprobante-' + id + '.pdf', { type: 'application/pdf' });
+                if (btn) btn.href = URL.createObjectURL(b);
+                if (navigator.canShare && navigator.canShare({ files: [state.pdfFile] })) {
+                    state.file = state.pdfFile;
+                    $('waBtnCompartir').style.display = '';
+                }
+            })
+            .catch(function() {});
+    }
+
     function abrir(id, phone, text) {
         state = { id: id, phone: phone, text: text, blob: null, file: null };
         framesEl.innerHTML = '';
         $('waBtnCopiar').disabled = true;
         $('waBtnCompartir').style.display = 'none';
         msgEl.textContent = '';
-        prevEl.innerHTML = '<div class="spinner-border text-success" role="status"></div><div class="small text-muted mt-2">Generando vista previa del ticket…</div>';
+        prevEl.innerHTML = '<div class="spinner-border text-success" role="status"></div><div class="small text-muted mt-2">Generando vista previa del ticket.</div>';
         if (!modal) modal = bootstrap.Modal.getOrCreateInstance(modalEl);
         modal.show();
         if (!id || !phone) {
             mostrarError('faltan datos');
             return;
         }
+        cargarPuntos(id);
+        cargarPdf(id);
         capturar(id).then(function(canvas) {
             prevEl.innerHTML = '';
             var img = document.createElement('img');

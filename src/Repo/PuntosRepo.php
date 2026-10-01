@@ -33,6 +33,27 @@ final class PuntosRepo
         return $v === false ? 0 : (int)$v;
     }
 
+    /** Puntos acumulados por una factura (0 si no aplica). */
+    public function acumulacionFactura(int $facturaId): int
+    {
+        if ($facturaId <= 0) {
+            return 0;
+        }
+        $st = Db::pdo()->prepare("SELECT puntos FROM puntos_movimientos WHERE factura_id = :f AND tipo = 'acumulacion' LIMIT 1");
+        $st->execute([':f' => $facturaId]);
+        $v = $st->fetchColumn();
+        return $v === false ? 0 : (int)$v;
+    }
+
+    /** @return array{obtenidos:int, totales:int} */
+    public function puntosDeFactura(int $facturaId, int $idclien): array
+    {
+        return [
+            'obtenidos' => $this->acumulacionFactura($facturaId),
+            'totales' => $this->saldo($idclien),
+        ];
+    }
+
     /** Returns new balance, or null if duplicate. $puntos may be negative for reversal/adjustment. */
     public function registrar(string $tipo, int $idclien, int $puntos, ?int $facturaId, ?int $orderId, string $descripcion, ?int $createdBy): ?int
     {
