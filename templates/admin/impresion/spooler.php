@@ -151,8 +151,12 @@ $impresora = $impresora ?? null;
         jobs.forEach(function(j) {
             var tr = document.createElement('tr');
             var phone = String(j.cliente_tele || '').replace(/\D/g, '');
+            var wText = whatsappText(j);
+            var waAttr = function(s) {
+                return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            };
             var waBtn = phone
-                ? '<a class="btn btn-sm btn-outline-success py-0 px-1" target="_blank" title="Enviar por WhatsApp" href="https://wa.me/' + phone + '?text=' + encodeURIComponent(whatsappText(j)) + '"><i class="bi bi-whatsapp"></i></a>'
+                ? '<a class="btn btn-sm btn-outline-success py-0 px-1 wa-send-comprobante" target="_blank" title="Enviar por WhatsApp con imagen del ticket" href="https://wa.me/' + phone + '?text=' + encodeURIComponent(wText) + '" data-wa-id="' + (j.factura_id || 0) + '" data-wa-phone="' + waAttr(phone) + '" data-wa-text="' + waAttr(wText) + '"><i class="bi bi-whatsapp"></i></a>'
                 : '<button class="btn btn-sm btn-outline-secondary py-0 px-1" type="button" disabled title="Sin teléfono"><i class="bi bi-whatsapp"></i></button>';
             tr.innerHTML = '<td class="small">#' + j.id + '</td>'
                 + '<td><strong>' + (j.factura_codigo || ('#' + j.factura_id)) + '</strong></td>'
@@ -193,3 +197,4 @@ $impresora = $impresora ?? null;
     setInterval(poll, 5000);
 })();
 </script>
+<?php require __DIR__ . '/../facturas/wa_enviar_modal.php'; ?>
