@@ -40,9 +40,12 @@ final class CustomerRepo
         $where = [];
 
         if ($q !== '') {
-            $where[] = '(u.name LIKE :like OR u.email LIKE :like OR u.phone LIKE :like OR u.phone_key LIKE :pk)';
+            $digits = preg_replace('/[^0-9]/', '', $q) ?? '';
+            $where[] = '(u.name LIKE :like OR u.email LIKE :like OR u.phone LIKE :like OR u.phone_key LIKE :pk'
+                . ' OR c.razon LIKE :like OR c.cuit LIKE :cuit_like)';
             $params[':like'] = '%' . $q . '%';
-            $params[':pk'] = preg_replace('/[^0-9]/', '', $q) ?? '';
+            $params[':pk'] = $digits;
+            $params[':cuit_like'] = $digits !== '' ? '%' . $digits . '%' : '%' . $q . '%';
         }
 
         $sql = $select . $from;

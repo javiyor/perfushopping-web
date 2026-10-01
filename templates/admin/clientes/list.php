@@ -24,7 +24,7 @@ $customerCategories = [
     <div class="card-body">
         <form method="get" action="/admin/clientes" class="row g-2">
             <div class="col-lg-8">
-                <input class="form-control form-control-sm" name="q" value="<?= htmlspecialchars($q) ?>" placeholder="Buscar por nombre, email o teléfono" />
+                <input class="form-control form-control-sm" name="q" value="<?= htmlspecialchars($q) ?>" placeholder="Buscar por nombre, email, teléfono o DNI/CUIT" />
             </div>
             <div class="col-lg-2">
                 <button class="btn btn-accent btn-sm w-100" type="submit"><i class="bi bi-search"></i> Buscar</button>
