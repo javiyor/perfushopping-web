@@ -802,6 +802,7 @@ function recalcTotals() {
 const cliInput = document.getElementById('clienteSearch');
 const cliSuggestions = document.getElementById('clienteSuggestions');
 let cliTimer;
+let clienteNombreSel = '';
 
 cliInput.addEventListener('input', function() {
     clearTimeout(cliTimer);
@@ -839,6 +840,7 @@ cliInput.addEventListener('blur', function() {
 function selectCliente(c) {
     document.getElementById('clienteId').value = c.id || 0;
     document.getElementById('clienteErpId').value = c.idclien || 0;
+    clienteNombreSel = (c.name || '').trim();
     document.getElementById('clienteNombre').textContent = c.name || 'Consumidor Final';
     document.getElementById('clienteCuit').textContent = c.cuit || '';
     document.getElementById('clienteCondIva').value = c.condicion_iva || 'consumidor_final';
@@ -893,6 +895,7 @@ function loadPuntosSaldo(idclien) {
 function clearCliente() {
     document.getElementById('clienteId').value = 0;
     document.getElementById('clienteErpId').value = 0;
+    clienteNombreSel = '';
     document.getElementById('clienteNombre').textContent = 'Consumidor Final';
     document.getElementById('clienteCuit').textContent = '';
     document.getElementById('clienteCondIva').value = 'consumidor_final';
@@ -1232,6 +1235,7 @@ function editarPrefill() {
         });
     } else {
         if (f.cliente_nombre) {
+            clienteNombreSel = (f.cliente_nombre || '').trim();
             document.getElementById('clienteNombre').textContent = f.cliente_nombre;
             cliInput.value = f.cliente_nombre;
         }
@@ -1510,10 +1514,18 @@ function submitFactura() {
     const tipo = document.getElementById('tipoComprobante').value;
     const clienteId = parseInt(document.getElementById('clienteId').value) || 0;
     const remitoId = parseInt(document.getElementById('remitoId').value) || 0;
-    const clienteNombre = clienteId ? (document.getElementById('clienteNombre').textContent || 'Consumidor Final') : 'Consumidor Final';
+    const clienteErpId = parseInt(document.getElementById('clienteErpId').value) || 0;
+    let clienteNombre = (clienteNombreSel || '').trim();
+    if (!clienteNombre && (clienteId || clienteErpId)) {
+        // Fallback: el texto visible puede traer CUIT y/o badges de categoría.
+        clienteNombre = (document.getElementById('clienteNombre').textContent || '')
+            .replace(/\s*\[.*$/, '')
+            .replace(/\s+-\s+.*$/, '')
+            .trim();
+    }
+    if (!clienteNombre) clienteNombre = 'Consumidor Final';
     const clienteCuit = document.getElementById('clienteCuit').textContent || '';
     const clienteCondIva = document.getElementById('clienteCondIva').value || 'consumidor_final';
-    const clienteErpId = parseInt(document.getElementById('clienteErpId').value) || 0;
     const notas = document.getElementById('facturaNotas').value;
 
     const descPct = parseFloat(document.getElementById('posDescuento').value) || 0;
@@ -1603,7 +1615,7 @@ function submitFactura() {
         cliente: {
             id: clienteId || null,
             idclien: clienteErpId || null,
-            nombre: clienteNombre.replace(/ -.*$/, ''), // strip CUIT from display
+            nombre: clienteNombre,
             cuit: clienteCuit,
             condicion_iva: clienteCondIva,
         },

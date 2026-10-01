@@ -183,10 +183,19 @@ final class FacturaController
 
         $tipo = (string)($input['tipo_comprobante'] ?? 'FACT-B');
         $cliente = $input['cliente'] ?? [];
-        $clienteNombre = trim((string)($cliente['nombre'] ?? 'Consumidor Final'));
+        $clienteNombre = trim((string)($cliente['nombre'] ?? ''));
         $clienteCuit = trim((string)($cliente['cuit'] ?? ''));
         $clienteId = (int)($cliente['id'] ?? 0) ?: null;
         $clienteCondIva = trim((string)($cliente['condicion_iva'] ?? 'consumidor_final'));
+
+        $repo = new FacturaRepo();
+        // Si el cliente está identificado pero el nombre llegó vacío o como CF, usar su razón real.
+        $clienteNombre = $this->resolverNombreCliente(
+            $repo,
+            $clienteNombre,
+            $clienteId,
+            (int)($cliente['idclien'] ?? 0) ?: null
+        );
 
         $itemsData = $this->normalizarItems($input['items']);
         $items = $itemsData['items'];
@@ -209,8 +218,6 @@ final class FacturaController
             $envioDireccion = trim((string)($entrega['direccion'] ?? ''));
             $envioObs = trim((string)($entrega['observacion'] ?? ''));
         }
-
-        $repo = new FacturaRepo();
 
         if (\Perfushopping\Web\Support\Env::isDemo() && $repo->countActivas() >= 20) {
             Response::json(['ok' => false, 'error' => 'La demo permite un máximo de 20 facturas.']);
@@ -389,6 +396,33 @@ final class FacturaController
             'codigo' => $codigo,
             'arca' => !empty($arca['cae']) ? ['cae' => $arca['cae']] : (!empty($arca['error']) ? ['error' => $arca['error']] : null),
         ]);
+    }
+
+    /**
+     * El POS puede traer el cliente identificado pero sin nombre (id de web_users = 0
+     * cuando no tiene cuenta web). Si hay id, resuelve la razón social real.
+     */
+    private function resolverNombreCliente(FacturaRepo $repo, string $nombre, ?int $clienteWebId, ?int $clienteErpId): string
+    {
+        $nombre = trim($nombre);
+        if ($nombre !== '' && strcasecmp($nombre, 'Consumidor Final') !== 0) {
+            return $nombre;
+        }
+
+        $idclien = $clienteErpId ?: 0;
+        if ($idclien <= 0 && ($clienteWebId ?: 0) > 0) {
+            $erp = $repo->findClienteErpByWebId((int)$clienteWebId);
+            $idclien = $erp ? (int)$erp['idclien'] : 0;
+        }
+        if ($idclien > 0) {
+            $erp = $repo->findClienteByIdclien($idclien);
+            $razon = $erp ? trim((string)($erp['razon'] ?? '')) : '';
+            if ($razon !== '') {
+                return $razon;
+            }
+        }
+
+        return $nombre !== '' ? $nombre : 'Consumidor Final';
     }
 
     /** @return array{items:array,subtotal:int,iva:int} */
@@ -680,10 +714,16 @@ final class FacturaController
 
         $tipo = (string)($input['tipo_comprobante'] ?? $old['tipo_comprobante'] ?? 'FACT-B');
         $cliente = $input['cliente'] ?? [];
-        $clienteNombre = trim((string)($cliente['nombre'] ?? $old['cliente_nombre'] ?? 'Consumidor Final'));
         $clienteCuit = trim((string)($cliente['cuit'] ?? $old['cliente_cuit'] ?? ''));
         $clienteId = (int)($cliente['id'] ?? 0) ?: null;
         $clienteCondIva = trim((string)($cliente['condicion_iva'] ?? $old['cliente_condicion_iva'] ?? 'consumidor_final'));
+        // Si el cliente está identificado pero el nombre llegó vacío o como CF, usar su razón real.
+        $clienteNombre = $this->resolverNombreCliente(
+            $repo,
+            trim((string)($cliente['nombre'] ?? $old['cliente_nombre'] ?? '')),
+            $clienteId,
+            (int)($cliente['idclien'] ?? 0) ?: null
+        );
 
         try {
             $itemsData = $this->normalizarItems($input['items']);
