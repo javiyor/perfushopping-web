@@ -83,7 +83,7 @@ $esSuperadmin = $esSuperadmin ?? false;
 
     <div class="col-lg-4">
         <?php if ($esSuperadmin): ?>
-        <div class="card shadow-sm mb-3">
+        <div class="card shadow-sm mb-3" id="solicitudesPendientes">
             <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
                 <span>Autorizaciones pendientes</span>
                 <span class="badge bg-danger"><?= count($solicitudesPendientes) ?></span>
@@ -130,8 +130,11 @@ $esSuperadmin = $esSuperadmin ?? false;
         </div>
         <?php endif; ?>
 
-        <div class="card shadow-sm mb-3">
-            <div class="card-header bg-white fw-semibold">Mis solicitudes recientes</div>
+        <div class="card shadow-sm mb-3" id="misSolicitudes">
+            <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+                <span>Mis solicitudes recientes</span>
+                <button class="btn btn-sm btn-outline-secondary" type="button" id="btnActualizarSolicitudes" title="Actualizar solicitudes"><i class="bi bi-arrow-repeat"></i> Actualizar</button>
+            </div>
             <div class="card-body small p-0">
                 <?php if (!$misSolicitudes): ?>
                     <div class="p-3 text-muted">Todavía no tenés solicitudes.</div>
@@ -301,4 +304,25 @@ ajusteForm.addEventListener('submit', function(e) {
 if (Array.isArray(initialItems) && initialItems.length) {
     initialItems.forEach(addItemRow);
 }
+
+// ── Auto-actualización de solicitudes (no toca el formulario) ──
+function actualizarSolicitudes() {
+    fetch('/admin/stock/ajuste')
+        .then(r => r.text())
+        .then(html => {
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const pend = doc.getElementById('solicitudesPendientes');
+            const mis = doc.getElementById('misSolicitudes');
+            if (pend) {
+                document.getElementById('solicitudesPendientes').innerHTML = pend.innerHTML;
+            }
+            if (mis) {
+                document.getElementById('misSolicitudes').innerHTML = mis.innerHTML;
+            }
+        })
+        .catch(function() {});
+}
+
+document.getElementById('btnActualizarSolicitudes').addEventListener('click', actualizarSolicitudes);
+setInterval(actualizarSolicitudes, 20000);
 </script>
