@@ -703,6 +703,64 @@ final class FacturaController
         return is_array($rows) ? $rows : [];
     }
 
+    public function diagnosticoStock(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $auth->requirePermiso('facturacion');
+
+        header('Content-Type: text/plain; charset=utf-8');
+
+        $sucId = $auth->getSucursalId();
+        $depoId = $auth->getDepositoId();
+        echo "sucursal sesion: {$sucId} | deposito sesion: {$depoId} | turno: " . $auth->getTurno() . " | PV: " . $auth->getPuntoVenta() . "\n";
+        echo ($depoId > 0 ? "OK: al facturar SE descuenta stock del deposito {$depoId}\n" : "PROBLEMA: deposito 0, al facturar NO se descuenta stock\n");
+        echo "\n";
+
+        $pdo = \Perfushopping\Web\Infra\Db::pdo();
+        try {
+            $s = (new \Perfushopping\Web\Repo\SucursalRepo())->findById($sucId);
+            echo "sucursal iddepo: " . var_export($s['iddepo'] ?? 'FALTA COLUMNA', true) . "\n\n";
+        } catch (\Throwable $e) {
+            echo "sucursal: ERROR " . $e->getMessage() . "\n\n";
+        }
+
+        foreach (['stock', 'stockcab', 'stockdet'] as $t) {
+            try {
+                $n = $pdo->query("SELECT COUNT(*) FROM {$t}")->fetchColumn();
+                echo "tabla {$t}: existe, filas = {$n}\n";
+            } catch (\Throwable $e) {
+                echo "tabla {$t}: NO EXISTE\n";
+            }
+        }
+        echo "\n";
+
+        try {
+            $facts = $pdo->query('SELECT id, codigo, fecha, created_at, punto_venta FROM facturas ORDER BY id DESC LIMIT 5')->fetchAll();
+            foreach ($facts as $f) {
+                echo "factura id={$f['id']} cod={$f['codigo']} pv={$f['punto_venta']}\n";
+                $sti = $pdo->prepare('SELECT idprodu, idcodgusto, producto, qty FROM factura_items WHERE factura_id = :f');
+                $sti->execute([':f' => $f['id']]);
+                foreach ($sti->fetchAll() as $it) {
+                    echo "  item prod={$it['idprodu']} gusto=" . ($it['idcodgusto'] ?? 'NULL') . " qty={$it['qty']} " . mb_substr((string)$it['producto'], 0, 30) . "\n";
+                }
+            }
+        } catch (\Throwable $e) {
+            echo "facturas: ERROR " . $e->getMessage() . "\n";
+        }
+        echo "\n";
+
+        try {
+            $cabs = $pdo->query("SELECT id, fecha, notas, tipo_movimiento FROM stockcab ORDER BY id DESC LIMIT 5")->fetchAll();
+            echo "--- ultimos stockcab ---\n";
+            foreach ($cabs as $c) {
+                echo "  id={$c['id']} fecha={$c['fecha']} tipo={$c['tipo_movimiento']} notas=" . mb_substr((string)$c['notas'], 0, 60) . "\n";
+            }
+        } catch (\Throwable $e) {
+            echo "stockcab: ERROR " . $e->getMessage() . "\n";
+        }
+        exit;
+    }
+
     public function searchProducts(array $params): void
     {
         $auth = new AdminAuthService();

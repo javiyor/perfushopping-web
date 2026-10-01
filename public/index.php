@@ -387,6 +387,7 @@ $router->get('/admin/remitos/buscar-presupuestos', [AdminRemitoController::class
 $router->get('/admin/remitos/buscar-proveedores', [AdminRemitoController::class, 'searchProveedores']);
 $router->get('/admin/facturas', [AdminFacturaController::class, 'pos']);
 $router->get('/admin/facturas/comprobantes', [AdminFacturaController::class, 'index']);
+$router->get('/admin/facturas/diagnostico-stock', [AdminFacturaController::class, 'diagnosticoStock']);
 $router->get('/admin/facturas/nueva', [AdminFacturaController::class, 'pos']);
 $router->post('/admin/facturas/guardar', [AdminFacturaController::class, 'store']);
 $router->get('/admin/facturas/(?P<id>\d+)', [AdminFacturaController::class, 'show']);

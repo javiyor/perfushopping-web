@@ -125,6 +125,8 @@ $impresora = $impresora ?? null;
         };
         try {
             var frame = document.createElement('iframe');
+            frame.style.width = FORMATO === '58mm' ? '58mm' : '80mm';
+            frame.style.border = '0';
             var to = setTimeout(function() { finish('error', 'timeout de impresión'); }, 45000);
             frame.onload = function() {
                 setTimeout(function() { clearTimeout(to); finish('impreso', null); }, 2000);
