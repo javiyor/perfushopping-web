@@ -27,14 +27,14 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
     <meta charset="utf-8" />
     <title><?= htmlspecialchars($factura['codigo'] ?? '') ?></title>
     <style>
-        @page { <?= $isTicket ? ('size:' . $bodyWidth . ' auto; margin:3mm 4mm;') : 'margin:20mm 15mm;' ?> }
+        @page { <?= $isTicket ? ('size:' . $bodyWidth . ' auto; margin:0;') : 'margin:20mm 15mm;' ?> }
         * { box-sizing:border-box; }
         <?php if ($isTicket): ?>
         .cut-space { display:none; }
         <?php endif; ?>
         body {
-            font-family:<?= $isTicket ? "'Courier New',Courier,monospace" : "'Segoe UI',Arial,sans-serif" ?>;
-            font-size:<?= $bodyFontSize ?>; line-height:1.4; color:#000;
+            font-family:Arial,Helvetica,sans-serif;
+            font-size:<?= $bodyFontSize ?>; line-height:<?= $isTicket ? '1.5' : '1.4' ?>; color:#000;
             width:<?= $bodyWidth ?>; margin:0 auto;
         }
         h1 { font-size:<?= $formato === '58mm' ? '13px' : '16px' ?>; text-align:center; margin:0 0 4px; }
@@ -44,7 +44,7 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
         .header .data { font-size:<?= $formato === '58mm' ? '9px' : '11px' ?>; }
         hr { border:none; border-top:1px dashed #000; margin:6px 0; }
         table { width:100%; border-collapse:collapse; font-size:<?= $formato === '58mm' ? '9px' : ($isTicket ? '11px' : '12px') ?>; }
-        th, td { padding:<?= $isTicket ? '2px 4px' : '6px 8px' ?>; text-align:left; }
+        th, td { padding:<?= $isTicket ? '2px 4px' : '6px 8px' ?>; text-align:left; <?= $isTicket ? 'word-break:break-word; overflow-wrap:anywhere;' : '' ?> }
         th { border-bottom:1px solid #000; <?= $formato === 'a4' ? 'background:#f5f5f5;' : '' ?> }
         .text-right { text-align:right; }
         .text-center { text-align:center; }
@@ -60,7 +60,8 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
         .cliente-box { background:#f9f9f9; padding:8px 12px; border-radius:4px; <?= $formato === 'a4' ? 'margin-bottom:8px;' : '' ?> }
         <?php endif; ?>
         @media print {
-            html, body { margin:0; padding:0; width:100%; }
+            html, body { margin:0; padding:0; }
+            body { width:<?= $formato === '58mm' ? '52mm' : ($isTicket ? '72mm' : '100%') ?>; margin:0 auto; }
             .no-print { display:none; }
             <?php if ($isTicket): ?>
             .cut-space { display:block; height:10mm; }

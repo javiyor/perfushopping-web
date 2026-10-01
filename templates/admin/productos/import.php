@@ -3,6 +3,8 @@ use Perfushopping\Web\Support\Format;
 
 $preview = $preview ?? null;
 $stats = $stats ?? null;
+$proveedores = $proveedores ?? [];
+$previewProveedor = is_array($preview) ? (string)($preview['proveedor'] ?? '') : '';
 $results = is_array($preview) ? ($preview['results'] ?? []) : [];
 $total = (int)($preview['total'] ?? 0);
 $found = (int)($preview['found'] ?? 0);
@@ -47,10 +49,19 @@ $errors = (int)($stats['errors'] ?? 0);
         <form method="post" action="/admin/productos/importar/preview" enctype="multipart/form-data">
             <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
             <div class="row g-2 align-items-end">
-                <div class="col-md-8">
-                    <input class="form-control form-control-sm" type="file" name="csv_file" accept=".csv,.txt" required />
+                <div class="col-md-5">
+                    <label class="form-label small">Proveedor (opcional: filtra solo sus productos)</label>
+                    <select class="form-select form-select-sm" name="idprovee">
+                        <option value="0">Todos los proveedores</option>
+                        <?php foreach ($proveedores as $pr): ?>
+                            <option value="<?= (int)$pr['idprovee'] ?>"><?= htmlspecialchars((string)($pr['razon'] ?? '')) ?> (<?= (int)($pr['product_count'] ?? 0) ?>)</option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
                 <div class="col-md-4">
+                    <input class="form-control form-control-sm" type="file" name="csv_file" accept=".csv,.txt" required />
+                </div>
+                <div class="col-md-3">
                     <button class="btn btn-accent btn-sm w-100" type="submit"><i class="bi bi-eye"></i> Previsualizar</button>
                 </div>
             </div>
@@ -67,7 +78,7 @@ $errors = (int)($stats['errors'] ?? 0);
 <?php if ($preview): ?>
 <div class="card shadow-sm">
     <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-table"></i> Vista previa</span>
+        <span><i class="bi bi-table"></i> Vista previa<?php if ($previewProveedor !== ''): ?> · Proveedor: <strong><?= htmlspecialchars($previewProveedor) ?></strong><?php endif; ?></span>
         <div class="d-flex gap-2 align-items-center">
             <span class="badge bg-success"><?= $found ?> encontrados</span>
             <?php if ($notFound > 0): ?>

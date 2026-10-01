@@ -631,13 +631,27 @@
             });
         }
 
+        var wakeLock = null;
+        function requestWakeLock() {
+            if (!('wakeLock' in navigator)) return;
+            if (document.visibilityState !== 'visible') return;
+            try {
+                navigator.wakeLock.request('screen').then(function(lock) {
+                    wakeLock = lock;
+                    wakeLock.addEventListener('release', function() { wakeLock = null; });
+                }).catch(function() {});
+            } catch (e) {}
+        }
+
         send();
+        requestWakeLock();
         if (!isAdmin) {
             setTimeout(paintBlock, GRACE);
         }
         setInterval(send, INTERVAL);
         document.addEventListener('visibilitychange', function() {
             if (document.visibilityState !== 'visible') return;
+            requestWakeLock();
             if (Date.now() - lastSend() >= INTERVAL) send();
             paintBlock();
         });

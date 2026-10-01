@@ -7,18 +7,24 @@ use Perfushopping\Web\Infra\Db;
 
 final class ImportRepo
 {
-    public function findByCodprodup(string $codprodup): ?array
+    public function findByCodprodup(string $codprodup, int $idprovee = 0): ?array
     {
+        $provWhere = '';
+        $params = [':c' => $codprodup];
+        if ($idprovee > 0) {
+            $provWhere = ' AND p.codprove = :prov';
+            $params[':prov'] = $idprovee;
+        }
         $st = Db::pdo()->prepare('
             SELECT p.*, r.nomrub, s.nomsub, i.tiva
             FROM producto p
             LEFT JOIN rubros r ON r.codrub = p.codrub
             LEFT JOIN subrubro s ON s.codsub = p.codsub
             LEFT JOIN ivaprodu i ON i.codivaprodu = p.iva
-            WHERE p.codprodup = :c
+            WHERE p.codprodup = :c' . $provWhere . '
             LIMIT 1
         ');
-        $st->execute([':c' => $codprodup]);
+        $st->execute($params);
         $p = $st->fetch();
         if (!$p) {
             return null;
@@ -40,7 +46,7 @@ final class ImportRepo
         return $p;
     }
 
-    public function findByCodscan(string $codscan): ?array
+    public function findByCodscan(string $codscan, int $idprovee = 0): ?array
     {
         $pdo = Db::pdo();
         $st = $pdo->prepare('
@@ -69,6 +75,9 @@ final class ImportRepo
         if (!$p) {
             return null;
         }
+        if ($idprovee > 0 && (int)($p['codprove'] ?? 0) !== $idprovee) {
+            return null;
+        }
 
         $p['_match_type'] = 'codscan';
         $p['_idcodgusto'] = (int)$g['idcodgusto'];
@@ -77,17 +86,17 @@ final class ImportRepo
         return $p;
     }
 
-    public function findByCodprodupOrCodscan(string $codprodup, string $codscan): ?array
+    public function findByCodprodupOrCodscan(string $codprodup, string $codscan, int $idprovee = 0): ?array
     {
         if ($codprodup !== '') {
-            $p = $this->findByCodprodup($codprodup);
+            $p = $this->findByCodprodup($codprodup, $idprovee);
             if ($p) {
                 $p['_match_type'] = 'codprodup';
                 return $p;
             }
         }
         if ($codscan !== '') {
-            $p = $this->findByCodscan($codscan);
+            $p = $this->findByCodscan($codscan, $idprovee);
             if ($p) {
                 return $p;
             }

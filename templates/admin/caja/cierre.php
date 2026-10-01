@@ -47,9 +47,10 @@ $esperadoEfectivo = (int)($esperadoEfectivo ?? 0);
             <div class="card-body">
                 <form method="post" action="/admin/caja/cierre/guardar">
                     <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                    <input type="hidden" name="detalle_efectivo" id="detalleEfectivo" value="" />
 
                     <div class="mb-3">
-                        <label class="form-label small fw-semibold">Detalle por billete (opcional)</label>
+                        <label class="form-label small fw-semibold">Detalle por billete (conteo final)</label>
                         <div class="table-responsive">
                             <table class="table table-bordered table-sm align-middle mb-2" id="detalleTable">
                                 <thead class="table-light">
@@ -101,10 +102,9 @@ $esperadoEfectivo = (int)($esperadoEfectivo ?? 0);
                         </div>
                     </div>
 
-                    <div class="alert alert-warning small py-2">
-                        <i class="bi bi-exclamation-triangle"></i>
-                        Al cerrar la caja se finaliza el registro. No se podrán agregar más movimientos.
-                        <strong>¿Hiciste un arqueo antes de cerrar?</strong>
+                    <div class="alert alert-info small py-2">
+                        <i class="bi bi-info-circle"></i>
+                        El conteo de arriba queda guardado como arqueo del cierre. Al cerrar se finaliza el registro y no se podrán agregar más movimientos.
                     </div>
 
                     <button class="btn btn-warning w-100" type="submit"><i class="bi bi-stop-fill"></i> Cerrar caja</button>
@@ -184,7 +184,20 @@ function recalcDetalle() {
     if (hasData) {
         document.getElementById('montoCierre').value = total;
     }
+    document.getElementById('detalleEfectivo').value = JSON.stringify(getDetalle());
     calcQueda();
+}
+
+function getDetalle() {
+    const detalle = [];
+    document.querySelectorAll('#detalleBody tr').forEach(tr => {
+        const denom = parseInt(tr.querySelector('.denom-input').value) || 0;
+        const qty = parseInt(tr.querySelector('.qty-input').value) || 0;
+        if (denom > 0 && qty > 0) {
+            detalle.push({ denominacion: denom, cantidad: qty, subtotal: denom * qty });
+        }
+    });
+    return detalle;
 }
 
 document.getElementById('montoCierre').addEventListener('input', calcQueda);

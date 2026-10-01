@@ -28,10 +28,17 @@ final class ImportController
         $stats = $_SESSION['import_stats'] ?? null;
         unset($_SESSION['import_preview'], $_SESSION['import_stats']);
 
+        $proveedores = [];
+        try {
+            $proveedores = (new \Perfushopping\Web\Repo\ProveedorRepo())->findAll();
+        } catch (\Throwable $e) {
+        }
+
         echo View::adminPage('admin/productos/import.php', [
             'adminUser' => $adminUser,
             'preview' => $preview,
             'stats' => $stats,
+            'proveedores' => $proveedores,
             'csrf' => Csrf::token(),
             'flash' => $_SESSION['admin_flash'] ?? null,
             'pageTitle' => 'Importar productos',
@@ -61,6 +68,20 @@ final class ImportController
             Response::redirect('/admin/productos/importar');
         }
 
+        $idprovee = (int)($_POST['idprovee'] ?? 0);
+        $proveedorNombre = '';
+        if ($idprovee > 0) {
+            try {
+                $prov = (new \Perfushopping\Web\Repo\ProveedorRepo())->findById($idprovee);
+                $proveedorNombre = $prov ? (string)($prov['razon'] ?? '') : '';
+            } catch (\Throwable $e) {
+            }
+            if ($proveedorNombre === '') {
+                $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Proveedor inválido.'];
+                Response::redirect('/admin/productos/importar');
+            }
+        }
+
         $results = [];
         $found = 0;
         $notFound = 0;
@@ -75,7 +96,7 @@ final class ImportController
             $ganan2New = $this->parseFloat((string)($row['ganan2'] ?? ''));
             $precio1New = $this->parseFloat((string)($row['precio1_sin_iva'] ?? ''));
 
-            $match = $this->repo->findByCodprodupOrCodscan($codprodup, $codscan);
+            $match = $this->repo->findByCodprodupOrCodscan($codprodup, $codscan, $idprovee);
 
             $item = [
                 'row' => $idx + 2,
@@ -146,6 +167,8 @@ final class ImportController
             'total' => count($results),
             'found' => $found,
             'notFound' => $notFound,
+            'idprovee' => $idprovee,
+            'proveedor' => $proveedorNombre,
         ];
 
         Response::redirect('/admin/productos/importar');
