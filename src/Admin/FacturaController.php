@@ -929,9 +929,19 @@ final class FacturaController
             return;
         }
 
+        $cuit = trim((string)($_POST['cuit'] ?? ''));
+        $force = (string)($_POST['force'] ?? '') === '1';
+        if (!$force) {
+            $duplicados = (new FacturaRepo())->findDuplicadosCliente($razon, $cuit);
+            if ($duplicados) {
+                Response::json(['ok' => false, 'confirm' => true, 'duplicados' => $duplicados]);
+                return;
+            }
+        }
+
         $cliente = (new FacturaRepo())->crearClientePos([
             'razon' => $razon,
-            'cuit' => trim((string)($_POST['cuit'] ?? '')),
+            'cuit' => $cuit,
             'direc' => trim((string)($_POST['direc'] ?? '')),
             'localidad' => trim((string)($_POST['localidad'] ?? '')),
             'tele' => trim((string)($_POST['tele'] ?? '')),

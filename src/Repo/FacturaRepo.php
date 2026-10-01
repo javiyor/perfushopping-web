@@ -904,6 +904,91 @@ final class FacturaRepo
         return $r ?: null;
     }
 
+    /** @return array<int, array<string,mixed>> */
+    public function findDuplicadosCliente(string $razon, string $cuit): array
+    {
+        $razon = trim($razon);
+        $digits = preg_replace('/\D/', '', $cuit) ?? '';
+        $conds = [];
+        $params = [];
+        if ($digits !== '') {
+            if (strlen($digits) <= 8) {
+                $conds[] = 'c.cuit = :d1';
+                $params[':d1'] = $digits;
+                $conds[] = '(LENGTH(c.cuit) = 11 AND SUBSTRING(c.cuit, 3, 8) = :d2)';
+                $params[':d2'] = str_pad($digits, 8, '0', STR_PAD_LEFT);
+            } elseif (strlen($digits) === 11) {
+                $conds[] = 'c.cuit = :d3';
+                $params[':d3'] = $digits;
+                $conds[] = 'c.cuit = :d4';
+                $params[':d4'] = substr($digits, 2, 8);
+            }
+        }
+        if ($razon !== '') {
+            $conds[] = 'c.razon = :razon';
+            $params[':razon'] = $razon;
+        }
+        if (!$conds) {
+            return [];
+        }
+
+        $condIvaExpr = $this->clientesTieneCondicionIva()
+            ? 'COALESCE(c.condicion_iva, \'consumidor_final\')'
+            : '\'consumidor_final\'';
+        $catExpr = $this->clientesTieneCategoria()
+            ? 'COALESCE(c.categoria, \'minorista\') AS categoria, COALESCE(c.precio_mayorista, 0) AS precio_mayorista, c.especialidad'
+            : '\'minorista\' AS categoria, 0 AS precio_mayorista, NULL AS especialidad';
+
+        $st = Db::pdo()->prepare('
+            SELECT DISTINCT COALESCE(w.id, 0) AS id, c.idclien,
+                   c.razon AS name, c.cuit, c.direc, c.tele AS phone, c.mail AS email,
+                   c.Localidad AS city,
+                   ' . $condIvaExpr . ' AS condicion_iva,
+                   ' . $catExpr . '
+            FROM clientes c
+            LEFT JOIN web_users w ON w.cliente_id = c.idclien
+            WHERE (' . implode(' OR ', $conds) . ')
+            ORDER BY c.razon ASC
+            LIMIT 6
+        ');
+        $st->execute($params);
+        $rows = $st->fetchAll();
+        $razonN = self::normNombre($razon);
+        foreach ($rows as &$r) {
+            $r['condicion_iva'] = self::normalizeCondIva($r['condicion_iva'] ?? null);
+            $r['categoria'] = self::normalizeCategoria($r['categoria'] ?? null);
+            $r['precio_mayorista'] = (int)($r['precio_mayorista'] ?? 0);
+
+            $rc = preg_replace('/\D/', '', (string)($r['cuit'] ?? '')) ?? '';
+            $motivos = [];
+            if ($digits !== '' && $rc !== '') {
+                $len = strlen($digits);
+                $match = false;
+                if ($len <= 8) {
+                    $match = $rc === $digits
+                        || (strlen($rc) === 11 && substr($rc, 2, 8) === str_pad($digits, 8, '0', STR_PAD_LEFT));
+                } elseif ($len === 11) {
+                    $match = $rc === $digits || $rc === substr($digits, 2, 8);
+                }
+                if ($match) {
+                    $motivos[] = 'mismo DNI/CUIT';
+                }
+            }
+            if ($razonN !== '' && self::normNombre((string)($r['name'] ?? '')) === $razonN) {
+                $motivos[] = 'mismo nombre';
+            }
+            $r['motivo'] = $motivos ? implode(' y ', $motivos) : 'posible duplicado';
+        }
+        return $rows;
+    }
+
+    private static function normNombre(string $s): string
+    {
+        $s = mb_strtolower(trim($s), 'UTF-8');
+        $s = strtr($s, ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ü' => 'u', 'ñ' => 'n']);
+        return (string)preg_replace('/\s+/', ' ', $s);
+    }
+
     public function crearClientePos(array $data): ?array
     {
         $cuit = trim($data['cuit'] ?? '');

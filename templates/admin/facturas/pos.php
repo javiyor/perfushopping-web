@@ -278,6 +278,14 @@ $plazos = $plazos ?? [];
                     </div>
                 </div>
                 <div id="ncError" class="alert alert-danger small py-2" style="display:none"></div>
+                <div id="ncDup" class="alert alert-warning small py-2 mb-0" style="display:none">
+                    <div class="fw-semibold mb-1"><i class="bi bi-exclamation-triangle-fill"></i> Se parecen a clientes ya cargados:</div>
+                    <div id="ncDupList" class="mb-2"></div>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="guardarNuevoCliente(true)"><i class="bi bi-plus-lg"></i> Crear de todos modos</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -900,18 +908,64 @@ function categoriaBadge(c) {
     }
     return '';
 }
-function guardarNuevoCliente() {
+let ncDups = [];
+
+function ncLimpiarForm() {
+    document.getElementById('ncRazon').value = '';
+    document.getElementById('ncCuit').value = '';
+    document.getElementById('ncTele').value = '';
+    document.getElementById('ncMail').value = '';
+    document.getElementById('ncDirec').value = '';
+    document.getElementById('ncLocalidad').value = '';
+    document.getElementById('ncCondIva').value = 'consumidor_final';
+    document.getElementById('ncCategoria').value = 'minorista';
+    document.getElementById('ncPrecioMayorista').checked = false;
+    document.getElementById('ncEspecialidad').value = '';
+    document.getElementById('ncDup').style.display = 'none';
+    document.getElementById('ncError').style.display = 'none';
+    toggleNcCategoria();
+}
+
+function ncMostrarDuplicados(dups) {
+    ncDups = dups || [];
+    const box = document.getElementById('ncDupList');
+    box.innerHTML = ncDups.map((d, i) => {
+        const doc = (d.cuit || '').trim();
+        return '<div class="d-flex justify-content-between align-items-center border rounded px-2 py-1 mb-1 bg-white">'
+            + '<div class="me-2"><strong>' + esc(d.name || '') + '</strong>'
+            + (doc ? ' <span class="text-muted">&middot; ' + esc(doc) + '</span>' : '')
+            + (d.motivo ? '<div class="text-muted" style="font-size:11px">' + esc(d.motivo) + '</div>' : '')
+            + '</div>'
+            + '<button type="button" class="btn btn-sm btn-outline-success text-nowrap" onclick="ncUsarExistente(' + i + ')"><i class="bi bi-check2"></i> Usar</button>'
+            + '</div>';
+    }).join('');
+    document.getElementById('ncDup').style.display = '';
+    document.getElementById('ncError').style.display = 'none';
+}
+
+function ncUsarExistente(i) {
+    const c = ncDups[i];
+    if (!c) return;
+    const modal = bootstrap.Modal.getInstance(document.getElementById('nuevoClienteModal'));
+    if (modal) modal.hide();
+    selectCliente(c);
+    ncLimpiarForm();
+}
+
+function guardarNuevoCliente(force) {
     const razon = document.getElementById('ncRazon').value.trim();
     const cuit = document.getElementById('ncCuit').value.trim();
     if (!razon) { alert('Ingresá el nombre del cliente.'); return; }
     const btn = document.getElementById('ncSaveBtn');
     btn.disabled = true;
     document.getElementById('ncError').style.display = 'none';
+    document.getElementById('ncDup').style.display = 'none';
 
     const body = new URLSearchParams();
     body.append('_csrf', document.getElementById('csrfToken').value);
     body.append('razon', razon);
     body.append('cuit', cuit);
+    if (force === true) body.append('force', '1');
     body.append('tele', document.getElementById('ncTele').value.trim());
     body.append('mail', document.getElementById('ncMail').value.trim());
     body.append('direc', document.getElementById('ncDirec').value.trim());
@@ -933,17 +987,9 @@ function guardarNuevoCliente() {
                 const modal = bootstrap.Modal.getInstance(document.getElementById('nuevoClienteModal'));
                 if (modal) modal.hide();
                 selectCliente(res.cliente);
-                document.getElementById('ncRazon').value = '';
-                document.getElementById('ncCuit').value = '';
-                document.getElementById('ncTele').value = '';
-                document.getElementById('ncMail').value = '';
-                document.getElementById('ncDirec').value = '';
-                document.getElementById('ncLocalidad').value = '';
-                document.getElementById('ncCondIva').value = 'consumidor_final';
-                document.getElementById('ncCategoria').value = 'minorista';
-                document.getElementById('ncPrecioMayorista').checked = false;
-                document.getElementById('ncEspecialidad').value = '';
-                toggleNcCategoria();
+                ncLimpiarForm();
+            } else if (res.confirm && res.duplicados) {
+                ncMostrarDuplicados(res.duplicados);
             } else {
                 document.getElementById('ncError').textContent = res.error || 'Error al crear el cliente.';
                 document.getElementById('ncError').style.display = '';
@@ -962,6 +1008,8 @@ function guardarNuevoCliente() {
 }
 
 document.getElementById('nuevoClienteModal').addEventListener('shown.bs.modal', function() {
+    document.getElementById('ncDup').style.display = 'none';
+    document.getElementById('ncError').style.display = 'none';
     document.getElementById('ncRazon').focus();
 });
 
