@@ -83,7 +83,7 @@ final class StockRepo
                 GROUP BY sd.idcodgusto
             ) cv ON cv.idcodgusto = g.idcodgusto
             " . $this->depSubquery($depDepo) . "
-            WHERE " . implode(' AND ', $where) . " {$stockWhere}
+            " . self::whereSql($where, $stockWhere) . "
             ORDER BY p.produ ASC, g.nomgusto ASC, dep.nomdepo ASC
             LIMIT {$offset}, {$limit}
         ";
@@ -101,11 +101,21 @@ final class StockRepo
             FROM producto p
             INNER JOIN gustos g ON g.idprodu = p.idprodu
             " . $this->depSubquery($depDepo) . "
-            WHERE " . implode(' AND ', $where) . " {$stockWhere}
+            " . self::whereSql($where, $stockWhere) . "
         ";
         $st = Db::pdo()->prepare($sql);
         $st->execute($params);
         return (int)$st->fetchColumn();
+    }
+
+    private static function whereSql(array $where, string $stockWhere): string
+    {
+        $conds = $where;
+        $extra = trim($stockWhere);
+        if ($extra !== '') {
+            $conds[] = (string)preg_replace('/^\s*AND\s+/i', '', $extra);
+        }
+        return $conds ? 'WHERE ' . implode(' AND ', $conds) : '';
     }
 
     private function stockFilterParts(string $q, int $codepar, string $stockFilter, int $codrub, int $codsub, string $codprove, ?int $iddepo, string $desde, string $hasta, ?string $enweb = null): array
