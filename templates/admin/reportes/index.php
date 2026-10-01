@@ -123,6 +123,13 @@ $hasta = (string)($hasta ?? date('Y-m-d'));
                         <thead><tr><th>Forma</th><th class="text-end">Monto</th></tr></thead>
                         <tbody id="formaPagoBody"></tbody>
                     </table>
+                    <div id="equipoTarjetaBox" class="border-top" style="display:none">
+                        <div class="px-3 pt-2 pb-1 small fw-semibold text-muted">Tarjetas por equipo POS</div>
+                        <table class="table table-admin mb-0">
+                            <thead><tr><th>Equipo</th><th class="text-end">Pagos</th><th class="text-end">Monto</th></tr></thead>
+                            <tbody id="equipoTarjetaBody"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -130,7 +137,7 @@ $hasta = (string)($hasta ?? date('Y-m-d'));
 
     <div class="row g-3 mt-2">
         <!-- Mensual -->
-        <div class="col-lg-8">
+        <div class="col-12">
             <div class="card shadow-sm">
                 <div class="card-header bg-white fw-semibold">Ventas mensuales (24 meses)</div>
                 <div class="card-body">
@@ -138,16 +145,32 @@ $hasta = (string)($hasta ?? date('Y-m-d'));
                 </div>
             </div>
         </div>
+    </div>
+
+    <div class="row g-3 mt-2">
         <!-- Por sucursal -->
-        <div class="col-lg-4">
+        <div class="col-12">
             <div class="card shadow-sm">
                 <div class="card-header bg-white fw-semibold">Ventas por sucursal</div>
                 <div class="card-body">
-                    <canvas id="sucursalChart" height="180"></canvas>
+                    <canvas id="sucursalChart" height="140"></canvas>
                 </div>
-                <div class="card-body p-0">
+                <div class="table-responsive">
                     <table class="table table-admin mb-0">
-                        <thead><tr><th>Sucursal</th><th class="text-end">Cant.</th><th class="text-end">Total</th></tr></thead>
+                        <thead>
+                            <tr>
+                                <th>Sucursal</th>
+                                <th class="text-end">Comprobantes</th>
+                                <th class="text-end">Ventas totales</th>
+                                <th class="text-end">Neto sin IVA</th>
+                                <th class="text-end">Descuentos</th>
+                                <th class="text-end">Costo</th>
+                                <th class="text-end">Ganancia neta</th>
+                                <th class="text-end">Margen neto</th>
+                                <th class="text-end">Ticket prom.</th>
+                                <th class="text-end">Gastos</th>
+                            </tr>
+                        </thead>
                         <tbody id="sucursalBody"></tbody>
                     </table>
                 </div>
@@ -374,6 +397,16 @@ function cargarReportes() {
                 });
             }
 
+            // Tarjetas por equipo POS
+            const eqBody = document.getElementById('equipoTarjetaBody');
+            const eqBox = document.getElementById('equipoTarjetaBox');
+            eqBody.innerHTML = '';
+            const equipos = d.porEquipoTarjeta || [];
+            if (eqBox) eqBox.style.display = equipos.length ? '' : 'none';
+            equipos.forEach(e => {
+                eqBody.innerHTML += '<tr><td>' + escHtml(e.equipo) + '</td><td class="text-end">' + parseInt(e.pagos || 0) + '</td><td class="text-end">' + fmtCents(parseInt(e.total_cents || 0)) + '</td></tr>';
+            });
+
             // Mensuales
             if (mensualChartInstance) mensualChartInstance.destroy();
             const mens = d.mensuales || [];
@@ -393,10 +426,30 @@ function cargarReportes() {
             sucBody.innerHTML = '';
             const sucs = d.porSucursal || [];
             if (!sucs.length) {
-                sucBody.innerHTML = '<tr><td colspan="3" class="text-muted text-center">Sin datos</td></tr>';
+                sucBody.innerHTML = '<tr><td colspan="10" class="text-muted text-center">Sin datos</td></tr>';
             } else {
                 sucs.forEach(s => {
-                    sucBody.innerHTML += '<tr><td>' + escHtml(s.sucursal) + '</td><td class="text-end">' + parseInt(s.cantidad || 0) + '</td><td class="text-end">' + fmtCents(parseInt(s.total_cents || 0)) + '</td></tr>';
+                    const total = parseInt(s.total_cents || 0);
+                    const cant = parseInt(s.cantidad || 0);
+                    const neto = parseInt(s.neto_cents || 0);
+                    const desc = parseInt(s.descuento_cents || 0) + parseInt(s.puntos_cents || 0);
+                    const costo = parseInt(s.costo_cents || 0);
+                    const gana = parseInt(s.ganancia_cents || 0);
+                    const gastos = parseInt(s.gastos_cents || 0);
+                    const margen = (s.margen_pct !== null && s.margen_pct !== undefined) ? parseFloat(s.margen_pct).toFixed(1) + '%' : '—';
+                    const ticket = cant > 0 ? fmtCents(Math.round(total / cant)) : '—';
+                    sucBody.innerHTML += '<tr>'
+                        + '<td>' + escHtml(s.sucursal) + '</td>'
+                        + '<td class="text-end">' + cant + '</td>'
+                        + '<td class="text-end">' + fmtCents(total) + '</td>'
+                        + '<td class="text-end">' + fmtCents(neto) + '</td>'
+                        + '<td class="text-end">' + fmtCents(desc) + '</td>'
+                        + '<td class="text-end">' + fmtCents(costo) + '</td>'
+                        + '<td class="text-end text-success">' + fmtCents(gana) + '</td>'
+                        + '<td class="text-end">' + margen + '</td>'
+                        + '<td class="text-end">' + ticket + '</td>'
+                        + '<td class="text-end text-danger">' + fmtCents(gastos) + '</td>'
+                        + '</tr>';
                 });
             }
             if (sucursalChartInstance) sucursalChartInstance.destroy();
@@ -405,9 +458,12 @@ function cargarReportes() {
                     type: 'bar',
                     data: {
                         labels: sucs.map(s => s.sucursal),
-                        datasets: [{ label: 'Ventas ($)', data: sucs.map(s => parseInt(s.total_cents || 0) / 100), backgroundColor: chartColors(sucs.length) }],
+                        datasets: [
+                            { label: 'Ventas ($)', data: sucs.map(s => parseInt(s.total_cents || 0) / 100), backgroundColor: 'rgba(216, 178, 90, 0.7)', borderColor: 'rgba(216, 178, 90, 1)', borderWidth: 1 },
+                            { label: 'Gastos ($)', data: sucs.map(s => parseInt(s.gastos_cents || 0) / 100), backgroundColor: 'rgba(220, 53, 69, 0.6)', borderColor: 'rgba(220, 53, 69, 1)', borderWidth: 1 },
+                        ],
                     },
-                    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
+                    options: { responsive: true, plugins: { legend: { display: true } }, scales: { y: { beginAtZero: true } } },
                 });
             }
 
@@ -529,6 +585,18 @@ function exportarCSV() {
                 csv += (dp.departamento || '') + ',' + (dp.qty_total ?? 0) + ',' + (parseInt(dp.total_cents ?? 0) / 100).toFixed(2) + '\n';
             });
 
+            csv += '\nPor Forma de Pago\n';
+            csv += 'Forma,Monto\n';
+            (d.porFormaPago || []).forEach(f => {
+                csv += '"' + String(f.forma_pago || '').replace(/"/g, '""') + '",' + (parseInt(f.total_cents ?? 0) / 100).toFixed(2) + '\n';
+            });
+
+            csv += '\nTarjetas por equipo POS\n';
+            csv += 'Equipo,Pagos,Monto\n';
+            (d.porEquipoTarjeta || []).forEach(e => {
+                csv += '"' + String(e.equipo || '').replace(/"/g, '""') + '",' + (e.pagos ?? 0) + ',' + (parseInt(e.total_cents ?? 0) / 100).toFixed(2) + '\n';
+            });
+
             csv += '\nComparativas\n';
             csv += 'Periodo,Desde,Hasta,Facturas,Total\n';
             const comp = d.comparativas || {};
@@ -544,9 +612,24 @@ function exportarCSV() {
             });
 
             csv += '\nPor Sucursal\n';
-            csv += 'Sucursal,Facturas,Total\n';
+            csv += 'Sucursal,Comprobantes,Ventas totales,Neto sin IVA,Descuentos,Costo,Ganancia neta,Margen neto %,Ticket promedio,Gastos\n';
             (d.porSucursal || []).forEach(s => {
-                csv += (s.sucursal || '') + ',' + (s.cantidad ?? 0) + ',' + (parseInt(s.total_cents ?? 0) / 100).toFixed(2) + '\n';
+                const total = parseInt(s.total_cents || 0);
+                const cant = parseInt(s.cantidad || 0);
+                const neto = parseInt(s.neto_cents || 0);
+                const desc = parseInt(s.descuento_cents || 0) + parseInt(s.puntos_cents || 0);
+                const gana = parseInt(s.ganancia_cents || 0);
+                const margen = neto > 0 ? (gana / neto * 100).toFixed(1) : '0';
+                const ticket = cant > 0 ? (total / cant / 100).toFixed(2) : '0';
+                csv += '"' + String(s.sucursal || '').replace(/"/g, '""') + '",' + cant + ','
+                    + (total / 100).toFixed(2) + ','
+                    + (neto / 100).toFixed(2) + ','
+                    + (desc / 100).toFixed(2) + ','
+                    + (parseInt(s.costo_cents || 0) / 100).toFixed(2) + ','
+                    + (gana / 100).toFixed(2) + ','
+                    + margen + ','
+                    + ticket + ','
+                    + (parseInt(s.gastos_cents || 0) / 100).toFixed(2) + '\n';
             });
 
             const gan = d.ganancia || {};

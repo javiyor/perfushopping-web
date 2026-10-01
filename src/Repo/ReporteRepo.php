@@ -129,6 +129,64 @@ final class ReporteRepo
         return $st->fetchAll();
     }
 
+    private static ?bool $pagosTieneEquipo = null;
+
+    private function pagosTieneEquipo(): bool
+    {
+        if (self::$pagosTieneEquipo !== null) {
+            return self::$pagosTieneEquipo;
+        }
+        try {
+            $cols = array_column(Db::pdo()->query('SHOW COLUMNS FROM factura_pagos')->fetchAll(), 'Field');
+            self::$pagosTieneEquipo = in_array('equipo_id', $cols, true);
+        } catch (\Throwable $e) {
+            self::$pagosTieneEquipo = false;
+        }
+        return self::$pagosTieneEquipo;
+    }
+
+    /** Pagos con tarjeta agrupados por equipo POS. */
+    public function ventasTarjetasPorEquipo(string $desde, string $hasta, int $puntoVenta = 0): array
+    {
+        if (!$this->pagosTieneEquipo()) {
+            return [];
+        }
+        try {
+            $params = [':desde' => $desde, ':hasta' => $hasta];
+            $pvWhere = '';
+            if ($puntoVenta > 0) {
+                $pvWhere = ' AND f.punto_venta = :pv';
+                $params[':pv'] = $puntoVenta;
+            }
+            $legacy = "CASE fp.forma_pago WHEN 'tarjeta' THEN 'tarjeta' WHEN 'tarjeta_credito' THEN 'tarjeta' WHEN 'tarjeta_debito' THEN 'tarjeta' WHEN 'tarjetas' THEN 'tarjeta' ELSE 'otro' END";
+            try {
+                \Perfushopping\Web\Repo\FormaPagoRepo::ensureTable();
+                $tipoExpr = 'COALESCE((SELECT fpm.tipo FROM formas_pago fpm WHERE fpm.codigo = fp.forma_pago COLLATE utf8mb4_unicode_ci LIMIT 1), ' . $legacy . ')';
+            } catch (\Throwable $e) {
+                $tipoExpr = $legacy;
+            }
+            $st = Db::pdo()->prepare("
+                SELECT COALESCE(NULLIF(TRIM(e.empresa), ''), CONCAT('Equipo ', fp.equipo_id), 'Sin equipo') AS equipo,
+                       COUNT(*) AS pagos,
+                       COALESCE(SUM(fp.monto_cents), 0) AS total_cents
+                FROM factura_pagos fp
+                INNER JOIN facturas f ON f.id = fp.factura_id
+                LEFT JOIN equipotar e ON e.idequipo = fp.equipo_id
+                WHERE f.estado = 'emitida'
+                  AND f.fecha BETWEEN :desde AND :hasta
+                  AND {$tipoExpr} = 'tarjeta'
+                  {$pvWhere}
+                GROUP BY equipo
+                ORDER BY total_cents DESC
+            ");
+            $st->execute($params);
+            return $st->fetchAll();
+        } catch (\Throwable $e) {
+            error_log('ReporteRepo::ventasTarjetasPorEquipo error: ' . $e->getMessage());
+            return [];
+        }
+    }
+
     public function resumenRecibos(string $desde, string $hasta, int $puntoVenta = 0): array
     {
         $params = [':desde' => $desde, ':hasta' => $hasta];
@@ -165,16 +223,23 @@ final class ReporteRepo
         return in_array('punto_venta', self::$recibosColumns, true);
     }
 
-    /** Ventas agrupadas por sucursal (todas, sin filtro de sesión). */
+    /** Ventas agrupadas por sucursal con métricas completas (comprobantes, neto, costo, ganancia, margen, ticket, gastos). */
     public function ventasPorSucursal(string $desde, string $hasta): array
     {
+        $byKey = [];
         try {
+            $descExpr = $this->facturasTieneColumna('descuento_cents') ? 'COALESCE(SUM(f.descuento_cents), 0)' : '0';
+            $puntosExpr = $this->facturasTieneColumna('puntos_cents') ? 'COALESCE(SUM(f.puntos_cents), 0)' : '0';
             $st = Db::pdo()->prepare("
                 SELECT
                     COALESCE(s.id, CONCAT('pv-', f.punto_venta)) AS sucursal_key,
                     COALESCE(s.nomsuc, spv_suc.nomsuc, CONCAT('PV ', f.punto_venta)) AS sucursal,
                     COUNT(*) AS cantidad,
-                    COALESCE(SUM(f.total_cents), 0) AS total_cents
+                    COALESCE(SUM(f.total_cents), 0) AS total_cents,
+                    COALESCE(SUM(f.subtotal_cents), 0) AS subtotal_cents,
+                    COALESCE(SUM(f.iva_cents), 0) AS iva_cents,
+                    {$descExpr} AS descuento_cents,
+                    {$puntosExpr} AS puntos_cents
                 FROM facturas f
                 LEFT JOIN admin_sucursales s ON s.id = f.sucursal_id
                 LEFT JOIN admin_sucursal_puntos_venta spv ON spv.punto_venta = f.punto_venta
@@ -182,14 +247,104 @@ final class ReporteRepo
                 WHERE f.estado = 'emitida'
                   AND f.fecha BETWEEN :desde AND :hasta
                 GROUP BY sucursal_key
-                ORDER BY total_cents DESC
             ");
             $st->execute([':desde' => $desde, ':hasta' => $hasta]);
-            return $st->fetchAll();
+            foreach ($st->fetchAll() as $r) {
+                $key = (string)$r['sucursal_key'];
+                $byKey[$key] = [
+                    'sucursal_key' => $r['sucursal_key'],
+                    'sucursal' => (string)$r['sucursal'],
+                    'cantidad' => (int)$r['cantidad'],
+                    'total_cents' => (int)$r['total_cents'],
+                    'subtotal_cents' => (int)$r['subtotal_cents'],
+                    'iva_cents' => (int)$r['iva_cents'],
+                    'descuento_cents' => (int)$r['descuento_cents'],
+                    'puntos_cents' => (int)$r['puntos_cents'],
+                    'costo_cents' => 0,
+                    'gastos_cents' => 0,
+                ];
+            }
         } catch (\Throwable $e) {
             error_log('ReporteRepo::ventasPorSucursal error: ' . $e->getMessage());
             return [];
         }
+
+        try {
+            $costo = $this->costoUnitExpr();
+            $st2 = Db::pdo()->prepare("
+                SELECT
+                    COALESCE(s.id, CONCAT('pv-', f.punto_venta)) AS sucursal_key,
+                    COALESCE(SUM({$costo} * fi.qty), 0) AS costo_cents
+                FROM factura_items fi
+                INNER JOIN facturas f ON f.id = fi.factura_id
+                LEFT JOIN producto p ON p.idprodu = fi.idprodu
+                LEFT JOIN admin_sucursales s ON s.id = f.sucursal_id
+                LEFT JOIN admin_sucursal_puntos_venta spv ON spv.punto_venta = f.punto_venta
+                LEFT JOIN admin_sucursales spv_suc ON spv_suc.id = spv.sucursal_id
+                WHERE f.estado = 'emitida'
+                  AND f.fecha BETWEEN :desde AND :hasta
+                GROUP BY sucursal_key
+            ");
+            $st2->execute([':desde' => $desde, ':hasta' => $hasta]);
+            foreach ($st2->fetchAll() as $r) {
+                $key = (string)$r['sucursal_key'];
+                if (isset($byKey[$key])) {
+                    $byKey[$key]['costo_cents'] = (int)$r['costo_cents'];
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('ReporteRepo::ventasPorSucursal costo error: ' . $e->getMessage());
+        }
+
+        try {
+            $st3 = Db::pdo()->prepare("
+                SELECT
+                    COALESCE(s.id, CONCAT('pv-', g.punto_venta)) AS sucursal_key,
+                    COALESCE(s.nomsuc, spv_suc.nomsuc, CONCAT('PV ', g.punto_venta)) AS sucursal,
+                    COALESCE(SUM(g.importe_cents), 0) AS gastos_cents
+                FROM gastos g
+                LEFT JOIN admin_sucursales s ON s.id = g.sucursal_id
+                LEFT JOIN admin_sucursal_puntos_venta spv ON spv.punto_venta = g.punto_venta
+                LEFT JOIN admin_sucursales spv_suc ON spv_suc.id = spv.sucursal_id
+                WHERE g.fecha BETWEEN :desde AND :hasta
+                  AND (g.sucursal_id IS NOT NULL OR g.punto_venta IS NOT NULL)
+                GROUP BY sucursal_key
+            ");
+            $st3->execute([':desde' => $desde, ':hasta' => $hasta]);
+            foreach ($st3->fetchAll() as $r) {
+                $key = (string)$r['sucursal_key'];
+                if (!isset($byKey[$key])) {
+                    $byKey[$key] = [
+                        'sucursal_key' => $r['sucursal_key'],
+                        'sucursal' => (string)$r['sucursal'],
+                        'cantidad' => 0,
+                        'total_cents' => 0,
+                        'subtotal_cents' => 0,
+                        'iva_cents' => 0,
+                        'descuento_cents' => 0,
+                        'puntos_cents' => 0,
+                        'costo_cents' => 0,
+                        'gastos_cents' => 0,
+                    ];
+                }
+                $byKey[$key]['gastos_cents'] = (int)$r['gastos_cents'];
+            }
+        } catch (\Throwable $e) {
+            error_log('ReporteRepo::ventasPorSucursal gastos error: ' . $e->getMessage());
+        }
+
+        foreach ($byKey as &$row) {
+            $neto = $row['subtotal_cents'] - $row['descuento_cents'] - $row['puntos_cents'];
+            $row['neto_cents'] = $neto;
+            $row['ganancia_cents'] = $neto - $row['costo_cents'];
+            $row['ticket_promedio_cents'] = $row['cantidad'] > 0 ? (int)round($row['total_cents'] / $row['cantidad']) : 0;
+            $row['margen_pct'] = $neto > 0 ? round(($row['ganancia_cents'] / $neto) * 100, 1) : null;
+        }
+        unset($row);
+
+        $rows = array_values($byKey);
+        usort($rows, static fn (array $a, array $b): int => $b['total_cents'] <=> $a['total_cents']);
+        return $rows;
     }
 
     /** Totales por mes calendario (mes = 'YYYY-MM'). */

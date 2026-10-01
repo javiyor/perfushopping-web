@@ -61,6 +61,8 @@ final class ReporteController
             $porDepartamento = $repo->ventasPorDepartamento($desde, $hasta, $puntoVenta);
             $step = 'porFormaPago';
             $porFormaPago = $repo->ventasPorFormaPago($desde, $hasta, $puntoVenta);
+            $step = 'porEquipoTarjeta';
+            $porEquipoTarjeta = $repo->ventasTarjetasPorEquipo($desde, $hasta, $puntoVenta);
             $step = 'recibos';
             $recibos = $repo->resumenRecibos($desde, $hasta, $puntoVenta);
             $step = 'porTipo';
@@ -122,6 +124,7 @@ final class ReporteController
             'topProductos' => $topProductos,
             'porDepartamento' => $porDepartamento,
             'porFormaPago' => $porFormaPago,
+            'porEquipoTarjeta' => $porEquipoTarjeta,
             'recibos' => $recibos,
             'porTipo' => $porTipo,
             'porSucursal' => $porSucursal,
