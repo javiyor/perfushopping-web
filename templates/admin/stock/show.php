@@ -101,6 +101,9 @@ if (!$producto):
                             <th class="text-center">Stock</th>
                             <th class="text-center">Comprado</th>
                             <th class="text-center">Vendido</th>
+                            <th class="text-center">Otros mov.</th>
+                            <th class="text-center">Calculado</th>
+                            <th class="text-center">Estado</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -115,19 +118,71 @@ if (!$producto):
                             <?php
                             $key = (int)$sd['iddepo'] . '-' . ((int)($sd['idcodgusto'] ?? 0));
                             $cv = $cvMap[$key] ?? null;
+                            $stockActual = (int)($sd['stock'] ?? 0);
                             $comprado = $cv ? (int)$cv['unidades_compradas'] : 0;
                             $vendido = $cv ? (int)$cv['unidades_vendidas'] : 0;
+                            $ledger = $cv ? (int)$cv['stock_ledger'] : 0;
+                            $otros = $ledger - $comprado + $vendido;
+                            $calculado = $comprado - $vendido + $otros;
+                            $dif = $stockActual - $calculado;
                             ?>
                             <tr>
                                 <td><?= htmlspecialchars((string)($sd['nomdepo'] ?? '-')) ?></td>
                                 <td class="small"><?= htmlspecialchars((string)($sd['nomgusto'] ?? 'Principal')) ?></td>
-                                <td class="text-center fw-bold"><?= (int)($sd['stock'] ?? 0) ?></td>
+                                <td class="text-center fw-bold"><?= $stockActual ?></td>
                                 <td class="text-center text-success small"><?= $comprado ?></td>
                                 <td class="text-center text-danger small"><?= $vendido ?></td>
+                                <td class="text-center small <?= $otros < 0 ? 'text-danger' : ($otros > 0 ? 'text-success' : 'text-muted') ?>"><?= ($otros > 0 ? '+' : '') . $otros ?></td>
+                                <td class="text-center small"><?= $calculado ?></td>
+                                <td class="text-center">
+                                    <?php if ($dif === 0): ?>
+                                        <span class="badge bg-success">OK</span>
+                                    <?php else: ?>
+                                        <span class="badge bg-danger" title="Stock en tabla menos calculado (comprado − vendido + otros)"><?= ($dif > 0 ? '+' : '') . $dif ?></span>
+                                    <?php endif; ?>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
+                    <tfoot class="table-light">
+                        <?php
+                        $tStock = 0; $tComp = 0; $tVent = 0; $tOtros = 0; $tCalc = 0;
+                        foreach ($stockDepositos as $sd) {
+                            $key = (int)$sd['iddepo'] . '-' . ((int)($sd['idcodgusto'] ?? 0));
+                            $cv = $cvMap[$key] ?? null;
+                            $c = $cv ? (int)$cv['unidades_compradas'] : 0;
+                            $v = $cv ? (int)$cv['unidades_vendidas'] : 0;
+                            $l = $cv ? (int)$cv['stock_ledger'] : 0;
+                            $tStock += (int)($sd['stock'] ?? 0);
+                            $tComp += $c;
+                            $tVent += $v;
+                            $tOtros += $l - $c + $v;
+                            $tCalc += $l;
+                        }
+                        $tDif = $tStock - $tCalc;
+                        ?>
+                        <tr>
+                            <td colspan="2" class="text-end fw-bold">Totales</td>
+                            <td class="text-center fw-bold"><?= $tStock ?></td>
+                            <td class="text-center text-success fw-bold"><?= $tComp ?></td>
+                            <td class="text-center text-danger fw-bold"><?= $tVent ?></td>
+                            <td class="text-center fw-bold"><?= ($tOtros > 0 ? '+' : '') . $tOtros ?></td>
+                            <td class="text-center fw-bold"><?= $tCalc ?></td>
+                            <td class="text-center">
+                                <?php if ($tDif === 0): ?>
+                                    <span class="badge bg-success">OK</span>
+                                <?php else: ?>
+                                    <span class="badge bg-danger"><?= ($tDif > 0 ? '+' : '') . $tDif ?></span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    </tfoot>
                 </table>
+            </div>
+            <div class="card-body border-top small text-muted">
+                Calculado = Comprado − Vendido + Otros movimientos (ajustes, transferencias, importaciones) según el libro de movimientos.
+                Estado = Stock de la tabla − Calculado.
+                El clamping en 0 y las importaciones sin movimientos pueden explicar diferencias.
             </div>
         </div>
         <?php endif; ?>
@@ -273,6 +328,17 @@ if (!$producto):
                 <dl class="row small mb-0">
                     <dt class="col-sm-6">Stock total (ERP)</dt>
                     <dd class="col-sm-6 text-end fw-bold"><?= (int)($producto['stocact'] ?? 0) ?></dd>
+                    <?php
+                    $stockPorDepoResumen = [];
+                    foreach ($stockDepositos as $sdr) {
+                        $nomb = (string)($sdr['nomdepo'] ?? '-');
+                        $stockPorDepoResumen[$nomb] = ($stockPorDepoResumen[$nomb] ?? 0) + (int)($sdr['stock'] ?? 0);
+                    }
+                    foreach ($stockPorDepoResumen as $nombDepo => $unidadesDepo):
+                    ?>
+                    <dt class="col-sm-6 small text-muted ps-3"><?= htmlspecialchars($nombDepo) ?></dt>
+                    <dd class="col-sm-6 text-end small"><?= $unidadesDepo ?> un.</dd>
+                    <?php endforeach; ?>
                     <dt class="col-sm-6">Stock depósito</dt>
                     <dd class="col-sm-6 text-end"><?= (int)($producto['stocdep'] ?? 0) ?></dd>
                     <dt class="col-sm-6">Variantes</dt>

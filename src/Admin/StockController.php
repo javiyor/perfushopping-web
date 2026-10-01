@@ -28,8 +28,8 @@ final class StockController
         $iddepo = (int)($_GET['iddepo'] ?? 0);
         $enweb = trim((string)($_GET['enweb'] ?? ''));
         if (!in_array($enweb, ['', '1', '0'], true)) $enweb = '';
-        if ($desde === '') $desde = date('Y-m-01', strtotime('first day of last month'));
-        if ($hasta === '') $hasta = date('Y-m-t', strtotime('last day of last month'));
+        if ($desde === '') $desde = date('Y-m-01');
+        if ($hasta === '') $hasta = date('Y-m-d');
         $page = max(1, (int)($_GET['page'] ?? 1));
         $perPage = 80;
         $list = $repo->listarStock($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $perPage, $iddepo ?: null, $desde, $hasta, $page, $enweb === '' ? null : $enweb);
@@ -83,8 +83,8 @@ final class StockController
         $iddepo = (int)($_GET['iddepo'] ?? 0);
         $enweb = trim((string)($_GET['enweb'] ?? ''));
         if (!in_array($enweb, ['', '1', '0'], true)) $enweb = '';
-        if ($desde === '') $desde = date('Y-m-01', strtotime('first day of last month'));
-        if ($hasta === '') $hasta = date('Y-m-t', strtotime('last day of last month'));
+        if ($desde === '') $desde = date('Y-m-01');
+        if ($hasta === '') $hasta = date('Y-m-d');
         $list = $repo->listarStock($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, 1000, $iddepo ?: null, $desde, $hasta, 1, $enweb === '' ? null : $enweb);
 
         header('Content-Type: text/csv; charset=utf-8');

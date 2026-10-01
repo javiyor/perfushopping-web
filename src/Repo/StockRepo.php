@@ -48,10 +48,13 @@ final class StockRepo
 
         [$where, $stockWhere, $depDepo, $params] = $this->stockFilterParts($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $iddepo, $desde, $hasta, $enweb);
 
-        if ($desde === '') $desde = date('Y-m-01', strtotime('first day of last month'));
-        if ($hasta === '') $hasta = date('Y-m-t', strtotime('last day of last month'));
+        if ($desde === '') $desde = date('Y-m-01');
+        if ($hasta === '') $hasta = date('Y-m-d');
         $params[':desde'] = $desde;
         $params[':hasta'] = $hasta;
+        if ($iddepo) {
+            $params[':vd'] = $iddepo;
+        }
 
         $sql = "
             SELECT p.idprodu, p.codprodu, p.produ, p.codprodup, p.precio, p.precomp, p.stocact, p.stocdep, p.codepar, p.enweb, p.observ, p.imagen,
@@ -68,18 +71,19 @@ final class StockRepo
             LEFT JOIN proveedo pv ON pv.idprovee = p.codprove
             LEFT JOIN (
                 SELECT sd.idcodgusto,
-                    ABS(COALESCE(SUM(
+                    COALESCE(SUM(
                         CASE
-                            WHEN sc.iddepod = 6 THEN sd.canti
-                            WHEN sc.iddepoh = 6 THEN -sd.canti
+                            WHEN sc.tipo_movimiento = 'venta' THEN sd.canti
+                            WHEN sc.tipo_movimiento = 'devolucion_venta' THEN -sd.canti
                             ELSE 0
                         END
-                    ), 0)) AS total_vendido
+                    ), 0) AS total_vendido
                 FROM stockdet sd
                 INNER JOIN stockcab sc ON sc.idcabstock = sd.idstockcab
                 WHERE sd.idcodgusto > 0
                   AND sc.fecha >= :desde
                   AND sc.fecha < DATE_ADD(:hasta, INTERVAL 1 DAY)
+                  " . ($iddepo ? 'AND sc.iddepod = :vd' : '') . "
                 GROUP BY sd.idcodgusto
             ) cv ON cv.idcodgusto = g.idcodgusto
             " . $this->depSubquery($depDepo) . "
@@ -514,7 +518,14 @@ final class StockRepo
                         WHEN sc.tipo_movimiento = 'devolucion_venta' AND sc.iddepoh IS NOT NULL AND sc.iddepod IS NULL AND d.iddepo = sc.iddepoh THEN -sd.canti
                         ELSE 0
                     END
-                ), 0) AS unidades_vendidas
+                ), 0) AS unidades_vendidas,
+                COALESCE(SUM(
+                    CASE
+                        WHEN sc.iddepoh = d.iddepo THEN sd.canti
+                        WHEN sc.iddepod = d.iddepo THEN -sd.canti
+                        ELSE 0
+                    END
+                ), 0) AS stock_ledger
             FROM stockdet sd
             INNER JOIN stockcab sc ON sc.idcabstock = sd.idstockcab
             INNER JOIN deposito d ON d.iddepo IN (sc.iddepoh, sc.iddepod)
