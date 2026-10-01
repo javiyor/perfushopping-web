@@ -423,6 +423,8 @@
         var updateBtn = document.getElementById('btnUpdateApp');
         var deferredPrompt = null;
         var waitingWorker = null;
+        var updateRequested = false;
+        var updateNoticeShown = false;
         var isIos = /iphone|ipad|ipod/i.test(window.navigator.userAgent || '');
         var isStandaloneIos = window.navigator.standalone === true;
 
@@ -431,12 +433,52 @@
             installBtn.title = 'Instalar app';
         }
 
+        function facturaEnProceso() {
+            try {
+                return typeof window.__facturaEnProceso === 'function' && window.__facturaEnProceso();
+            } catch (e) {
+                return false;
+            }
+        }
+
+        // Aviso no intrusivo: la actualización queda a la espera del usuario.
+        function avisoActualizacion() {
+            if (updateNoticeShown || document.getElementById('sw-update-notice')) return;
+            updateNoticeShown = true;
+            var div = document.createElement('div');
+            div.id = 'sw-update-notice';
+            div.className = 'position-fixed bottom-0 end-0 m-3 p-2 px-3 rounded shadow d-flex align-items-center gap-2';
+            div.style.zIndex = '2080';
+            div.style.background = '#ffc107';
+            div.style.color = '#212529';
+            div.style.fontSize = '14px';
+            div.innerHTML = '<span><strong>Nueva versión disponible.</strong> Se aplicará cuando lo indiques.</span>';
+            var btn = document.createElement('button');
+            btn.className = 'btn btn-sm btn-dark';
+            btn.textContent = 'Actualizar ahora';
+            btn.addEventListener('click', function() {
+                updateRequested = true;
+                if (waitingWorker) {
+                    waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+                } else {
+                    window.location.reload();
+                }
+            });
+            div.appendChild(btn);
+            document.body.appendChild(div);
+        }
+
         function applyUpdate(reg) {
             if (reg && reg.waiting) {
                 waitingWorker = reg.waiting;
             }
-            // Auto-actualizar a la última versión sin pedir confirmación.
+            // Auto-actualizar a la última versión sin pedir confirmación,
+            // salvo que haya una factura en proceso: en ese caso se espera al usuario.
             if (waitingWorker) {
+                if (!updateRequested && facturaEnProceso()) {
+                    avisoActualizacion();
+                    return;
+                }
                 try {
                     waitingWorker.postMessage({ type: 'SKIP_WAITING' });
                 } catch (e) {
@@ -467,14 +509,21 @@
             }).catch(function() {});
 
             navigator.serviceWorker.addEventListener('controllerchange', function() {
+                if (!updateRequested && facturaEnProceso()) {
+                    avisoActualizacion();
+                    return;
+                }
                 window.location.reload();
             });
         }
 
         if (updateBtn) {
             updateBtn.addEventListener('click', function() {
+                updateRequested = true;
                 if (waitingWorker) {
                     waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+                } else {
+                    window.location.reload();
                 }
             });
         }

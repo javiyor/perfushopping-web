@@ -404,6 +404,9 @@ $plazos = $plazos ?? [];
 <script>
 // ── State ──
 let cart = [];
+// Mientras la factura está abierta (POS), el layout NO recarga la página
+// al actualizar el service worker: espera la acción del usuario.
+window.__facturaEnProceso = function() { return true; };
 let productSearchTimer;
 let html5Scanner = null;
 let isScanning = false;
