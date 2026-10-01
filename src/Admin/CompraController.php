@@ -5,6 +5,7 @@ namespace Perfushopping\Web\Admin;
 
 use Perfushopping\Web\Infra\Db;
 use Perfushopping\Web\Repo\CompraRepo;
+use Perfushopping\Web\Repo\CtaCteProveedorRepo;
 use Perfushopping\Web\Repo\StockRepo;
 use Perfushopping\Web\Service\AdminAuthService;
 use Perfushopping\Web\Service\ArcaQrParser;
@@ -149,7 +150,8 @@ final class CompraController
                 continue;
             }
             $idprovee = $repo->proveedorEnsure($row['cuit'], $row['razon']);
-            $repo->insert([
+            $razonFinal = $repo->resolverRazon($idprovee, $row['cuit'], $row['razon']);
+            $compraId = $repo->insert([
                 'origen' => 'excel',
                 'estado' => 'pendiente',
                 'fecha' => $row['fecha'],
@@ -159,7 +161,7 @@ final class CompraController
                 'numero_hasta' => $row['numero'],
                 'cod_autorizacion' => $row['cae'],
                 'cuit_proveedor' => $row['cuit'],
-                'razon_proveedor' => $repo->resolverRazon($idprovee, $row['cuit'], $row['razon']),
+                'razon_proveedor' => $razonFinal,
                 'idprovee' => $idprovee,
                 'moneda' => $row['moneda'] !== '' ? $row['moneda'] : 'PES',
                 'tipo_cambio' => $row['tipo_cambio'] > 0 ? $row['tipo_cambio'] : 1,
@@ -171,6 +173,16 @@ final class CompraController
                 'imp_total' => $row['total'],
                 'created_by' => (int)$adminUser['id'],
             ]);
+            $this->sincronizarCtacteCompra(
+                $compraId,
+                $idprovee,
+                $razonFinal,
+                (float)$row['total'],
+                (string)$row['tipo'],
+                (string)$row['punto_venta'],
+                (string)$row['numero'],
+                (int)$adminUser['id']
+            );
             $inserted++;
         }
 
@@ -264,6 +276,7 @@ final class CompraController
             'adminUser' => $adminUser,
             'compra' => $compra,
             'items' => $repo->items($id),
+            'cronograma' => $repo->cronogramaPlazo($compra),
             'csrf' => Csrf::token(),
             'flash' => $_SESSION['admin_flash'] ?? null,
             'pageTitle' => 'Factura de compra #' . $id,
@@ -283,6 +296,14 @@ final class CompraController
         $cuit = preg_replace('/\D/', '', (string)($_POST['cuit_proveedor'] ?? ''));
         $razon = trim((string)($_POST['razon_proveedor'] ?? ''));
         $idprovee = $cuit !== '' ? $repo->proveedorEnsure($cuit, $razon) : null;
+        if (CompraRepo::esCondicionIva($razon)) {
+            // Autocorrige con la razón real del proveedor; si no hay, rechaza el guardado.
+            $razon = $repo->resolverRazon($idprovee, $cuit, '');
+            if ($razon === '') {
+                $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'El nombre del proveedor no puede ser una condición de IVA. Revisá el campo Proveedor.'];
+                Response::redirect($id > 0 ? '/admin/compras/' . $id . '/editar' : '/admin/compras/nueva');
+            }
+        }
 
         // Cuenta contable: existente o crear subcuenta
         $idcta1 = (int)($_POST['idcta1'] ?? 0);
@@ -343,6 +364,17 @@ final class CompraController
             }
         }
 
+        $this->sincronizarCtacteCompra(
+            $compraId,
+            $idprovee,
+            (string)$data['razon_proveedor'],
+            (float)$data['imp_total'],
+            (string)$data['tipo'],
+            (string)$data['punto_venta'],
+            (string)$data['numero_desde'],
+            (int)$adminUser['id']
+        );
+
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Factura de compra guardada.'];
         Response::redirect('/admin/compras/' . $compraId);
     }
@@ -381,6 +413,11 @@ final class CompraController
 
         $id = (int)($_POST['id'] ?? 0);
         if ($id > 0) {
+            try {
+                (new CtaCteProveedorRepo())->anularMovimientosPorOrigen('compra', $id);
+            } catch (\Throwable $e) {
+                error_log('ctacte compra anular: ' . $e->getMessage());
+            }
             (new CompraRepo())->delete($id);
             $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Factura de compra eliminada.'];
         }
@@ -462,6 +499,10 @@ final class CompraController
         $numero = $v('numerodesde') !== '' ? $v('numerodesde') : $v('numero');
         $cuit = ExcelReader::digits($v('nrodocemisor') !== '' ? $v('nrodocemisor') : $v('cuit'));
         $razon = $v('denominacionemisor') !== '' ? $v('denominacionemisor') : $v('denominacion');
+        // Algunos exports de ARCA traen la condición IVA en la columna de denominación.
+        if (CompraRepo::esCondicionIva($razon)) {
+            $razon = '';
+        }
 
         return [
             'fecha' => $fecha,
@@ -482,6 +523,40 @@ final class CompraController
             'dup' => false,
             'proveedor_match' => false,
         ];
+    }
+
+    /**
+     * Sincroniza el débito de la factura de compra en cuenta corriente de proveedores:
+     * anula movimientos previos del comprobante y vuelve a cargar el débito por el total.
+     */
+    private function sincronizarCtacteCompra(
+        int $compraId,
+        ?int $idprovee,
+        string $razon,
+        float $impTotal,
+        string $tipo,
+        string $puntoVenta,
+        string $numeroDesde,
+        int $adminId
+    ): void {
+        try {
+            $ctacte = new CtaCteProveedorRepo();
+            $ctacte->anularMovimientosPorOrigen('compra', $compraId);
+            if ($impTotal > 0) {
+                $ctacte->agregarMovimiento(
+                    'debito',
+                    'compra',
+                    $compraId,
+                    $idprovee,
+                    $razon !== '' ? $razon : 'Proveedor',
+                    (int)round($impTotal * 100),
+                    'Compra ' . $tipo . ' ' . $puntoVenta . '-' . $numeroDesde . ' — ' . $razon,
+                    $adminId
+                );
+            }
+        } catch (\Throwable $e) {
+            error_log('ctacte compra sync: ' . $e->getMessage());
+        }
     }
 
     /** @return array<int, array{idprodu:int, idcodgusto:?int, product_name:string, qty:float, unit_cost:float, bonif_pct:float}> */

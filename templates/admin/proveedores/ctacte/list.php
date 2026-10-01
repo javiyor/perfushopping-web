@@ -5,12 +5,18 @@ $list = $list ?? [];
 $q = (string)($q ?? '');
 $saldoTotal = (int)($saldoTotal ?? 0);
 ?>
-<div class="d-flex justify-content-between align-items-start mb-3">
+    <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
         <h4 class="fw-bold mb-1">Cta Cte — Proveedores</h4>
         <p class="text-muted small">Saldos pendientes con proveedores (fletes en cta cte)</p>
     </div>
-    <a class="btn btn-outline-secondary btn-sm" href="/admin/proveedores">Volver a proveedores</a>
+    <div class="d-flex gap-2">
+        <form method="post" action="/admin/proveedores/ctacte/sincronizar" class="d-inline">
+            <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>" />
+            <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-arrow-repeat"></i> Sincronizar compras</button>
+        </form>
+        <a class="btn btn-outline-secondary btn-sm" href="/admin/proveedores">Volver a proveedores</a>
+    </div>
 </div>
 
 <div class="card shadow-sm mb-3">

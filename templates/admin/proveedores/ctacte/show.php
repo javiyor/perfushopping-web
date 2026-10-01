@@ -2,10 +2,12 @@
 use Perfushopping\Web\Support\Format;
 
 $movimientos = $movimientos ?? [];
+$comprobantes = $comprobantes ?? [];
 $proveedorNombre = (string)($proveedorNombre ?? '');
 $proveedorId = $proveedorId ?? null;
 $saldo = (int)($saldo ?? 0);
 $q = (string)($q ?? '');
+$mon = static fn ($v) => number_format((float)$v, 2, ',', '.');
 ?>
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
@@ -30,6 +32,61 @@ $q = (string)($q ?? '');
         </form>
     </div>
 </div>
+
+<?php if ($comprobantes): ?>
+<div class="card shadow-sm mb-3">
+    <div class="card-header bg-white fw-semibold">Comprobantes en cuenta corriente</div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Comprobante</th>
+                    <th>Fecha</th>
+                    <th class="text-end">Total</th>
+                    <th>Cuotas</th>
+                    <th>Estado</th>
+                    <th class="text-end">Pendiente</th>
+                    <th style="width:110px"></th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($comprobantes as $c): ?>
+                    <tr>
+                        <td>
+                            <strong><?= htmlspecialchars((string)($c['tipo'] ?? '')) ?></strong>
+                            <span class="text-muted"><?= htmlspecialchars((string)($c['punto_venta'] ?? '') . '-' . (string)($c['numero_desde'] ?? '')) ?></span>
+                            <div class="small text-muted">
+                                <?php if ($c['cronograma']): ?>
+                                    <?php foreach ($c['cronograma'] as $cu): ?>
+                                        <div>Cuota <?= (int)$cu['cuota'] ?><?= $cu['dias'] > 0 ? ' a ' . (int)$cu['dias'] . 'd' : ' contado' ?>: <?= $cu['fecha'] ? date('d/m/Y', strtotime((string)$cu['fecha'])) : '—' ?> — $<?= $mon($cu['monto']) ?></div>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    Sin plazo
+                                <?php endif; ?>
+                            </div>
+                        </td>
+                        <td class="small"><?= $c['fecha'] ? date('d/m/Y', strtotime((string)$c['fecha'])) : '—' ?></td>
+                        <td class="text-end">$<?= $mon($c['imp_total']) ?></td>
+                        <td class="text-center"><?= count($c['cronograma']) ?: 1 ?></td>
+                        <td>
+                            <?php $est = ['Pagada' => 'success', 'Parcial' => 'warning', 'Pendiente' => 'danger']; ?>
+                            <span class="badge bg-<?= $est[$c['estado']] ?? 'secondary' ?>"><?= htmlspecialchars((string)$c['estado']) ?></span>
+                        </td>
+                        <td class="text-end <?= $c['pendiente'] > 0 ? 'text-danger' : 'text-success' ?>">$<?= $mon($c['pendiente']) ?></td>
+                        <td class="text-end">
+                            <?php if ($c['pendiente'] > 0): ?>
+                                <a class="btn btn-sm btn-outline-success" title="Cargar pago"
+                                   href="/admin/ordenes-pago/nueva?proveedor_id=<?= (int)$proveedorId ?>&proveedor_nombre=<?= urlencode($proveedorNombre) ?>&monto=<?= $c['pendiente'] ?>"><i class="bi bi-cash-stack"></i></a>
+                            <?php endif; ?>
+                            <a class="btn btn-sm btn-outline-secondary" title="Ver factura" href="/admin/compras/<?= (int)$c['id'] ?>"><i class="bi bi-eye"></i></a>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+<?php endif; ?>
 
 <div class="card shadow-sm">
     <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">

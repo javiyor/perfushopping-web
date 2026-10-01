@@ -40,11 +40,19 @@ final class OrdenPagoController
 
         $bancos = (new BancoCuentaRepo())->findAll();
 
+        // Prefill desde ctacte de proveedores: /admin/ordenes-pago/nueva?proveedor_id=..&proveedor_nombre=..&monto=..
+        $proveedorId = (int)($_GET['proveedor_id'] ?? 0) ?: null;
+        $proveedorNombre = trim((string)($_GET['proveedor_nombre'] ?? ''));
+        $monto = (float)($_GET['monto'] ?? 0);
+
         echo View::adminPage('admin/ordenes-pago/form.php', [
             'adminUser' => $adminUser,
             'orden' => null,
             'pagos' => [],
             'bancos' => $bancos,
+            'proveedorId' => $proveedorId,
+            'proveedorNombre' => $proveedorNombre,
+            'monto' => $monto,
             'csrf' => Csrf::token(),
             'pageTitle' => 'Nueva orden de pago',
         ]);
@@ -201,6 +209,11 @@ final class OrdenPagoController
 
         $id = (int)($_POST['id'] ?? 0);
         if ($id <= 0) Response::redirect('/admin/ordenes-pago');
+        try {
+            (new CtaCteProveedorRepo())->anularMovimientosPorOrigen('op', $id);
+        } catch (\Throwable $e) {
+            error_log('ctacte op anular: ' . $e->getMessage());
+        }
         (new OrdenPagoRepo())->delete($id);
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Orden eliminada.'];
         Response::redirect('/admin/ordenes-pago');

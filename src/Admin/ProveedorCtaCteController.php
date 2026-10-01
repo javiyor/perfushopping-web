@@ -33,6 +33,18 @@ final class ProveedorCtaCteController
         ]);
     }
 
+    public function sincronizar(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requirePermiso('compras');
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $res = (new CtaCteProveedorRepo())->sincronizarCompras((int)$adminUser['id']);
+
+        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Sincronizadas ' . $res['insertadas'] . ' facturas de compra con cuenta corriente.' . ($res['omitidas'] > 0 ? ' Omitidas ' . $res['omitidas'] . ' sin importe.' : '')];
+        Response::redirect('/admin/proveedores/ctacte');
+    }
+
     public function movimientos(array $params): void
     {
         $auth = new AdminAuthService();
@@ -44,6 +56,7 @@ final class ProveedorCtaCteController
         $repo = new CtaCteProveedorRepo();
         $movimientos = $repo->movimientos($proveedorId, $q);
         $saldo = $repo->saldoActual($proveedorId);
+        $comprobantes = $proveedorId !== null ? $repo->comprobantesConPlazo($proveedorId) : [];
 
         $proveedorNombre = '';
         if ($movimientos) {
@@ -53,6 +66,7 @@ final class ProveedorCtaCteController
         echo View::adminPage('admin/proveedores/ctacte/show.php', [
             'adminUser' => $adminUser,
             'movimientos' => $movimientos,
+            'comprobantes' => $comprobantes,
             'proveedorId' => $proveedorId,
             'proveedorNombre' => $proveedorNombre,
             'saldo' => $saldo,

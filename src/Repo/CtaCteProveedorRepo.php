@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Perfushopping\Web\Repo;
 
 use Perfushopping\Web\Infra\Db;
+use Perfushopping\Web\Support\Plazo;
 
 final class CtaCteProveedorRepo
 {
@@ -135,5 +136,201 @@ final class CtaCteProveedorRepo
             ':cb' => $createdBy,
         ]);
         return (int)Db::pdo()->lastInsertId();
+    }
+
+    public function anularMovimientosPorOrigen(string $origen, int $origenId): void
+    {
+        $pdo = Db::pdo();
+        $st = $pdo->prepare('SELECT * FROM ctacte_proveedor_movimientos WHERE origen = :o AND origen_id = :oid ORDER BY id ASC');
+        $st->execute([':o' => $origen, ':oid' => $origenId]);
+        $movs = $st->fetchAll();
+
+        if (!$movs) return;
+
+        $pdo->beginTransaction();
+        try {
+            $del = $pdo->prepare('DELETE FROM ctacte_proveedor_movimientos WHERE origen = :o AND origen_id = :oid');
+            $del->execute([':o' => $origen, ':oid' => $origenId]);
+
+            $grupos = [];
+            foreach ($movs as $m) {
+                $pid = (int)($m['proveedor_id'] ?? 0);
+                $pn = (string)($m['proveedor_nombre'] ?? '');
+                $key = $pid > 0 ? 'id:' . $pid : 'nm:' . $pn;
+                $grupos[$key] = [$pid, $pn];
+            }
+            foreach ($grupos as [$pid, $pn]) {
+                $this->recalcularSaldos($pid > 0 ? $pid : null, $pn);
+            }
+
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+    }
+
+    public function recalcularSaldos(?int $proveedorId = null, string $proveedorNombre = ''): void
+    {
+        $params = [];
+        $where = '';
+        if ($proveedorId !== null) {
+            $where = ' WHERE proveedor_id = :pid';
+            $params[':pid'] = $proveedorId;
+        } elseif ($proveedorNombre !== '') {
+            $where = ' WHERE proveedor_nombre = :pn AND proveedor_id IS NULL';
+            $params[':pn'] = $proveedorNombre;
+        } else {
+            return;
+        }
+
+        $movs = Db::pdo()->prepare('
+            SELECT id, tipo, monto_cents FROM ctacte_proveedor_movimientos' . $where . ' ORDER BY id ASC
+        ');
+        $movs->execute($params);
+        $saldo = 0;
+        $upd = Db::pdo()->prepare('UPDATE ctacte_proveedor_movimientos SET saldo_after_cents = :s WHERE id = :id');
+        foreach ($movs as $m) {
+            if ($m['tipo'] === 'debito') {
+                $saldo += (int)$m['monto_cents'];
+            } else {
+                $saldo -= (int)$m['monto_cents'];
+            }
+            $upd->execute([':s' => $saldo, ':id' => $m['id']]);
+        }
+    }
+
+    /**
+     * Backfill: genera el débito en ctacte de todas las facturas de compra,
+     * en orden de fecha, y recalcula saldos. Idempotente.
+     * @return array{insertadas:int, omitidas:int}
+     */
+    public function sincronizarCompras(int $adminId): array
+    {
+        $pdo = Db::pdo();
+        $rows = $pdo->query('
+            SELECT fc.id, fc.idprovee, fc.razon_proveedor, fc.cuit_proveedor, fc.tipo,
+                   fc.punto_venta, fc.numero_desde, fc.imp_total
+            FROM factura_compra fc
+            ORDER BY fc.fecha ASC, fc.id ASC
+        ')->fetchAll();
+
+        $insertadas = 0;
+        $omitidas = 0;
+        foreach ($rows as $r) {
+            $compraId = (int)$r['id'];
+            $impTotal = (float)($r['imp_total'] ?? 0);
+            if ($impTotal <= 0) {
+                $omitidas++;
+                continue;
+            }
+
+            $idprovee = (int)($r['idprovee'] ?? 0) ?: null;
+            $razon = trim((string)($r['razon_proveedor'] ?? ''));
+            if ($razon === '') {
+                $razon = $this->razonProveedor($pdo, $idprovee, (string)($r['cuit_proveedor'] ?? ''));
+            }
+            if ($razon === '') {
+                $razon = 'Proveedor';
+            }
+
+            $this->anularMovimientosPorOrigen('compra', $compraId);
+            $this->agregarMovimiento(
+                'debito',
+                'compra',
+                $compraId,
+                $idprovee,
+                $razon,
+                (int)round($impTotal * 100),
+                'Compra ' . (string)$r['tipo'] . ' ' . (string)$r['punto_venta'] . '-' . (string)$r['numero_desde'] . ' — ' . $razon,
+                $adminId
+            );
+            $insertadas++;
+        }
+
+        return ['insertadas' => $insertadas, 'omitidas' => $omitidas];
+    }
+
+    /**
+     * Comprobantes de compra de un proveedor con cronograma y estado FIFO (display-only).
+     * @return array<int, array{id:int, tipo:string, punto_venta:string, numero_desde:string, fecha:?string, imp_total:float, cronograma:array, estado:string, pendiente:float}>
+     */
+    public function comprobantesConPlazo(?int $proveedorId, string $cuit = ''): array
+    {
+        $pdo = Db::pdo();
+        $params = [];
+        $where = '';
+        if ($proveedorId !== null) {
+            $where = ' WHERE fc.idprovee = :pid';
+            $params[':pid'] = $proveedorId;
+        } elseif ($cuit !== '') {
+            $where = ' WHERE fc.cuit_proveedor = :c';
+            $params[':c'] = $cuit;
+        } else {
+            return [];
+        }
+
+        $rows = $pdo->prepare('
+            SELECT fc.id, fc.tipo, fc.punto_venta, fc.numero_desde, fc.fecha,
+                   fc.imp_total, fc.plazo_cuotas, fc.plazo_dias
+            FROM factura_compra fc' . $where . '
+            ORDER BY fc.fecha ASC, fc.id ASC
+        ');
+        $rows->execute($params);
+        $comprobantes = $rows->fetchAll();
+
+        $creditos = 0;
+        if ($proveedorId !== null) {
+            $st = $pdo->prepare("SELECT COALESCE(SUM(monto_cents), 0) FROM ctacte_proveedor_movimientos WHERE proveedor_id = :p AND tipo = 'credito'");
+            $st->execute([':p' => $proveedorId]);
+            $creditos = (int)$st->fetchColumn();
+        }
+
+        $out = [];
+        foreach ($comprobantes as $c) {
+            $total = (float)($c['imp_total'] ?? 0);
+            $pendiente = $total;
+            $estado = 'Pendiente';
+            if ($total > 0 && $creditos > 0) {
+                $aplicado = min($creditos, $total);
+                $creditos -= $aplicado;
+                $pendiente = round($total - $aplicado, 2);
+                $estado = $pendiente > 0 ? 'Parcial' : 'Pagada';
+            }
+            $out[] = [
+                'id' => (int)$c['id'],
+                'tipo' => (string)($c['tipo'] ?? ''),
+                'punto_venta' => (string)($c['punto_venta'] ?? ''),
+                'numero_desde' => (string)($c['numero_desde'] ?? ''),
+                'fecha' => $c['fecha'],
+                'imp_total' => $total,
+                'cronograma' => Plazo::cronograma($c),
+                'estado' => $estado,
+                'pendiente' => $pendiente,
+            ];
+        }
+        return $out;
+    }
+
+    private function razonProveedor(\PDO $pdo, ?int $idprovee, string $cuit): string
+    {
+        if ($idprovee !== null && $idprovee > 0) {
+            $st = $pdo->prepare('SELECT razon FROM proveedo WHERE idprovee = :i LIMIT 1');
+            $st->execute([':i' => $idprovee]);
+            $r = trim((string)($st->fetchColumn() ?: ''));
+            if ($r !== '') {
+                return $r;
+            }
+        }
+        $cuit = (string)preg_replace('/\D/', '', $cuit);
+        if ($cuit !== '' && $cuit !== '0') {
+            $st = $pdo->prepare('SELECT razon FROM proveedo WHERE cuit = :c LIMIT 1');
+            $st->execute([':c' => $cuit]);
+            $r = trim((string)($st->fetchColumn() ?: ''));
+            if ($r !== '') {
+                return $r;
+            }
+        }
+        return '';
     }
 }

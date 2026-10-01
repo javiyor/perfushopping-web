@@ -1,6 +1,7 @@
 <?php
 $compra = $compra ?? null;
 $items = $items ?? [];
+$cronograma = $cronograma ?? [];
 if (!$compra) { echo '<div class="alert alert-warning">Factura no encontrada.</div>'; return; }
 
 $mon = static fn ($v) => number_format((float)$v, 2, ',', '.');
@@ -60,6 +61,34 @@ $estado = (string)($compra['estado'] ?? 'pendiente');
                 </dl>
             </div>
         </div>
+
+        <?php if ($cronograma): ?>
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-white fw-semibold">Plan de pago</div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Cuota</th>
+                            <th>Días</th>
+                            <th>Vencimiento</th>
+                            <th class="text-end">Monto</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($cronograma as $c): ?>
+                            <tr>
+                                <td><?= (int)$c['cuota'] ?></td>
+                                <td class="text-muted"><?= (int)$c['dias'] ?></td>
+                                <td><?= $c['fecha'] ? date('d/m/Y', strtotime((string)$c['fecha'])) : '—' ?></td>
+                                <td class="text-end fw-bold">$<?= $mon($c['monto']) ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <?php endif; ?>
 
         <div class="card shadow-sm">
             <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">

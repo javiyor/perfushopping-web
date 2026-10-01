@@ -199,6 +199,24 @@ $idcta1Sel = (int)($compra['idcta1'] ?? 0);
             </div>
 
             <div class="card shadow-sm mb-3">
+                <div class="card-header bg-white fw-semibold">Plazo de pago</div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label small">Cuotas</label>
+                            <input class="form-control form-control-sm" name="plazo_cuotas" id="plazoCuotas" type="number" min="1" max="36" value="<?= (int)($compra['plazo_cuotas'] ?? 1) ?>" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Días por cuota (CSV)</label>
+                            <input class="form-control form-control-sm" name="plazo_dias" id="plazoDias" value="<?= htmlspecialchars((string)($compra['plazo_dias'] ?? '')) ?>" placeholder="30,60,90" />
+                        </div>
+                    </div>
+                    <div class="form-text small mb-2">Días desde la fecha del comprobante para cada cuota. Si hay menos días que cuotas, se repite el último.</div>
+                    <div id="plazoPreview" class="small"></div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-3">
                 <div class="card-header bg-white fw-semibold">Cuenta contable y depósito</div>
                 <div class="card-body">
                     <div class="mb-2">
@@ -459,6 +477,43 @@ function recalcular() {
     const foot = document.getElementById('itemsFootTotal');
     if (foot) foot.textContent = '$' + totalLineas.toLocaleString('es-AR', {minimumFractionDigits:2});
 }
+
+// ── Plazo de pago ──
+function plazoDiasArray() {
+    return (document.getElementById('plazoDias').value || '')
+        .split(',')
+        .map(s => parseInt(s.trim(), 10))
+        .filter(n => !isNaN(n) && n >= 0);
+}
+
+function previewPlazo() {
+    const box = document.getElementById('plazoPreview');
+    if (!box) return;
+    const cuotas = Math.max(1, parseInt(document.getElementById('plazoCuotas').value, 10) || 1);
+    const dias = plazoDiasArray();
+    const total = parseFloat(document.getElementById('imp_total').value) || 0;
+    const fechaVal = document.getElementById('fecha').value;
+    if (!fechaVal || total <= 0) { box.innerHTML = ''; return; }
+    const base = new Date(fechaVal + 'T00:00:00');
+    const monto = Math.round((total / cuotas) * 100) / 100;
+    let html = '<table class="table table-sm table-borderless mb-0"><tbody>';
+    let acum = 0;
+    for (let i = 0; i < cuotas; i++) {
+        const d = dias.length ? (dias[i] !== undefined ? dias[i] : dias[dias.length - 1]) : 0;
+        const f = new Date(base); f.setDate(f.getDate() + d);
+        const esUltima = i === cuotas - 1;
+        const importe = esUltima ? Math.round((total - acum) * 100) / 100 : monto;
+        acum += importe;
+        html += '<tr><td class="text-muted">Cuota ' + (i + 1) + (d > 0 ? ' (a ' + d + ' días)' : ' (contado)') + '</td><td class="text-end">' + f.toLocaleDateString('es-AR') + '</td><td class="text-end fw-bold">$' + importe.toLocaleString('es-AR', {minimumFractionDigits: 2}) + '</td></tr>';
+    }
+    box.innerHTML = html + '</tbody></table>';
+}
+
+['plazoCuotas', 'plazoDias', 'imp_total', 'fecha'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', previewPlazo);
+});
+document.addEventListener('DOMContentLoaded', previewPlazo);
 
 document.addEventListener('change', function(e) {
     if (e.target && e.target.id === 'idcta1Sel') {

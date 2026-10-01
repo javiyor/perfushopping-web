@@ -45,15 +45,15 @@ $formasPago = ['efectivo' => 'Efectivo', 'transferencia' => 'Transferencia', 'ch
                 <div class="card-body">
                     <div class="mb-2">
                         <label class="form-label small">Buscar proveedor</label>
-                        <input class="form-control form-control-sm" id="proveedorSearch" placeholder="Nombre, código o CUIT..." autocomplete="off" />
+                        <input class="form-control form-control-sm" id="proveedorSearch" placeholder="Nombre, código o CUIT..." autocomplete="off" value="<?= htmlspecialchars((string)($proveedorNombre ?? '')) ?>" />
                         <div id="proveedorSuggestions" style="position:relative"></div>
                     </div>
                     <hr class="my-2" />
                     <div class="row g-2">
                         <div class="col-12">
                             <label class="form-label small">Razón social <span class="text-danger">*</span></label>
-                            <input class="form-control form-control-sm" name="proveedor_nombre" id="proveedorNombre" required />
-                            <input type="hidden" name="proveedor_id" id="proveedorId" value="0" />
+                            <input class="form-control form-control-sm" name="proveedor_nombre" id="proveedorNombre" value="<?= htmlspecialchars((string)($proveedorNombre ?? '')) ?>" required />
+                            <input type="hidden" name="proveedor_id" id="proveedorId" value="<?= (int)($proveedorId ?? 0) ?>" />
                         </div>
                     </div>
                 </div>
@@ -204,3 +204,15 @@ if (provInput) {
 
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 </script>
+
+<?php if (($monto ?? 0) > 0): ?>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const inp = document.querySelector('.monto-input');
+    if (inp) {
+        inp.value = '<?= number_format((float)$monto, 2, '.', '') ?>';
+        recalcular();
+    }
+});
+</script>
+<?php endif; ?>

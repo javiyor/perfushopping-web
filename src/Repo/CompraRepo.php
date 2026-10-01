@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Perfushopping\Web\Repo;
 
 use Perfushopping\Web\Infra\Db;
+use Perfushopping\Web\Support\Plazo;
 
 final class CompraRepo
 {
@@ -327,7 +328,7 @@ final class CompraRepo
         }
         $existing = $this->proveedorByCuit($cuit);
         if ($existing) {
-            if (trim((string)$existing['razon']) === '' && trim($razon) !== '') {
+            if (trim((string)$existing['razon']) === '' && trim($razon) !== '' && !self::esCondicionIva($razon)) {
                 Db::pdo()->prepare('UPDATE proveedo SET razon = :r WHERE idprovee = :i LIMIT 1')
                     ->execute([':r' => $razon, ':i' => (int)$existing['idprovee']]);
             }
@@ -342,8 +343,23 @@ final class CompraRepo
             INSERT INTO proveedo (codprove, razon, cuit, activo, fealta)
             VALUES (:cp, :r, :c, 1, CURDATE())
         ');
-        $ins->execute([':cp' => $codprove, ':r' => $razon !== '' ? $razon : ('Proveedor ' . $cuit), ':c' => $cuit]);
+        $ins->execute([':cp' => $codprove, ':r' => ($razon !== '' && !self::esCondicionIva($razon)) ? $razon : ('Proveedor ' . $cuit), ':c' => $cuit]);
         return (int)Db::pdo()->lastInsertId();
+    }
+
+    /** true si el texto es exactamente una condición IVA (no una razón social). */
+    public static function esCondicionIva(string $txt): bool
+    {
+        $t = mb_strtolower(trim($txt));
+        if ($t === '') {
+            return false;
+        }
+        return in_array($t, [
+            'responsable inscripto', 'responsable inscripta', 'monotributista', 'monotributo',
+            'exento', 'exenta', 'consumidor final', 'no categorizado', 'no alcanzado',
+            'sujeto exento', 'no responsable', 'iva responsable inscripto', 'iva exento',
+            'monotributista social', 'pequeño contribuyente',
+        ], true);
     }
 
     /**
@@ -377,6 +393,15 @@ final class CompraRepo
         }
 
         return '';
+    }
+
+    /**
+     * Cronograma de vencimientos del plazo de pago.
+     * @return array<int, array{cuota:int, dias:int, fecha:?string, monto:float}>
+     */
+    public function cronogramaPlazo(array $compra): array
+    {
+        return Plazo::cronograma($compra);
     }
 
     // ── Depósitos ──
