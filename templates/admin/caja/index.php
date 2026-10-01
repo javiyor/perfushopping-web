@@ -10,6 +10,7 @@ $totalRecibos = (int)($totalRecibos ?? 0);
 $arqueos = $arqueos ?? [];
 $detalleTurno = $detalleTurno ?? [];
 $totalesForma = $totalesForma ?? [];
+$totalesTarjetaEquipo = $totalesTarjetaEquipo ?? [];
 $egresosTurno = (int)($egresosTurno ?? 0);
 $formaLabels = ($formasPagoLabels ?? []) + ['efectivo' => 'Efectivo', 'transferencia' => 'Transf.', 'mercadopago' => 'MercadoPago', 'debito' => 'Débito', 'credito' => 'Crédito', 'tarjeta' => 'Tarjeta', 'tarjeta_credito' => 'Tarj. crédito', 'tarjeta_debito' => 'Tarj. débito', 'cheque' => 'Cheque', 'cuenta_corriente' => 'Cta. cte.'];
 $tipoBadges = ['venta' => 'info', 'cobro' => 'primary', 'ingreso' => 'success', 'egreso' => 'danger'];
@@ -155,7 +156,16 @@ $saldoEsperado = $montoInicial + $ventasEfectivo + (int)$totalesMov['total_ingre
                                     <td class="small"><?= $d['hora'] !== '' ? date('H:i', strtotime($d['hora'])) : '—' ?></td>
                                     <td><span class="badge bg-<?= $tipoBadges[$d['tipo']] ?? 'secondary' ?>"><?= htmlspecialchars($d['tipo']) ?></span></td>
                                     <td class="small"><?= htmlspecialchars((string)$d['detalle']) ?></td>
-                                    <td class="small"><?= $d['forma'] !== '' ? htmlspecialchars($formaLabels[$d['forma']] ?? ucfirst(str_replace('_', ' ', $d['forma']))) : '—' ?></td>
+                                    <td class="small">
+                                        <?php if ($d['forma'] !== ''): ?>
+                                            <?= htmlspecialchars($formaLabels[$d['forma']] ?? ucfirst(str_replace('_', ' ', $d['forma']))) ?>
+                                            <?php if (($d['forma_tipo'] ?? '') === 'tarjeta' && trim((string)($d['equipo_nombre'] ?? '')) !== ''): ?>
+                                                <span class="text-muted">· <?= htmlspecialchars((string)$d['equipo_nombre']) ?></span>
+                                            <?php endif; ?>
+                                        <?php else: ?>
+                                            —
+                                        <?php endif; ?>
+                                    </td>
                                     <td class="text-end small <?= $d['monto'] < 0 ? 'text-danger' : 'text-success' ?>"><?= Format::moneyFromCents((int)$d['monto']) ?></td>
                                 </tr>
                             <?php endforeach; ?>
@@ -163,13 +173,21 @@ $saldoEsperado = $montoInicial + $ventasEfectivo + (int)$totalesMov['total_ingre
                     </tbody>
                 </table>
             </div>
-            <?php if ($totalesForma || $egresosTurno > 0): ?>
+            <?php if ($totalesForma || $totalesTarjetaEquipo || $egresosTurno > 0): ?>
             <div class="card-footer bg-white small text-muted">
                 <?php foreach ($totalesForma as $forma => $total): ?>
                     <span class="me-2"><?= htmlspecialchars($formaLabels[$forma] ?? ucfirst(str_replace('_', ' ', $forma))) ?>: <strong><?= Format::moneyFromCents((int)$total) ?></strong></span>
                 <?php endforeach; ?>
                 <?php if ($egresosTurno > 0): ?>
                     <span>Egresos: <strong class="text-danger">−<?= Format::moneyFromCents($egresosTurno) ?></strong></span>
+                <?php endif; ?>
+                <?php if ($totalesTarjetaEquipo): ?>
+                    <div class="mt-1 text-dark">
+                        <i class="bi bi-credit-card"></i> <strong>Tarjetas por equipo POS:</strong>
+                        <?php foreach ($totalesTarjetaEquipo as $eq => $mt): ?>
+                            <span class="me-2"><?= htmlspecialchars($eq) ?>: <strong><?= Format::moneyFromCents((int)$mt) ?></strong></span>
+                        <?php endforeach; ?>
+                    </div>
                 <?php endif; ?>
             </div>
             <?php endif; ?>

@@ -32,6 +32,7 @@ final class CajaController
 
         $detalleTurno = [];
         $totalesForma = [];
+        $totalesTarjetaEquipo = [];
         $egresosTurno = 0;
 
         if ($apertura) {
@@ -50,6 +51,8 @@ final class CajaController
                     'tipo' => 'venta',
                     'detalle' => 'Factura ' . ($v['codigo'] ?? '') . ' — ' . ($v['cliente_nombre'] ?? 'Consumidor Final'),
                     'forma' => (string)($v['forma_pago'] ?? ''),
+                    'forma_tipo' => (string)($v['forma_tipo'] ?? ''),
+                    'equipo_nombre' => (string)($v['equipo_nombre'] ?? ''),
                     'monto' => (int)($v['monto_cents'] ?? 0),
                 ];
             }
@@ -80,8 +83,16 @@ final class CajaController
                     $egresosTurno += -$d['monto'];
                 } elseif ($d['forma'] !== '') {
                     $totalesForma[$d['forma']] = ($totalesForma[$d['forma']] ?? 0) + $d['monto'];
+                    if (($d['forma_tipo'] ?? '') === 'tarjeta' && $d['monto'] > 0) {
+                        $eq = trim((string)($d['equipo_nombre'] ?? ''));
+                        if ($eq === '') {
+                            $eq = 'Sin equipo';
+                        }
+                        $totalesTarjetaEquipo[$eq] = ($totalesTarjetaEquipo[$eq] ?? 0) + $d['monto'];
+                    }
                 }
             }
+            ksort($totalesTarjetaEquipo);
         }
 
         $historial = $repo->historial($sucursalId, 10);
@@ -104,6 +115,7 @@ final class CajaController
             'saldoGeneral' => $saldoGeneral,
             'detalleTurno' => $detalleTurno,
             'totalesForma' => $totalesForma,
+            'totalesTarjetaEquipo' => $totalesTarjetaEquipo,
             'egresosTurno' => $egresosTurno,
             'formasPagoLabels' => (new \Perfushopping\Web\Repo\FormaPagoRepo())->labels(),
             'ajustePendiente' => $ajustePendiente,

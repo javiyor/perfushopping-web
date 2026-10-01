@@ -660,16 +660,40 @@ final class CajaRepo
         }
     }
 
+    private static ?bool $pagosTieneEquipo = null;
+
+    private function pagosTieneEquipo(): bool
+    {
+        if (self::$pagosTieneEquipo !== null) {
+            return self::$pagosTieneEquipo;
+        }
+        try {
+            $cols = array_column(Db::pdo()->query('SHOW COLUMNS FROM factura_pagos')->fetchAll(), 'Field');
+            self::$pagosTieneEquipo = in_array('equipo_id', $cols, true);
+        } catch (\Throwable $e) {
+            self::$pagosTieneEquipo = false;
+        }
+        return self::$pagosTieneEquipo;
+    }
+
     public function ventasDetalleTurno(int $cajaId, string $fecha, int $puntoVenta, string $aperturaCreada): array
     {
         $this->ensureCajaColumnas();
         try {
             $extra = $this->efectivoNoCajaWhere();
+            $tipoSel = $this->formaPagoTipoExpr('fp') . ' AS forma_tipo';
+            $equipoSel = 'NULL AS equipo_id, NULL AS equipo_nombre';
+            $equipoJoin = '';
+            if ($this->pagosTieneEquipo()) {
+                $equipoSel = "fp.equipo_id, COALESCE(NULLIF(TRIM(e.empresa), ''), CONCAT('Equipo ', fp.equipo_id)) AS equipo_nombre";
+                $equipoJoin = 'LEFT JOIN equipotar e ON e.idequipo = fp.equipo_id';
+            }
             $st = Db::pdo()->prepare("
                 SELECT fp.id, f.codigo, f.cliente_nombre, f.created_at,
-                       fp.forma_pago, fp.monto_cents
+                       fp.forma_pago, fp.monto_cents, {$tipoSel}, {$equipoSel}
                 FROM factura_pagos fp
                 INNER JOIN facturas f ON f.id = fp.factura_id
+                {$equipoJoin}
                 WHERE f.estado = 'emitida'
                   AND f.fecha = :fec
                   AND f.punto_venta = :pv
