@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Perfushopping\Web\Admin;
 
+use Perfushopping\Web\Repo\BancoRepo;
 use Perfushopping\Web\Repo\ChequeRepo;
 use Perfushopping\Web\Service\AdminAuthService;
 use Perfushopping\Web\Support\Csrf;
@@ -60,7 +61,7 @@ final class ChequeController
         $auth = new AdminAuthService();
         $adminUser = $auth->requirePermiso('cheques');
 
-        $bancos = (new \Perfushopping\Web\Repo\BancoCuentaRepo())->findAll();
+        $bancos = (new BancoRepo())->findAll();
         $tipo = trim((string)($_GET['tipo'] ?? 'propio'));
         if (!in_array($tipo, ['propio', 'tercero'], true)) {
             $tipo = 'propio';

@@ -781,8 +781,7 @@ final class FacturaController
 
         $fecha = (string)($input['fecha'] ?? $old['fecha'] ?? date('Y-m-d'));
         $descuento = max(0, (int)($input['descuento_cents'] ?? 0));
-
-        $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
+$puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
         $puntosUsados = max(0, (int)($input['puntos_usados'] ?? 0));
         $puntosUsadosCents = $puntosUsados * 100;
         $oldUse = $puntosRepo->usoEnFactura($editarId);
@@ -791,6 +790,7 @@ final class FacturaController
             if ($oldUse && (int)($oldUse['idclien'] ?? 0) === (int)($clienteErpId ?: 0)) {
                 $saldoPuntos += (int)($oldUse['puntos'] ?? 0);
             }
+
             if ($puntosUsados > $saldoPuntos) {
                 Response::json(['ok' => false, 'error' => 'El cliente no tiene suficientes puntos para canjear.'], 422);
                 return;
@@ -799,6 +799,14 @@ final class FacturaController
                 $puntosUsados = (int)floor(($subtotal + $ivaTotal - $descuento) / 100);
                 $puntosUsadosCents = $puntosUsados * 100;
             }
+        }
+
+        // Validación: no permitir guardar si el total pagado es menor al facturado
+        $totalPagado = array_sum(array_column($pagos, 'monto_cents'));
+        $totalFacturado = $subtotal + $ivaTotal - $descuento - $puntosUsadosCents;
+        if ($totalPagado < $totalFacturado) {
+            Response::json(['ok' => false, 'error' => 'El total abonado es menor al total facturado.'], 422);
+            return;
         }
 
         $repo->actualizar($editarId, [
