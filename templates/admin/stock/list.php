@@ -157,14 +157,13 @@ $qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $
                     $prevId = -1;
                     $totalStockValor = 0.0;
                     $totalVendidoValor = 0.0;
-                    $prevVentaId = -1;
                     ?>
                     <?php foreach ($list as $p): ?>
                         <?php $gid = (int)($p['idcodgusto'] ?? 0); $isFirst = ($gid !== $prevId); $prevId = $gid; ?>
                         <?php $stock = (int)($p['stock_deposito'] ?? 0); ?>
                         <?php
                         $totalStockValor += $stock * (float)($p['precomp'] ?? 0);
-                        if ($gid !== $prevVentaId) { $totalVendidoValor += (float)($p['total_vendido'] ?? 0) * (float)($p['precomp'] ?? 0); $prevVentaId = $gid; }
+                        $totalVendidoValor += (float)($p['total_vendido'] ?? 0) * (float)($p['precomp'] ?? 0);
                         ?>
                         <tr style="<?= $isFirst ? 'border-top:2px solid #adb5bd' : '' ?>">
                             <td>
@@ -192,7 +191,7 @@ $qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $
                                     <span class="badge bg-success"><?= $stock ?></span>
                                 <?php endif; ?>
                             </td>
-                            <td class="text-center"><?= $isFirst ? (int)($p['total_vendido'] ?? 0) : '' ?></td>
+                            <td class="text-center"><?= (int)($p['total_vendido'] ?? 0) ?></td>
                             <td class="text-center">
                                 <?php if ($isFirst): ?>
                                     <input type="number" class="form-control form-control-sm np-qty" style="width:55px;text-align:center" min="0" value="0"

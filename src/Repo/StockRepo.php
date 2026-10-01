@@ -52,6 +52,8 @@ final class StockRepo
         if ($hasta === '') $hasta = date('Y-m-d');
         $params[':desde'] = $desde;
         $params[':hasta'] = $hasta;
+        $params[':desde2'] = $desde;
+        $params[':hasta2'] = $hasta;
         if ($iddepo) {
             $params[':vd'] = $iddepo;
         }
@@ -62,31 +64,56 @@ final class StockRepo
                    r.nomrub, s.nomsub, pv.razon AS nomprovee,
                    dep.iddepo, dep.nomdepo,
                    COALESCE(dep.stock, 0) AS stock_deposito,
-                   COALESCE(cv.total_vendido, 0) AS total_vendido
+                   CASE
+                       WHEN dep.iddepo IS NOT NULL THEN COALESCE(cv.total_vendido, 0)
+                       ELSE COALESCE(cvt.total_vendido, 0)
+                   END AS total_vendido
             FROM producto p
             INNER JOIN gustos g ON g.idprodu = p.idprodu
             LEFT JOIN departa d ON d.codepar = p.codepar
             LEFT JOIN rubros r ON r.codrub = p.codrub
             LEFT JOIN subrubro s ON s.codsub = p.codsub
             LEFT JOIN proveedo pv ON pv.idprovee = p.codprove
+            " . $this->depSubquery($depDepo) . "
             LEFT JOIN (
                 SELECT sd.idcodgusto,
-                    COALESCE(SUM(
+                    CASE
+                        WHEN sc.tipo_movimiento = 'venta' THEN sc.iddepod
+                        WHEN sc.tipo_movimiento = 'devolucion_venta' THEN sc.iddepoh
+                    END AS iddepo,
+                    SUM(
                         CASE
                             WHEN sc.tipo_movimiento = 'venta' THEN sd.canti
                             WHEN sc.tipo_movimiento = 'devolucion_venta' THEN -sd.canti
                             ELSE 0
                         END
-                    ), 0) AS total_vendido
+                    ) AS total_vendido
                 FROM stockdet sd
                 INNER JOIN stockcab sc ON sc.idcabstock = sd.idstockcab
                 WHERE sd.idcodgusto > 0
                   AND sc.fecha >= :desde
                   AND sc.fecha < DATE_ADD(:hasta, INTERVAL 1 DAY)
-                  " . ($iddepo ? 'AND sc.iddepod = :vd' : '') . "
+                  AND sc.tipo_movimiento IN ('venta', 'devolucion_venta')
+                GROUP BY sd.idcodgusto, iddepo
+            ) cv ON cv.idcodgusto = g.idcodgusto AND cv.iddepo = dep.iddepo
+            LEFT JOIN (
+                SELECT sd.idcodgusto,
+                    SUM(
+                        CASE
+                            WHEN sc.tipo_movimiento = 'venta' THEN sd.canti
+                            WHEN sc.tipo_movimiento = 'devolucion_venta' THEN -sd.canti
+                            ELSE 0
+                        END
+                    ) AS total_vendido
+                FROM stockdet sd
+                INNER JOIN stockcab sc ON sc.idcabstock = sd.idstockcab
+                WHERE sd.idcodgusto > 0
+                  AND sc.fecha >= :desde2
+                  AND sc.fecha < DATE_ADD(:hasta2, INTERVAL 1 DAY)
+                  AND sc.tipo_movimiento IN ('venta', 'devolucion_venta')
+                  " . ($iddepo ? "AND ((sc.tipo_movimiento = 'venta' AND sc.iddepod = :vd) OR (sc.tipo_movimiento = 'devolucion_venta' AND sc.iddepoh = :vd))" : '') . "
                 GROUP BY sd.idcodgusto
-            ) cv ON cv.idcodgusto = g.idcodgusto
-            " . $this->depSubquery($depDepo) . "
+            ) cvt ON cvt.idcodgusto = g.idcodgusto
             " . self::whereSql($where, $stockWhere) . "
             ORDER BY p.produ ASC, g.nomgusto ASC, dep.nomdepo ASC
             LIMIT {$offset}, {$limit}
