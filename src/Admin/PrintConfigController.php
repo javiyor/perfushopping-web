@@ -57,7 +57,8 @@ final class PrintConfigController
                 trim((string)($_POST['nombre'] ?? '')),
                 (int)($_POST['punto_venta'] ?? 0),
                 (int)($_POST['sucursal_id'] ?? 0) ?: null,
-                isset($_POST['activo']) ? 1 : 0
+                isset($_POST['activo']) ? 1 : 0,
+                trim((string)($_POST['formato'] ?? '80mm'))
             );
             $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Impresora guardada.'];
         } catch (\Throwable $e) {

@@ -21,6 +21,7 @@ $sucursales = $sucursales ?? [];
                     <th>Nombre</th>
                     <th>Punto de venta</th>
                     <th>Sucursal</th>
+                    <th>Formato</th>
                     <th>Token (agente local)</th>
                     <th>Activa</th>
                     <th style="width:130px"></th>
@@ -28,13 +29,14 @@ $sucursales = $sucursales ?? [];
             </thead>
             <tbody>
                 <?php if (!$list): ?>
-                <tr><td colspan="6" class="text-center text-muted py-4">No hay impresoras. Agregá una por cada punto de venta.</td></tr>
+                <tr><td colspan="7" class="text-center text-muted py-4">No hay impresoras. Agregá una por cada punto de venta.</td></tr>
                 <?php else: ?>
                     <?php foreach ($list as $imp): ?>
                     <tr>
                         <td class="fw-semibold"><?= htmlspecialchars((string)($imp['nombre'] ?? '')) ?></td>
                         <td><span class="badge bg-primary">PV <?= (int)($imp['punto_venta'] ?? 0) ?></span></td>
                         <td class="small"><?= htmlspecialchars((string)($imp['sucursal_nombre'] ?? '—')) ?></td>
+                        <td class="small"><?= htmlspecialchars((string)($imp['formato'] ?? '80mm')) ?></td>
                         <td class="small"><code><?= htmlspecialchars(substr((string)($imp['token'] ?? ''), 0, 8)) ?>…</code></td>
                         <td>
                             <?php if (!empty($imp['activo'])): ?>
@@ -97,6 +99,13 @@ $sucursales = $sucursales ?? [];
                             <?php endforeach; ?>
                         </select>
                     </div>
+                    <div class="col">
+                        <label class="form-label">Papel</label>
+                        <select name="formato" id="inputFormato" class="form-select">
+                            <option value="80mm">80mm</option>
+                            <option value="58mm">58mm</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="form-check">
                     <input type="checkbox" name="activo" id="inputActivo" class="form-check-input" value="1" checked />
@@ -118,6 +127,7 @@ const impresoras = <?= json_encode(array_map(function($imp) {
         'nombre' => $imp['nombre'] ?? '',
         'punto_venta' => (int)($imp['punto_venta'] ?? 0),
         'sucursal_id' => (int)($imp['sucursal_id'] ?? 0),
+        'formato' => (string)($imp['formato'] ?? '80mm'),
         'activo' => !empty($imp['activo']),
     ];
 }, $list)) ?>;
@@ -128,6 +138,7 @@ function abrirModal(id) {
     document.getElementById('inputNombre').value = '';
     document.getElementById('inputPv').value = '';
     document.getElementById('inputSucursal').value = '';
+    document.getElementById('inputFormato').value = '80mm';
     document.getElementById('inputActivo').checked = true;
     document.getElementById('modalTitle').textContent = 'Nueva impresora';
 
@@ -138,6 +149,7 @@ function abrirModal(id) {
             document.getElementById('inputNombre').value = imp.nombre;
             document.getElementById('inputPv').value = imp.punto_venta;
             document.getElementById('inputSucursal').value = imp.sucursal_id || '';
+            document.getElementById('inputFormato').value = imp.formato || '80mm';
             document.getElementById('inputActivo').checked = imp.activo;
             document.getElementById('modalTitle').textContent = 'Editar impresora';
         }

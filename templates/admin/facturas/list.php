@@ -120,7 +120,7 @@ $tipoBadges = ['FACT-A' => 'primary', 'FACT-B' => 'success', 'FACT-C' => 'second
                             <td class="small text-muted"><?= htmlspecialchars((string)($f['created_by_nombre'] ?? '-')) ?></td>
                             <td style="white-space:nowrap">
                                 <a class="btn btn-sm btn-outline-secondary py-0 px-1" title="Ver" href="/admin/facturas/<?= (int)($f['id'] ?? 0) ?>"><i class="bi bi-eye"></i></a>
-                                <a class="btn btn-sm btn-outline-secondary py-0 px-1" title="Imprimir" target="_blank" href="/admin/facturas/imprimir/<?= (int)($f['id'] ?? 0) ?>"><i class="bi bi-printer"></i></a>
+                                <a class="btn btn-sm btn-outline-secondary py-0 px-1 print-link" title="Imprimir" target="_blank" data-print-id="<?= (int)($f['id'] ?? 0) ?>" href="/admin/facturas/imprimir/<?= (int)($f['id'] ?? 0) ?>"><i class="bi bi-printer"></i></a>
                                 <?php
                                 $waTel = preg_replace('/\D/', '', (string)($f['cliente_tele'] ?? ''));
                                 if ($waTel !== ''):
@@ -139,6 +139,14 @@ $tipoBadges = ['FACT-A' => 'primary', 'FACT-B' => 'success', 'FACT-C' => 'second
         </table>
     </div>
     <script>
+    document.querySelectorAll('a.print-link').forEach(function(a) {
+        a.addEventListener('click', function() {
+            var fmt = '80mm';
+            try { fmt = localStorage.getItem('perfushopping_print_format') || '80mm'; } catch (e) {}
+            if (fmt !== '80mm' && fmt !== '58mm' && fmt !== 'a4') fmt = '80mm';
+            a.href = '/admin/facturas/imprimir/' + a.getAttribute('data-print-id') + '?formato=' + fmt;
+        });
+    });
     function enviarComprobanteEmail(id, btn) {
         if (!confirm('¿Enviar el comprobante por email al cliente?')) return;
         btn.disabled = true;

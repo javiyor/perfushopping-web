@@ -23,6 +23,7 @@ final class PrintJobRepo
                     punto_venta INT NOT NULL DEFAULT 0,
                     sucursal_id INT UNSIGNED DEFAULT NULL,
                     token VARCHAR(64) NOT NULL,
+                    formato VARCHAR(10) NOT NULL DEFAULT '80mm',
                     activo TINYINT(1) NOT NULL DEFAULT 1,
                     created_at DATETIME DEFAULT NULL,
                     updated_at DATETIME DEFAULT NULL,
@@ -31,6 +32,11 @@ final class PrintJobRepo
                     KEY idx_pv (punto_venta)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             ");
+            $cols = Db::pdo()->query('SHOW COLUMNS FROM impresoras')->fetchAll();
+            $fields = array_column($cols, 'Field');
+            if (!in_array('formato', $fields, true)) {
+                Db::pdo()->exec("ALTER TABLE impresoras ADD COLUMN formato VARCHAR(10) NOT NULL DEFAULT '80mm'");
+            }
             Db::pdo()->exec("
                 CREATE TABLE IF NOT EXISTS print_jobs (
                     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -97,7 +103,7 @@ final class PrintJobRepo
         return $st->fetch() ?: null;
     }
 
-    public function guardarImpresora(?int $id, string $nombre, int $puntoVenta, ?int $sucursalId, int $activo): int
+    public function guardarImpresora(?int $id, string $nombre, int $puntoVenta, ?int $sucursalId, int $activo, string $formato = '80mm'): int
     {
         self::ensureTables();
         $nombre = trim($nombre);
@@ -107,18 +113,21 @@ final class PrintJobRepo
         if ($puntoVenta <= 0) {
             throw new \RuntimeException('El punto de venta es obligatorio.');
         }
+        if (!in_array($formato, ['80mm', '58mm'], true)) {
+            $formato = '80mm';
+        }
         if ($id) {
             Db::pdo()->prepare('
                 UPDATE impresoras SET nombre = :n, punto_venta = :pv, sucursal_id = :suc,
-                    activo = :a, updated_at = NOW() WHERE id = :id LIMIT 1
-            ')->execute([':n' => $nombre, ':pv' => $puntoVenta, ':suc' => $sucursalId, ':a' => $activo, ':id' => $id]);
+                    formato = :f, activo = :a, updated_at = NOW() WHERE id = :id LIMIT 1
+            ')->execute([':n' => $nombre, ':pv' => $puntoVenta, ':suc' => $sucursalId, ':f' => $formato, ':a' => $activo, ':id' => $id]);
             return $id;
         }
         $token = bin2hex(random_bytes(16));
         Db::pdo()->prepare('
-            INSERT INTO impresoras (nombre, punto_venta, sucursal_id, token, activo, created_at, updated_at)
-            VALUES (:n, :pv, :suc, :t, :a, NOW(), NOW())
-        ')->execute([':n' => $nombre, ':pv' => $puntoVenta, ':suc' => $sucursalId, ':t' => $token, ':a' => $activo]);
+            INSERT INTO impresoras (nombre, punto_venta, sucursal_id, token, formato, activo, created_at, updated_at)
+            VALUES (:n, :pv, :suc, :t, :f, :a, NOW(), NOW())
+        ')->execute([':n' => $nombre, ':pv' => $puntoVenta, ':suc' => $sucursalId, ':t' => $token, ':f' => $formato, ':a' => $activo]);
         return (int)Db::pdo()->lastInsertId();
     }
 

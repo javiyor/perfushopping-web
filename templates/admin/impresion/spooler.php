@@ -22,7 +22,7 @@ $impresora = $impresora ?? null;
 <?php else: ?>
 <div class="alert alert-success py-2 small">
     <i class="bi bi-printer"></i>
-    Impresora asignada: <strong><?= htmlspecialchars((string)($impresora['nombre'] ?? '')) ?></strong>
+    Impresora asignada: <strong><?= htmlspecialchars((string)($impresora['nombre'] ?? '')) ?></strong> (<?= htmlspecialchars((string)(($impresora['formato'] ?? '') ?: '80mm')) ?>)
 </div>
 <?php endif; ?>
 
@@ -68,6 +68,8 @@ $impresora = $impresora ?? null;
 <script>
 (function() {
     var CSRF = <?= json_encode($csrf ?? '') ?>;
+    var FORMATO = <?= json_encode((string)(($impresora['formato'] ?? '') ?: '80mm')) ?>;
+    if (FORMATO !== '80mm' && FORMATO !== '58mm') FORMATO = '80mm';
     var running = true;
     var busy = false;
     var queue = [];
@@ -128,7 +130,7 @@ $impresora = $impresora ?? null;
                 setTimeout(function() { clearTimeout(to); finish('impreso', null); }, 2000);
             };
             frame.onerror = function() { clearTimeout(to); finish('error', 'no se pudo cargar el ticket'); };
-            frame.src = '/admin/facturas/imprimir/' + job.factura_id + '?formato=80mm&auto=1';
+            frame.src = '/admin/facturas/imprimir/' + job.factura_id + '?formato=' + FORMATO + '&auto=1';
             document.getElementById('spoolerFrames').appendChild(frame);
             setTimeout(function() { try { frame.remove(); } catch (e) {} }, 60000);
         } catch (e) {
@@ -155,7 +157,7 @@ $impresora = $impresora ?? null;
                 + '<td class="small">' + escSpooler(j.cliente_nombre || '') + '</td>'
                 + '<td class="small text-muted">' + (j.created_at || '') + '</td>'
                 + '<td><div class="d-flex gap-1">'
-                + '<a class="btn btn-sm btn-outline-secondary py-0 px-1" target="_blank" title="Imprimir" href="/admin/facturas/imprimir/' + j.factura_id + '?formato=80mm"><i class="bi bi-printer"></i></a>'
+                + '<a class="btn btn-sm btn-outline-secondary py-0 px-1" target="_blank" title="Imprimir" href="/admin/facturas/imprimir/' + j.factura_id + '?formato=' + FORMATO + '"><i class="bi bi-printer"></i></a>'
                 + waBtn
                 + '</div></td>';
             tb.appendChild(tr);

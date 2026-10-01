@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS impresoras (
     punto_venta INT NOT NULL DEFAULT 0,
     sucursal_id INT UNSIGNED DEFAULT NULL,
     token VARCHAR(64) NOT NULL,
+    formato VARCHAR(10) NOT NULL DEFAULT '80mm',
     activo TINYINT(1) NOT NULL DEFAULT 1,
     created_at DATETIME DEFAULT NULL,
     updated_at DATETIME DEFAULT NULL,
