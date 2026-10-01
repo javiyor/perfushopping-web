@@ -16,7 +16,18 @@ $customerCategories = [
 if (!$customer):
 ?>
     <div class="alert alert-warning">Cliente no encontrado.</div>
-<?php return; endif; ?>
+<?php return; endif;
+
+$mov = $movimientos ?? ['facturas' => 0, 'pedidos' => 0, 'ctacte' => 0, 'puntos' => 0, 'total' => 0];
+$erpCols = $erpCols ?? [];
+$erpCondIvas = [
+    'consumidor_final' => 'Consumidor Final',
+    'monotributista' => 'Monotributista',
+    'responsable_inscripto' => 'Responsable Inscripto',
+    'exento' => 'Exento',
+];
+$erpCategorias = ['minorista' => 'Minorista', 'mayorista' => 'Mayorista', 'profesional' => 'Profesional'];
+?>
 
 <nav aria-label="breadcrumb" class="mb-3">
     <ol class="breadcrumb">
@@ -30,13 +41,42 @@ if (!$customer):
         <div class="card shadow-sm h-100">
             <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
                 <span><i class="bi bi-person"></i> Datos del cliente</span>
-                <?php if (!empty($customer['disabled_at'])): ?>
-                    <span class="badge bg-secondary">Bloqueado</span>
-                <?php else: ?>
-                    <span class="badge bg-success">Activo</span>
-                <?php endif; ?>
+                <span class="d-flex align-items-center gap-2">
+                    <?php if (!empty($customer['disabled_at'])): ?>
+                        <span class="badge bg-secondary">Bloqueado</span>
+                    <?php else: ?>
+                        <span class="badge bg-success">Activo</span>
+                    <?php endif; ?>
+                    <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#editarClienteModal">
+                        <i class="bi bi-pencil"></i> Editar
+                    </button>
+                    <?php if ((int)$mov['total'] === 0): ?>
+                        <button class="btn btn-sm btn-outline-danger" type="button" onclick="eliminarCliente()">
+                            <i class="bi bi-trash"></i> Eliminar
+                        </button>
+                    <?php else: ?>
+                        <button class="btn btn-sm btn-outline-danger" type="button" disabled title="Tiene movimientos: no se puede eliminar">
+                            <i class="bi bi-trash"></i> Eliminar
+                        </button>
+                    <?php endif; ?>
+                </span>
             </div>
             <div class="card-body">
+                <div class="alert alert-<?= (int)$mov['total'] > 0 ? 'warning' : 'success' ?> py-2 px-2 small mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <span>
+                        <i class="bi bi-clipboard-check"></i>
+                        <strong>Chequeo de movimientos:</strong>
+                        <?= (int)$mov['facturas'] ?> factura(s) ·
+                        <?= (int)$mov['pedidos'] ?> pedido(s) ·
+                        <?= (int)$mov['ctacte'] ?> mov. cta. cte. ·
+                        <?= (int)$mov['puntos'] ?> mov. puntos
+                    </span>
+                    <?php if ((int)$mov['total'] > 0): ?>
+                        <span class="badge bg-warning text-dark">No se puede eliminar</span>
+                    <?php else: ?>
+                        <span class="badge bg-success">Sin movimientos: se puede eliminar</span>
+                    <?php endif; ?>
+                </div>
                 <dl class="row mb-0 small">
                     <dt class="col-sm-4">ID</dt>
                     <dd class="col-sm-8"><?= (int)($customer['id'] ?? 0) ?></dd>
@@ -231,3 +271,146 @@ if (!$customer):
         <?php endif; ?>
     </div>
 </div>
+
+<form method="post" action="/admin/clientes/eliminar" id="eliminarClienteForm" class="d-none">
+    <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+    <input type="hidden" name="user_id" value="<?= (int)($customer['id'] ?? 0) ?>" />
+</form>
+
+<div class="modal fade" id="editarClienteModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post" action="/admin/clientes/editar">
+                <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                <input type="hidden" name="user_id" value="<?= (int)($customer['id'] ?? 0) ?>" />
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-pencil"></i> Editar cliente</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info py-2 px-2 small">
+                        <i class="bi bi-clipboard-check"></i>
+                        Chequeo de movimientos previo:
+                        <strong><?= (int)$mov['facturas'] ?></strong> factura(s),
+                        <strong><?= (int)$mov['pedidos'] ?></strong> pedido(s),
+                        <strong><?= (int)$mov['ctacte'] ?></strong> mov. cta. cte.,
+                        <strong><?= (int)$mov['puntos'] ?></strong> mov. puntos.
+                        Los comprobantes ya emitidos conservan sus propios datos (copia por factura).
+                    </div>
+
+                    <h6 class="fw-bold small text-uppercase text-muted mb-2">Datos de la cuenta web</h6>
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label small">Nombre *</label>
+                            <input type="text" class="form-control form-control-sm" name="name" value="<?= htmlspecialchars((string)($customer['name'] ?? '')) ?>" required />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Email *</label>
+                            <input type="email" class="form-control form-control-sm" name="email" value="<?= htmlspecialchars((string)($customer['email'] ?? '')) ?>" required />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Teléfono</label>
+                            <input type="text" class="form-control form-control-sm" name="phone" value="<?= htmlspecialchars((string)($customer['phone'] ?? '')) ?>" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Dirección</label>
+                            <input type="text" class="form-control form-control-sm" name="address" value="<?= htmlspecialchars((string)($customer['address'] ?? '')) ?>" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Ciudad</label>
+                            <input type="text" class="form-control form-control-sm" name="city" value="<?= htmlspecialchars((string)($customer['city'] ?? '')) ?>" />
+                        </div>
+                        <div class="col-3">
+                            <label class="form-label small">C.P.</label>
+                            <input type="text" class="form-control form-control-sm" name="postal_code" value="<?= htmlspecialchars((string)($customer['postal_code'] ?? '')) ?>" />
+                        </div>
+                        <div class="col-3">
+                            <label class="form-label small">Categoría</label>
+                            <select class="form-select form-select-sm" name="customer_category">
+                                <?php foreach ($customerCategories as $ck => $cl): ?>
+                                    <option value="<?= htmlspecialchars($ck) ?>" <?= (($customer['customer_category'] ?? 'none') === $ck) ? 'selected' : '' ?>><?= htmlspecialchars($cl) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+
+                    <?php if ($clienteErp): ?>
+                    <hr class="my-2" />
+                    <h6 class="fw-bold small text-uppercase text-muted mb-2">Datos de facturación (ERP)</h6>
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label small">Razón social / Nombre facturado</label>
+                            <input type="text" class="form-control form-control-sm" name="erp_razon" value="<?= htmlspecialchars((string)($clienteErp['razon'] ?? '')) ?>" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">CUIT / DNI</label>
+                            <input type="text" class="form-control form-control-sm" name="erp_cuit" maxlength="11" value="<?= htmlspecialchars((string)($clienteErp['cuit'] ?? '')) ?>" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Dirección</label>
+                            <input type="text" class="form-control form-control-sm" name="erp_direc" value="<?= htmlspecialchars((string)($clienteErp['direc'] ?? '')) ?>" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Localidad</label>
+                            <input type="text" class="form-control form-control-sm" name="erp_localidad" value="<?= htmlspecialchars((string)($clienteErp['Localidad'] ?? '')) ?>" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Teléfono</label>
+                            <input type="text" class="form-control form-control-sm" name="erp_tele" value="<?= htmlspecialchars((string)($clienteErp['tele'] ?? '')) ?>" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Email</label>
+                            <input type="text" class="form-control form-control-sm" name="erp_mail" value="<?= htmlspecialchars((string)($clienteErp['mail'] ?? '')) ?>" />
+                        </div>
+                        <?php if (!empty($erpCols['condicion_iva'])): ?>
+                        <div class="col-6">
+                            <label class="form-label small">Condición frente al IVA</label>
+                            <select class="form-select form-select-sm" name="erp_condicion_iva">
+                                <?php foreach ($erpCondIvas as $ck => $cl): ?>
+                                    <option value="<?= htmlspecialchars($ck) ?>" <?= (($clienteErp['condicion_iva'] ?? 'consumidor_final') === $ck) ? 'selected' : '' ?>><?= htmlspecialchars($cl) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <?php endif; ?>
+                        <?php if (!empty($erpCols['categoria'])): ?>
+                        <div class="col-6">
+                            <label class="form-label small">Categoría comercial</label>
+                            <select class="form-select form-select-sm" name="erp_categoria">
+                                <?php foreach ($erpCategorias as $ck => $cl): ?>
+                                    <option value="<?= htmlspecialchars($ck) ?>" <?= (($clienteErp['categoria'] ?? 'minorista') === $ck) ? 'selected' : '' ?>><?= htmlspecialchars($cl) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <?php if (!empty($erpCols['precio_mayorista'])): ?>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="erp_precio_mayorista" value="1" id="erpPrecioMayorista" <?= !empty($clienteErp['precio_mayorista']) ? 'checked' : '' ?> />
+                                <label class="form-check-label small" for="erpPrecioMayorista">Aplica precios mayoristas</label>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+                        <?php if (!empty($erpCols['especialidad'])): ?>
+                        <div class="col-12">
+                            <label class="form-label small">Especialidad</label>
+                            <input type="text" class="form-control form-control-sm" name="erp_especialidad" value="<?= htmlspecialchars((string)($clienteErp['especialidad'] ?? '')) ?>" />
+                        </div>
+                        <?php endif; ?>
+                        <?php endif; ?>
+                    </div>
+                    <?php endif; ?>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-sm btn-accent"><i class="bi bi-check-lg"></i> Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function eliminarCliente() {
+    const ok = confirm('¿Eliminar este usuario web?\n\nNo tiene movimientos asociados. Esta acción no se puede deshacer.');
+    if (ok) document.getElementById('eliminarClienteForm').submit();
+}
+</script>

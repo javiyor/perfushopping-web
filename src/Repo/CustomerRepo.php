@@ -136,4 +136,98 @@ final class CustomerRepo
         $st->execute([':u' => $userId, ':a' => $adminUserId, ':n' => $texto]);
         return (int)Db::pdo()->lastInsertId();
     }
+
+    /** @return array{facturas:int,pedidos:int,ctacte:int,puntos:int,total:int} */
+    public function movimientos(int $userId, int $clienteId = 0): array
+    {
+        $erp = max(0, $clienteId);
+        $sql = 'SELECT
+            (SELECT COUNT(*) FROM facturas WHERE cliente_id = :u1' . ($erp > 0 ? ' OR idclien = :erp1' : '') . ') AS facturas,
+            (SELECT COUNT(*) FROM orders WHERE user_id = :u2) AS pedidos,
+            (SELECT COUNT(*) FROM ctacte_movimientos WHERE cliente_id = :u3) AS ctacte'
+            . ($erp > 0 ? ', (SELECT COUNT(*) FROM puntos_movimientos WHERE idclien = :erp2) AS puntos' : ', 0 AS puntos');
+        $params = [':u1' => $userId, ':u2' => $userId, ':u3' => $userId];
+        if ($erp > 0) {
+            $params[':erp1'] = $erp;
+            $params[':erp2'] = $erp;
+        }
+        $st = Db::pdo()->prepare($sql);
+        $st->execute($params);
+        $r = $st->fetch() ?: [];
+        $out = [
+            'facturas' => (int)($r['facturas'] ?? 0),
+            'pedidos' => (int)($r['pedidos'] ?? 0),
+            'ctacte' => (int)($r['ctacte'] ?? 0),
+            'puntos' => (int)($r['puntos'] ?? 0),
+        ];
+        $out['total'] = $out['facturas'] + $out['pedidos'] + $out['ctacte'] + $out['puntos'];
+        return $out;
+    }
+
+    /** @param array<string,mixed> $data */
+    public function updateWebUser(int $id, array $data): void
+    {
+        $allowed = ['name', 'email', 'phone', 'address', 'city', 'postal_code', 'customer_category'];
+        $set = [];
+        $params = [':id' => $id];
+        foreach ($allowed as $f) {
+            if (array_key_exists($f, $data)) {
+                $set[] = "{$f} = :{$f}";
+                $params[":{$f}"] = $data[$f];
+            }
+        }
+        if (!$set) {
+            return;
+        }
+        Db::pdo()->prepare('UPDATE web_users SET ' . implode(', ', $set) . ' WHERE id = :id')->execute($params);
+    }
+
+    /** @return array<string,bool> */
+    public static function clientesColumnas(): array
+    {
+        static $cols = null;
+        if ($cols === null) {
+            try {
+                $cols = array_fill_keys(array_column(Db::pdo()->query('SHOW COLUMNS FROM clientes')->fetchAll(), 'Field'), true);
+            } catch (\Throwable $e) {
+                $cols = [];
+            }
+        }
+        return $cols;
+    }
+
+    /** @param array<string,mixed> $data */
+    public function updateClienteErp(int $idclien, array $data): void
+    {
+        $map = [
+            'razon' => 'razon',
+            'cuit' => 'cuit',
+            'direc' => 'direc',
+            'tele' => 'tele',
+            'mail' => 'mail',
+            'localidad' => 'Localidad',
+            'condicion_iva' => 'condicion_iva',
+            'categoria' => 'categoria',
+            'precio_mayorista' => 'precio_mayorista',
+            'especialidad' => 'especialidad',
+        ];
+        $cols = self::clientesColumnas();
+        $set = [];
+        $params = [':id' => $idclien];
+        foreach ($map as $input => $col) {
+            if (array_key_exists($input, $data) && !empty($cols[$col])) {
+                $set[] = "{$col} = :{$input}";
+                $params[":{$input}"] = $data[$input];
+            }
+        }
+        if (!$set) {
+            return;
+        }
+        Db::pdo()->prepare('UPDATE clientes SET ' . implode(', ', $set) . ' WHERE idclien = :id')->execute($params);
+    }
+
+    public function deleteWebUser(int $id): void
+    {
+        Db::pdo()->prepare('DELETE FROM web_users WHERE id = :i')->execute([':i' => $id]);
+    }
 }

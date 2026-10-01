@@ -64,6 +64,8 @@ final class CustomerController
         }
 
         $notas = $repo->notas($id);
+        $movimientos = $repo->movimientos($id, (int)($customer['cliente_id'] ?? 0));
+        $erpCols = CustomerRepo::clientesColumnas();
 
         echo View::adminPage('admin/clientes/detail.php', [
             'adminUser' => $adminUser,
@@ -72,6 +74,8 @@ final class CustomerController
             'itemsByOrder' => $itemsByOrder,
             'clienteErp' => $clienteErp,
             'notas' => $notas,
+            'movimientos' => $movimientos,
+            'erpCols' => $erpCols,
             'csrf' => Csrf::token(),
             'flash' => $_SESSION['admin_flash'] ?? null,
             'pageTitle' => 'Cliente: ' . htmlspecialchars(mb_substr((string)($customer['name'] ?? $customer['email'] ?? ''), 0, 40)),
@@ -96,6 +100,108 @@ final class CustomerController
         (new CustomerRepo())->addNota($userId, (int)$adminUser['id'], $texto);
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Nota agregada.'];
         Response::redirect('/admin/clientes/' . $userId);
+    }
+
+    public function editar(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requirePermiso('clientes');
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $userId = (int)($_POST['user_id'] ?? 0);
+        $repo = new CustomerRepo();
+        $customer = $repo->findById($userId);
+        if (!$customer) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Cliente no encontrado.'];
+            Response::redirect('/admin/clientes');
+        }
+
+        $name = trim((string)($_POST['name'] ?? ''));
+        $email = trim((string)($_POST['email'] ?? ''));
+        if ($name === '' || $email === '') {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Nombre y email son obligatorios.'];
+            Response::redirect('/admin/clientes/' . $userId);
+        }
+
+        $allowedCats = ['none', 'peluquero', 'cosmetologa', 'esteticista', 'manicura', 'masajista', 'barbero', 'maquillador', 'spa', 'revendedor', 'otro'];
+        $cat = trim((string)($_POST['customer_category'] ?? 'none'));
+        if (!in_array($cat, $allowedCats, true)) {
+            $cat = 'none';
+        }
+
+        try {
+            $repo->updateWebUser($userId, [
+                'name' => $name,
+                'email' => $email,
+                'phone' => trim((string)($_POST['phone'] ?? '')),
+                'address' => trim((string)($_POST['address'] ?? '')),
+                'city' => trim((string)($_POST['city'] ?? '')),
+                'postal_code' => trim((string)($_POST['postal_code'] ?? '')),
+                'customer_category' => $cat,
+            ]);
+        } catch (\PDOException $e) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se pudo guardar: ese email ya está en uso por otro usuario.'];
+            Response::redirect('/admin/clientes/' . $userId);
+        }
+
+        $erpId = (int)($customer['cliente_id'] ?? 0);
+        if ($erpId > 0 && $repo->clienteErp($erpId)) {
+            $erpRazon = trim((string)($_POST['erp_razon'] ?? ''));
+            $erpData = [
+                'razon' => $erpRazon !== '' ? $erpRazon : $name,
+                'cuit' => (string)(preg_replace('/[^0-9]/', '', (string)($_POST['erp_cuit'] ?? '')) ?? ''),
+                'direc' => trim((string)($_POST['erp_direc'] ?? '')),
+                'localidad' => trim((string)($_POST['erp_localidad'] ?? '')),
+                'tele' => trim((string)($_POST['erp_tele'] ?? '')),
+                'mail' => trim((string)($_POST['erp_mail'] ?? '')),
+            ];
+            $ci = trim((string)($_POST['erp_condicion_iva'] ?? ''));
+            if ($ci !== '') {
+                $erpData['condicion_iva'] = FacturaRepo::normalizeCondIva($ci);
+            }
+            $erpCat = trim((string)($_POST['erp_categoria'] ?? ''));
+            if ($erpCat !== '') {
+                $erpData['categoria'] = FacturaRepo::normalizeCategoria($erpCat);
+                $erpData['precio_mayorista'] = !empty($_POST['erp_precio_mayorista']) ? 1 : 0;
+                $erpData['especialidad'] = mb_substr(trim((string)($_POST['erp_especialidad'] ?? '')), 0, 60) ?: null;
+            }
+            $repo->updateClienteErp($erpId, $erpData);
+        }
+
+        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Cliente actualizado.'];
+        Response::redirect('/admin/clientes/' . $userId);
+    }
+
+    public function eliminar(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requirePermiso('clientes');
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $userId = (int)($_POST['user_id'] ?? 0);
+        $repo = new CustomerRepo();
+        $customer = $repo->findById($userId);
+        if (!$customer) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Cliente no encontrado.'];
+            Response::redirect('/admin/clientes');
+        }
+
+        $mov = $repo->movimientos($userId, (int)($customer['cliente_id'] ?? 0));
+        if ($mov['total'] > 0) {
+            $detalle = $mov['facturas'] . ' factura(s), ' . $mov['pedidos'] . ' pedido(s), ' . $mov['ctacte'] . ' mov. cta. cte., ' . $mov['puntos'] . ' mov. puntos';
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se puede eliminar: el cliente tiene movimientos (' . $detalle . '). Podés bloquearlo en su lugar.'];
+            Response::redirect('/admin/clientes/' . $userId);
+        }
+
+        try {
+            $repo->deleteWebUser($userId);
+        } catch (\PDOException $e) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se pudo eliminar: el usuario está referenciado por otros datos (afiliados u otros).'];
+            Response::redirect('/admin/clientes/' . $userId);
+        }
+
+        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Cliente eliminado.'];
+        Response::redirect('/admin/clientes');
     }
 
     public function buscarArca(array $params): void
