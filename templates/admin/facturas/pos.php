@@ -9,6 +9,10 @@ $bancosCuentas = $bancosCuentas ?? [];
 $tarjetas = $tarjetas ?? [];
 $equipos = $equipos ?? [];
 $plazos = $plazos ?? [];
+$editarId = (int)($editarId ?? 0);
+$editarFactura = is_array($editarFactura ?? null) ? $editarFactura : null;
+$editarItems = is_array($editarItems ?? null) ? $editarItems : [];
+$editarPagos = is_array($editarPagos ?? null) ? $editarPagos : [];
 ?>
 <style>
 .pos-layout { display:flex; gap:20px; align-items:flex-start; }
@@ -112,7 +116,7 @@ $plazos = $plazos ?? [];
 
 <div class="d-flex justify-content-between align-items-start mb-2">
     <div>
-        <h4 class="fw-bold mb-0">Nueva factura</h4>
+        <h4 class="fw-bold mb-0"><?= $editarId > 0 ? 'Editar comprobante' : 'Nueva factura' ?></h4>
     </div>
     <a class="btn btn-outline-secondary btn-sm" href="/admin/facturas/comprobantes"><i class="bi bi-list-ul"></i> Comprobantes emitidos</a>
 </div>
@@ -171,7 +175,7 @@ $plazos = $plazos ?? [];
     <span class="badge bg-success fs-6">Pedido web <?= htmlspecialchars($pedidoCodigo ?? '') ?> cargado</span>
     <input type="hidden" id="pedidoId" value="<?= $pedidoId ?>" />
     <?php else: ?>
-    <input type="hidden" id="pedidoId" value="0" />
+        <input type="hidden" id="pedidoId" value="0" />
     <button class="btn btn-sm btn-outline-success" type="button" onclick="document.getElementById('pedidoSearchWrap').style.display='block'">
         <i class="bi bi-cart"></i> Desde pedido web
     </button>
@@ -186,6 +190,10 @@ $plazos = $plazos ?? [];
         <input class="form-control form-control-sm" id="pedidoSearch" placeholder="...o buscar otro pedido" autocomplete="off" style="width:320px" />
         <div id="pedidoSuggestions" style="position:absolute;z-index:1050;width:100%"></div>
     </div>
+    <?php endif; ?>
+
+    <?php if ($editarId > 0): ?>
+    <span class="badge bg-warning text-dark fs-6"><i class="bi bi-pencil"></i> Editando <?= htmlspecialchars((string)($editarFactura['codigo'] ?? '')) ?></span>
     <?php endif; ?>
 </div>
 
@@ -327,7 +335,7 @@ $plazos = $plazos ?? [];
                 <div class="pt-row" id="posIvaRow"><span>IVA</span><span id="posIva">$0</span></div>
                 <div class="pt-row">
                     <span>Dto. %</span>
-                    <span><input type="number" id="posDescuento" value="0" min="0" max="100" style="width:60px;text-align:right;font-size:14px;border:1px solid #ccc;border-radius:4px;padding:2px 4px" onchange="recalcTotals()" />%</span>
+                    <span><input type="number" id="posDescuento" value="0" min="0" max="100" step="any" style="width:60px;text-align:right;font-size:14px;border:1px solid #ccc;border-radius:4px;padding:2px 4px" onchange="recalcTotals()" />%</span>
                 </div>
                 <div class="pt-row" id="posPuntosRow" style="display:none">
                     <span>Puntos a canjear (1 pto = $1)</span>
@@ -403,7 +411,7 @@ $plazos = $plazos ?? [];
         <input type="hidden" id="csrfToken" value="<?= htmlspecialchars($csrfToken) ?>" />
 
         <button class="btn btn-accent w-100 py-3 fw-bold fs-5" id="btnFacturar" onclick="submitFactura()">
-            <i class="bi bi-receipt"></i> FACTURAR
+            <i class="bi bi-<?= $editarId > 0 ? 'pencil' : 'receipt' ?>"></i> <?= $editarId > 0 ? 'GUARDAR CAMBIOS' : 'FACTURAR' ?>
         </button>
     </div>
 </div>
@@ -754,7 +762,7 @@ function recalcTotals() {
         iva += lineIva;
         total += netLine + lineIva;
     });
-    const descPct = parseInt(document.getElementById('posDescuento').value) || 0;
+    const descPct = parseFloat(document.getElementById('posDescuento').value) || 0;
     const descuento = descPct > 0 ? Math.round(total * descPct / 100) : 0;
 
     const isRI = getCondIva() === 'responsable_inscripto';
@@ -1132,6 +1140,13 @@ const PEDIDO_ENVIO = <?= json_encode($pedidoEnvio, JSON_UNESCAPED_UNICODE) ?>;
 const PEDIDO_PAGO = <?= json_encode($pedidoPago, JSON_UNESCAPED_UNICODE) ?>;
 const PEDIDO_DESC_PCT = <?= json_encode($pedidoDescPct ?? 0) ?>;
 
+// ── Edición de comprobante (facturas sin CAE) ──
+const EDITAR_ID = <?= (int)$editarId ?>;
+const EDITAR_FACTURA = <?= json_encode($editarFactura, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?>;
+const EDITAR_ITEMS = <?= json_encode($editarItems, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?>;
+const EDITAR_PAGOS = <?= json_encode($editarPagos, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?>;
+const BTN_LABEL = EDITAR_ID > 0 ? '<i class="bi bi-pencil"></i> GUARDAR CAMBIOS' : '<i class="bi bi-receipt"></i> FACTURAR';
+
 function pedidoDisplayedTotalCents() {
     const t = (document.getElementById('posTotal').textContent || '').replace(/[^0-9,.\-]/g, '').replace(/\./g, '').replace(',', '.');
     const v = Math.round(parseFloat(t) * 100);
@@ -1139,6 +1154,7 @@ function pedidoDisplayedTotalCents() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    if (EDITAR_ID > 0) { editarPrefill(); return; }
     const pidEl = document.getElementById('pedidoId');
     if (!pidEl || parseInt(pidEl.value) <= 0) return;
     (PEDIDO_ITEMS || []).forEach(it => addToCart({
@@ -1185,6 +1201,123 @@ document.addEventListener('DOMContentLoaded', function() {
         recalcTotals();
     }
 });
+
+// ── Prefill para editar un comprobante existente ──
+function editarPrefill() {
+    const f = EDITAR_FACTURA || {};
+    (EDITAR_ITEMS || []).forEach(it => addToCart({
+        idprodu: it.idprodu || 0,
+        idcodgusto: it.idcodgusto || 0,
+        producto: it.producto || '',
+        variedad: it.variedad || '',
+        qty: it.qty || 1,
+        unit_price_cents: it.unit_price_cents || 0,
+        iva_rate: (it.iva_rate === undefined || it.iva_rate === null) ? 21 : it.iva_rate,
+        dto: it.descuento_pct || 0,
+    }));
+    if (f.cliente_id || f.idclien) {
+        selectCliente({
+            id: f.cliente_id || 0,
+            idclien: f.idclien || 0,
+            name: f.cliente_nombre || '',
+            cuit: f.cliente_cuit || '',
+            condicion_iva: f.cliente_condicion_iva || 'consumidor_final',
+        });
+    } else {
+        if (f.cliente_nombre) {
+            document.getElementById('clienteNombre').textContent = f.cliente_nombre;
+            cliInput.value = f.cliente_nombre;
+        }
+        if (f.cliente_cuit) document.getElementById('clienteCuit').textContent = f.cliente_cuit;
+        if (f.cliente_condicion_iva) document.getElementById('clienteCondIva').value = f.cliente_condicion_iva;
+    }
+    // selectCliente puede cambiar el tipo según la condición: prevalece el original
+    const tc = document.getElementById('tipoComprobante');
+    if (tc && f.tipo_comprobante) tc.value = f.tipo_comprobante;
+    const vEl = document.getElementById('vendedorId');
+    if (vEl) {
+        vEl.value = String(parseInt(f.vendedor_id || 0)) || '0';
+    }
+    // Dto. global (% con decimales para reconstruir los centavos exactos)
+    const bruto = cart.reduce((s, item) => {
+        const netLine = Math.round(item.qty * precioActivo(item) * (1 - lineDto(item.dto) / 100));
+        return s + netLine + (item.iva_rate > 0 ? Math.round(netLine * item.iva_rate / 100) : 0);
+    }, 0);
+    const descCents = parseInt(f.descuento_cents || 0);
+    const dp = document.getElementById('posDescuento');
+    if (dp) dp.value = (descCents > 0 && bruto > 0) ? parseFloat((descCents / bruto * 100).toFixed(6)) : 0;
+    // Entrega
+    if (f.entrega_tipo === 'envio') {
+        const radio = document.querySelector('input[name="entrega_tipo"][value="envio"]');
+        if (radio) { radio.checked = true; onEntregaChange(); }
+        const ts = document.getElementById('transporteSelect');
+        if (ts && f.transporte) ts.value = f.transporte;
+        const ed = document.getElementById('envioDireccion');
+        if (ed) ed.value = f.envio_direccion || '';
+        const eo = document.getElementById('envioObs');
+        if (eo) eo.value = f.envio_observacion || '';
+    }
+    const nEl = document.getElementById('facturaNotas');
+    if (nEl && f.notas) nEl.value = f.notas;
+
+    // Pagos originales (los cheques conservan su cheque_id para reutilizarse)
+    (EDITAR_PAGOS || []).forEach(pg => {
+        if ((pg.monto_cents || 0) <= 0) return;
+        const forma = pg.forma_pago === 'tarjetas' ? 'tarjeta' : (pg.forma_pago || 'efectivo');
+        addPagoLine(forma);
+        const lines = document.querySelectorAll('#pagosContainer .pago-line');
+        const line = lines[lines.length - 1];
+        if (!line) return;
+        const sel = line.querySelector('.fp-forma');
+        if (sel && sel.value !== forma) {
+            const opt = document.createElement('option');
+            opt.value = forma;
+            opt.textContent = forma;
+            sel.appendChild(opt);
+            sel.value = forma;
+            onPagoFormaChange(sel);
+        }
+        const monto = line.querySelector('.fp-monto');
+        if (monto) monto.value = (pg.monto_cents / 100).toFixed(2);
+        const tipo = formaTipo(forma);
+        if (tipo === 'tarjeta') {
+            const t = line.querySelector('.fp-tarjeta'); if (t && pg.tarjeta_id) t.value = String(pg.tarjeta_id);
+            const e = line.querySelector('.fp-equipo'); if (e && pg.equipo_id) e.value = String(pg.equipo_id);
+            const c = line.querySelector('.fp-cupon'); if (c && pg.cupon_numero) c.value = pg.cupon_numero;
+        } else if (tipo === 'banco') {
+            const b = line.querySelector('.fp-banco-cuenta'); if (b && pg.banco_cuenta_id) b.value = String(pg.banco_cuenta_id);
+        } else if (tipo === 'ctacte') {
+            const p = line.querySelector('.fp-plazo'); if (p && pg.idplazo) p.value = String(pg.idplazo);
+        } else if (tipo === 'cheque') {
+            if (pg.cheque_id) line.dataset.chequeId = String(pg.cheque_id);
+            const b = line.querySelector('.fp-banco'); if (b && pg.banco_id) b.value = String(pg.banco_id);
+            const n = line.querySelector('.fp-chequenum'); if (n) n.value = pg.numero_cheque || '';
+            const t = line.querySelector('.fp-chequetitular'); if (t) t.value = pg.cheque_titular || '';
+            const cu = line.querySelector('.fp-chequecuit'); if (cu) cu.value = pg.cheque_cuit || '';
+            const v = line.querySelector('.fp-chequevenc'); if (v && pg.cheque_vto) v.value = String(pg.cheque_vto).substring(0, 10);
+        } else if (tipo === 'moneda') {
+            const mm = line.querySelector('.fp-monto-moneda');
+            const cz = line.querySelector('.fp-cotizacion');
+            if (mm && pg.monto_moneda_cents) mm.value = (pg.monto_moneda_cents / 100).toFixed(2);
+            if (cz && pg.cotizacion) cz.value = pg.cotizacion;
+            if (mm) mm.dispatchEvent(new Event('input'));
+        }
+    });
+
+    // Puntos canjeados: setear después de selectCliente (loadPuntosSaldo lo pone en 0)
+    const pu = document.getElementById('posPuntosUsar');
+    const pts = Math.floor(parseInt(f.puntos_cents || 0) / 100);
+    if (pu && pts > 0) pu.value = pts;
+    renderCart();
+
+    if (document.querySelectorAll('#pagosContainer .pago-line').length === 0) {
+        addPagoLine('efectivo');
+        const lines = document.querySelectorAll('#pagosContainer .pago-line');
+        const monto = lines[lines.length - 1]?.querySelector('.fp-monto');
+        if (monto) monto.value = (pedidoDisplayedTotalCents() / 100).toFixed(2);
+        recalcTotals();
+    }
+}
 
 // ── Payment lines (multi-pago) ──
 const BANCOS = <?= json_encode($bancos, JSON_UNESCAPED_UNICODE) ?>;
@@ -1326,7 +1459,7 @@ function onPagoFormaChange(sel) {
     recalcTotals();
 }
 
-addPagoLine('efectivo');
+    if (EDITAR_ID <= 0) addPagoLine('efectivo');
 
 function onEntregaChange() {
     const tipo = document.querySelector('input[name="entrega_tipo"]:checked').value;
@@ -1376,7 +1509,7 @@ function submitFactura() {
     const clienteErpId = parseInt(document.getElementById('clienteErpId').value) || 0;
     const notas = document.getElementById('facturaNotas').value;
 
-    const descPct = parseInt(document.getElementById('posDescuento').value) || 0;
+    const descPct = parseFloat(document.getElementById('posDescuento').value) || 0;
     const totalBruto = cart.reduce((sum, item) => {
         const netLine = Math.round(item.qty * precioActivo(item) * (1 - lineDto(item.dto) / 100));
         const lineIva = item.iva_rate > 0 ? Math.round(netLine * item.iva_rate / 100) : 0;
@@ -1417,13 +1550,14 @@ function submitFactura() {
                 cuit: line.querySelector('.fp-chequecuit').value,
                 vencimiento: line.querySelector('.fp-chequevenc').value,
             };
+            if (line.dataset.chequeId) entry.cheque_id = parseInt(line.dataset.chequeId) || null;
         }
         pagos.push(entry);
     });
     if (pagos.length === 0) {
         alert('Agregá al menos una forma de pago (con monto mayor a cero).');
         btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-receipt"></i> FACTURAR';
+        btn.innerHTML = BTN_LABEL;
         return;
     }
     const totalFactura = totalBruto - descuentoCents;
@@ -1432,7 +1566,7 @@ function submitFactura() {
         const ok = confirm('El total pagado ($' + fmtPrice(totalPagado) + ') es menor que el total de la factura ($' + fmtPrice(totalFactura) + '). ¿Continuar igual?');
         if (!ok) {
             btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-receipt"></i> FACTURAR';
+            btn.innerHTML = BTN_LABEL;
             return;
         }
     }
@@ -1442,6 +1576,7 @@ function submitFactura() {
     const entregaTipo = document.querySelector('input[name="entrega_tipo"]:checked')?.value || 'local';
     const payload = {
         _csrf: document.getElementById('csrfToken').value,
+        editar_id: EDITAR_ID,
         tipo_comprobante: tipo,
         forma_pago: pagos[0].forma_pago,
         entrega: {
@@ -1455,7 +1590,7 @@ function submitFactura() {
         pedido_id: parseInt((document.getElementById('pedidoId') || {}).value) || 0,
         vendedor_id: vendedorEl ? parseInt(vendedorEl.value) || null : null,
         notas: notas,
-        fecha: (function() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })(),
+        fecha: EDITAR_ID > 0 && EDITAR_FACTURA && EDITAR_FACTURA.fecha ? EDITAR_FACTURA.fecha : (function() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })(),
         descuento_cents: descuentoCents,
         puntos_usados: parseInt(document.getElementById('posPuntosUsar').value) || 0,
         cliente: {
@@ -1478,7 +1613,7 @@ function submitFactura() {
         pagos: pagos,
     };
 
-    fetch('/admin/facturas/guardar', {
+    fetch(EDITAR_ID > 0 ? '/admin/facturas/actualizar' : '/admin/facturas/guardar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -1496,18 +1631,18 @@ function submitFactura() {
             } else {
                 alert(res.error || 'Error al facturar');
                 btn.disabled = false;
-                btn.innerHTML = '<i class="bi bi-receipt"></i> FACTURAR';
+                btn.innerHTML = BTN_LABEL;
             }
         } catch (e) {
             alert('Error del servidor: ' + text.substring(0, 300));
             btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-receipt"></i> FACTURAR';
+            btn.innerHTML = BTN_LABEL;
         }
     }))
     .catch(err => {
         alert('Error de conexión: ' + err.message);
         btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-receipt"></i> FACTURAR';
+        btn.innerHTML = BTN_LABEL;
     });
 }
 

@@ -97,9 +97,18 @@ $tipoBadges = ['FACT-A' => 'primary', 'FACT-B' => 'success', 'FACT-C' => 'second
                             <td class="small">
                                 <?php
                                 $cae = !empty($f['cae']) && (string)$f['cae'] !== 'NULL' ? (string)$f['cae'] : '';
+                                $nroArca = '';
+                                if ($cae !== '' && preg_match('/^\d{4,5}-\d{8}$/', (string)($f['codigo'] ?? ''))) {
+                                    $nroArca = (string)$f['codigo'];
+                                } elseif ($cae !== '' && (int)($f['pv_arca_num'] ?? 0) > 0 && (int)($f['codigo_emision'] ?? 0) > 0) {
+                                    $nroArca = sprintf('%05d-%08d', (int)$f['pv_arca_num'], (int)$f['codigo_emision']);
+                                }
                                 if ($cae !== ''):
                                 ?>
                                     <span class="badge bg-success" title="CAE <?= htmlspecialchars($cae) ?>">Autorizada</span>
+                                    <?php if ($nroArca !== ''): ?>
+                                        <div class="text-muted mt-1" title="Número ARCA">N° <?= htmlspecialchars($nroArca) ?></div>
+                                    <?php endif; ?>
                                 <?php elseif (($f['arca_resultado'] ?? '') === 'R'): ?>
                                     <span class="badge bg-danger" title="<?= htmlspecialchars((string)($f['arca_observaciones'] ?? '')) ?>">Rechazada</span>
                                     <form method="post" action="/admin/arca/reenviar" class="d-inline">
@@ -107,12 +116,18 @@ $tipoBadges = ['FACT-A' => 'primary', 'FACT-B' => 'success', 'FACT-C' => 'second
                                         <input type="hidden" name="factura_id" value="<?= (int)$f['id'] ?>" />
                                         <button type="submit" class="btn btn-sm btn-outline-primary py-0 px-1" title="Reenviar a ARCA"><i class="bi bi-arrow-repeat"></i></button>
                                     </form>
+                                    <?php if (($f['estado'] ?? '') !== 'anulada'): ?>
+                                    <a class="btn btn-sm btn-outline-warning py-0 px-1" title="Editar comprobante" href="/admin/facturas/editar/<?= (int)$f['id'] ?>"><i class="bi bi-pencil"></i></a>
+                                    <?php endif; ?>
                                 <?php else: ?>
                                     <form method="post" action="/admin/arca/reenviar" class="d-inline">
                                         <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>" />
                                         <input type="hidden" name="factura_id" value="<?= (int)$f['id'] ?>" />
                                         <button type="submit" class="btn btn-sm btn-outline-primary py-0 px-1">Autorizar</button>
                                     </form>
+                                    <?php if (($f['estado'] ?? '') !== 'anulada'): ?>
+                                    <a class="btn btn-sm btn-outline-warning py-0 px-1" title="Editar comprobante" href="/admin/facturas/editar/<?= (int)$f['id'] ?>"><i class="bi bi-pencil"></i></a>
+                                    <?php endif; ?>
                                 <?php endif; ?>
                             </td>
                             <td class="small"><?= htmlspecialchars((string)($f['forma_pago'] ?? '-')) ?></td>

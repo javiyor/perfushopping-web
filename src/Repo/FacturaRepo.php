@@ -58,10 +58,12 @@ final class FacturaRepo
 
         $sql = '
             SELECT f.*, a.nombre AS created_by_nombre, v.nombre AS vendedor_nombre, COUNT(fi.id) AS items_count,
-                   ac.cae, ac.cae_vto, ac.resultado AS arca_resultado, ac.observaciones AS arca_observaciones
+                   ac.cae, ac.cae_vto, ac.resultado AS arca_resultado, ac.observaciones AS arca_observaciones,
+                   COALESCE(s.punto_venta_arca, f.punto_venta) AS pv_arca_num
             FROM facturas f
             LEFT JOIN admin_users a ON a.id = f.created_by
             LEFT JOIN admin_users v ON v.id = f.vendedor_id
+            LEFT JOIN admin_sucursales s ON s.id = f.sucursal_id
             LEFT JOIN factura_items fi ON fi.factura_id = f.id
             LEFT JOIN (
                 SELECT ac1.*
@@ -227,7 +229,7 @@ final class FacturaRepo
         // Intentar con nuevas columnas, fallback si no existen
         try {
             $st = Db::pdo()->prepare('
-                SELECT fp.*, c.banco_emisor AS cheque_banco, c.numero_cheque, c.titular AS cheque_titular, c.fecha_vencimiento AS cheque_vto, c.estado AS cheque_estado,
+                SELECT fp.*, c.banco_emisor AS cheque_banco, c.numero_cheque, c.titular AS cheque_titular, c.fecha_vencimiento AS cheque_vto, c.estado AS cheque_estado, c.cuit_titular AS cheque_cuit,
                        b.nombanc AS banco_nombre, p.descripcion AS plazo_descripcion, p.cuotas AS plazo_cuotas, p.dias AS plazo_dias, p.pricuo AS plazo_pricuo,
                        t.nomtar AS tarjeta_nombre, e.empresa AS equipo_empresa, e.idequipo AS equipo_idequipo,
                        bc.banco AS banco_cuenta_nombre
@@ -244,7 +246,7 @@ final class FacturaRepo
             return $st->fetchAll();
         } catch (\Throwable $e) {
             $st = Db::pdo()->prepare('
-                SELECT fp.*, c.banco_emisor AS cheque_banco, c.numero_cheque, c.titular AS cheque_titular, c.fecha_vencimiento AS cheque_vto, c.estado AS cheque_estado,
+                SELECT fp.*, c.banco_emisor AS cheque_banco, c.numero_cheque, c.titular AS cheque_titular, c.fecha_vencimiento AS cheque_vto, c.estado AS cheque_estado, c.cuit_titular AS cheque_cuit,
                        b.nombanc AS banco_nombre, p.descripcion AS plazo_descripcion, p.cuotas AS plazo_cuotas, p.dias AS plazo_dias, p.pricuo AS plazo_pricuo
                 FROM factura_pagos fp
                 LEFT JOIN cheques c ON c.id = fp.cheque_id
@@ -336,125 +338,193 @@ final class FacturaRepo
             }
             $id = (int)$pdo->lastInsertId();
 
-            $hasDtoCol = false;
-            $hasCostoCol = false;
-            try {
-                $itemCols = $pdo->query('SHOW COLUMNS FROM factura_items')->fetchAll();
-                $itemFields = array_column($itemCols, 'Field');
-                $hasDtoCol = in_array('descuento_pct', $itemFields, true);
-                if (!in_array('costo_cents', $itemFields, true)) {
-                    $pdo->exec('ALTER TABLE factura_items ADD COLUMN costo_cents INT DEFAULT NULL');
-                }
-                $hasCostoCol = true;
-            } catch (\Throwable $e) {}
-            // Snapshot del costo vigente (precomp neto en pesos -> centavos por unidad)
-            $costos = [];
-            try {
-                $ids = [];
-                foreach ($items as $it) {
-                    $pid = (int)($it['idprodu'] ?? 0);
-                    if ($pid > 0) {
-                        $ids[$pid] = true;
-                    }
-                }
-                if ($ids) {
-                    $in = implode(',', array_keys($ids));
-                    foreach ($pdo->query("SELECT idprodu, precomp FROM producto WHERE idprodu IN ({$in})")->fetchAll() as $pr) {
-                        $costos[(int)$pr['idprodu']] = (int)round((float)($pr['precomp'] ?? 0) * 100);
-                    }
-                }
-            } catch (\Throwable $e) {}
-            $sti = $pdo->prepare('
-                INSERT INTO factura_items (factura_id, idprodu, idcodgusto, producto, variedad, qty, unit_price_cents, iva_rate, iva_cents, total_cents' . ($hasDtoCol ? ', descuento_pct' : '') . ($hasCostoCol ? ', costo_cents' : '') . ')
-                VALUES (:fid, :idprodu, :idcodgusto, :producto, :variedad, :qty, :unit_price, :iva_rate, :iva_cents, :total' . ($hasDtoCol ? ', :dto' : '') . ($hasCostoCol ? ', :costo' : '') . ')
-            ');
-            foreach ($items as $it) {
-                $itemParams = [
-                    ':fid' => $id,
-                    ':idprodu' => $it['idprodu'],
-                    ':idcodgusto' => $it['idcodgusto'],
-                    ':producto' => $it['producto'],
-                    ':variedad' => $it['variedad'],
-                    ':qty' => $it['qty'],
-                    ':unit_price' => $it['unit_price_cents'],
-                    ':iva_rate' => $it['iva_rate'],
-                    ':iva_cents' => $it['iva_cents'],
-                    ':total' => $it['total_cents'],
-                ];
-                if ($hasDtoCol) {
-                    $itemParams[':dto'] = $it['descuento_pct'] ?? 0;
-                }
-                if ($hasCostoCol) {
-                    $pid = (int)($it['idprodu'] ?? 0);
-                    $itemParams[':costo'] = $costos[$pid] ?? null;
-                }
-                $sti->execute($itemParams);
-            }
-
-            // Inserción compatible con columnas nuevas y viejas
-            $hasTarjeta = false; $hasEquipo = false; $hasBancoCuenta = false; $hasMoneda = false;
-            try {
-                $cols = $pdo->query('SHOW COLUMNS FROM factura_pagos')->fetchAll();
-                $fields = array_column($cols, 'Field');
-                $hasTarjeta = in_array('tarjeta_id', $fields, true);
-                $hasEquipo = in_array('equipo_id', $fields, true);
-                $hasBancoCuenta = in_array('banco_cuenta_id', $fields, true);
-                $needMoneda = ['moneda' => 'ADD COLUMN moneda CHAR(3) DEFAULT NULL',
-                    'monto_moneda_cents' => 'ADD COLUMN monto_moneda_cents INT DEFAULT NULL',
-                    'cotizacion' => 'ADD COLUMN cotizacion DECIMAL(18,6) DEFAULT NULL'];
-                foreach ($needMoneda as $col => $ddl) {
-                    if (!in_array($col, $fields, true)) {
-                        $pdo->exec("ALTER TABLE factura_pagos {$ddl}");
-                    }
-                }
-                $hasMoneda = true;
-            } catch (\Throwable $e) {}
-            if ($hasTarjeta && $hasEquipo && $hasBancoCuenta) {
-                $monCols = $hasMoneda ? ', moneda, monto_moneda_cents, cotizacion' : '';
-                $monVals = $hasMoneda ? ', :moneda, :montoMoneda, :cotiz' : '';
-                $stp = $pdo->prepare('INSERT INTO factura_pagos (factura_id, forma_pago, cheque_id, monto_cents, cupon_numero, cupon_monto_cents, idplazo, banco_id, tarjeta_id, equipo_id, banco_cuenta_id' . $monCols . ') VALUES (:fid, :forma, :chq, :monto, :cupon, :cuponm, :plazo, :banco, :tarjeta, :equipo, :bancoCuenta' . $monVals . ')');
-                foreach ($pagos as $pg) {
-                    // Compatibilidad: el código viejo 'tarjetas' equivale a 'tarjeta'
-                    $forma = $pg['forma_pago'] === 'tarjetas' ? 'tarjeta' : $pg['forma_pago'];
-                    $params = [
-                        ':fid' => $id,
-                        ':forma' => $forma,
-                        ':chq' => $pg['cheque_id'] ?? null,
-                        ':monto' => $pg['monto_cents'],
-                        ':cupon' => $pg['cupon_numero'] ?? null,
-                        ':cuponm' => $pg['cupon_monto_cents'] ?? null,
-                        ':plazo' => $pg['idplazo'] ?? null,
-                        ':banco' => $pg['banco_id'] ?? null,
-                        ':tarjeta' => $pg['tarjeta_id'] ?? null,
-                        ':equipo' => $pg['equipo_id'] ?? null,
-                        ':bancoCuenta' => $pg['banco_cuenta_id'] ?? null,
-                    ];
-                    if ($hasMoneda) {
-                        $params[':moneda'] = $pg['moneda'] ?? null;
-                        $params[':montoMoneda'] = $pg['monto_moneda_cents'] ?? null;
-                        $params[':cotiz'] = $pg['cotizacion'] ?? null;
-                    }
-                    $stp->execute($params);
-                }
-            } else {
-                $stp = $pdo->prepare('INSERT INTO factura_pagos (factura_id, forma_pago, cheque_id, monto_cents, cupon_numero, cupon_monto_cents, idplazo, banco_id) VALUES (:fid, :forma, :chq, :monto, :cupon, :cuponm, :plazo, :banco)');
-                foreach ($pagos as $pg) {
-                    $forma = $pg['forma_pago'] === 'tarjetas' ? 'tarjeta' : $pg['forma_pago'];
-                    $stp->execute([
-                        ':fid' => $id,
-                        ':forma' => $forma,
-                        ':chq' => $pg['cheque_id'] ?? null,
-                        ':monto' => $pg['monto_cents'],
-                        ':cupon' => $pg['cupon_numero'] ?? null,
-                        ':cuponm' => $pg['cupon_monto_cents'] ?? null,
-                        ':plazo' => $pg['idplazo'] ?? null,
-                        ':banco' => $pg['banco_id'] ?? null,
-                    ]);
-                }
-            }
+            $this->insertarItems($id, $items);
+            $this->insertarPagos($id, $pagos);
 
             $pdo->commit();
             return $id;
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+    }
+
+    private function insertarItems(int $id, array $items): void
+    {
+        $pdo = Db::pdo();
+        $hasDtoCol = false;
+        $hasCostoCol = false;
+        try {
+            $itemCols = $pdo->query('SHOW COLUMNS FROM factura_items')->fetchAll();
+            $itemFields = array_column($itemCols, 'Field');
+            $hasDtoCol = in_array('descuento_pct', $itemFields, true);
+            if (!in_array('costo_cents', $itemFields, true)) {
+                $pdo->exec('ALTER TABLE factura_items ADD COLUMN costo_cents INT DEFAULT NULL');
+            }
+            $hasCostoCol = true;
+        } catch (\Throwable $e) {}
+        // Snapshot del costo vigente (precomp neto en pesos -> centavos por unidad)
+        $costos = [];
+        try {
+            $ids = [];
+            foreach ($items as $it) {
+                $pid = (int)($it['idprodu'] ?? 0);
+                if ($pid > 0) {
+                    $ids[$pid] = true;
+                }
+            }
+            if ($ids) {
+                $in = implode(',', array_keys($ids));
+                foreach ($pdo->query("SELECT idprodu, precomp FROM producto WHERE idprodu IN ({$in})")->fetchAll() as $pr) {
+                    $costos[(int)$pr['idprodu']] = (int)round((float)($pr['precomp'] ?? 0) * 100);
+                }
+            }
+        } catch (\Throwable $e) {}
+        $sti = $pdo->prepare('
+            INSERT INTO factura_items (factura_id, idprodu, idcodgusto, producto, variedad, qty, unit_price_cents, iva_rate, iva_cents, total_cents' . ($hasDtoCol ? ', descuento_pct' : '') . ($hasCostoCol ? ', costo_cents' : '') . ')
+            VALUES (:fid, :idprodu, :idcodgusto, :producto, :variedad, :qty, :unit_price, :iva_rate, :iva_cents, :total' . ($hasDtoCol ? ', :dto' : '') . ($hasCostoCol ? ', :costo' : '') . ')
+        ');
+        foreach ($items as $it) {
+            $itemParams = [
+                ':fid' => $id,
+                ':idprodu' => $it['idprodu'],
+                ':idcodgusto' => $it['idcodgusto'],
+                ':producto' => $it['producto'],
+                ':variedad' => $it['variedad'],
+                ':qty' => $it['qty'],
+                ':unit_price' => $it['unit_price_cents'],
+                ':iva_rate' => $it['iva_rate'],
+                ':iva_cents' => $it['iva_cents'],
+                ':total' => $it['total_cents'],
+            ];
+            if ($hasDtoCol) {
+                $itemParams[':dto'] = $it['descuento_pct'] ?? 0;
+            }
+            if ($hasCostoCol) {
+                $pid = (int)($it['idprodu'] ?? 0);
+                $itemParams[':costo'] = $costos[$pid] ?? null;
+            }
+            $sti->execute($itemParams);
+        }
+    }
+
+    private function insertarPagos(int $id, array $pagos): void
+    {
+        $pdo = Db::pdo();
+        $hasTarjeta = false; $hasEquipo = false; $hasBancoCuenta = false; $hasMoneda = false;
+        try {
+            $cols = $pdo->query('SHOW COLUMNS FROM factura_pagos')->fetchAll();
+            $fields = array_column($cols, 'Field');
+            $hasTarjeta = in_array('tarjeta_id', $fields, true);
+            $hasEquipo = in_array('equipo_id', $fields, true);
+            $hasBancoCuenta = in_array('banco_cuenta_id', $fields, true);
+            $needMoneda = ['moneda' => 'ADD COLUMN moneda CHAR(3) DEFAULT NULL',
+                'monto_moneda_cents' => 'ADD COLUMN monto_moneda_cents INT DEFAULT NULL',
+                'cotizacion' => 'ADD COLUMN cotizacion DECIMAL(18,6) DEFAULT NULL'];
+            foreach ($needMoneda as $col => $ddl) {
+                if (!in_array($col, $fields, true)) {
+                    $pdo->exec("ALTER TABLE factura_pagos {$ddl}");
+                }
+            }
+            $hasMoneda = true;
+        } catch (\Throwable $e) {}
+        if ($hasTarjeta && $hasEquipo && $hasBancoCuenta) {
+            $monCols = $hasMoneda ? ', moneda, monto_moneda_cents, cotizacion' : '';
+            $monVals = $hasMoneda ? ', :moneda, :montoMoneda, :cotiz' : '';
+            $stp = $pdo->prepare('INSERT INTO factura_pagos (factura_id, forma_pago, cheque_id, monto_cents, cupon_numero, cupon_monto_cents, idplazo, banco_id, tarjeta_id, equipo_id, banco_cuenta_id' . $monCols . ') VALUES (:fid, :forma, :chq, :monto, :cupon, :cuponm, :plazo, :banco, :tarjeta, :equipo, :bancoCuenta' . $monVals . ')');
+            foreach ($pagos as $pg) {
+                // Compatibilidad: el código viejo 'tarjetas' equivale a 'tarjeta'
+                $forma = $pg['forma_pago'] === 'tarjetas' ? 'tarjeta' : $pg['forma_pago'];
+                $params = [
+                    ':fid' => $id,
+                    ':forma' => $forma,
+                    ':chq' => $pg['cheque_id'] ?? null,
+                    ':monto' => $pg['monto_cents'],
+                    ':cupon' => $pg['cupon_numero'] ?? null,
+                    ':cuponm' => $pg['cupon_monto_cents'] ?? null,
+                    ':plazo' => $pg['idplazo'] ?? null,
+                    ':banco' => $pg['banco_id'] ?? null,
+                    ':tarjeta' => $pg['tarjeta_id'] ?? null,
+                    ':equipo' => $pg['equipo_id'] ?? null,
+                    ':bancoCuenta' => $pg['banco_cuenta_id'] ?? null,
+                ];
+                if ($hasMoneda) {
+                    $params[':moneda'] = $pg['moneda'] ?? null;
+                    $params[':montoMoneda'] = $pg['monto_moneda_cents'] ?? null;
+                    $params[':cotiz'] = $pg['cotizacion'] ?? null;
+                }
+                $stp->execute($params);
+            }
+        } else {
+            $stp = $pdo->prepare('INSERT INTO factura_pagos (factura_id, forma_pago, cheque_id, monto_cents, cupon_numero, cupon_monto_cents, idplazo, banco_id) VALUES (:fid, :forma, :chq, :monto, :cupon, :cuponm, :plazo, :banco)');
+            foreach ($pagos as $pg) {
+                $forma = $pg['forma_pago'] === 'tarjetas' ? 'tarjeta' : $pg['forma_pago'];
+                $stp->execute([
+                    ':fid' => $id,
+                    ':forma' => $forma,
+                    ':chq' => $pg['cheque_id'] ?? null,
+                    ':monto' => $pg['monto_cents'],
+                    ':cupon' => $pg['cupon_numero'] ?? null,
+                    ':cuponm' => $pg['cupon_monto_cents'] ?? null,
+                    ':plazo' => $pg['idplazo'] ?? null,
+                    ':banco' => $pg['banco_id'] ?? null,
+                ]);
+            }
+        }
+    }
+
+    /** Reemplaza cabecera, items y pagos de una factura existente (sin tocar código ni estado). */
+    public function actualizar(int $id, array $data, array $items, array $pagos): void
+    {
+        $this->ensureEntregaColumns();
+        $pdo = Db::pdo();
+        $pdo->beginTransaction();
+        try {
+            $cols = 'tipo_comprobante = :tipo, cliente_id = :cliente_id, idclien = :idclien, cliente_nombre = :cliente_nombre, '
+                . 'cliente_cuit = :cliente_cuit, cliente_direc = :cliente_direc, cliente_tele = :cliente_tele, '
+                . 'cliente_mail = :cliente_mail, cliente_condicion_iva = :cond, fecha = :fecha, '
+                . 'subtotal_cents = :subtotal, iva_cents = :iva, descuento_cents = :descuento, '
+                . 'puntos_cents = :puntos, total_cents = :total, forma_pago = :forma_pago, '
+                . 'notas = :notas, vendedor_id = :vendedor_id, updated_at = NOW()';
+            $params = [
+                ':tipo' => $data['tipo_comprobante'],
+                ':cliente_id' => $data['cliente_id'],
+                ':idclien' => $data['idclien'],
+                ':cliente_nombre' => $data['cliente_nombre'],
+                ':cliente_cuit' => $data['cliente_cuit'],
+                ':cliente_direc' => $data['cliente_direc'],
+                ':cliente_tele' => $data['cliente_tele'],
+                ':cliente_mail' => $data['cliente_mail'],
+                ':cond' => $data['cliente_condicion_iva'],
+                ':fecha' => $data['fecha'],
+                ':subtotal' => $data['subtotal_cents'],
+                ':iva' => $data['iva_cents'],
+                ':descuento' => $data['descuento_cents'] ?? 0,
+                ':puntos' => $data['puntos_cents'] ?? 0,
+                ':total' => $data['total_cents'],
+                ':forma_pago' => $data['forma_pago'],
+                ':notas' => $data['notas'],
+                ':vendedor_id' => $data['vendedor_id'] ?? null,
+            ];
+            if (self::$facturasEntregaHasCols) {
+                $cols .= ', entrega_tipo = :entrega_tipo, transporte = :transporte, envio_estado = :envio_estado, '
+                    . 'envio_direccion = :envio_direccion, envio_observacion = :envio_obs';
+                $params[':entrega_tipo'] = $data['entrega_tipo'] ?? 'local';
+                $params[':transporte'] = $data['transporte'] ?? null;
+                $params[':envio_estado'] = $data['envio_estado'] ?? null;
+                $params[':envio_direccion'] = $data['envio_direccion'] ?? null;
+                $params[':envio_obs'] = $data['envio_observacion'] ?? null;
+            }
+            $st = $pdo->prepare("UPDATE facturas SET {$cols} WHERE id = :i LIMIT 1");
+            $params[':i'] = $id;
+            $st->execute($params);
+
+            $pdo->prepare('DELETE FROM factura_items WHERE factura_id = :f')->execute([':f' => $id]);
+            $pdo->prepare('DELETE FROM factura_pagos WHERE factura_id = :f')->execute([':f' => $id]);
+            $this->insertarItems($id, $items);
+            $this->insertarPagos($id, $pagos);
+
+            $pdo->commit();
         } catch (\Throwable $e) {
             $pdo->rollBack();
             throw $e;

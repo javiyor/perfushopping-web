@@ -37,7 +37,7 @@ final class AfipWsfe
         @file_put_contents($dir . '/' . $this->debugTag . '-response.xml', $this->lastResponse);
     }
 
-    private function resolvePuntoVentaArca(array $factura): int
+    public function resolvePuntoVentaArca(array $factura): int
     {
         $sucursalId = (int)($factura['sucursal_id'] ?? 0);
         if ($sucursalId > 0) {
@@ -242,7 +242,7 @@ final class AfipWsfe
         $xml = $this->buildEnvelope($body);
         $response = $this->call($xml, 'FECAESolicitar');
 
-        return $this->parsearRespuesta($response, $xml, $cbteNro);
+        return $this->parsearRespuesta($response, $xml, $cbteNro, $puntoVenta);
     }
 
     public static function getTipoCbteCode(string $tipoComprobante): int
@@ -264,14 +264,8 @@ final class AfipWsfe
         }
         $importeTotal = $importeNeto + $iva;
 
-        $condIva = $factura['cliente_condicion_iva'] ?? 'consumidor_final';
-        $tipoDocRec = $condIva === 'consumidor_final' ? 99 : 80;
-        $nroDocRec = '0';
-        $cuit = trim((string)($factura['cliente_cuit'] ?? ''));
-        if ($cuit !== '') {
-            $tipoDocRec = 80;
-            $nroDocRec = preg_replace('/\D/', '', $cuit);
-        }
+        $tipoDocRec = $this->getTipoDoc($factura);
+        $nroDocRec = $this->getNroDoc($factura);
 
         $data = [
             'ver' => 1,
@@ -297,20 +291,43 @@ final class AfipWsfe
 
     private function getTipoDoc(array $factura): int
     {
-        $cuit = trim((string)($factura['cliente_cuit'] ?? ''));
-        if ($cuit !== '') {
-            return 80;
+        $doc = preg_replace('/\D/', '', (string)($factura['cliente_cuit'] ?? ''));
+        if ($doc === '') {
+            return 99;
+        }
+        if (strlen($doc) === 11) {
+            return self::cuitValido($doc) ? 80 : 99;
+        }
+        if (strlen($doc) === 7 || strlen($doc) === 8) {
+            return 96;
         }
         return 99;
     }
 
+    private static function cuitValido(string $doc): bool
+    {
+        if (strlen($doc) !== 11 || !ctype_digit($doc)) {
+            return false;
+        }
+        $pesos = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
+        $suma = 0;
+        for ($i = 0; $i < 10; $i++) {
+            $suma += (int)$doc[$i] * $pesos[$i];
+        }
+        $resto = $suma % 11;
+        if ($resto === 1) {
+            return false;
+        }
+        $dv = $resto === 0 ? 0 : 11 - $resto;
+        return $dv === (int)$doc[10];
+    }
+
     private function getNroDoc(array $factura): string
     {
-        $cuit = trim((string)($factura['cliente_cuit'] ?? ''));
-        if ($cuit !== '') {
-            return preg_replace('/\D/', '', $cuit);
+        if ($this->getTipoDoc($factura) === 99) {
+            return '0';
         }
-        return '0';
+        return preg_replace('/\D/', '', (string)($factura['cliente_cuit'] ?? ''));
     }
 
     private function buildAuthXml(): string
@@ -375,7 +392,7 @@ XML;
         return $response;
     }
 
-    private function parsearRespuesta(string $response, string $requestXml, int $cbteNro): array
+    private function parsearRespuesta(string $response, string $requestXml, int $cbteNro, int $puntoVenta): array
     {
         $dom = new \DOMDocument();
         $dom->loadXML($response);

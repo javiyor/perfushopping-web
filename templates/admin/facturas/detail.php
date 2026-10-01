@@ -144,6 +144,17 @@ $discriminaIva = in_array($factura['tipo_comprobante'] ?? '', ['FACT-A']);
                             <i class="bi bi-envelope"></i> Enviar email
                         </button>
                     <?php endif; ?>
+                    <?php
+                    $caeActual = trim((string)($factura['cae'] ?? ''));
+                    $puedeEditar = ($factura['estado'] ?? '') !== 'anulada'
+                        && ($caeActual === '' || $caeActual === 'NULL')
+                        && (($arcaComprobante['resultado'] ?? '') !== 'A');
+                    ?>
+                    <?php if ($puedeEditar): ?>
+                        <a class="btn btn-outline-warning btn-sm" href="/admin/facturas/editar/<?= (int)($factura['id'] ?? 0) ?>">
+                            <i class="bi bi-pencil"></i> Editar
+                        </a>
+                    <?php endif; ?>
                     <?php if (($factura['entrega_tipo'] ?? 'local') === 'envio' && in_array($factura['envio_estado'] ?? '', ['pendiente','en_transito'], true)): ?>
                         <form method="post" action="/admin/envios/entregar" style="display:inline" onsubmit="return confirm('¿Confirmar entrega y cobro?')">
                             <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />

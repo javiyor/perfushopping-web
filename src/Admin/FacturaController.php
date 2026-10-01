@@ -57,21 +57,12 @@ final class FacturaController
     public function pos(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requirePermiso('facturacion');
 
         $repo = new FacturaRepo();
         $remitoId = (int)($_GET['remito_id'] ?? 0);
         $remitoItems = [];
         $presupuestoId = (int)($_GET['presupuesto_id'] ?? 0);
         $presupuestoItems = [];
-
-        $vendedoresSesion = $auth->getVendedores();
-        $vendedores = [];
-        if ($vendedoresSesion) {
-            $st = \Perfushopping\Web\Infra\Db::pdo()->prepare('SELECT id, nombre, username, rol FROM admin_users WHERE id IN (' . implode(',', array_fill(0, count($vendedoresSesion), '?')) . ') AND activo = 1');
-            $st->execute(array_values($vendedoresSesion));
-            $vendedores = $st->fetchAll();
-        }
 
         if ($remitoId > 0) {
             $remito = (new \Perfushopping\Web\Repo\RemitoRepo())->findById($remitoId);
@@ -108,28 +99,7 @@ final class FacturaController
             }
         }
 
-        $pedidosPendientes = [];
-        try {
-            if ($repo->ensureOrderColumn()) {
-                $pedidosPendientes = (new \Perfushopping\Web\Repo\OrderRepo())->paidNotInvoiced(100);
-            }
-        } catch (\Throwable $e) {
-            $pedidosPendientes = [];
-        }
-
-        $cobroRepo = new CobroCuentaRepo();
-        $transferCuentaId = $cobroRepo->getTransferenciaCuentaId();
-        $tarjetaCobros = [];
-        try { $tarjetaCobros = $cobroRepo->all(); } catch (\Throwable $e) {}
-        // Mapeo tarjeta -> banco_cuenta_id para preselección
-        $tarjetaBancoMap = [];
-        foreach ($tarjetaCobros as $tc) {
-            if (($tc['tipo'] ?? '') === 'tarjeta' && !empty($tc['idtarje'])) {
-                $tarjetaBancoMap[(int)$tc['idtarje']] = (int)$tc['banco_cuenta_id'];
-            }
-        }
-        echo View::adminPage('admin/facturas/pos.php', [
-            'adminUser' => $adminUser,
+        echo View::adminPage('admin/facturas/pos.php', $this->posCommon($auth) + [
             'remitoId' => $remitoId,
             'remitoItems' => $remitoItems,
             'presupuestoId' => $presupuestoId,
@@ -141,6 +111,45 @@ final class FacturaController
             'pedidoEnvio' => $pedidoEnvio,
             'pedidoPago' => $pedidoPago,
             'pedidoDescPct' => $pedidoDescPct,
+            'pageTitle' => 'Nueva factura',
+        ]);
+    }
+
+    /** Datos comunes del POS (también usado al editar comprobantes). */
+    private function posCommon(AdminAuthService $auth): array
+    {
+        $adminUser = $auth->requirePermiso('facturacion');
+
+        $vendedoresSesion = $auth->getVendedores();
+        $vendedores = [];
+        if ($vendedoresSesion) {
+            $st = \Perfushopping\Web\Infra\Db::pdo()->prepare('SELECT id, nombre, username, rol FROM admin_users WHERE id IN (' . implode(',', array_fill(0, count($vendedoresSesion), '?')) . ') AND activo = 1');
+            $st->execute(array_values($vendedoresSesion));
+            $vendedores = $st->fetchAll();
+        }
+
+        $pedidosPendientes = [];
+        try {
+            if ((new FacturaRepo())->ensureOrderColumn()) {
+                $pedidosPendientes = (new \Perfushopping\Web\Repo\OrderRepo())->paidNotInvoiced(100);
+            }
+        } catch (\Throwable $e) {
+            $pedidosPendientes = [];
+        }
+
+        $cobroRepo = new CobroCuentaRepo();
+        $transferCuentaId = $cobroRepo->getTransferenciaCuentaId();
+        $tarjetaCobros = [];
+        try { $tarjetaCobros = $cobroRepo->all(); } catch (\Throwable $e) {}
+        $tarjetaBancoMap = [];
+        foreach ($tarjetaCobros as $tc) {
+            if (($tc['tipo'] ?? '') === 'tarjeta' && !empty($tc['idtarje'])) {
+                $tarjetaBancoMap[(int)$tc['idtarje']] = (int)$tc['banco_cuenta_id'];
+            }
+        }
+
+        return [
+            'adminUser' => $adminUser,
             'pedidosPendientes' => $pedidosPendientes,
             'vendedores' => $vendedores,
             'bancos' => $this->bancos(),
@@ -152,8 +161,7 @@ final class FacturaController
             'transferCuentaId' => $transferCuentaId,
             'tarjetaBancoMap' => $tarjetaBancoMap,
             'csrf' => Csrf::token(),
-            'pageTitle' => 'Nueva factura',
-        ]);
+        ];
     }
 
     public function store(array $params): void
@@ -180,109 +188,12 @@ final class FacturaController
         $clienteId = (int)($cliente['id'] ?? 0) ?: null;
         $clienteCondIva = trim((string)($cliente['condicion_iva'] ?? 'consumidor_final'));
 
-        $items = [];
-        $subtotal = 0;
-        $ivaTotal = 0;
-        foreach ($input['items'] as $it) {
-            $qty = max(1, (int)($it['qty'] ?? 1));
-            $unitPrice = max(0, (int)($it['unit_price_cents'] ?? 0));
-            $ivaRate = (float)($it['iva_rate'] ?? 21);
-            $dtoPct = min(100.0, max(0.0, (float)($it['descuento_pct'] ?? 0)));
-            $lineNet = (int)round($qty * $unitPrice * (1 - $dtoPct / 100));
-            $lineIva = $ivaRate > 0 ? (int)round($lineNet * $ivaRate / 100) : 0;
-            $items[] = [
-                'idprodu' => (int)($it['idprodu'] ?? 0) ?: null,
-                'idcodgusto' => (int)($it['idcodgusto'] ?? 0) ?: null,
-                'producto' => trim((string)($it['producto'] ?? '')),
-                'variedad' => trim((string)($it['variedad'] ?? '')),
-                'qty' => $qty,
-                'unit_price_cents' => $unitPrice,
-                'iva_rate' => $ivaRate,
-                'descuento_pct' => $dtoPct,
-                'iva_cents' => $lineIva,
-                'total_cents' => $lineNet + $lineIva,
-            ];
-            $subtotal += $lineNet;
-            $ivaTotal += $lineIva;
-        }
+        $itemsData = $this->normalizarItems($input['items']);
+        $items = $itemsData['items'];
+        $subtotal = $itemsData['subtotal'];
+        $ivaTotal = $itemsData['iva'];
 
-        $pagosRaw = $input['pagos'] ?? [];
-        $pagos = [];
-        $bancoNombres = [];
-        if ($pagosRaw) {
-            $st = \Perfushopping\Web\Infra\Db::pdo()->query('SELECT idban, nombanc FROM bancos');
-            foreach ($st->fetchAll() as $b) {
-                $bancoNombres[(int)$b['idban']] = (string)$b['nombanc'];
-            }
-        }
-        foreach ($pagosRaw as $pg) {
-            $monto = (int)($pg['monto_cents'] ?? 0);
-            if ($monto <= 0) continue;
-            $formaPagoP = trim((string)($pg['forma_pago'] ?? 'efectivo'));
-            // Compatibilidad: el código viejo 'tarjetas' equivale a 'tarjeta'
-            if ($formaPagoP === 'tarjetas') $formaPagoP = 'tarjeta';
-            $tipoPago = \Perfushopping\Web\Repo\FormaPagoRepo::tipoDe($formaPagoP);
-            $bancoId = null;
-            $chequeId = null;
-            $moneda = null;
-            $montoMoneda = null;
-            $cotiz = null;
-            if ($tipoPago === 'moneda') {
-                $moneda = strtoupper(trim((string)($pg['moneda'] ?? '')));
-                $montoMoneda = (int)($pg['monto_moneda_cents'] ?? 0);
-                $cotiz = (float)($pg['cotizacion'] ?? 0);
-                if (!preg_match('/^[A-Z]{3}$/', (string)$moneda) || $montoMoneda <= 0 || $cotiz <= 0) {
-                    Response::json(['ok' => false, 'error' => 'Pago en moneda extranjera incompleto (monto y cotización).'], 422);
-                    return;
-                }
-                $monto = (int)round($montoMoneda * $cotiz / 100);
-                if ($monto <= 0) continue;
-            }
-            if ($tipoPago === 'cheque' && !empty($pg['cheque'])) {
-                $chq = $pg['cheque'];
-                $bancoId = (int)($chq['banco_id'] ?? 0) ?: null;
-                $bancoEmisor = trim((string)($chq['banco'] ?? ''));
-                if (!$bancoEmisor && $bancoId) {
-                    $bancoEmisor = $bancoNombres[$bancoId] ?? '';
-                }
-                $chequeRepo = new ChequeRepo();
-                $chequeId = $chequeRepo->create([
-                    'tipo' => 'tercero',
-                    'estado' => 'en_cartera',
-                    'banco_emisor' => $bancoEmisor,
-                    'numero_cheque' => trim((string)($chq['numero'] ?? '')),
-                    'titular' => trim((string)($chq['titular'] ?? '')),
-                    'cuit_titular' => trim((string)($chq['cuit'] ?? '')),
-                    'monto_cents' => $monto,
-                    'fecha_emision' => (string)($input['fecha'] ?? date('Y-m-d')),
-                    'fecha_vencimiento' => trim((string)($chq['vencimiento'] ?? '')) ?: null,
-                    'concepto' => 'Factura — ' . $clienteNombre,
-                ], (int)$adminUser['id']);
-                $chequeRepo->agregarMovimiento($chequeId, 'recibido', 'factura', 0, '', (int)$adminUser['id']);
-            }
-            $pagos[] = [
-                'forma_pago' => $formaPagoP,
-                'monto_cents' => $monto,
-                'cheque_id' => $chequeId,
-                'cupon_numero' => $tipoPago === 'tarjeta' ? trim((string)($pg['cupon_numero'] ?? '')) : null,
-                'cupon_monto_cents' => $tipoPago === 'tarjeta' ? (int)($pg['cupon_monto_cents'] ?? 0) : null,
-                'idplazo' => $tipoPago === 'ctacte' ? ((int)($pg['idplazo'] ?? 0) ?: null) : null,
-                'banco_id' => $bancoId,
-                'banco_cuenta_id' => $tipoPago === 'banco' ? ((int)($pg['banco_cuenta_id'] ?? $pg['banco_id'] ?? 0) ?: null) : null,
-                'tarjeta_id' => $tipoPago === 'tarjeta' ? ((int)($pg['tarjeta_id'] ?? $pg['idtarje'] ?? 0) ?: null) : null,
-                'equipo_id' => $tipoPago === 'tarjeta' ? ((int)($pg['equipo_id'] ?? $pg['idequipo'] ?? 0) ?: null) : null,
-                'moneda' => $moneda,
-                'monto_moneda_cents' => $montoMoneda,
-                'cotizacion' => $cotiz,
-            ];
-        }
-
-        if (!$pagos) {
-            $pagos[] = [
-                'forma_pago' => trim((string)($input['forma_pago'] ?? 'efectivo')),
-                'monto_cents' => $subtotal + $ivaTotal,
-            ];
-        }
+        $pagos = $this->normalizarPagos($input['pagos'] ?? [], $input, (int)$adminUser['id'], $clienteNombre, $subtotal + $ivaTotal);
 
         $formaPago = $pagos[0]['forma_pago'] ?? 'efectivo';
 
@@ -440,31 +351,7 @@ final class FacturaController
         }
 
         // Registrar movimientos bancarios para transferencias y tarjetas
-        try {
-            $bancoMovRepo = new \Perfushopping\Web\Repo\BancoMovimientoRepo();
-            $cobroRepo = new \Perfushopping\Web\Repo\CobroCuentaRepo();
-            foreach ($pagos as $pg) {
-                $fp = $pg['forma_pago'];
-                $fpTipo = \Perfushopping\Web\Repo\FormaPagoRepo::tipoDe((string)$fp);
-                $esBancoNuevo = $fpTipo === 'banco' && !in_array($fp, ['transferencia', 'mercadopago', 'debito', 'credito'], true);
-                if ($fp === 'transferencia' || $esBancoNuevo) {
-                    $bancoCuentaId = $pg['banco_cuenta_id'] ?? null;
-                    if (!$bancoCuentaId) $bancoCuentaId = $cobroRepo->getTransferenciaCuentaId();
-                    if ($bancoCuentaId) {
-                        $bancoMovRepo->create((int)$bancoCuentaId, 'credito', 'factura', $id, 'Cobro factura ' . $codigo . ' (transferencia)', (int)$pg['monto_cents'], $fecha, (int)$adminUser['id']);
-                    }
-                } elseif ($fp === 'tarjeta') {
-                    $tarjetaId = $pg['tarjeta_id'] ?? null;
-                    $bancoCuentaId = null;
-                    if ($tarjetaId) $bancoCuentaId = $cobroRepo->getTarjetaCuentaId((int)$tarjetaId);
-                    // fallback a cuenta seleccionada explícitamente
-                    if (!$bancoCuentaId) $bancoCuentaId = $pg['banco_cuenta_id'] ?? null;
-                    if ($bancoCuentaId) {
-                        $bancoMovRepo->create((int)$bancoCuentaId, 'credito', 'factura', $id, 'Cobro factura ' . $codigo . ' (tarjeta ' . ($pg['tarjeta_id'] ?? '') . ')', (int)$pg['monto_cents'], $fecha, (int)$adminUser['id']);
-                    }
-                }
-            }
-        } catch (\Throwable $e) { error_log('BancoMov factura: '.$e->getMessage()); }
+        $this->registrarBancoMov($pagos, $id, $codigo, $fecha, (int)$adminUser['id']);
 
         // Encolar impresión en tickets para la impresora del punto de venta.
         try {
@@ -491,46 +378,571 @@ final class FacturaController
         }
 
         // Auto-send to ARCA if enabled
-        $arcaResult = null;
-        $arcaError = null;
-        $arcaRepo = new \Perfushopping\Web\Repo\ArcaRepo();
-        $wsfe = new \Perfushopping\Web\Service\AfipWsfe();
-        $wsfe->setDebugTag('factura-' . $id);
-        if ($arcaRepo->isHabilitado()) {
-            try {
-                $facturaData = $repo->findById($id);
-                $facturaItems = $repo->items($id);
-                $wsfe->autenticar();
-                $resultado = $wsfe->solicitarCAE($facturaData, $facturaItems);
-                $arcaRepo->guardarComprobante($id, $resultado);
-                $arcaResult = $resultado['cae'] ?? null;
-                if (!empty($resultado['cae']) && !empty($resultado['codigo_emision']) && !empty($resultado['punto_venta_arca'])) {
-                    $pv = (int)$resultado['punto_venta_arca'];
-                    $nro = (int)$resultado['codigo_emision'];
-                    $nuevoCodigo = sprintf('%05d-%08d', $pv, $nro);
-                    $repo->actualizarCodigo($id, $nuevoCodigo);
-                    $codigo = $nuevoCodigo;
-                }
-            } catch (\Throwable $e) {
-                $arcaError = $e->getMessage();
-                $arcaRepo->guardarComprobante($id, [
-                    'resultado' => 'R',
-                    'observaciones' => $arcaError,
-                    'cae' => null,
-                    'cae_vto' => null,
-                    'codigo_emision' => null,
-                    'request_xml' => $wsfe->lastRequest(),
-                    'response_xml' => $wsfe->lastResponse(),
-                ]);
-            }
+        $arca = $this->autoEnviarArca($id, $repo);
+        if (isset($arca['codigo'])) {
+            $codigo = $arca['codigo'];
         }
 
         Response::json([
             'ok' => true,
             'id' => $id,
             'codigo' => $codigo,
-            'arca' => $arcaResult ? ['cae' => $arcaResult] : ($arcaError ? ['error' => $arcaError] : null),
+            'arca' => !empty($arca['cae']) ? ['cae' => $arca['cae']] : (!empty($arca['error']) ? ['error' => $arca['error']] : null),
         ]);
+    }
+
+    /** @return array{items:array,subtotal:int,iva:int} */
+    private function normalizarItems(array $rawItems): array
+    {
+        $items = [];
+        $subtotal = 0;
+        $ivaTotal = 0;
+        foreach ($rawItems as $it) {
+            $qty = max(1, (int)($it['qty'] ?? 1));
+            $unitPrice = max(0, (int)($it['unit_price_cents'] ?? 0));
+            $ivaRate = (float)($it['iva_rate'] ?? 21);
+            $dtoPct = min(100.0, max(0.0, (float)($it['descuento_pct'] ?? 0)));
+            $lineNet = (int)round($qty * $unitPrice * (1 - $dtoPct / 100));
+            $lineIva = $ivaRate > 0 ? (int)round($lineNet * $ivaRate / 100) : 0;
+            $items[] = [
+                'idprodu' => (int)($it['idprodu'] ?? 0) ?: null,
+                'idcodgusto' => (int)($it['idcodgusto'] ?? 0) ?: null,
+                'producto' => trim((string)($it['producto'] ?? '')),
+                'variedad' => trim((string)($it['variedad'] ?? '')),
+                'qty' => $qty,
+                'unit_price_cents' => $unitPrice,
+                'iva_rate' => $ivaRate,
+                'descuento_pct' => $dtoPct,
+                'iva_cents' => $lineIva,
+                'total_cents' => $lineNet + $lineIva,
+            ];
+            $subtotal += $lineNet;
+            $ivaTotal += $lineIva;
+        }
+        return ['items' => $items, 'subtotal' => $subtotal, 'iva' => $ivaTotal];
+    }
+
+    /**
+     * Normaliza el array de pagos del POS. Si un pago de cheque trae cheque_id (edición),
+     * reutiliza ese cheque en cartera en lugar de crear uno nuevo.
+     * @throws \InvalidArgumentException cuando un pago en moneda extranjera está incompleto.
+     */
+    private function normalizarPagos(array $pagosRaw, array $input, int $adminUserId, string $clienteNombre, int $fallbackMonto): array
+    {
+        $pagos = [];
+        $bancoNombres = [];
+        if ($pagosRaw) {
+            $st = \Perfushopping\Web\Infra\Db::pdo()->query('SELECT idban, nombanc FROM bancos');
+            foreach ($st->fetchAll() as $b) {
+                $bancoNombres[(int)$b['idban']] = (string)$b['nombanc'];
+            }
+        }
+        foreach ($pagosRaw as $pg) {
+            $monto = (int)($pg['monto_cents'] ?? 0);
+            if ($monto <= 0) continue;
+            $formaPagoP = trim((string)($pg['forma_pago'] ?? 'efectivo'));
+            // Compatibilidad: el código viejo 'tarjetas' equivale a 'tarjeta'
+            if ($formaPagoP === 'tarjetas') $formaPagoP = 'tarjeta';
+            $tipoPago = \Perfushopping\Web\Repo\FormaPagoRepo::tipoDe($formaPagoP);
+            $bancoId = null;
+            $chequeId = null;
+            $moneda = null;
+            $montoMoneda = null;
+            $cotiz = null;
+            if ($tipoPago === 'moneda') {
+                $moneda = strtoupper(trim((string)($pg['moneda'] ?? '')));
+                $montoMoneda = (int)($pg['monto_moneda_cents'] ?? 0);
+                $cotiz = (float)($pg['cotizacion'] ?? 0);
+                if (!preg_match('/^[A-Z]{3}$/', (string)$moneda) || $montoMoneda <= 0 || $cotiz <= 0) {
+                    throw new \InvalidArgumentException('Pago en moneda extranjera incompleto (monto y cotización).');
+                }
+                $monto = (int)round($montoMoneda * $cotiz / 100);
+                if ($monto <= 0) continue;
+            }
+            if ($tipoPago === 'cheque' && !empty($pg['cheque'])) {
+                $chq = $pg['cheque'];
+                $bancoId = (int)($chq['banco_id'] ?? 0) ?: null;
+                $bancoEmisor = trim((string)($chq['banco'] ?? ''));
+                if (!$bancoEmisor && $bancoId) {
+                    $bancoEmisor = $bancoNombres[$bancoId] ?? '';
+                }
+                $chequeRepo = new ChequeRepo();
+                $chequeIdReusar = (int)($pg['cheque_id'] ?? 0) ?: null;
+                if ($chequeIdReusar) {
+                    $chequeRow = $chequeRepo->findById($chequeIdReusar);
+                    if ($chequeRow && ($chequeRow['estado'] ?? '') === 'en_cartera') {
+                        $upd = ['monto_cents = :m'];
+                        $updPrm = [':m' => $monto, ':i' => $chequeIdReusar];
+                        $campos = [
+                            'numero_cheque' => trim((string)($chq['numero'] ?? '')),
+                            'titular' => trim((string)($chq['titular'] ?? '')),
+                            'cuit_titular' => trim((string)($chq['cuit'] ?? '')),
+                            'fecha_vencimiento' => trim((string)($chq['vencimiento'] ?? '')),
+                            'banco_emisor' => $bancoEmisor,
+                        ];
+                        foreach ($campos as $col => $val) {
+                            if ($val !== '') {
+                                $upd[] = $col . ' = :' . $col;
+                                $updPrm[':' . $col] = $val;
+                            }
+                        }
+                        $upd[] = 'updated_at = NOW()';
+                        \Perfushopping\Web\Infra\Db::pdo()
+                            ->prepare('UPDATE cheques SET ' . implode(', ', $upd) . ' WHERE id = :i LIMIT 1')
+                            ->execute($updPrm);
+                        $chequeId = $chequeIdReusar;
+                        $bancoId = (int)($chequeRow['banco_id'] ?? $bancoId ?? 0) ?: $bancoId;
+                    } else {
+                        $chequeIdReusar = null;
+                    }
+                }
+                if (!$chequeIdReusar) {
+                    $chequeId = $chequeRepo->create([
+                        'tipo' => 'tercero',
+                        'estado' => 'en_cartera',
+                        'banco_emisor' => $bancoEmisor,
+                        'numero_cheque' => trim((string)($chq['numero'] ?? '')),
+                        'titular' => trim((string)($chq['titular'] ?? '')),
+                        'cuit_titular' => trim((string)($chq['cuit'] ?? '')),
+                        'monto_cents' => $monto,
+                        'fecha_emision' => (string)($input['fecha'] ?? date('Y-m-d')),
+                        'fecha_vencimiento' => trim((string)($chq['vencimiento'] ?? '')) ?: null,
+                        'concepto' => 'Factura — ' . $clienteNombre,
+                    ], $adminUserId);
+                    $chequeRepo->agregarMovimiento($chequeId, 'recibido', 'factura', 0, '', $adminUserId);
+                }
+            }
+            $pagos[] = [
+                'forma_pago' => $formaPagoP,
+                'monto_cents' => $monto,
+                'cheque_id' => $chequeId,
+                'cupon_numero' => $tipoPago === 'tarjeta' ? trim((string)($pg['cupon_numero'] ?? '')) : null,
+                'cupon_monto_cents' => $tipoPago === 'tarjeta' ? (int)($pg['cupon_monto_cents'] ?? 0) : null,
+                'idplazo' => $tipoPago === 'ctacte' ? ((int)($pg['idplazo'] ?? 0) ?: null) : null,
+                'banco_id' => $bancoId,
+                'banco_cuenta_id' => $tipoPago === 'banco' ? ((int)($pg['banco_cuenta_id'] ?? $pg['banco_id'] ?? 0) ?: null) : null,
+                'tarjeta_id' => $tipoPago === 'tarjeta' ? ((int)($pg['tarjeta_id'] ?? $pg['idtarje'] ?? 0) ?: null) : null,
+                'equipo_id' => $tipoPago === 'tarjeta' ? ((int)($pg['equipo_id'] ?? $pg['idequipo'] ?? 0) ?: null) : null,
+                'moneda' => $moneda,
+                'monto_moneda_cents' => $montoMoneda,
+                'cotizacion' => $cotiz,
+            ];
+        }
+
+        if (!$pagos) {
+            $pagos[] = [
+                'forma_pago' => trim((string)($input['forma_pago'] ?? 'efectivo')),
+                'monto_cents' => $fallbackMonto,
+            ];
+        }
+        return $pagos;
+    }
+
+    /** Registra movimientos bancarios por cobros de transferencia/tarjeta. */
+    private function registrarBancoMov(array $pagos, int $id, string $codigo, string $fecha, int $adminId): void
+    {
+        try {
+            $bancoMovRepo = new \Perfushopping\Web\Repo\BancoMovimientoRepo();
+            $cobroRepo = new CobroCuentaRepo();
+            foreach ($pagos as $pg) {
+                $fp = $pg['forma_pago'];
+                $fpTipo = \Perfushopping\Web\Repo\FormaPagoRepo::tipoDe((string)$fp);
+                $esBancoNuevo = $fpTipo === 'banco' && !in_array($fp, ['transferencia', 'mercadopago', 'debito', 'credito'], true);
+                if ($fp === 'transferencia' || $esBancoNuevo) {
+                    $bancoCuentaId = $pg['banco_cuenta_id'] ?? null;
+                    if (!$bancoCuentaId) $bancoCuentaId = $cobroRepo->getTransferenciaCuentaId();
+                    if ($bancoCuentaId) {
+                        $bancoMovRepo->create((int)$bancoCuentaId, 'credito', 'factura', $id, 'Cobro factura ' . $codigo . ' (transferencia)', (int)$pg['monto_cents'], $fecha, $adminId);
+                    }
+                } elseif ($fp === 'tarjeta') {
+                    $tarjetaId = $pg['tarjeta_id'] ?? null;
+                    $bancoCuentaId = null;
+                    if ($tarjetaId) $bancoCuentaId = $cobroRepo->getTarjetaCuentaId((int)$tarjetaId);
+                    // fallback a cuenta seleccionada explícitamente
+                    if (!$bancoCuentaId) $bancoCuentaId = $pg['banco_cuenta_id'] ?? null;
+                    if ($bancoCuentaId) {
+                        $bancoMovRepo->create((int)$bancoCuentaId, 'credito', 'factura', $id, 'Cobro factura ' . $codigo . ' (tarjeta ' . ($pg['tarjeta_id'] ?? '') . ')', (int)$pg['monto_cents'], $fecha, $adminId);
+                    }
+                }
+            }
+        } catch (\Throwable $e) { error_log('BancoMov factura: '.$e->getMessage()); }
+    }
+
+    /**
+     * Envía la factura a ARCA (si está habilitado). Devuelve cae/codigo o error.
+     * @return array{cae?:string,codigo?:string,error?:string}
+     */
+    private function autoEnviarArca(int $id, FacturaRepo $repo): array
+    {
+        $out = [];
+        $arcaRepo = new ArcaRepo();
+        if (!$arcaRepo->isHabilitado()) {
+            return $out;
+        }
+        $wsfe = new \Perfushopping\Web\Service\AfipWsfe();
+        $wsfe->setDebugTag('factura-' . $id);
+        try {
+            $facturaData = $repo->findById($id);
+            $facturaItems = $repo->items($id);
+            $wsfe->autenticar();
+            $resultado = $wsfe->solicitarCAE($facturaData, $facturaItems);
+            $arcaRepo->guardarComprobante($id, $resultado);
+            $out['cae'] = (string)($resultado['cae'] ?? '');
+            if (!empty($resultado['cae']) && !empty($resultado['codigo_emision']) && !empty($resultado['punto_venta_arca'])) {
+                $pv = (int)$resultado['punto_venta_arca'];
+                $nro = (int)$resultado['codigo_emision'];
+                $nuevoCodigo = sprintf('%05d-%08d', $pv, $nro);
+                $repo->actualizarCodigo($id, $nuevoCodigo);
+                $out['codigo'] = $nuevoCodigo;
+            }
+        } catch (\Throwable $e) {
+            $out['error'] = $e->getMessage();
+            $arcaRepo->guardarComprobante($id, [
+                'resultado' => 'R',
+                'observaciones' => $e->getMessage(),
+                'cae' => null,
+                'cae_vto' => null,
+                'codigo_emision' => null,
+                'request_xml' => $wsfe->lastRequest(),
+                'response_xml' => $wsfe->lastResponse(),
+            ]);
+        }
+        return $out;
+    }
+
+    /** Motivo por el que la factura no se puede editar, o null si es editable. */
+    private function motivoNoEditable(?array $f, int $id): ?string
+    {
+        if (!$f) {
+            return 'Factura no encontrada.';
+        }
+        if (($f['estado'] ?? '') === 'anulada') {
+            return 'No se puede editar una factura anulada.';
+        }
+        $cae = trim((string)($f['cae'] ?? ''));
+        if ($cae !== '' && $cae !== 'NULL') {
+            return 'La factura ya tiene CAE: no se puede editar.';
+        }
+        $arca = (new ArcaRepo())->getComprobante($id);
+        if (($arca['resultado'] ?? '') === 'A') {
+            return 'El comprobante ya fue autorizado por ARCA: no se puede editar.';
+        }
+        return null;
+    }
+
+    public function editar(array $params): void
+    {
+        $auth = new AdminAuthService();
+
+        $id = (int)($params['id'] ?? 0);
+        $repo = new FacturaRepo();
+        $factura = $repo->findById($id);
+        $motivo = $this->motivoNoEditable($factura, $id);
+        if ($motivo) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => $motivo];
+            Response::redirect($factura ? '/admin/facturas/' . $id : '/admin/facturas');
+            return;
+        }
+
+        echo View::adminPage('admin/facturas/pos.php', $this->posCommon($auth) + [
+            'editarId' => $id,
+            'editarFactura' => $factura,
+            'editarItems' => $repo->items($id),
+            'editarPagos' => $repo->pagos($id),
+            'pageTitle' => 'Editar factura ' . ($factura['codigo'] ?? ''),
+        ]);
+    }
+
+    public function actualizar(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requirePermiso('facturacion');
+
+        $input = json_decode(file_get_contents('php://input'), true);
+        Csrf::check($input['_csrf'] ?? null);
+
+        $editarId = (int)($input['editar_id'] ?? 0);
+        if ($editarId <= 0 || !$input || !isset($input['items']) || !is_array($input['items']) || count($input['items']) < 1) {
+            Response::json(['ok' => false, 'error' => 'Datos inválidos.'], 422);
+            return;
+        }
+
+        $repo = new FacturaRepo();
+        $old = $repo->findById($editarId);
+        $motivo = $this->motivoNoEditable($old, $editarId);
+        if ($motivo) {
+            Response::json(['ok' => false, 'error' => $motivo], 422);
+            return;
+        }
+
+        $oldItems = $repo->items($editarId);
+        $oldPagos = $repo->pagos($editarId);
+
+        $tipo = (string)($input['tipo_comprobante'] ?? $old['tipo_comprobante'] ?? 'FACT-B');
+        $cliente = $input['cliente'] ?? [];
+        $clienteNombre = trim((string)($cliente['nombre'] ?? $old['cliente_nombre'] ?? 'Consumidor Final'));
+        $clienteCuit = trim((string)($cliente['cuit'] ?? $old['cliente_cuit'] ?? ''));
+        $clienteId = (int)($cliente['id'] ?? 0) ?: null;
+        $clienteCondIva = trim((string)($cliente['condicion_iva'] ?? $old['cliente_condicion_iva'] ?? 'consumidor_final'));
+
+        try {
+            $itemsData = $this->normalizarItems($input['items']);
+            $items = $itemsData['items'];
+            $subtotal = $itemsData['subtotal'];
+            $ivaTotal = $itemsData['iva'];
+            $pagos = $this->normalizarPagos($input['pagos'] ?? [], $input, (int)$adminUser['id'], $clienteNombre, $subtotal + $ivaTotal);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['ok' => false, 'error' => $e->getMessage()], 422);
+            return;
+        }
+
+        $formaPago = $pagos[0]['forma_pago'] ?? 'efectivo';
+
+        $entrega = $input['entrega'] ?? [];
+        $entregaTipo = in_array($entrega['tipo'] ?? 'local', ['local','envio'], true) ? $entrega['tipo'] : 'local';
+        $transporte = null;
+        $envioEstado = null;
+        $envioDireccion = null;
+        $envioObs = null;
+        if ($entregaTipo === 'envio') {
+            $transporte = in_array($entrega['transporte'] ?? '', ['propio','delivery','correo_argentino'], true) ? $entrega['transporte'] : 'propio';
+            $envioEstado = trim((string)($old['envio_estado'] ?? '')) ?: 'pendiente';
+            $envioDireccion = trim((string)($entrega['direccion'] ?? ''));
+            $envioObs = trim((string)($entrega['observacion'] ?? ''));
+        }
+
+        $clienteDirec = trim((string)($cliente['direc'] ?? ''));
+        $clienteTele = trim((string)($cliente['tele'] ?? ''));
+        $clienteMail = trim((string)($cliente['mail'] ?? ''));
+        $clienteErpId = (int)($cliente['idclien'] ?? 0) ?: null;
+        if (!$clienteErpId && $clienteId) {
+            $erp = $repo->findClienteErpByWebId($clienteId);
+            $clienteErpId = $erp ? (int)$erp['idclien'] : null;
+        }
+        if ($clienteId || $clienteErpId) {
+            if ($clienteDirec === '') $clienteDirec = trim((string)($old['cliente_direc'] ?? ''));
+            if ($clienteTele === '') $clienteTele = trim((string)($old['cliente_tele'] ?? ''));
+            if ($clienteMail === '') $clienteMail = trim((string)($old['cliente_mail'] ?? ''));
+            $erp = $clienteErpId ? $repo->findClienteByIdclien($clienteErpId) : $repo->findClienteErpByWebId($clienteId);
+            if ($erp) {
+                $clienteErpId = (int)$erp['idclien'];
+                if (!$clienteDirec) $clienteDirec = trim((string)($erp['direc'] ?? ''));
+                if (!$clienteTele) $clienteTele = trim((string)($erp['tele'] ?? ''));
+                if (!$clienteMail) $clienteMail = trim((string)($erp['mail'] ?? ''));
+            }
+        }
+
+        $vendedorId = (int)($input['vendedor_id'] ?? 0) ?: null;
+        $notas = (string)($input['notas'] ?? '');
+
+        $fecha = (string)($input['fecha'] ?? $old['fecha'] ?? date('Y-m-d'));
+        $descuento = max(0, (int)($input['descuento_cents'] ?? 0));
+
+        $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
+        $puntosUsados = max(0, (int)($input['puntos_usados'] ?? 0));
+        $puntosUsadosCents = $puntosUsados * 100;
+        $oldUse = $puntosRepo->usoEnFactura($editarId);
+        if ($puntosUsados > 0) {
+            $saldoPuntos = $puntosRepo->saldo($clienteErpId ?: 0);
+            if ($oldUse && (int)($oldUse['idclien'] ?? 0) === (int)($clienteErpId ?: 0)) {
+                $saldoPuntos += (int)($oldUse['puntos'] ?? 0);
+            }
+            if ($puntosUsados > $saldoPuntos) {
+                Response::json(['ok' => false, 'error' => 'El cliente no tiene suficientes puntos para canjear.'], 422);
+                return;
+            }
+            if ($puntosUsadosCents > ($subtotal + $ivaTotal - $descuento)) {
+                $puntosUsados = (int)floor(($subtotal + $ivaTotal - $descuento) / 100);
+                $puntosUsadosCents = $puntosUsados * 100;
+            }
+        }
+
+        $repo->actualizar($editarId, [
+            'tipo_comprobante' => $tipo,
+            'cliente_id' => $clienteId,
+            'idclien' => $clienteErpId,
+            'cliente_nombre' => $clienteNombre,
+            'cliente_cuit' => $clienteCuit,
+            'cliente_direc' => $clienteDirec,
+            'cliente_tele' => $clienteTele,
+            'cliente_mail' => $clienteMail,
+            'cliente_condicion_iva' => $clienteCondIva,
+            'fecha' => $fecha,
+            'subtotal_cents' => $subtotal,
+            'iva_cents' => $ivaTotal,
+            'descuento_cents' => $descuento,
+            'puntos_cents' => $puntosUsadosCents,
+            'total_cents' => $subtotal + $ivaTotal - $descuento - $puntosUsadosCents,
+            'forma_pago' => $formaPago,
+            'entrega_tipo' => $entregaTipo,
+            'transporte' => $transporte,
+            'envio_estado' => $envioEstado,
+            'envio_direccion' => $envioDireccion,
+            'envio_observacion' => $envioObs,
+            'notas' => $notas,
+            'vendedor_id' => $vendedorId,
+        ], $items, $pagos);
+
+        $codigo = (string)($old['codigo'] ?? '');
+        $pdo = \Perfushopping\Web\Infra\Db::pdo();
+        $puntosService = new \Perfushopping\Web\Service\PuntosService();
+
+        // Puntos de uso: ajustar la única fila de 'uso' de la factura a lo nuevo.
+        if ($oldUse) {
+            $oldUseCli = (int)($oldUse['idclien'] ?? 0);
+            $oldUsePts = (int)($oldUse['puntos'] ?? 0);
+            $mismoCli = $oldUseCli > 0 && $oldUseCli === (int)($clienteErpId ?: 0);
+            if ($puntosUsados > 0 && $mismoCli && $oldUsePts > 0) {
+                $pdo->prepare('UPDATE puntos_movimientos SET puntos = :p WHERE id = :i LIMIT 1')
+                    ->execute([':p' => $puntosUsados, ':i' => (int)$oldUse['id']]);
+                $delta = $puntosUsados - $oldUsePts;
+                if ($delta !== 0) {
+                    $pdo->prepare('UPDATE puntos_cuentas SET saldo_puntos = saldo_puntos - :d, total_usados = total_usados + :d, updated_at = NOW() WHERE idclien = :c LIMIT 1')
+                        ->execute([':d' => $delta, ':c' => $oldUseCli]);
+                }
+            } else {
+                $pdo->prepare('DELETE FROM puntos_movimientos WHERE id = :i LIMIT 1')
+                    ->execute([':i' => (int)$oldUse['id']]);
+                if ($oldUseCli > 0 && $oldUsePts > 0) {
+                    $pdo->prepare('UPDATE puntos_cuentas SET saldo_puntos = saldo_puntos + :p, total_usados = total_usados - :p, updated_at = NOW() WHERE idclien = :c LIMIT 1')
+                        ->execute([':p' => $oldUsePts, ':c' => $oldUseCli]);
+                }
+                $oldUse = null;
+            }
+        }
+        if (!$oldUse && $puntosUsados > 0 && $clienteErpId) {
+            $puntosService->usarEnFactura($clienteErpId, $puntosUsados, $editarId, (int)$adminUser['id']);
+        }
+
+        // Puntos de acumulación: borrar la vieja y acreditar con los nuevos datos.
+        $stAcc = $pdo->prepare("SELECT idclien, puntos FROM puntos_movimientos WHERE factura_id = :f AND tipo = 'acumulacion' LIMIT 1");
+        $stAcc->execute([':f' => $editarId]);
+        $oldAcc = $stAcc->fetch();
+        if ($oldAcc) {
+            $pdo->prepare("DELETE FROM puntos_movimientos WHERE factura_id = :f AND tipo = 'acumulacion'")
+                ->execute([':f' => $editarId]);
+            $accCli = (int)($oldAcc['idclien'] ?? 0);
+            $accPts = (int)($oldAcc['puntos'] ?? 0);
+            if ($accCli > 0 && $accPts > 0) {
+                $pdo->prepare('UPDATE puntos_cuentas SET saldo_puntos = saldo_puntos - :p, total_acumulado = total_acumulado - :p, updated_at = NOW() WHERE idclien = :c LIMIT 1')
+                    ->execute([':p' => $accPts, ':c' => $accCli]);
+            }
+        }
+        $facturaNow = $repo->findById($editarId);
+        if ($facturaNow) {
+            $puntosService->acreditarFactura($facturaNow, $items);
+        }
+
+        // Cuenta corriente: rearmar el débito con los nuevos importes.
+        $ctaCte = new \Perfushopping\Web\Repo\CtaCteRepo();
+        $ctaCte->anularMovimientosPorOrigen('factura', $editarId);
+        if ($clienteId && $formaPago === 'cuenta_corriente') {
+            $ctaCte->agregarMovimiento(
+                'debito',
+                'factura',
+                $editarId,
+                $clienteId,
+                $clienteErpId,
+                $subtotal + $ivaTotal - $descuento,
+                'Factura ' . $codigo . ' — ' . $clienteNombre,
+                (int)$adminUser['id']
+            );
+        }
+
+        // Movimientos bancarios: borrar los viejos y registrar los nuevos.
+        $pdo->prepare("DELETE FROM banco_movimientos WHERE origen = 'factura' AND origen_id = :i")
+            ->execute([':i' => $editarId]);
+        $this->registrarBancoMov($pagos, $editarId, $codigo, $fecha, (int)$adminUser['id']);
+
+        // Stock: aplicar solo el delta viejo -> nuevo.
+        $depoId = $auth->getDepositoId();
+        if ($depoId > 0) {
+            $stockRepo = new StockRepo();
+            $qtyViejo = [];
+            $mapProd = [];
+            foreach ($oldItems as $it) {
+                $pid = (int)($it['idprodu'] ?? 0);
+                if ($pid <= 0) continue;
+                $gid = (int)($it['idcodgusto'] ?? 0);
+                $k = $pid . '-' . $gid;
+                $qtyViejo[$k] = ($qtyViejo[$k] ?? 0) + (int)($it['qty'] ?? 0);
+                $mapProd[$k] = [$pid, $gid ?: null];
+            }
+            $qtyNuevo = [];
+            foreach ($items as $it) {
+                $pid = (int)($it['idprodu'] ?? 0);
+                if ($pid <= 0) continue;
+                $gid = (int)($it['idcodgusto'] ?? 0);
+                $k = $pid . '-' . $gid;
+                $qtyNuevo[$k] = ($qtyNuevo[$k] ?? 0) + (int)($it['qty'] ?? 0);
+                $mapProd[$k] = [$pid, $gid ?: null];
+            }
+            foreach (array_unique(array_merge(array_keys($qtyViejo), array_keys($qtyNuevo))) as $k) {
+                $delta = ($qtyNuevo[$k] ?? 0) - ($qtyViejo[$k] ?? 0);
+                if ($delta === 0 || !isset($mapProd[$k])) {
+                    continue;
+                }
+                [$pid, $gid] = $mapProd[$k];
+                if ($delta > 0) {
+                    $stockRepo->registrarAjuste($pid, $gid, $depoId, 0, $delta, 'Edición Factura ' . $codigo, (int)$adminUser['id'], 'venta');
+                } else {
+                    $stockRepo->registrarAjuste($pid, $gid, 0, $depoId, -$delta, 'Edición Factura ' . $codigo, (int)$adminUser['id'], 'devolucion_venta');
+                }
+            }
+        }
+
+        // Cheques: eliminar los huérfanos que quedaron en cartera.
+        $usados = [];
+        foreach ($pagos as $pg) {
+            if (!empty($pg['cheque_id'])) {
+                $usados[(int)$pg['cheque_id']] = true;
+            }
+        }
+        foreach ($oldPagos as $op) {
+            $chqId = (int)($op['cheque_id'] ?? 0);
+            if ($chqId <= 0 || isset($usados[$chqId])) {
+                continue;
+            }
+            try {
+                $chq = (new ChequeRepo())->findById($chqId);
+                if (!$chq || ($chq['estado'] ?? '') !== 'en_cartera' || $this->chequeReferenciado($chqId)) {
+                    continue;
+                }
+                $pdo->prepare('DELETE FROM cheque_movimientos WHERE cheque_id = :c')->execute([':c' => $chqId]);
+                $pdo->prepare('DELETE FROM cheques WHERE id = :c LIMIT 1')->execute([':c' => $chqId]);
+            } catch (\Throwable $e) {
+                error_log('Cheque orphan factura: ' . $e->getMessage());
+            }
+        }
+
+        // Auto-send to ARCA if enabled
+        $arca = $this->autoEnviarArca($editarId, $repo);
+        if (isset($arca['codigo'])) {
+            $codigo = $arca['codigo'];
+        }
+
+        Response::json([
+            'ok' => true,
+            'id' => $editarId,
+            'codigo' => $codigo,
+            'arca' => !empty($arca['cae']) ? ['cae' => $arca['cae']] : (!empty($arca['error']) ? ['error' => $arca['error']] : null),
+        ]);
+    }
+
+    private function chequeReferenciado(int $chequeId): bool
+    {
+        $pdo = \Perfushopping\Web\Infra\Db::pdo();
+        foreach (['factura_pagos', 'orden_pago_pagos', 'recibo_pagos'] as $tabla) {
+            try {
+                $st = $pdo->prepare("SELECT COUNT(*) FROM {$tabla} WHERE cheque_id = :c");
+                $st->execute([':c' => $chequeId]);
+                if ((int)$st->fetchColumn() > 0) {
+                    return true;
+                }
+            } catch (\Throwable $e) {
+            }
+        }
+        return false;
     }
 
     public function show(array $params): void

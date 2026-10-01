@@ -392,6 +392,8 @@ $router->get('/admin/facturas/comprobantes', [AdminFacturaController::class, 'in
 $router->get('/admin/facturas/diagnostico-stock', [AdminFacturaController::class, 'diagnosticoStock']);
 $router->get('/admin/facturas/nueva', [AdminFacturaController::class, 'pos']);
 $router->post('/admin/facturas/guardar', [AdminFacturaController::class, 'store']);
+$router->get('/admin/facturas/editar/(?P<id>\d+)', [AdminFacturaController::class, 'editar']);
+$router->post('/admin/facturas/actualizar', [AdminFacturaController::class, 'actualizar']);
 $router->get('/admin/facturas/(?P<id>\d+)', [AdminFacturaController::class, 'show']);
 $router->post('/admin/facturas/estado', [AdminFacturaController::class, 'estado']);
 $router->post('/admin/facturas/delete', [AdminFacturaController::class, 'delete']);
