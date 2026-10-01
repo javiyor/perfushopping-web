@@ -13,6 +13,13 @@ $editarId = (int)($editarId ?? 0);
 $editarFactura = is_array($editarFactura ?? null) ? $editarFactura : null;
 $editarItems = is_array($editarItems ?? null) ? $editarItems : [];
 $editarPagos = is_array($editarPagos ?? null) ? $editarPagos : [];
+$pedidoId = (int)($pedidoId ?? 0);
+$pedidoCodigo = (string)($pedidoCodigo ?? '');
+$pedidoItems = is_array($pedidoItems ?? null) ? $pedidoItems : [];
+$pedidoCliente = $pedidoCliente ?? null;
+$pedidoEnvio = $pedidoEnvio ?? null;
+$pedidoPago = $pedidoPago ?? null;
+$pedidoDescPct = $pedidoDescPct ?? 0;
 ?>
 <style>
 .pos-layout { display:flex; gap:20px; align-items:flex-start; }
@@ -1134,17 +1141,17 @@ if (pedInput) {
 }
 
 // ── Prefill desde pedido web ──
-const PEDIDO_ITEMS = <?= json_encode($pedidoItems ?? [], JSON_UNESCAPED_UNICODE) ?>;
-const PEDIDO_CLIENTE = <?= json_encode($pedidoCliente, JSON_UNESCAPED_UNICODE) ?>;
-const PEDIDO_ENVIO = <?= json_encode($pedidoEnvio, JSON_UNESCAPED_UNICODE) ?>;
-const PEDIDO_PAGO = <?= json_encode($pedidoPago, JSON_UNESCAPED_UNICODE) ?>;
-const PEDIDO_DESC_PCT = <?= json_encode($pedidoDescPct ?? 0) ?>;
+const PEDIDO_ITEMS = <?= json_encode($pedidoItems, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]' ?>;
+const PEDIDO_CLIENTE = <?= json_encode($pedidoCliente, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?: 'null' ?>;
+const PEDIDO_ENVIO = <?= json_encode($pedidoEnvio, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?: 'null' ?>;
+const PEDIDO_PAGO = <?= json_encode($pedidoPago, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?: 'null' ?>;
+const PEDIDO_DESC_PCT = <?= json_encode($pedidoDescPct) ?: '0' ?>;
 
 // ── Edición de comprobante (facturas sin CAE) ──
 const EDITAR_ID = <?= (int)$editarId ?>;
-const EDITAR_FACTURA = <?= json_encode($editarFactura, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?>;
-const EDITAR_ITEMS = <?= json_encode($editarItems, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?>;
-const EDITAR_PAGOS = <?= json_encode($editarPagos, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?>;
+const EDITAR_FACTURA = <?= json_encode($editarFactura, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?: 'null' ?>;
+const EDITAR_ITEMS = <?= json_encode($editarItems, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]' ?>;
+const EDITAR_PAGOS = <?= json_encode($editarPagos, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]' ?>;
 const BTN_LABEL = EDITAR_ID > 0 ? '<i class="bi bi-pencil"></i> GUARDAR CAMBIOS' : '<i class="bi bi-receipt"></i> FACTURAR';
 
 function pedidoDisplayedTotalCents() {
@@ -1320,14 +1327,14 @@ function editarPrefill() {
 }
 
 // ── Payment lines (multi-pago) ──
-const BANCOS = <?= json_encode($bancos, JSON_UNESCAPED_UNICODE) ?>;
-const BANCOS_CUENTAS = <?= json_encode($bancosCuentas, JSON_UNESCAPED_UNICODE) ?>;
-const TARJETAS = <?= json_encode($tarjetas, JSON_UNESCAPED_UNICODE) ?>;
-const EQUIPOS = <?= json_encode($equipos, JSON_UNESCAPED_UNICODE) ?>;
-const TRANSFER_CUENTA_ID = <?= json_encode($transferCuentaId ?? null) ?>;
-const TARJETA_BANCO_MAP = <?= json_encode($tarjetaBancoMap ?? []) ?>;
-const PLAZOS = <?= json_encode($plazos, JSON_UNESCAPED_UNICODE) ?>;
-const FORMAS_PAGO_RAW = <?= json_encode($formasPago ?? [], JSON_UNESCAPED_UNICODE) ?>;
+const BANCOS = <?= json_encode($bancos, JSON_UNESCAPED_UNICODE) ?: '[]' ?>;
+const BANCOS_CUENTAS = <?= json_encode($bancosCuentas, JSON_UNESCAPED_UNICODE) ?: '[]' ?>;
+const TARJETAS = <?= json_encode($tarjetas, JSON_UNESCAPED_UNICODE) ?: '[]' ?>;
+const EQUIPOS = <?= json_encode($equipos, JSON_UNESCAPED_UNICODE) ?: '[]' ?>;
+const TRANSFER_CUENTA_ID = <?= json_encode($transferCuentaId) ?: 'null' ?>;
+const TARJETA_BANCO_MAP = <?= json_encode($tarjetaBancoMap) ?: '[]' ?>;
+const PLAZOS = <?= json_encode($plazos, JSON_UNESCAPED_UNICODE) ?: '[]' ?>;
+const FORMAS_PAGO_RAW = <?= json_encode($formasPago, JSON_UNESCAPED_UNICODE) ?: '[]' ?>;
 const FORMAS_PAGO = (FORMAS_PAGO_RAW.length ? FORMAS_PAGO_RAW : [
     {codigo: 'efectivo', nombre: 'Efectivo', tipo: 'efectivo'},
     {codigo: 'transferencia', nombre: 'Transferencia bancaria', tipo: 'banco'},
