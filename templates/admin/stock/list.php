@@ -14,16 +14,18 @@ $subrubros = $subrubros ?? [];
 $proveedores = $proveedores ?? [];
 $depositos = $depositos ?? [];
 $stockFilters = ['' => 'Todos', 'sin_stock' => 'Sin stock', 'bajo_stock' => 'Stock bajo (≤5)', 'con_stock' => 'Con stock'];
+$enweb = (string)($enweb ?? '');
+$webFilters = ['' => 'Web: todos', '1' => 'Publicados', '0' => 'No publicados'];
 $isSuper = ($adminUser['rol'] ?? '') === 'superadmin';
 $page = (int)($page ?? 1);
 $lastPage = (int)($lastPage ?? 1);
 $perPage = (int)($perPage ?? 80);
 $total = (int)($total ?? 0);
-$qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $iddepo, $desde, $hasta): string {
+$qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $iddepo, $desde, $hasta, $enweb): string {
     $p = [
         'q' => $q, 'codepar' => $codepar, 'stock' => $stockFilter,
         'codrub' => $codrub, 'codsub' => $codsub, 'codprove' => $codprove,
-        'iddepo' => $iddepo, 'desde' => $desde, 'hasta' => $hasta,
+        'iddepo' => $iddepo, 'desde' => $desde, 'hasta' => $hasta, 'enweb' => $enweb,
     ];
     foreach ($overrides as $k => $v) {
         $p[$k] = $v;
@@ -91,6 +93,13 @@ $qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $
                 </select>
             </div>
             <div class="col-lg-2">
+                <select class="form-select form-select-sm" name="enweb" title="Publicación web">
+                    <?php foreach ($webFilters as $v => $l): ?>
+                        <option value="<?= htmlspecialchars($v) ?>" <?= $enweb === (string)$v ? 'selected' : '' ?>><?= htmlspecialchars($l) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-lg-2">
                 <select class="form-select form-select-sm" name="iddepo">
                     <option value="0">Todos los depósitos</option>
                     <?php foreach ($depositos as $d): ?>
@@ -108,7 +117,7 @@ $qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $
                 <button class="btn btn-accent btn-sm w-100" type="submit"><i class="bi bi-search"></i></button>
             </div>
             <div class="col-lg-1">
-                <?php if ($q !== '' || $codprove !== '' || $codsub > 0 || $codrub > 0 || $stockFilter !== '' || $iddepo > 0): ?>
+                <?php if ($q !== '' || $codprove !== '' || $codsub > 0 || $codrub > 0 || $stockFilter !== '' || $iddepo > 0 || $enweb !== ''): ?>
                     <a class="btn btn-outline-secondary btn-sm w-100" href="/admin/stock?desde=<?= urlencode($desde) ?>&hasta=<?= urlencode($hasta) ?>">Limpiar</a>
                 <?php endif; ?>
             </div>
@@ -165,7 +174,7 @@ $qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $
                                     <span class="text-muted"><i class="bi bi-image"></i></span>
                                 <?php endif; ?>
                             </td>
-                            <td><strong><?= htmlspecialchars((string)($p['produ'] ?? '-')) ?></strong></td>
+                            <td><strong><?= htmlspecialchars((string)($p['produ'] ?? '-')) ?></strong><?php if ((int)($p['enweb'] ?? 1) !== 1): ?> <span class="badge bg-secondary" style="font-size:9px" title="No publicado en la web">No web</span><?php endif; ?></td>
                             <td class="small"><?= htmlspecialchars((string)($p['nomgusto'] ?? '-')) ?></td>
                             <td class="small text-muted"><?= htmlspecialchars((string)($p['nomdepo'] ?? '-')) ?></td>
                             <td class="small text-muted"><?= htmlspecialchars((string)($p['codscan'] ?: $p['codprodu'] ?? '')) ?></td>

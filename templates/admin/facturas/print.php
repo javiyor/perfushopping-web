@@ -45,6 +45,11 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
         hr { border:none; border-top:1px dashed #000; margin:6px 0; }
         table { width:100%; border-collapse:collapse; font-size:<?= $formato === '58mm' ? '9px' : ($isTicket ? '11px' : '12px') ?>; }
         th, td { padding:<?= $isTicket ? '2px 4px' : '6px 8px' ?>; text-align:left; <?= $isTicket ? 'word-break:break-word; overflow-wrap:anywhere;' : '' ?> }
+        <?php if ($isTicket): ?>
+        .ticket-item { margin:0 0 5px; font-size:<?= $formato === '58mm' ? '9px' : '11px' ?>; }
+        .ticket-item-name { font-weight:bold; word-break:break-word; overflow-wrap:anywhere; }
+        .ticket-item-line { display:flex; justify-content:space-between; gap:6px; }
+        <?php endif; ?>
         th { border-bottom:1px solid #000; <?= $formato === 'a4' ? 'background:#f5f5f5;' : '' ?> }
         .text-right { text-align:right; }
         .text-center { text-align:center; }
@@ -112,6 +117,21 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
     </div>
     <hr />
 
+    <?php if ($isTicket): ?>
+        <?php foreach ($items as $it):
+            $qty = max(1, (int)($it['qty'] ?? 1));
+            $netPrice = (int)($it['unit_price_cents'] ?? 0);
+            $ivaCents = (int)($it['iva_cents'] ?? 0);
+            $unitDisplay = $discriminaIva ? $netPrice : $netPrice + (int)round($ivaCents / $qty);
+            $totalDisplay = (int)($it['total_cents'] ?? 0);
+            $dtoPct = (float)($it['descuento_pct'] ?? 0);
+        ?>
+        <div class="ticket-item">
+            <div class="ticket-item-name"><?= htmlspecialchars((string)($it['producto'] ?? '')) ?><?= ($it['variedad'] ?? '') ? ' (' . htmlspecialchars($it['variedad']) . ')' : '' ?></div>
+            <div class="ticket-item-line"><span><?= $qty ?> x <?= htmlspecialchars(Format::moneyRoundedFromCents($unitDisplay)) ?><?= $dtoPct > 0 ? ' (-' . rtrim(rtrim(number_format($dtoPct, 2, ',', '.'), '0'), ',') . '%)' : '' ?></span><strong><?= htmlspecialchars(Format::moneyRoundedFromCents($totalDisplay)) ?></strong></div>
+        </div>
+        <?php endforeach; ?>
+    <?php else: ?>
     <table>
         <thead>
             <tr>
@@ -140,6 +160,7 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
             <?php endforeach; ?>
         </tbody>
     </table>
+    <?php endif; ?>
 
     <div class="totals">
         <?php if ($discriminaIva): ?>
