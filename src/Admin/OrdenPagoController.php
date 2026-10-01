@@ -102,7 +102,7 @@ final class OrdenPagoController
         foreach ($formasPago as $idx => $fp) {
             $fp = trim((string)$fp);
             if ($fp === '') continue;
-            $monto = max(0, (int)($montosPago[$idx] ?? 0));
+            $monto = max(0, (int)round(((float)($montosPago[$idx] ?? 0)) * 100));
             if ($monto <= 0) continue;
 
             $chequeId = null;

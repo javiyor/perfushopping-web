@@ -122,7 +122,7 @@ function addPago() {
         <td>
             <div class="input-group input-group-sm">
                 <span class="input-group-text">$</span>
-                <input class="form-control form-control-sm monto-input" name="pago_monto_cents[]" type="number" min="1" step="1" oninput="recalcular()" />
+                <input class="form-control form-control-sm monto-input" name="pago_monto_cents[]" type="number" min="1" step="0.01" oninput="recalcular()" />
             </div>
         </td>
         <td class="cheque-data" style="display:none">
@@ -182,9 +182,9 @@ function removeRow(btn) {
 function recalcular() {
     let total = 0;
     document.querySelectorAll('.monto-input').forEach(inp => {
-        total += parseInt(inp.value) || 0;
+        total += parseFloat(inp.value) || 0;
     });
-    document.getElementById('resumenTotal').textContent = '$' + (total / 100).toLocaleString('es-AR', {minimumFractionDigits:2});
+    document.getElementById('resumenTotal').textContent = '$' + total.toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
 
 // Proveedor search
