@@ -61,13 +61,29 @@ $customerCategories = [
                     <tr><td colspan="11" class="text-muted text-center py-4">No se encontraron clientes.</td></tr>
                 <?php else: ?>
                     <?php foreach ($list as $u): ?>
-                        <?php $isBlocked = !empty($u['disabled_at']); ?>
+                        <?php
+                        $isBlocked = !empty($u['disabled_at']);
+                        $nombreFacturado = trim((string)($u['cliente_razon'] ?? ''));
+                        if ($nombreFacturado === '') {
+                            $nombreFacturado = (string)($u['name'] ?? 'Sin nombre');
+                        }
+                        $docRaw = preg_replace('/\D/', '', (string)($u['cliente_cuit'] ?? ''));
+                        $docHtml = '';
+                        if (strlen($docRaw) === 11) {
+                            $docHtml = 'CUIT ' . substr($docRaw, 0, 2) . '-' . substr($docRaw, 2, 8) . '-' . substr($docRaw, 10, 1);
+                        } elseif (strlen($docRaw) >= 7 && strlen($docRaw) <= 8) {
+                            $docHtml = 'DNI ' . $docRaw;
+                        }
+                        ?>
                         <tr class="<?= $isBlocked ? 'table-light text-muted' : '' ?>">
                             <td><?= (int)($u['id'] ?? 0) ?></td>
                             <td>
-                                <strong><?= htmlspecialchars((string)($u['name'] ?? 'Sin nombre')) ?></strong>
+                                <strong><?= htmlspecialchars($nombreFacturado) ?></strong>
                                 <?php if (($u['wholesale_status'] ?? '') === 'approved'): ?>
                                     <span class="badge bg-info">Mayorista</span>
+                                <?php endif; ?>
+                                <?php if ($docHtml !== ''): ?>
+                                    <div class="small text-muted"><?= htmlspecialchars($docHtml) ?></div>
                                 <?php endif; ?>
                             </td>
                             <td><?= htmlspecialchars((string)($u['email'] ?? '-')) ?></td>

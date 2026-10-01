@@ -17,12 +17,15 @@ final class CustomerRepo
             SELECT u.id, u.email, u.name, u.phone, u.role, u.wholesale_status,
                    u.disabled_at, u.created_at, u.last_login_at,
                    u.cliente_id,
+                   c.razon AS cliente_razon,
+                   c.cuit AS cliente_cuit,
                    COALESCE(o_sum.order_count, 0) AS order_count,
                    COALESCE(o_sum.total_spent, 0) AS total_spent_cents,
                    o_sum.last_order_at
         ';
         $from = '
             FROM web_users u
+            LEFT JOIN clientes c ON c.idclien = u.cliente_id
             LEFT JOIN (
                 SELECT user_id,
                        COUNT(*) AS order_count,
