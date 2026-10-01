@@ -61,12 +61,17 @@ final class ChequeController
         $adminUser = $auth->requirePermiso('cheques');
 
         $bancos = (new \Perfushopping\Web\Repo\BancoCuentaRepo())->findAll();
+        $tipo = trim((string)($_GET['tipo'] ?? 'propio'));
+        if (!in_array($tipo, ['propio', 'tercero'], true)) {
+            $tipo = 'propio';
+        }
 
         echo View::adminPage('admin/cheques/emitir.php', [
             'adminUser' => $adminUser,
             'bancos' => $bancos,
+            'tipo' => $tipo,
             'csrf' => Csrf::token(),
-            'pageTitle' => 'Emitir cheque propio',
+            'pageTitle' => $tipo === 'tercero' ? 'Cargar cheque de tercero' : 'Emitir cheque propio',
         ]);
     }
 
@@ -76,36 +81,55 @@ final class ChequeController
         $adminUser = $auth->requirePermiso('cheques');
         Csrf::check($_POST['_csrf'] ?? null);
 
+        $tipo = trim((string)($_POST['tipo'] ?? 'propio'));
+        if (!in_array($tipo, ['propio', 'tercero'], true)) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Tipo de cheque inválido.'];
+            Response::redirect('/admin/cheques/emitir');
+        }
+
         $montoCents = (int)($_POST['monto_cents'] ?? 0);
         if ($montoCents <= 0) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'El monto debe ser mayor a cero.'];
-            Response::redirect('/admin/cheques/emitir');
-        }
-
-        $bancoCuentaId = (int)($_POST['banco_cuenta_id'] ?? 0);
-        if ($bancoCuentaId <= 0) {
-            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Seleccioná una cuenta bancaria.'];
-            Response::redirect('/admin/cheques/emitir');
+            Response::redirect('/admin/cheques/emitir?tipo=' . $tipo);
         }
 
         $repo = new ChequeRepo();
-        $chequeId = $repo->create([
-            'tipo' => 'propio',
-            'estado' => 'emitido',
-            'banco_emisor' => trim((string)($_POST['banco_emisor'] ?? '')),
-            'numero_cheque' => trim((string)($_POST['numero_cheque'] ?? '')),
-            'titular' => trim((string)($_POST['titular'] ?? '')),
-            'cuit_titular' => trim((string)($_POST['cuit_titular'] ?? '')),
-            'monto_cents' => $montoCents,
-            'fecha_emision' => (string)($_POST['fecha_emision'] ?? date('Y-m-d')),
-            'fecha_vencimiento' => trim((string)($_POST['fecha_vencimiento'] ?? '')) ?: null,
-            'banco_cuenta_id' => $bancoCuentaId,
-            'concepto' => trim((string)($_POST['concepto'] ?? '')),
-        ], (int)$adminUser['id']);
-
-        $repo->agregarMovimiento($chequeId, 'emitido', null, null, 'Emisión directa', (int)$adminUser['id']);
-
-        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Cheque propio emitido correctamente.'];
+        if ($tipo === 'propio') {
+            $bancoCuentaId = (int)($_POST['banco_cuenta_id'] ?? 0);
+            if ($bancoCuentaId <= 0) {
+                $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Seleccioná una cuenta bancaria.'];
+                Response::redirect('/admin/cheques/emitir?tipo=propio');
+            }
+            $chequeId = $repo->create([
+                'tipo' => 'propio',
+                'estado' => 'emitido',
+                'banco_emisor' => trim((string)($_POST['banco_emisor'] ?? '')),
+                'numero_cheque' => trim((string)($_POST['numero_cheque'] ?? '')),
+                'titular' => trim((string)($_POST['titular'] ?? '')),
+                'cuit_titular' => trim((string)($_POST['cuit_titular'] ?? '')),
+                'monto_cents' => $montoCents,
+                'fecha_emision' => (string)($_POST['fecha_emision'] ?? date('Y-m-d')),
+                'fecha_vencimiento' => trim((string)($_POST['fecha_vencimiento'] ?? '')) ?: null,
+                'banco_cuenta_id' => $bancoCuentaId,
+                'concepto' => trim((string)($_POST['concepto'] ?? '')),
+            ], (int)$adminUser['id']);
+            $repo->agregarMovimiento($chequeId, 'emitido', null, null, 'Emisión directa', (int)$adminUser['id']);
+            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Cheque propio emitido correctamente.'];
+        } else {
+            $chequeId = $repo->create([
+                'tipo' => 'tercero',
+                'estado' => 'en_cartera',
+                'numero_cheque' => trim((string)($_POST['numero_cheque'] ?? '')),
+                'banco_cuenta_id' => (int)($_POST['banco_cuenta_id'] ?? 0) ?: null,
+                'monto_cents' => $montoCents,
+                'fecha_vencimiento' => trim((string)($_POST['fecha_vencimiento'] ?? '')) ?: null,
+                'quien_entrego' => trim((string)($_POST['quien_entrego'] ?? '')),
+                'fecha_emision' => (string)($_POST['fecha_emision'] ?? date('Y-m-d')),
+                'concepto' => trim((string)($_POST['concepto'] ?? '')),
+            ], (int)$adminUser['id']);
+            $repo->agregarMovimiento($chequeId, 'en_cartera', null, null, 'Ingreso a cartera de cheques', (int)$adminUser['id']);
+            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Cheque de tercero agregado a cartera.'];
+        }
         Response::redirect('/admin/cheques/' . $chequeId);
     }
 

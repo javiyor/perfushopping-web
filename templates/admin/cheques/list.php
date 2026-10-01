@@ -8,12 +8,15 @@ $q = (string)($q ?? '');
 $tipos = ['' => 'Todos', 'propio' => 'Propios', 'tercero' => 'De terceros'];
 $estadosDisponibles = ['' => 'Todos', 'en_cartera' => 'En cartera', 'emitido' => 'Emitido', 'entregado' => 'Entregado', 'depositado' => 'Depositado', 'cobrado' => 'Cobrado', 'rechazado' => 'Rechazado', 'anulado' => 'Anulado'];
 ?>
-<div class="d-flex justify-content-between align-items-start mb-3">
+    <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
         <h4 class="fw-bold mb-1">Cheques</h4>
         <p class="text-muted small">Gestión de cheques propios y de terceros</p>
     </div>
-    <a class="btn btn-accent btn-sm" href="/admin/cheques/emitir"><i class="bi bi-plus-lg"></i> Emitir cheque propio</a>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-primary btn-sm" href="/admin/cheques/emitir?tipo=tercero"><i class="bi bi-plus-lg"></i> Cheque de tercero</a>
+        <a class="btn btn-accent btn-sm" href="/admin/cheques/emitir"><i class="bi bi-plus-lg"></i> Emitir cheque propio</a>
+    </div>
 </div>
 
 <div class="card shadow-sm mb-3">
@@ -53,6 +56,7 @@ $estadosDisponibles = ['' => 'Todos', 'en_cartera' => 'En cartera', 'emitido' =>
                     <th>Banco</th>
                     <th>N° Cheque</th>
                     <th>Titular</th>
+                    <th>Quién entregó</th>
                     <th class="text-end">Monto</th>
                     <th>Emisión</th>
                     <th>Vencimiento</th>
@@ -71,6 +75,7 @@ $estadosDisponibles = ['' => 'Todos', 'en_cartera' => 'En cartera', 'emitido' =>
                             <td><?= htmlspecialchars((string)($c['banco_emisor'] ?? '')) ?></td>
                             <td><?= htmlspecialchars((string)($c['numero_cheque'] ?? '')) ?></td>
                             <td><?= htmlspecialchars((string)($c['titular'] ?? '')) ?></td>
+                            <td class="small"><?= htmlspecialchars((string)($c['quien_entrego'] ?? '')) ?></td>
                             <td class="text-end fw-bold"><?= Format::moneyFromCents((int)($c['monto_cents'] ?? 0)) ?></td>
                             <td class="small"><?= htmlspecialchars((string)($c['fecha_emision'] ?? '')) ?></td>
                             <td class="small"><?= htmlspecialchars((string)($c['fecha_vencimiento'] ?? '')) ?></td>

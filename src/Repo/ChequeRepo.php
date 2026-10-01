@@ -72,8 +72,8 @@ final class ChequeRepo
     public function create(array $data, int $createdBy): int
     {
         $st = Db::pdo()->prepare('
-            INSERT INTO cheques (tipo, estado, banco_emisor, numero_cheque, titular, cuit_titular, monto_cents, fecha_emision, fecha_vencimiento, banco_cuenta_id, concepto, created_by, created_at, updated_at)
-            VALUES (:tipo, :estado, :banco, :numero, :titular, :cuit, :monto, :fecha_emi, :fecha_ven, :banco_cta, :concepto, :cb, NOW(), NOW())
+            INSERT INTO cheques (tipo, estado, banco_emisor, numero_cheque, titular, cuit_titular, quien_entrego, monto_cents, fecha_emision, fecha_vencimiento, banco_cuenta_id, concepto, created_by, created_at, updated_at)
+            VALUES (:tipo, :estado, :banco, :numero, :titular, :cuit, :quien_entrego, :monto, :fecha_emi, :fecha_ven, :banco_cta, :concepto, :cb, NOW(), NOW())
         ');
         $st->execute([
             ':tipo' => $data['tipo'],
@@ -82,6 +82,7 @@ final class ChequeRepo
             ':numero' => $data['numero_cheque'] ?? null,
             ':titular' => $data['titular'] ?? null,
             ':cuit' => $data['cuit_titular'] ?? null,
+            ':quien_entrego' => $data['quien_entrego'] ?? null,
             ':monto' => (int)($data['monto_cents'] ?? 0),
             ':fecha_emi' => $data['fecha_emision'] ?? date('Y-m-d'),
             ':fecha_ven' => $data['fecha_vencimiento'] ?? null,
@@ -90,6 +91,19 @@ final class ChequeRepo
             ':cb' => $createdBy,
         ]);
         return (int)Db::pdo()->lastInsertId();
+    }
+
+    /** Cheques de terceros en cartera disponibles para pagar proveedores. */
+    public function disponiblesTerceros(): array
+    {
+        $st = Db::pdo()->prepare("
+            SELECT id, numero_cheque, banco_emisor, titular, quien_entrego, monto_cents, fecha_vencimiento
+            FROM cheques
+            WHERE tipo = 'tercero' AND estado = 'en_cartera'
+            ORDER BY fecha_vencimiento ASC
+        ");
+        $st->execute();
+        return $st->fetchAll();
     }
 
     public function updateEstado(int $id, string $estado): void

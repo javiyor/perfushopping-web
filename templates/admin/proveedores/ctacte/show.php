@@ -35,11 +35,15 @@ $mon = static fn ($v) => number_format((float)$v, 2, ',', '.');
 
 <?php if ($comprobantes): ?>
 <div class="card shadow-sm mb-3">
-    <div class="card-header bg-white fw-semibold">Comprobantes en cuenta corriente</div>
+    <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+        <span>Comprobantes en cuenta corriente</span>
+        <button class="btn btn-sm btn-success" type="button" onclick="cargarPagoComprobantes()" title="Pagar los comprobantes seleccionados (el monto se puede ajustar en la orden de pago)"><i class="bi bi-cash-stack"></i> Cargar pago</button>
+    </div>
     <div class="table-responsive">
         <table class="table table-sm table-hover mb-0">
             <thead>
                 <tr>
+                    <th style="width:30px"></th>
                     <th>Comprobante</th>
                     <th>Fecha</th>
                     <th class="text-end">Total</th>
@@ -52,6 +56,11 @@ $mon = static fn ($v) => number_format((float)$v, 2, ',', '.');
             <tbody>
                 <?php foreach ($comprobantes as $c): ?>
                     <tr>
+                        <td>
+                            <?php if ($c['pendiente'] > 0): ?>
+                                <input type="checkbox" name="compra_ids[]" value="<?= (int)$c['id'] ?>" data-pendiente="<?= (float)$c['pendiente'] ?>" title="Seleccionar para pagar" />
+                            <?php endif; ?>
+                        </td>
                         <td>
                             <strong><?= htmlspecialchars((string)($c['tipo'] ?? '')) ?></strong>
                             <span class="text-muted"><?= htmlspecialchars((string)($c['punto_venta'] ?? '') . '-' . (string)($c['numero_desde'] ?? '')) ?></span>
@@ -75,8 +84,8 @@ $mon = static fn ($v) => number_format((float)$v, 2, ',', '.');
                         <td class="text-end <?= $c['pendiente'] > 0 ? 'text-danger' : 'text-success' ?>">$<?= $mon($c['pendiente']) ?></td>
                         <td class="text-end">
                             <?php if ($c['pendiente'] > 0): ?>
-                                <a class="btn btn-sm btn-outline-success" title="Cargar pago"
-                                   href="/admin/ordenes-pago/nueva?proveedor_id=<?= (int)$proveedorId ?>&proveedor_nombre=<?= urlencode($proveedorNombre) ?>&monto=<?= $c['pendiente'] ?>"><i class="bi bi-cash-stack"></i></a>
+                                <a class="btn btn-sm btn-outline-success" title="Cargar pago a cuenta (monto editable)"
+                                   href="/admin/ordenes-pago/nueva?proveedor_id=<?= (int)$proveedorId ?>&proveedor_nombre=<?= urlencode($proveedorNombre) ?>&monto=<?= $c['pendiente'] ?>&compra_ids=<?= (int)$c['id'] ?>"><i class="bi bi-cash-stack"></i></a>
                             <?php endif; ?>
                             <a class="btn btn-sm btn-outline-secondary" title="Ver factura" href="/admin/compras/<?= (int)$c['id'] ?>"><i class="bi bi-eye"></i></a>
                         </td>
@@ -136,3 +145,19 @@ $mon = static fn ($v) => number_format((float)$v, 2, ',', '.');
         </table>
     </div>
 </div>
+<script>
+function cargarPagoComprobantes() {
+    var total = 0;
+    var n = 0;
+    document.querySelectorAll('input[name="compra_ids[]"]:checked').forEach(function(cb) {
+        n++;
+        total += parseFloat(cb.getAttribute('data-pendiente') || '0');
+    });
+    if (!n) {
+        alert('Seleccioná al menos un comprobante para pagar.');
+        return;
+    }
+    var url = '/admin/ordenes-pago/nueva?proveedor_id=<?= (int)$proveedorId ?>&proveedor_nombre=<?= urlencode($proveedorNombre) ?>&monto=' + total.toFixed(2);
+    window.location.href = url;
+}
+</script>

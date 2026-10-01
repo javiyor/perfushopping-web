@@ -3,7 +3,7 @@ $orden = $orden ?? null;
 $pagos = $pagos ?? [];
 $bancos = $bancos ?? [];
 $csrfToken = $csrf ?? '';
-$formasPago = ['efectivo' => 'Efectivo', 'transferencia' => 'Transferencia', 'cheque_propio' => 'Cheque propio'];
+$formasPago = ['efectivo' => 'Efectivo', 'transferencia' => 'Transferencia', 'cheque_propio' => 'Cheque propio', 'cheque_tercero' => 'Cheque de tercero'];
 ?>
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
@@ -74,7 +74,7 @@ $formasPago = ['efectivo' => 'Efectivo', 'transferencia' => 'Transferencia', 'ch
                     </div>
                     <div class="mb-2">
                         <label class="form-label small">Concepto</label>
-                        <textarea class="form-control form-control-sm" name="concepto" rows="2" placeholder="Motivo del pago"></textarea>
+                        <textarea class="form-control form-control-sm" name="concepto" rows="2" placeholder="Motivo del pago"><?= htmlspecialchars((string)($comprobantesLabel ?? '')) ?></textarea>
                     </div>
                 </div>
             </div>
@@ -126,10 +126,18 @@ function addPago() {
             </div>
         </td>
         <td class="cheque-data" style="display:none">
+            <select class="form-select form-select-sm mb-1" name="pago_cheque_tercero_id[]" onchange="seleccionarChequeTercero(this)" title="Cheque de tercero en cartera">
+                <option value="">— Usar cheque de tercero en cartera —</option>
+                <?php foreach (($chequesTerceros ?? []) as $ch): ?>
+                    <option value="<?= (int)$ch['id'] ?>" data-monto="<?= (int)($ch['monto_cents'] ?? 0) ?>">
+                        <?= htmlspecialchars((string)($ch['numero_cheque'] ?? '')) ?> — <?= htmlspecialchars((string)($ch['banco_emisor'] ?? '')) ?> — $<?= number_format((int)($ch['monto_cents'] ?? 0) / 100, 2, ',', '.') ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
             <select class="form-select form-select-sm mb-1" name="pago_banco_cuenta_id[]">
                 <option value="">Banco</option>
                 <?php foreach ($bancos as $b): ?>
-                <option value="<?= (int)$b['id'] ?>"><?= htmlspecialchars((string)($b['banco'] ?? '')) ?></option>
+                    <option value="<?= (int)$b['id'] ?>"><?= htmlspecialchars((string)($b['banco'] ?? '')) ?></option>
                 <?php endforeach; ?>
             </select>
             <input class="form-control form-control-sm mb-1" name="pago_numero_cheque[]" placeholder="N° cheque" />
@@ -144,8 +152,24 @@ function addPago() {
 
 function toggleChequeData(sel) {
     const td = sel.closest('tr').querySelector('.cheque-data');
-    td.style.display = sel.value === 'cheque_propio' ? '' : 'none';
+    const esCheque = sel.value === 'cheque_propio' || sel.value === 'cheque_tercero';
+    td.style.display = esCheque ? '' : 'none';
+    if (!esCheque) {
+        const montoInput = sel.closest('tr').querySelector('.monto-input');
+        if (montoInput) montoInput.readOnly = false;
+    }
     recalcular();
+}
+
+function seleccionarChequeTercero(sel) {
+    const opt = sel.options[sel.selectedIndex];
+    const monto = opt ? opt.getAttribute('data-monto') : null;
+    const montoInput = sel.closest('tr').querySelector('.monto-input');
+    if (monto && montoInput) {
+        montoInput.value = (parseInt(monto, 10) / 100).toFixed(2);
+        montoInput.readOnly = true;
+        recalcular();
+    }
 }
 
 function removeRow(btn) {

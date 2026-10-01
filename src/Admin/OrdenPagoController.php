@@ -39,20 +39,36 @@ final class OrdenPagoController
         $adminUser = $auth->requirePermiso('pagos_proveedores');
 
         $bancos = (new BancoCuentaRepo())->findAll();
+        $chequesTerceros = (new ChequeRepo())->disponiblesTerceros();
 
-        // Prefill desde ctacte de proveedores: /admin/ordenes-pago/nueva?proveedor_id=..&proveedor_nombre=..&monto=..
+        // Prefill desde ctacte de proveedores: /admin/ordenes-pago/nueva?proveedor_id=..&proveedor_nombre=..&monto=..&compra_ids=..
         $proveedorId = (int)($_GET['proveedor_id'] ?? 0) ?: null;
         $proveedorNombre = trim((string)($_GET['proveedor_nombre'] ?? ''));
         $monto = (float)($_GET['monto'] ?? 0);
+
+        $comprobantesLabel = '';
+        $compraIds = array_values(array_filter(array_map('intval', explode(',', trim((string)($_GET['compra_ids'] ?? ''))))));
+        if ($compraIds) {
+            $in = implode(',', $compraIds);
+            $rows = \Perfushopping\Web\Infra\Db::pdo()->prepare("SELECT tipo, punto_venta, numero_desde FROM factura_compra WHERE id IN ($in)");
+            $rows->execute();
+            $labels = [];
+            foreach ($rows as $r) {
+                $labels[] = (string)($r['tipo'] ?? '') . ' ' . (string)($r['punto_venta'] ?? '') . '-' . (string)($r['numero_desde'] ?? '');
+            }
+            $comprobantesLabel = implode(', ', $labels);
+        }
 
         echo View::adminPage('admin/ordenes-pago/form.php', [
             'adminUser' => $adminUser,
             'orden' => null,
             'pagos' => [],
             'bancos' => $bancos,
+            'chequesTerceros' => $chequesTerceros,
             'proveedorId' => $proveedorId,
             'proveedorNombre' => $proveedorNombre,
             'monto' => $monto,
+            'comprobantesLabel' => $comprobantesLabel,
             'csrf' => Csrf::token(),
             'pageTitle' => 'Nueva orden de pago',
         ]);
@@ -106,6 +122,14 @@ final class OrdenPagoController
                 ];
                 $chequeId = $chequeRepo->create($chequeData, (int)$adminUser['id']);
                 $chequeRepo->agregarMovimiento($chequeId, 'emitido', null, null, 'Emitido para OP', (int)$adminUser['id']);
+            } elseif ($fp === 'cheque_tercero') {
+                $chequeId = (int)($_POST['pago_cheque_tercero_id'][$idx] ?? 0);
+                if ($chequeId > 0) {
+                    $cheque = $chequeRepo->findById($chequeId);
+                    if (!$cheque || $cheque['tipo'] !== 'tercero' || $cheque['estado'] !== 'en_cartera') {
+                        $chequeId = null;
+                    }
+                }
             }
 
             $pagos[] = [
@@ -131,6 +155,23 @@ final class OrdenPagoController
             'estado' => 'pagada',
             'concepto' => trim((string)($_POST['concepto'] ?? '')),
         ], $pagos, (int)$adminUser['id']);
+
+        // Marcar como entregados los cheques de terceros usados
+        foreach ($formasPago as $idx => $fp) {
+            if (trim((string)$fp) !== 'cheque_tercero') {
+                continue;
+            }
+            $chequeId = (int)($_POST['pago_cheque_tercero_id'][$idx] ?? 0);
+            if ($chequeId <= 0) {
+                continue;
+            }
+            $cheque = $chequeRepo->findById($chequeId);
+            if (!$cheque || $cheque['tipo'] !== 'tercero' || $cheque['estado'] !== 'en_cartera') {
+                continue;
+            }
+            $chequeRepo->updateEstado($chequeId, 'entregado');
+            $chequeRepo->agregarMovimiento($chequeId, 'entregado', 'op', $id, 'Entregado en OP ' . $codigo, (int)$adminUser['id']);
+        }
 
         // Register credit in supplier CTACTE
         try {
