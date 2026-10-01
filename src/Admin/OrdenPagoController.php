@@ -69,6 +69,7 @@ final class OrdenPagoController
             'proveedorNombre' => $proveedorNombre,
             'monto' => $monto,
             'comprobantesLabel' => $comprobantesLabel,
+            'compraIds' => implode(',', $compraIds),
             'csrf' => Csrf::token(),
             'pageTitle' => 'Nueva orden de pago',
         ]);
@@ -171,6 +172,34 @@ final class OrdenPagoController
             }
             $chequeRepo->updateEstado($chequeId, 'entregado');
             $chequeRepo->agregarMovimiento($chequeId, 'entregado', 'op', $id, 'Entregado en OP ' . $codigo, (int)$adminUser['id']);
+        }
+
+        // Asignar el pago a las facturas seleccionadas (solo esas se marcan como pagadas)
+        $compraIds = array_values(array_filter(array_map('intval', explode(',', trim((string)($_POST['compra_ids'] ?? ''))))));
+        if ($compraIds) {
+            $in = implode(',', $compraIds);
+            $rows = Db::pdo()->prepare("SELECT id, imp_total FROM factura_compra WHERE id IN ($in)");
+            $rows->execute();
+            $facturas = [];
+            foreach ($rows as $r) {
+                $facturas[(int)$r['id']] = (int)round(((float)($r['imp_total'] ?? 0)) * 100);
+            }
+            $restante = $total;
+            $asignaciones = [];
+            foreach ($compraIds as $cid) {
+                if ($restante <= 0 || !isset($facturas[$cid])) {
+                    continue;
+                }
+                $pendiente = $facturas[$cid] - $repo->totalAsignadoCompra($cid);
+                $asignado = min($pendiente, $restante);
+                if ($asignado > 0) {
+                    $asignaciones[] = ['factura_compra_id' => $cid, 'monto_cents' => $asignado];
+                    $restante -= $asignado;
+                }
+            }
+            if ($asignaciones) {
+                $repo->asignarCompras($id, $asignaciones);
+            }
         }
 
         // Register credit in supplier CTACTE

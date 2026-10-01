@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Perfushopping\Web\Repo;
 
 use Perfushopping\Web\Infra\Db;
+use Perfushopping\Web\Repo\OrdenPagoRepo;
 use Perfushopping\Web\Support\Plazo;
 
 final class CtaCteProveedorRepo
@@ -279,23 +280,19 @@ final class CtaCteProveedorRepo
         $rows->execute($params);
         $comprobantes = $rows->fetchAll();
 
-        $creditos = 0;
-        if ($proveedorId !== null) {
-            $st = $pdo->prepare("SELECT COALESCE(SUM(monto_cents), 0) FROM ctacte_proveedor_movimientos WHERE proveedor_id = :p AND tipo = 'credito'");
-            $st->execute([':p' => $proveedorId]);
-            $creditos = (int)$st->fetchColumn();
-        }
-
+        $opRepo = new OrdenPagoRepo();
         $out = [];
         foreach ($comprobantes as $c) {
             $total = (float)($c['imp_total'] ?? 0);
-            $pendiente = $total;
-            $estado = 'Pendiente';
-            if ($total > 0 && $creditos > 0) {
-                $aplicado = min($creditos, $total);
-                $creditos -= $aplicado;
-                $pendiente = round($total - $aplicado, 2);
-                $estado = $pendiente > 0 ? 'Parcial' : 'Pagada';
+            $asignado = $opRepo->totalAsignadoCompra((int)$c['id']) / 100;
+            $pendiente = round($total - $asignado, 2);
+            if ($pendiente <= 0) {
+                $estado = 'Pagada';
+                $pendiente = 0;
+            } elseif ($asignado > 0) {
+                $estado = 'Parcial';
+            } else {
+                $estado = 'Pendiente';
             }
             $out[] = [
                 'id' => (int)$c['id'],

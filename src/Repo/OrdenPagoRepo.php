@@ -80,6 +80,33 @@ final class OrdenPagoRepo
         return $st->fetchAll();
     }
 
+    /** @param array<int, array{factura_compra_id:int, monto_cents:int}> $compras */
+    public function asignarCompras(int $ordenPagoId, array $compras): void
+    {
+        if (!$compras) {
+            return;
+        }
+        $st = Db::pdo()->prepare('
+            INSERT INTO orden_pago_compras (orden_pago_id, factura_compra_id, monto_cents, created_at)
+            VALUES (:op, :compra, :monto, NOW())
+        ');
+        foreach ($compras as $c) {
+            $st->execute([
+                ':op' => $ordenPagoId,
+                ':compra' => (int)$c['factura_compra_id'],
+                ':monto' => (int)$c['monto_cents'],
+            ]);
+        }
+    }
+
+    /** Total asignado a una factura de compra (centavos). */
+    public function totalAsignadoCompra(int $facturaCompraId): int
+    {
+        $st = Db::pdo()->prepare('SELECT COALESCE(SUM(monto_cents), 0) FROM orden_pago_compras WHERE factura_compra_id = :c');
+        $st->execute([':c' => $facturaCompraId]);
+        return (int)$st->fetchColumn();
+    }
+
     public function create(array $data, array $pagos, int $createdBy): int
     {
         $pdo = Db::pdo();
