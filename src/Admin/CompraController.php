@@ -159,7 +159,7 @@ final class CompraController
                 'numero_hasta' => $row['numero'],
                 'cod_autorizacion' => $row['cae'],
                 'cuit_proveedor' => $row['cuit'],
-                'razon_proveedor' => $row['razon'],
+                'razon_proveedor' => $repo->resolverRazon($idprovee, $row['cuit'], $row['razon']),
                 'idprovee' => $idprovee,
                 'moneda' => $row['moneda'] !== '' ? $row['moneda'] : 'PES',
                 'tipo_cambio' => $row['tipo_cambio'] > 0 ? $row['tipo_cambio'] : 1,
@@ -302,7 +302,7 @@ final class CompraController
             'numero_hasta' => trim((string)($_POST['numero_hasta'] ?? '')) ?: trim((string)($_POST['numero_desde'] ?? '')),
             'cod_autorizacion' => trim((string)($_POST['cod_autorizacion'] ?? '')),
             'cuit_proveedor' => $cuit,
-            'razon_proveedor' => $razon !== '' ? $razon : (string)($_POST['razon_proveedor'] ?? ''),
+            'razon_proveedor' => $repo->resolverRazon($idprovee, $cuit, $razon),
             'idprovee' => $idprovee,
             'moneda' => trim((string)($_POST['moneda'] ?? 'PES')) ?: 'PES',
             'tipo_cambio' => (float)($_POST['tipo_cambio'] ?? 1),
@@ -432,6 +432,9 @@ final class CompraController
     private function formData(array $adminUser, array $compra, array $items): array
     {
         $repo = new CompraRepo();
+        // El formulario muestra la razón real aunque la factura se haya guardado vacía.
+        $compra['razon_proveedor'] = trim((string)($compra['razon_proveedor'] ?? ''))
+            ?: trim((string)($compra['proveedor_razon'] ?? ''));
         return [
             'adminUser' => $adminUser,
             'compra' => $compra,

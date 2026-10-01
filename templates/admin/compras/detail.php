@@ -33,7 +33,14 @@ $estado = (string)($compra['estado'] ?? 'pendiente');
                     <dt class="col-sm-3">Fecha</dt>
                     <dd class="col-sm-9"><?= htmlspecialchars((string)($compra['fecha'] ?? '-')) ?></dd>
                     <dt class="col-sm-3">Proveedor</dt>
-                    <dd class="col-sm-9 fw-bold"><?= htmlspecialchars((string)($compra['razon_proveedor'] ?? '-')) ?></dd>
+                    <dd class="col-sm-9 fw-bold">
+                        <?php
+                        $razonFc = trim((string)($compra['razon_proveedor'] ?? ''))
+                            ?: trim((string)($compra['proveedor_razon'] ?? ''))
+                            ?: (trim((string)($compra['cuit_proveedor'] ?? '')) !== '' ? 'CUIT ' . trim((string)$compra['cuit_proveedor']) : '-');
+                        echo htmlspecialchars($razonFc);
+                        ?>
+                    </dd>
                     <dt class="col-sm-3">CUIT</dt>
                     <dd class="col-sm-9"><?= htmlspecialchars((string)($compra['cuit_proveedor'] ?? '-')) ?></dd>
                     <dt class="col-sm-3">Cód. autorización</dt>

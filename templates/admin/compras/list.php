@@ -10,6 +10,9 @@ $cuentas = (new CompraRepo())->cuentas();
 $estados = ['' => 'Todos', 'pendiente' => 'Pendiente', 'completa' => 'Completa'];
 $origen = ['manual' => 'Manual', 'excel' => 'Excel', 'qr' => 'QR'];
 $mon = static fn ($v) => number_format((float)$v, 2, ',', '.');
+$nombreProv = static fn (array $fc): string => trim((string)($fc['razon_proveedor'] ?? ''))
+    ?: trim((string)($fc['proveedor_razon'] ?? ''))
+    ?: (trim((string)($fc['cuit_proveedor'] ?? '')) !== '' ? 'CUIT ' . trim((string)$fc['cuit_proveedor']) : '-');
 ?>
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
@@ -98,7 +101,7 @@ $mon = static fn ($v) => number_format((float)$v, 2, ',', '.');
                                     <strong><?= htmlspecialchars((string)($fc['tipo'] ?? '-')) ?></strong>
                                     <span class="text-muted"><?= htmlspecialchars((string)($fc['punto_venta'] ?? '') . '-' . $fc['numero_desde']) ?></span>
                                 </td>
-                                <td><?= htmlspecialchars((string)($fc['razon_proveedor'] ?: ($fc['proveedor_razon'] ?: '-'))) ?></td>
+                                <td><?= htmlspecialchars($nombreProv($fc)) ?></td>
                                 <td class="small"><?= htmlspecialchars((string)($fc['cuit_proveedor'] ?? '')) ?></td>
                                 <td class="text-end fw-bold">$<?= $mon($fc['imp_total']) ?></td>
                                 <td class="text-end">$<?= $mon($fc['imp_iva']) ?></td>

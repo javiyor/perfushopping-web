@@ -160,6 +160,14 @@ final class CompraRepo
             $extraCols[] = 'ret_iva';
             $extraVals[] = ':ret_iva';
         }
+        if (in_array('plazo_cuotas', $cols, true)) {
+            $extraCols[] = 'plazo_cuotas';
+            $extraVals[] = ':plazo_cuotas';
+        }
+        if (in_array('plazo_dias', $cols, true)) {
+            $extraCols[] = 'plazo_dias';
+            $extraVals[] = ':plazo_dias';
+        }
         $extraColsSql = $extraCols ? ', ' . implode(', ', $extraCols) : '';
         $extraValsSql = $extraVals ? ', ' . implode(', ', $extraVals) : '';
         $st = Db::pdo()->prepare('
@@ -174,11 +182,10 @@ final class CompraRepo
                :obs, :cb)
         ');
         $p = $this->params($d);
-        if (!in_array('ret_ing_brutos', $cols, true)) {
-            unset($p[':ret_ib']);
-        }
-        if (!in_array('ret_iva', $cols, true)) {
-            unset($p[':ret_iva']);
+        foreach (['ret_ing_brutos' => ':ret_ib', 'ret_iva' => ':ret_iva', 'plazo_cuotas' => ':plazo_cuotas', 'plazo_dias' => ':plazo_dias'] as $col => $ph) {
+            if (!in_array($col, $cols, true)) {
+                unset($p[$ph]);
+            }
         }
         $st->execute($p);
         return (int)Db::pdo()->lastInsertId();
@@ -195,6 +202,12 @@ final class CompraRepo
         if (in_array('ret_iva', $cols, true)) {
             $extraSet .= ', ret_iva = :ret_iva';
         }
+        if (in_array('plazo_cuotas', $cols, true)) {
+            $extraSet .= ', plazo_cuotas = :plazo_cuotas';
+        }
+        if (in_array('plazo_dias', $cols, true)) {
+            $extraSet .= ', plazo_dias = :plazo_dias';
+        }
         $st = Db::pdo()->prepare('
             UPDATE factura_compra SET
               estado = :estado, fecha = :fecha, tipo = :tipo, punto_venta = :pv,
@@ -209,11 +222,10 @@ final class CompraRepo
         $p = $this->params($d);
         // El UPDATE no toca origen ni created_by: deben salir del binding.
         unset($p[':origen'], $p[':cb']);
-        if (!in_array('ret_ing_brutos', $cols, true)) {
-            unset($p[':ret_ib']);
-        }
-        if (!in_array('ret_iva', $cols, true)) {
-            unset($p[':ret_iva']);
+        foreach (['ret_ing_brutos' => ':ret_ib', 'ret_iva' => ':ret_iva', 'plazo_cuotas' => ':plazo_cuotas', 'plazo_dias' => ':plazo_dias'] as $col => $ph) {
+            if (!in_array($col, $cols, true)) {
+                unset($p[$ph]);
+            }
         }
         $p[':id'] = $id;
         $st->execute($p);
@@ -248,6 +260,8 @@ final class CompraRepo
             ':iva' => (float)($d['imp_iva'] ?? 0),
             ':ret_ib' => (float)($d['ret_ing_brutos'] ?? 0),
             ':ret_iva' => (float)($d['ret_iva'] ?? 0),
+            ':plazo_cuotas' => max(1, (int)($d['plazo_cuotas'] ?? 1)),
+            ':plazo_dias' => (string)($d['plazo_dias'] ?? ''),
             ':total' => (float)($d['imp_total'] ?? 0),
             ':idcta1' => ((int)($d['idcta1'] ?? 0)) > 0 ? (int)$d['idcta1'] : null,
             ':depo' => ((int)($d['iddepo'] ?? 0)) > 0 ? (int)$d['iddepo'] : null,
@@ -330,6 +344,39 @@ final class CompraRepo
         ');
         $ins->execute([':cp' => $codprove, ':r' => $razon !== '' ? $razon : ('Proveedor ' . $cuit), ':c' => $cuit]);
         return (int)Db::pdo()->lastInsertId();
+    }
+
+    /**
+     * Razón social efectiva para persistir en la factura: la cargada, o la del
+     * proveedor por idprovee / CUIT cuando vino vacía (importación ARCA, QR).
+     */
+    public function resolverRazon(?int $idprovee, string $cuit, string $razon): string
+    {
+        $razon = trim($razon);
+        if ($razon !== '') {
+            return $razon;
+        }
+
+        if (($idprovee ?: 0) > 0) {
+            $st = Db::pdo()->prepare('SELECT razon FROM proveedo WHERE idprovee = :i LIMIT 1');
+            $st->execute([':i' => $idprovee]);
+            $r = trim((string)($st->fetchColumn() ?: ''));
+            if ($r !== '') {
+                return $r;
+            }
+        }
+
+        $cuit = (string)preg_replace('/\D/', '', $cuit);
+        if ($cuit !== '' && $cuit !== '0') {
+            $st = Db::pdo()->prepare('SELECT razon FROM proveedo WHERE cuit = :c LIMIT 1');
+            $st->execute([':c' => $cuit]);
+            $r = trim((string)($st->fetchColumn() ?: ''));
+            if ($r !== '') {
+                return $r;
+            }
+        }
+
+        return '';
     }
 
     // ── Depósitos ──
