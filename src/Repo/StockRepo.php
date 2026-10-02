@@ -764,6 +764,101 @@ final class StockRepo
         }
     }
 
+    /** @return array<int, array<string,mixed>> */
+    public function ajustesRecientes(int $limit = 30, string $desde = '', string $hasta = ''): array
+    {
+        $limit = max(1, min(200, $limit));
+        $params = [];
+        $where = '';
+        if ($desde !== '') {
+            $where .= ' AND sc.fecha >= :desde';
+            $params[':desde'] = $desde;
+        }
+        if ($hasta !== '') {
+            $where .= ' AND sc.fecha <= :hasta';
+            $params[':hasta'] = $hasta;
+        }
+        $st = Db::pdo()->prepare("
+            SELECT sc.idcabstock AS id, sc.fecha, sc.notas AS motivo, sc.tipo_movimiento AS tipo,
+                   sc.iddepoh, sc.iddepod,
+                   dh.nomdepo AS depo_hasta, dd.nomdepo AS depo_desde,
+                   COUNT(sd.idprodu) AS items, COALESCE(SUM(sd.canti), 0) AS unidades
+            FROM stockcab sc
+            LEFT JOIN stockdet sd ON sd.idstockcab = sc.idcabstock
+            LEFT JOIN deposito dh ON dh.iddepo = sc.iddepoh
+            LEFT JOIN deposito dd ON dd.iddepo = sc.iddepod
+            WHERE 1 = 1{$where}
+            GROUP BY sc.idcabstock
+            ORDER BY sc.idcabstock DESC
+            LIMIT {$limit}
+        ");
+        $st->execute($params);
+        return $st->fetchAll();
+    }
+
+    /** Cabecera + detalle de un ajuste con nombres de producto/variante/depósito. */
+    public function ajusteConDetalle(int $idcabstock): ?array
+    {
+        $pdo = Db::pdo();
+        $cab = $pdo->prepare('
+            SELECT sc.idcabstock AS id, sc.fecha, sc.notas AS motivo, sc.tipo_movimiento AS tipo,
+                   sc.iddepoh, sc.iddepod,
+                   dh.nomdepo AS depo_hasta, dd.nomdepo AS depo_desde
+            FROM stockcab sc
+            LEFT JOIN deposito dh ON dh.iddepo = sc.iddepoh
+            LEFT JOIN deposito dd ON dd.iddepo = sc.iddepod
+            WHERE sc.idcabstock = :id LIMIT 1
+        ');
+        $cab->execute([':id' => $idcabstock]);
+        $cabRow = $cab->fetch();
+        if (!$cabRow) {
+            return null;
+        }
+        $det = $pdo->prepare('
+            SELECT sd.idprodu, sd.idcodgusto, sd.canti,
+                   p.produ, p.codprodu,
+                   g.nomgusto, g.codscan
+            FROM stockdet sd
+            LEFT JOIN producto p ON p.idprodu = sd.idprodu
+            LEFT JOIN gustos g ON g.idcodgusto = sd.idcodgusto
+            WHERE sd.idstockcab = :id
+            ORDER BY p.produ ASC
+        ');
+        $det->execute([':id' => $idcabstock]);
+        $cabRow['items'] = $det->fetchAll();
+        return $cabRow;
+    }
+
+    /**
+     * Anula un ajuste generando el movimiento inverso (trazable).
+     * Devuelve los ids de las cabeceras de reversión.
+     * @return array<int>
+     */
+    public function anularAjuste(int $idcabstock, int $adminUserId): array
+    {
+        $aj = $this->ajusteConDetalle($idcabstock);
+        if (!$aj || empty($aj['items'])) {
+            throw new \RuntimeException('Ajuste no encontrado.');
+        }
+        $desde = (int)($aj['iddepoh'] ?? 0);
+        $hasta = (int)($aj['iddepod'] ?? 0);
+        $motivo = 'Anulación ajuste #' . (int)$aj['id'] . ': ' . trim((string)($aj['motivo'] ?? ''));
+        $nuevos = [];
+        foreach ($aj['items'] as $it) {
+            $nuevos[] = $this->registrarAjuste(
+                (int)$it['idprodu'],
+                $it['idcodgusto'] !== null ? (int)$it['idcodgusto'] : null,
+                $desde,
+                $hasta,
+                max(1, (int)$it['canti']),
+                $motivo,
+                $adminUserId,
+                'ajuste'
+            );
+        }
+        return $nuevos;
+    }
+
     private function updateStockDeposit(int $idprodu, ?int $idcodgusto, int $iddepo, int $delta): void
     {
         $pdo = Db::pdo();

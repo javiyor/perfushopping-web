@@ -313,6 +313,7 @@ final class StockController
             'initialAjusteItems' => $initialAjusteItems,
             'solicitudesPendientes' => $solicitudesPendientes,
             'misSolicitudes' => $misSolicitudes,
+            'historialAjustes' => $repo->ajustesRecientes(30),
             'esSuperadmin' => $esSuperadmin,
             'csrf' => Csrf::token(),
             'pageTitle' => 'Ajuste de stock',
@@ -381,9 +382,9 @@ final class StockController
                 Response::redirect('/admin/stock/ajuste');
             }
 
-            $aplicados = 0;
+            $cabIds = [];
             foreach ($items as $it) {
-                $repo->registrarAjuste(
+                $cabIds[] = $repo->registrarAjuste(
                     (int)$it['idprodu'],
                     $it['idcodgusto'] !== null ? (int)$it['idcodgusto'] : null,
                     $iddepodesde,
@@ -392,9 +393,10 @@ final class StockController
                     $motivo,
                     (int)$adminUser['id']
                 );
-                $aplicados++;
             }
-            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Ajuste de stock registrado. Productos procesados: ' . $aplicados . '.'];
+            $cabIds = array_values(array_filter(array_map('intval', $cabIds)));
+            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Ajuste de stock registrado. Productos procesados: ' . count($cabIds) . '.'];
+            Response::redirect('/admin/stock/ajuste/imprimir?ids=' . implode(',', $cabIds));
         } catch (\Throwable $e) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Error al registrar ajuste: ' . $e->getMessage()];
         }
@@ -548,35 +550,28 @@ final class StockController
         Response::redirect('/admin/stock');
     }
 
-    public function print(array $params): void
+    public function imprimirAjuste(array $params): void
     {
         $auth = new AdminAuthService();
         $adminUser = $auth->requirePermiso('productos');
 
-        $idAjuste = (int)($_GET['id'] ?? 0);
-        if ($idAjuste <= 0) {
+        $ids = array_values(array_filter(array_map('intval', explode(',', (string)($_GET['ids'] ?? '')))));
+        if (!$ids) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Ajuste inválido.'];
             Response::redirect('/admin/stock/ajuste');
         }
 
-        // Leer datos del ajuste desde los parámetros de URL (id, fecha, motivo, depósitos, items)
-        $fecha = (string)($_GET['f'] ?? '');
-        $motivo = (string)($_GET['m'] ?? '');
-        $depodesde = (int)($_GET['ds'] ?? 0);
-        $depohasta = (int)($_GET['dh'] ?? 0);
-        // Items: formato simplificado idprodu|cantidad,idprodu|cantidad,...
-        $itemsParam = (string)($_GET['i'] ?? '');
-        $items = [];
-        if ($itemsParam) {
-            foreach (explode(',', $itemsParam) as $item) {
-                $parts = explode('|', $item);
-                if (count($parts) === 2) {
-                    $items[] = [
-                        'idprodu' => (int)$parts[0],
-                        'cantidad' => (int)$parts[1],
-                    ];
-                }
+        $repo = new StockRepo();
+        $ajustes = [];
+        foreach ($ids as $id) {
+            $aj = $repo->ajusteConDetalle($id);
+            if ($aj) {
+                $ajustes[] = $aj;
             }
+        }
+        if (!$ajustes) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Ajuste no encontrado.'];
+            Response::redirect('/admin/stock/ajuste');
         }
 
         $empresa = (new \Perfushopping\Web\Repo\EmpresaRepo())->getDefault();
@@ -586,20 +581,31 @@ final class StockController
             $sucursal = $sucursalRepo->findById($auth->getSucursalId());
         }
 
-        echo View::adminPage('admin/stock/print_ajuste.php', [
-            'adminUser' => $adminUser,
+        echo View::render('admin/stock/print_ajuste.php', [
             'empresa' => $empresa,
             'sucursal' => $sucursal,
-            'ajuste' => [
-                'id' => $idAjuste,
-                'fecha' => $fecha,
-                'motivo' => $motivo,
-                'depodesde' => $depodesde,
-                'depohasta' => $depohasta,
-                'items' => $items,
-            ],
-            'csrf' => Csrf::token(),
-            'pageTitle' => 'Imprimir ajuste de stock',
+            'ajustes' => $ajustes,
         ]);
+    }
+
+    public function anularAjuste(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requirePermiso('productos');
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $id = (int)($_POST['idcabstock'] ?? 0);
+        if ($id <= 0) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Ajuste inválido.'];
+            Response::redirect('/admin/stock/ajuste');
+        }
+        try {
+            $nuevos = (new StockRepo())->anularAjuste($id, (int)$adminUser['id']);
+            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Ajuste #' . $id . ' anulado con movimiento inverso.'];
+            Response::redirect('/admin/stock/ajuste/imprimir?ids=' . implode(',', $nuevos));
+        } catch (\Throwable $e) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se pudo anular: ' . $e->getMessage()];
+            Response::redirect('/admin/stock/ajuste');
+        }
     }
 }

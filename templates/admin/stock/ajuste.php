@@ -5,6 +5,7 @@ $variantes = $variantes ?? [];
 $initialAjusteItems = $initialAjusteItems ?? [];
 $solicitudesPendientes = $solicitudesPendientes ?? [];
 $misSolicitudes = $misSolicitudes ?? [];
+$historialAjustes = $historialAjustes ?? [];
 $esSuperadmin = $esSuperadmin ?? false;
 ?>
 <nav aria-label="breadcrumb" class="mb-3">
@@ -187,6 +188,40 @@ $esSuperadmin = $esSuperadmin ?? false;
                 <p class="text-muted mb-0">Los ajustes quedan registrados en <code>stockcab</code>/<code>stockdet</code> y se actualizan las tablas <code>stock</code>, <code>producto.stocact</code> y <code>gustos.stockact</code> automáticamente.</p>
             </div>
         </div>
+    </div>
+</div>
+
+<div class="card shadow-sm mt-3">
+    <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+        <span>Ajustes de stock generados</span>
+        <span class="badge bg-secondary"><?= count($historialAjustes) ?></span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-admin mb-0">
+            <thead><tr><th>#</th><th>Fecha</th><th>Motivo</th><th>Desde → Hasta</th><th class="text-center">Ítems</th><th class="text-center">Unid.</th><th style="width:90px"></th></tr></thead>
+            <tbody>
+            <?php if (!$historialAjustes): ?>
+                <tr><td colspan="7" class="text-center text-muted">Sin ajustes registrados.</td></tr>
+            <?php else: foreach ($historialAjustes as $h): ?>
+                <tr>
+                    <td><?= (int)$h['id'] ?></td>
+                    <td class="small"><?= htmlspecialchars((string)($h['fecha'] ?? '')) ?></td>
+                    <td class="small"><?= htmlspecialchars(mb_substr((string)($h['motivo'] ?? ''), 0, 60)) ?></td>
+                    <td class="small"><?= htmlspecialchars((string)($h['depo_desde'] ?? '—')) ?> → <?= htmlspecialchars((string)($h['depo_hasta'] ?? '—')) ?></td>
+                    <td class="text-center"><?= (int)($h['items'] ?? 0) ?></td>
+                    <td class="text-center"><?= (int)($h['unidades'] ?? 0) ?></td>
+                    <td class="text-end text-nowrap">
+                        <a class="btn btn-sm btn-outline-primary py-0 px-1" title="Reimprimir" href="/admin/stock/ajuste/imprimir?ids=<?= (int)$h['id'] ?>" target="_blank"><i class="bi bi-printer"></i></a>
+                        <form method="post" action="/admin/stock/ajuste/anular" style="display:inline" onsubmit="return confirm('Anular el ajuste #<?= (int)$h['id'] ?> generando el movimiento inverso?')">
+                            <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                            <input type="hidden" name="idcabstock" value="<?= (int)$h['id'] ?>" />
+                            <button class="btn btn-sm btn-outline-danger py-0 px-1" title="Anular (movimiento inverso)"><i class="bi bi-arrow-counterclockwise"></i></button>
+                        </form>
+                    </td>
+                </tr>
+            <?php endforeach; endif; ?>
+            </tbody>
+        </table>
     </div>
 </div>
 
