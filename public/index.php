@@ -87,6 +87,7 @@ use Perfushopping\Web\Admin\SocialInboxController as AdminSocialInboxController;
 use Perfushopping\Web\Admin\GastoController as AdminGastoController;
 use Perfushopping\Web\Admin\BancoController as AdminBancoController;
 use Perfushopping\Web\Admin\BancoCuentaController as AdminBancoCuentaController;
+use Perfushopping\Web\Admin\CuentaContableController as AdminCuentaContableController;
 use Perfushopping\Web\Admin\Marketing\AnalyticsController as AdminMarketingAnalyticsController;
 use Perfushopping\Web\Admin\Marketing\ArticleController as AdminMarketingArticleController;
 use Perfushopping\Web\Admin\Marketing\BrandBlockController as AdminMarketingBrandBlockController;
@@ -564,6 +565,13 @@ $router->post('/admin/banco-cuentas/save', [AdminBancoCuentaController::class, '
 $router->post('/admin/banco-cuentas/delete', [AdminBancoCuentaController::class, 'delete']);
 $router->post('/admin/banco-cuentas/cobro/save', [AdminBancoCuentaController::class, 'saveCobro']);
 $router->post('/admin/banco-cuentas/cobro/delete-tarjeta', [AdminBancoCuentaController::class, 'deleteCobroTarjeta']);
+
+// Admin - Cuentas contables
+$router->get('/admin/cuentas-contables', [AdminCuentaContableController::class, 'index']);
+$router->post('/admin/cuentas-contables/guardar-cuenta', [AdminCuentaContableController::class, 'saveCuenta']);
+$router->post('/admin/cuentas-contables/guardar-subcuenta', [AdminCuentaContableController::class, 'saveSubcuenta']);
+$router->post('/admin/cuentas-contables/eliminar-cuenta', [AdminCuentaContableController::class, 'deleteCuenta']);
+$router->post('/admin/cuentas-contables/eliminar-subcuenta', [AdminCuentaContableController::class, 'deleteSubcuenta']);
 
 // Admin - Catálogo WhatsApp Business
 $router->get('/admin/whatsApp-catalog', [AdminWhatsAppCatalogController::class, 'index']);

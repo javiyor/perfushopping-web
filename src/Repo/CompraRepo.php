@@ -306,6 +306,54 @@ final class CompraRepo
         return (int)Db::pdo()->lastInsertId();
     }
 
+    public function actualizarCuenta(int $idcta, string $nomcta): void
+    {
+        $st = Db::pdo()->prepare('UPDATE contable SET nomcta = :n WHERE idcta = :i LIMIT 1');
+        $st->execute([':n' => trim($nomcta), ':i' => $idcta]);
+    }
+
+    public function actualizarSubcuenta(int $idcta1, string $nomcta1, int $idcta): void
+    {
+        $st = Db::pdo()->prepare('UPDATE contable1 SET nomcta1 = :n, idcta = :c WHERE idcta1 = :i LIMIT 1');
+        $st->execute([':n' => trim($nomcta1), ':c' => $idcta, ':i' => $idcta1]);
+    }
+
+    /** Cantidad de comprobantes/gastos que usan una subcuenta (para no borrarla si está en uso). */
+    public function usoSubcuenta(int $idcta1): int
+    {
+        $total = 0;
+        foreach (['factura_compra', 'gastos'] as $tabla) {
+            try {
+                $st = Db::pdo()->prepare("SELECT COUNT(*) FROM {$tabla} WHERE idcta1 = :i");
+                $st->execute([':i' => $idcta1]);
+                $total += (int)$st->fetchColumn();
+            } catch (\Throwable $e) {
+                continue;
+            }
+        }
+        return $total;
+    }
+
+    public function eliminarSubcuenta(int $idcta1): bool
+    {
+        if ($this->usoSubcuenta($idcta1) > 0) {
+            return false;
+        }
+        Db::pdo()->prepare('DELETE FROM contable1 WHERE idcta1 = :i LIMIT 1')->execute([':i' => $idcta1]);
+        return true;
+    }
+
+    public function eliminarCuenta(int $idcta): bool
+    {
+        $st = Db::pdo()->prepare('SELECT COUNT(*) FROM contable1 WHERE idcta = :i');
+        $st->execute([':i' => $idcta]);
+        if ((int)$st->fetchColumn() > 0) {
+            return false;
+        }
+        Db::pdo()->prepare('DELETE FROM contable WHERE idcta = :i LIMIT 1')->execute([':i' => $idcta]);
+        return true;
+    }
+
     // ── Proveedores ──
 
     public function proveedorByCuit(string $cuit): ?array
