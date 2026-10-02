@@ -54,6 +54,12 @@ final class ProveedorCtaCteController
         $q = trim((string)($_GET['q'] ?? ''));
 
         $repo = new CtaCteProveedorRepo();
+        try {
+            // Backfill idempotente: asigna OPs viejas (sin orden_pago_compras) a facturas impagas
+            $repo->sincronizarAsignaciones($proveedorId);
+        } catch (\Throwable $e) {
+            error_log('sincronizarAsignaciones: ' . $e->getMessage());
+        }
         $movimientos = $repo->movimientos($proveedorId, $q);
         $saldo = $repo->saldoActual($proveedorId);
         $comprobantes = $proveedorId !== null ? $repo->comprobantesConPlazo($proveedorId) : [];

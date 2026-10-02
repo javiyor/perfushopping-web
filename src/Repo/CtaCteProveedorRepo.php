@@ -253,7 +253,102 @@ final class CtaCteProveedorRepo
     }
 
     /**
-     * Comprobantes de compra de un proveedor con cronograma y estado FIFO (display-only).
+     * Backfill idempotente: asigna el remanente sin asignar de cada OP a las
+     * facturas impagas del proveedor (FIFO por fecha). Cubre las OP creadas
+     * antes de existir la tabla orden_pago_compras. Devuelve filas creadas.
+     */
+    public function sincronizarAsignaciones(?int $proveedorId = null): int
+    {
+        $pdo = Db::pdo();
+
+        if ($proveedorId !== null) {
+            $pids = [$proveedorId];
+        } else {
+            $st = $pdo->query("
+                SELECT o.proveedor_id
+                FROM ordenes_pago o
+                LEFT JOIN (
+                    SELECT orden_pago_id, SUM(monto_cents) AS asignado
+                    FROM orden_pago_compras GROUP BY orden_pago_id
+                ) x ON x.orden_pago_id = o.id
+                WHERE o.proveedor_id IS NOT NULL
+                  AND (o.monto_cents - COALESCE(x.asignado, 0)) > 0
+                GROUP BY o.proveedor_id
+            ");
+            $pids = array_map('intval', $st->fetchAll(\PDO::FETCH_COLUMN) ?: []);
+        }
+
+        $creadas = 0;
+        $ins = $pdo->prepare('
+            INSERT INTO orden_pago_compras (orden_pago_id, factura_compra_id, monto_cents, created_at)
+            VALUES (:op, :compra, :monto, NOW())
+        ');
+        foreach ($pids as $pid) {
+            if ($pid <= 0) {
+                continue;
+            }
+            $ops = $pdo->prepare('SELECT id, monto_cents FROM ordenes_pago WHERE proveedor_id = :p ORDER BY id ASC');
+            $ops->execute([':p' => $pid]);
+            $ops = $ops->fetchAll();
+            if (!$ops) {
+                continue;
+            }
+            $facts = $pdo->prepare('SELECT id, imp_total FROM factura_compra WHERE idprovee = :p ORDER BY fecha ASC, id ASC');
+            $facts->execute([':p' => $pid]);
+            $facts = $facts->fetchAll();
+            if (!$facts) {
+                continue;
+            }
+
+            $opIds = array_column($ops, 'id');
+            $in = implode(',', array_map('intval', $opIds));
+            $asigOp = [];
+            foreach ($pdo->query("SELECT orden_pago_id, COALESCE(SUM(monto_cents), 0) AS t FROM orden_pago_compras WHERE orden_pago_id IN ($in) GROUP BY orden_pago_id")->fetchAll() as $r) {
+                $asigOp[(int)$r['orden_pago_id']] = (int)$r['t'];
+            }
+            $factIds = array_column($facts, 'id');
+            $inF = implode(',', array_map('intval', $factIds));
+            $asigFact = [];
+            foreach ($pdo->query("SELECT factura_compra_id, COALESCE(SUM(monto_cents), 0) AS t FROM orden_pago_compras WHERE factura_compra_id IN ($inF) GROUP BY factura_compra_id")->fetchAll() as $r) {
+                $asigFact[(int)$r['factura_compra_id']] = (int)$r['t'];
+            }
+
+            $pdo->beginTransaction();
+            try {
+                foreach ($ops as $op) {
+                    $opId = (int)$op['id'];
+                    $restante = (int)$op['monto_cents'] - ($asigOp[$opId] ?? 0);
+                    if ($restante <= 0) {
+                        continue;
+                    }
+                    foreach ($facts as $f) {
+                        if ($restante <= 0) {
+                            break;
+                        }
+                        $fid = (int)$f['id'];
+                        $pend = (int)round(((float)($f['imp_total'] ?? 0)) * 100) - ($asigFact[$fid] ?? 0);
+                        $a = min($pend, $restante);
+                        if ($a > 0) {
+                            $ins->execute([':op' => $opId, ':compra' => $fid, ':monto' => $a]);
+                            $asigFact[$fid] = ($asigFact[$fid] ?? 0) + $a;
+                            $restante -= $a;
+                            $creadas++;
+                        }
+                    }
+                }
+                $pdo->commit();
+            } catch (\Throwable $e) {
+                $pdo->rollBack();
+                throw $e;
+            }
+        }
+
+        return $creadas;
+    }
+
+    /**
+     * Comprobantes de compra de un proveedor con cronograma y estado según
+     * las asignaciones reales de las órdenes de pago.
      * @return array<int, array{id:int, tipo:string, punto_venta:string, numero_desde:string, fecha:?string, imp_total:float, cronograma:array, estado:string, pendiente:float}>
      */
     public function comprobantesConPlazo(?int $proveedorId, string $cuit = ''): array
