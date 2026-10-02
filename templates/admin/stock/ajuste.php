@@ -26,7 +26,7 @@ $esSuperadmin = $esSuperadmin ?? false;
                     <div class="mb-3">
                         <label class="form-label small fw-semibold">Agregar productos al movimiento</label>
                         <div class="input-group">
-                            <input class="form-control form-control-sm" id="productoSearch" placeholder="Buscar por nombre o código y tocar para agregar" autocomplete="off" />
+                            <input class="form-control form-control-sm" id="productoSearch" placeholder="Buscar por nombre, código o ID y tocar para agregar" autocomplete="off" />
                             <button class="btn btn-outline-secondary btn-sm" type="button" id="clearProductoSearch"><i class="bi bi-x-lg"></i></button>
                         </div>
                         <div id="productoResults" class="list-group mt-1" style="display:none;position:absolute;z-index:1050;max-height:300px;overflow-y:auto"></div>

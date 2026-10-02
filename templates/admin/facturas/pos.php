@@ -314,7 +314,7 @@ $pedidoDescPct = $pedidoDescPct ?? 0;
     <div class="pos-left">
         <div class="pos-search-box">
             <div class="d-flex gap-1">
-                <input id="productSearch" placeholder="🔍 Buscar producto por nombre o código..." autofocus class="flex-fill" style="flex:1" />
+                <input id="productSearch" placeholder="🔍 Buscar producto por nombre, código o ID..." autofocus class="flex-fill" style="flex:1" />
                 <button class="btn btn-sm btn-outline-secondary" type="button" id="btnScanCam" title="Escanear código de barras con la cámara"><i class="bi bi-camera"></i></button>
             </div>
             <div id="scanReader" style="display:none;max-width:300px;margin-top:4px"></div>

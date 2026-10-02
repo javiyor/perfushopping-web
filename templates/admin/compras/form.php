@@ -315,7 +315,7 @@ function addRow(data) {
     const bonif = data ? (data.bonif_pct || 0) : 0;
     row.innerHTML = `
         <td>
-            <input class="form-control form-control-sm prod-input" name="item_name[]" placeholder="Buscar producto..." autocomplete="off" value="${esc(name)}" />
+            <input class="form-control form-control-sm prod-input" name="item_name[]" placeholder="Buscar producto por nombre, código o ID..." autocomplete="off" value="${esc(name)}" />
             <input type="hidden" name="item_idprodu[]" class="idprodu" value="${data ? data.idprodu || '' : ''}" />
             <div class="prod-suggestions"></div>
         </td>

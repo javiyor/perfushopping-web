@@ -615,8 +615,14 @@ final class FacturaRepo
 
         // Mismos criterios que la búsqueda de compras: nombre, códigos,
         // código de barras del producto y código de variante (parcial).
+        // Si es numérico también busca por idprodu exacto.
         $where = ['p.produ LIKE :like', 'p.codprodu LIKE :like', 'p.codprodup LIKE :like'];
         $exactRank = ['p.codprodu = :exact', 'p.codprodup = :exact'];
+        if (ctype_digit($q)) {
+            $params[':exactId'] = (int)$q;
+            array_unshift($where, 'p.idprodu = :exactId');
+            array_unshift($exactRank, 'p.idprodu = :exactId');
+        }
         if (in_array('codbarra', self::productoColumns(), true)) {
             $where[] = 'p.codbarra LIKE :like';
             $exactRank[] = 'p.codbarra = :exact';

@@ -647,6 +647,11 @@ final class StockRepo
         ];
         $where = ['p.produ LIKE :likeProdu', 'p.codprodu LIKE :likeCod', 'p.codprodup LIKE :likeProv'];
         $exactRank = ['p.codprodu = :exactCod', 'p.codprodup = :exactProv'];
+        if (ctype_digit($q)) {
+            $params[':exactId'] = (int)$q;
+            array_unshift($where, 'p.idprodu = :exactId');
+            array_unshift($exactRank, 'p.idprodu = :exactId');
+        }
         if ($hasCodbarra) {
             $params[':likeCodbarra'] = $like;
             $params[':exactCodbarra'] = $q;
