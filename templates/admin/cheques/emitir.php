@@ -1,5 +1,6 @@
 <?php
 $bancos = $bancos ?? [];
+$bancosLista = $bancosLista ?? [];
 $csrfToken = $csrf ?? '';
 $tipo = $tipo ?? 'propio';
 $isTercero = $tipo === 'tercero';
@@ -46,12 +47,12 @@ $isTercero = $tipo === 'tercero';
                             <input class="form-control" name="numero_cheque" placeholder="Ej: 00012345" />
                         </div>
                         <div class="col-6">
-                            <label class="form-label small fw-semibold"><?= $isTercero ? 'Banco (cuenta de depósito)' : 'Banco emisor' ?></label>
+                            <label class="form-label small fw-semibold">Banco emisor</label>
                             <?php if ($isTercero): ?>
-                                <select class="form-select" name="banco_cuenta_id">
+                                <select class="form-select" name="banco_id">
                                     <option value="">— Seleccionar —</option>
-                                    <?php foreach ($bancos as $b): ?>
-                                        <option value="<?= (int)$b['id'] ?>"><?= htmlspecialchars((string)($b['banco'] ?? '') . ' — ' . ($b['numero_cuenta'] ?? '')) ?></option>
+                                    <?php foreach ($bancosLista as $b): ?>
+                                        <option value="<?= (int)$b['idban'] ?>"><?= htmlspecialchars((string)($b['nombanc'] ?? '')) ?><?= isset($b['numbanc']) && $b['numbanc'] !== '' && $b['numbanc'] !== null ? ' — ' . htmlspecialchars((string)$b['numbanc']) : '' ?></option>
                                     <?php endforeach; ?>
                                 </select>
                             <?php else: ?>

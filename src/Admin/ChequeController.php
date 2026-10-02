@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Perfushopping\Web\Admin;
 
+use Perfushopping\Web\Repo\BancoCuentaRepo;
 use Perfushopping\Web\Repo\BancoRepo;
 use Perfushopping\Web\Repo\ChequeRepo;
 use Perfushopping\Web\Service\AdminAuthService;
@@ -61,7 +62,8 @@ final class ChequeController
         $auth = new AdminAuthService();
         $adminUser = $auth->requirePermiso('cheques');
 
-        $bancos = (new BancoRepo())->findAll();
+        $bancos = (new BancoCuentaRepo())->findAll();
+        $bancosLista = (new BancoRepo())->findAll();
         $tipo = trim((string)($_GET['tipo'] ?? 'propio'));
         if (!in_array($tipo, ['propio', 'tercero'], true)) {
             $tipo = 'propio';
@@ -70,6 +72,7 @@ final class ChequeController
         echo View::adminPage('admin/cheques/emitir.php', [
             'adminUser' => $adminUser,
             'bancos' => $bancos,
+            'bancosLista' => $bancosLista,
             'tipo' => $tipo,
             'csrf' => Csrf::token(),
             'pageTitle' => $tipo === 'tercero' ? 'Cargar cheque de tercero' : 'Emitir cheque propio',
@@ -117,10 +120,17 @@ final class ChequeController
             $repo->agregarMovimiento($chequeId, 'emitido', null, null, 'Emisión directa', (int)$adminUser['id']);
             $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Cheque propio emitido correctamente.'];
         } else {
+            $bancoId = (int)($_POST['banco_id'] ?? 0);
+            $bancoEmisor = '';
+            if ($bancoId > 0) {
+                $bancoRow = (new BancoRepo())->findById($bancoId);
+                $bancoEmisor = trim((string)($bancoRow['nombanc'] ?? ''));
+            }
             $chequeId = $repo->create([
                 'tipo' => 'tercero',
                 'estado' => 'en_cartera',
                 'numero_cheque' => trim((string)($_POST['numero_cheque'] ?? '')),
+                'banco_emisor' => $bancoEmisor !== '' ? $bancoEmisor : null,
                 'banco_cuenta_id' => (int)($_POST['banco_cuenta_id'] ?? 0) ?: null,
                 'monto_cents' => $montoCents,
                 'fecha_vencimiento' => trim((string)($_POST['fecha_vencimiento'] ?? '')) ?: null,
