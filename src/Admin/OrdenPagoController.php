@@ -94,7 +94,6 @@ final class OrdenPagoController
             Response::redirect('/admin/ordenes-pago/nueva');
         }
 
-        $fechaVenc = trim((string)($_POST['fecha_vencimiento'] ?? '')) ?: null;
         $repo = new OrdenPagoRepo();
         $chequeRepo = new ChequeRepo();
 
@@ -109,10 +108,20 @@ final class OrdenPagoController
             $chequeId = null;
             if ($fp === 'cheque_propio') {
                 $bancoCuentaId = (int)($_POST['pago_banco_cuenta_id'][$idx] ?? 0);
+                $fechaVenc = trim((string)($_POST['pago_fecha_vencimiento'][$idx] ?? ''));
+                if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaVenc)) {
+                    $fechaVenc = null;
+                }
+                $bancoEmisor = null;
+                if ($bancoCuentaId > 0) {
+                    $cuentaBanco = (new BancoCuentaRepo())->findById($bancoCuentaId);
+                    $bn = trim((string)($cuentaBanco['banco'] ?? ''));
+                    if ($bn !== '') $bancoEmisor = $bn;
+                }
                 $chequeData = [
                     'tipo' => 'propio',
                     'estado' => 'emitido',
-                    'banco_emisor' => trim((string)($_POST['pago_banco_emisor'][$idx] ?? '')),
+                    'banco_emisor' => $bancoEmisor,
                     'numero_cheque' => trim((string)($_POST['pago_numero_cheque'][$idx] ?? '')),
                     'titular' => $proveedorNombre,
                     'monto_cents' => $monto,

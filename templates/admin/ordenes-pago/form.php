@@ -63,15 +63,9 @@ $formasPago = ['efectivo' => 'Efectivo', 'transferencia' => 'Transferencia', 'ch
             <div class="card shadow-sm mb-3">
                 <div class="card-header bg-white fw-semibold">Detalles</div>
                 <div class="card-body">
-                    <div class="row g-2 mb-2">
-                        <div class="col-6">
-                            <label class="form-label small">Fecha</label>
-                            <input class="form-control form-control-sm" name="fecha" type="date" value="<?= date('Y-m-d') ?>" />
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label small">Venc. cheque</label>
-                            <input class="form-control form-control-sm" name="fecha_vencimiento" type="date" />
-                        </div>
+                    <div class="mb-2">
+                        <label class="form-label small">Fecha</label>
+                        <input class="form-control form-control-sm" name="fecha" type="date" value="<?= date('Y-m-d') ?>" />
                     </div>
                     <div class="mb-2">
                         <label class="form-label small">Concepto</label>
@@ -130,7 +124,7 @@ function addPago() {
             <select class="form-select form-select-sm mb-1" name="pago_cheque_tercero_id[]" onchange="seleccionarChequeTercero(this)" title="Cheque de tercero en cartera">
                 <option value="">— Usar cheque de tercero en cartera —</option>
                 <?php foreach (($chequesTerceros ?? []) as $ch): ?>
-                    <option value="<?= (int)$ch['id'] ?>" data-monto="<?= (int)($ch['monto_cents'] ?? 0) ?>">
+                    <option value="<?= (int)$ch['id'] ?>" data-monto="<?= (int)($ch['monto_cents'] ?? 0) ?>" data-venc="<?= htmlspecialchars(substr((string)($ch['fecha_vencimiento'] ?? ''), 0, 10)) ?>">
                         <?= htmlspecialchars((string)($ch['numero_cheque'] ?? '')) ?> — <?= htmlspecialchars((string)($ch['banco_emisor'] ?? '')) ?> — $<?= number_format((int)($ch['monto_cents'] ?? 0) / 100, 2, ',', '.') ?>
                     </option>
                 <?php endforeach; ?>
@@ -142,7 +136,7 @@ function addPago() {
                 <?php endforeach; ?>
             </select>
             <input class="form-control form-control-sm mb-1" name="pago_numero_cheque[]" placeholder="N° cheque" />
-            <input class="form-control form-control-sm" name="pago_banco_emisor[]" placeholder="Banco emisor" />
+            <input class="form-control form-control-sm" name="pago_fecha_vencimiento[]" type="date" title="Vencimiento del cheque" />
         </td>
         <td><button class="btn btn-sm btn-outline-danger" type="button" onclick="removeRow(this)"><i class="bi bi-x"></i></button></td>
     `;
@@ -171,6 +165,9 @@ function seleccionarChequeTercero(sel) {
         montoInput.readOnly = true;
         recalcular();
     }
+    const venc = opt ? opt.getAttribute('data-venc') : null;
+    const vencInput = sel.closest('tr').querySelector('input[name="pago_fecha_vencimiento[]"]');
+    if (vencInput && venc) vencInput.value = venc;
 }
 
 function removeRow(btn) {
