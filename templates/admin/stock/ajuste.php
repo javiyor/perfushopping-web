@@ -7,6 +7,28 @@ $solicitudesPendientes = $solicitudesPendientes ?? [];
 $misSolicitudes = $misSolicitudes ?? [];
 $historialAjustes = $historialAjustes ?? [];
 $esSuperadmin = $esSuperadmin ?? false;
+$histDesde = $histDesde ?? '';
+$histHasta = $histHasta ?? '';
+$histDepDesde = (int)($histDepDesde ?? 0);
+$histDepHasta = (int)($histDepHasta ?? 0);
+$histPage = max(1, (int)($histPage ?? 1));
+$histPages = max(1, (int)($histPages ?? 1));
+$histTotal = (int)($histTotal ?? count($historialAjustes));
+$histHayFiltros = $histDesde !== '' || $histHasta !== '' || $histDepDesde > 0 || $histDepHasta > 0;
+$histBase = '/admin/stock/ajuste' . ((int)($producto['idprodu'] ?? 0) > 0 ? '/' . (int)$producto['idprodu'] : '');
+$histQuery = http_build_query(array_filter([
+    'desde' => $histDesde,
+    'hasta' => $histHasta,
+    'dep_desde' => $histDepDesde > 0 ? $histDepDesde : '',
+    'dep_hasta' => $histDepHasta > 0 ? $histDepHasta : '',
+], static fn ($v) => $v !== ''));
+$histPageUrl = static function (int $p) use ($histBase, $histQuery): string {
+    $qs = $histQuery !== '' ? '&' . $histQuery : '';
+    return $histBase . '?page=' . $p . $qs;
+};
+$histWinStart = max(1, min($histPage - 3, $histPages - 6));
+$histWinEnd = min($histPages, $histWinStart + 6);
+$histWinStart = max(1, $histWinEnd - 6);
 ?>
 <nav aria-label="breadcrumb" class="mb-3">
     <ol class="breadcrumb">
@@ -194,14 +216,50 @@ $esSuperadmin = $esSuperadmin ?? false;
 <div class="card shadow-sm mt-3">
     <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
         <span>Grupos de ajuste generados</span>
-        <span class="badge bg-secondary"><?= count($historialAjustes) ?></span>
+        <span class="badge bg-secondary"><?= $histTotal ?><?= $histPages > 1 ? ' · pág. ' . $histPage . '/' . $histPages : '' ?></span>
+    </div>
+    <div class="card-body pb-2">
+        <form method="get" action="<?= htmlspecialchars($histBase) ?>" class="row g-2 align-items-end">
+            <div class="col-6 col-md-2">
+                <label class="form-label small mb-1">Fecha desde</label>
+                <input type="date" class="form-control form-control-sm" name="desde" value="<?= htmlspecialchars($histDesde) ?>" />
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small mb-1">Fecha hasta</label>
+                <input type="date" class="form-control form-control-sm" name="hasta" value="<?= htmlspecialchars($histHasta) ?>" />
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small mb-1">Depósito desde</label>
+                <select class="form-select form-select-sm" name="dep_desde">
+                    <option value="">Todos</option>
+                    <?php foreach ($depositos as $d): ?>
+                        <option value="<?= (int)($d['iddepo'] ?? 0) ?>" <?= $histDepDesde === (int)($d['iddepo'] ?? 0) ? 'selected' : '' ?>><?= htmlspecialchars((string)($d['nomdepo'] ?? '')) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small mb-1">Depósito hasta</label>
+                <select class="form-select form-select-sm" name="dep_hasta">
+                    <option value="">Todos</option>
+                    <?php foreach ($depositos as $d): ?>
+                        <option value="<?= (int)($d['iddepo'] ?? 0) ?>" <?= $histDepHasta === (int)($d['iddepo'] ?? 0) ? 'selected' : '' ?>><?= htmlspecialchars((string)($d['nomdepo'] ?? '')) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-accent btn-sm" type="submit"><i class="bi bi-funnel"></i> Filtrar</button>
+                <?php if ($histHayFiltros): ?>
+                    <a class="btn btn-outline-secondary btn-sm" href="<?= htmlspecialchars($histBase) ?>"><i class="bi bi-x-lg"></i> Limpiar</a>
+                <?php endif; ?>
+            </div>
+        </form>
     </div>
     <div class="table-responsive">
         <table class="table table-sm table-admin mb-0">
             <thead><tr><th>#</th><th>Fecha</th><th>Tipo</th><th>Motivo</th><th>Desde → Hasta</th><th class="text-center">Ítems</th><th class="text-center">Unid.</th><th style="width:90px"></th></tr></thead>
             <tbody>
             <?php if (!$historialAjustes): ?>
-                <tr><td colspan="8" class="text-center text-muted">Sin ajustes registrados.</td></tr>
+                <tr><td colspan="8" class="text-center text-muted"><?= $histHayFiltros ? 'Sin ajustes para los filtros aplicados.' : 'Sin ajustes registrados.' ?></td></tr>
             <?php else: foreach ($historialAjustes as $h): ?>
                 <tr>
                     <td><?= (int)$h['id'] ?></td>
@@ -224,6 +282,24 @@ $esSuperadmin = $esSuperadmin ?? false;
             </tbody>
         </table>
     </div>
+    <?php if ($histPages > 1): ?>
+        <div class="card-footer bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span class="small text-muted"><?= $histTotal ?> grupos · Página <?= $histPage ?> de <?= $histPages ?></span>
+            <ul class="pagination pagination-sm mb-0">
+                <li class="page-item <?= $histPage <= 1 ? 'disabled' : '' ?>">
+                    <a class="page-link" href="<?= htmlspecialchars($histPage <= 1 ? '#' : $histPageUrl($histPage - 1)) ?>">&laquo;</a>
+                </li>
+                <?php for ($p = $histWinStart; $p <= $histWinEnd; $p++): ?>
+                    <li class="page-item <?= $p === $histPage ? 'active' : '' ?>">
+                        <a class="page-link" href="<?= htmlspecialchars($histPageUrl($p)) ?>"><?= $p ?></a>
+                    </li>
+                <?php endfor; ?>
+                <li class="page-item <?= $histPage >= $histPages ? 'disabled' : '' ?>">
+                    <a class="page-link" href="<?= htmlspecialchars($histPage >= $histPages ? '#' : $histPageUrl($histPage + 1)) ?>">&raquo;</a>
+                </li>
+            </ul>
+        </div>
+    <?php endif; ?>
 </div>
 
 <script>

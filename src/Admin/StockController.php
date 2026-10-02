@@ -305,6 +305,28 @@ final class StockController
             }
         }
 
+        // Historial: filtros de fecha y depósito + paginación.
+        $fmtFecha = static function ($v): string {
+            $v = trim((string)$v);
+            return preg_match('/^\d{4}-\d{2}-\d{2}$/', $v) ? $v : '';
+        };
+        $histDesde = $fmtFecha($_GET['desde'] ?? '');
+        $histHasta = $fmtFecha($_GET['hasta'] ?? '');
+        $histDepDesde = (int)($_GET['dep_desde'] ?? 0);
+        $histDepHasta = (int)($_GET['dep_hasta'] ?? 0);
+        $histPerPage = 30;
+        $histTotal = $repo->ajustesGruposCount($histDesde, $histHasta, $histDepDesde, $histDepHasta);
+        $histPages = max(1, (int)ceil($histTotal / $histPerPage));
+        $histPage = max(1, min($histPages, (int)($_GET['page'] ?? 1)));
+        $historialAjustes = $repo->ajustesRecientes(
+            $histPerPage,
+            $histDesde,
+            $histHasta,
+            ($histPage - 1) * $histPerPage,
+            $histDepDesde,
+            $histDepHasta
+        );
+
         echo View::adminPage('admin/stock/ajuste.php', [
             'adminUser' => $adminUser,
             'depositos' => $depositos,
@@ -313,7 +335,14 @@ final class StockController
             'initialAjusteItems' => $initialAjusteItems,
             'solicitudesPendientes' => $solicitudesPendientes,
             'misSolicitudes' => $misSolicitudes,
-            'historialAjustes' => $repo->ajustesRecientes(30),
+            'historialAjustes' => $historialAjustes,
+            'histDesde' => $histDesde,
+            'histHasta' => $histHasta,
+            'histDepDesde' => $histDepDesde,
+            'histDepHasta' => $histDepHasta,
+            'histPage' => $histPage,
+            'histPages' => $histPages,
+            'histTotal' => $histTotal,
             'esSuperadmin' => $esSuperadmin,
             'csrf' => Csrf::token(),
             'pageTitle' => 'Ajuste de stock',

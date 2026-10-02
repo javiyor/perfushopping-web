@@ -927,19 +927,13 @@ final class StockRepo
     }
 
     /** @return array<int, array<string,mixed>> un renglón por grupo de ajuste */
-    public function ajustesRecientes(int $limit = 30, string $desde = '', string $hasta = ''): array
+    public function ajustesRecientes(int $limit = 30, string $desde = '', string $hasta = '', int $offset = 0, int $depDesde = 0, int $depHasta = 0): array
     {
         $limit = max(1, min(200, $limit));
+        $offset = max(0, $offset);
         $params = [];
-        $where = '';
-        if ($desde !== '') {
-            $where .= ' AND sc.fecha >= :desde';
-            $params[':desde'] = $desde;
-        }
-        if ($hasta !== '') {
-            $where .= ' AND sc.fecha <= :hasta';
-            $params[':hasta'] = $hasta;
-        }
+        $where = $this->ajustesFiltrosWhere($desde, $hasta, $params);
+        $having = $this->ajustesFiltrosHaving($depDesde, $depHasta, $params);
         $grupoExpr = $this->ensureGrupoColumn()
             ? 'COALESCE(sc.grupo_id, sc.idcabstock)'
             : 'sc.idcabstock';
@@ -956,8 +950,9 @@ final class StockRepo
             LEFT JOIN deposito dd ON dd.iddepo = sc.iddepod
             WHERE 1 = 1{$where}
             GROUP BY {$grupoExpr}
+            {$having}
             ORDER BY MAX(sc.idcabstock) DESC
-            LIMIT {$limit}
+            LIMIT {$limit} OFFSET {$offset}
         ");
         $st->execute($params);
         $rows = $st->fetchAll();
@@ -967,6 +962,58 @@ final class StockRepo
             $r['depo_hasta_label'] = self::etiquetaDeposito($r['depo_hasta'] ?? null, (string)($r['tipo'] ?? ''), 'hasta');
         }
         return $rows;
+    }
+
+    /** Cantidad total de grupos de ajuste para paginar el historial. */
+    public function ajustesGruposCount(string $desde = '', string $hasta = '', int $depDesde = 0, int $depHasta = 0): int
+    {
+        $params = [];
+        $where = $this->ajustesFiltrosWhere($desde, $hasta, $params);
+        $having = $this->ajustesFiltrosHaving($depDesde, $depHasta, $params);
+        $grupoExpr = $this->ensureGrupoColumn()
+            ? 'COALESCE(sc.grupo_id, sc.idcabstock)'
+            : 'sc.idcabstock';
+        $st = Db::pdo()->prepare("
+            SELECT COUNT(*) AS total
+            FROM (
+                SELECT {$grupoExpr} AS gid
+                FROM stockcab sc
+                WHERE 1 = 1{$where}
+                GROUP BY {$grupoExpr}
+                {$having}
+            ) g
+        ");
+        $st->execute($params);
+        $row = $st->fetch();
+        return (int)($row['total'] ?? 0);
+    }
+
+    private function ajustesFiltrosWhere(string $desde, string $hasta, array &$params): string
+    {
+        $where = '';
+        if ($desde !== '') {
+            $where .= ' AND sc.fecha >= :desde';
+            $params[':desde'] = $desde;
+        }
+        if ($hasta !== '') {
+            $where .= ' AND sc.fecha < DATE_ADD(:hasta, INTERVAL 1 DAY)';
+            $params[':hasta'] = $hasta;
+        }
+        return $where;
+    }
+
+    private function ajustesFiltrosHaving(int $depDesde, int $depHasta, array &$params): string
+    {
+        $having = '';
+        if ($depDesde > 0) {
+            $having .= ' HAVING SUM(sc.iddepod = :depd) > 0';
+            $params[':depd'] = $depDesde;
+        }
+        if ($depHasta > 0) {
+            $having .= ($having === '' ? ' HAVING ' : ' AND ') . 'SUM(sc.iddepoh = :deph) > 0';
+            $params[':deph'] = $depHasta;
+        }
+        return $having;
     }
 
     /** Cabecera + detalle de un ajuste con nombres de producto/variante/depósito. */
