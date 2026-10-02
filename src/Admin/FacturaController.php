@@ -1711,4 +1711,95 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
             Response::json(['ok' => false, 'error' => 'Error al enviar: ' . $e->getMessage()]);
         }
     }
+
+    public function pagos(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requirePermiso('pagos');
+
+        $q = trim((string)($_GET['q'] ?? ''));
+        $formaPago = trim((string)($_GET['forma_pago'] ?? ''));
+
+        $repo = new FacturaRepo();
+        $st = Db::pdo()->prepare(''
+            . 'SELECT fp.*, f.codigo, f.total_cents, f.fecha, '
+            . 'fp.forma_pago, fp.monto_cents, '
+            . 'b.nombanc AS banco_nombre, c.numero_cheque, c.titular AS cheque_titular, '
+            . 'p.descripcion AS plazo_descripcion '
+            . 'FROM factura_pagos fp '
+            . 'JOIN facturas f ON f.id = fp.factura_id '
+            . 'LEFT JOIN cheques c ON c.id = fp.cheque_id '
+            . 'LEFT JOIN bancos b ON b.idban = fp.banco_id '
+            . 'LEFT JOIN plazopago p ON p.idplazo = fp.idplazo '
+            . 'WHERE 1=1'
+        );
+        $params = [':f' => (int)($q ?? '')];
+
+        if ($formaPago) {
+            $st->bindValue(':fp_forma', $formaPago, PDO::PARAM_STR);
+            $sql_where = ' AND fp.forma_pago = :fp_forma';
+        } else {
+            $sql_where = '';
+        }
+
+        // Build the full query with proper WHERE clause
+        $query = "
+            SELECT fp.*, f.codigo, f.total_cents, f.fecha, 
+                   fp.forma_pago, fp.monto_cents, 
+                   b.nombanc AS banco_nombre, c.numero_cheque, c.titular AS cheque_titular, 
+                   p.descripcion AS plazo_descripcion
+            FROM factura_pagos fp
+            JOIN facturas f ON f.id = fp.factura_id
+            LEFT JOIN cheques c ON c.id = fp.cheque_id
+            LEFT JOIN bancos b ON b.idban = fp.banco_id
+            LEFT JOIN plazopago p ON p.idplazo = fp.idplazo
+            WHERE 1=1
+        ";
+        $queryParams = [];
+
+        if ($q) {
+            $query .= ' AND f.codigo LIKE :q';
+            $queryParams[':q'] = '%' . $q . '%';
+        }
+        if ($formaPago) {
+            $query .= ' AND fp.forma_pago = :fp';
+            $queryParams[':fp'] = $formaPago;
+        }
+
+        $st = Db::pdo()->prepare($query);
+        foreach ($queryParams as $name => $val) {
+            $st->bindValue($name, $val);
+        }
+        $st->execute();
+        $pagos = $st->fetchAll();
+
+        // Count by forma_pago for filter stats
+        $stCount = Db::pdo()->prepare(""
+            . "SELECT fp.forma_pago, COUNT(*) as total "
+            . "FROM factura_pagos fp "
+            . "JOIN facturas f ON f.id = fp.factura_id "
+            . "WHERE 1=1"
+        );
+        $countParams = [];
+        if ($q) {
+            $stCount->bindValue(':q', '%' . $q . '%', PDO::PARAM_STR);
+            $countParams[':q'] = '%' . $q . '%';
+        }
+        if ($formaPago) {
+            // already added via $queryParams
+        }
+        $stCount->execute($countParams);
+        $counts = $stCount->fetchAll(PDO::FETCH_KEY_PAIR);
+
+        echo View::adminPage('admin/facturas/pagos.php', [
+            'adminUser' => $adminUser,
+            'pagos' => $pagos,
+            'q' => $q,
+            'formaPago' => $formaPago,
+            'counts' => $counts,
+            'csrf' => Csrf::token(),
+            'pageTitle' => 'Listado de pagos de facturas',
+        ]);
+    }
+
 }
