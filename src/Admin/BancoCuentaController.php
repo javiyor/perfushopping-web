@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Perfushopping\Web\Admin;
 
 use Perfushopping\Web\Repo\BancoCuentaRepo;
+use Perfushopping\Web\Repo\BancoRepo;
 use Perfushopping\Web\Repo\CobroCuentaRepo;
 use Perfushopping\Web\Service\AdminAuthService;
 use Perfushopping\Web\Support\Csrf;
@@ -26,12 +27,17 @@ final class BancoCuentaController
         try {
             $tarjetas = \Perfushopping\Web\Infra\Db::pdo()->query('SELECT idtarje, nomtar FROM tarjeta ORDER BY nomtar ASC')->fetchAll();
         } catch (\Throwable $e) {}
+        $bancos = [];
+        try {
+            $bancos = (new BancoRepo())->findAll();
+        } catch (\Throwable $e) {}
         echo View::adminPage('admin/banco_cuentas/list.php', [
             'adminUser' => $adminUser,
             'list' => $list,
             'transferCuentaId' => $transferCuentaId,
             'cobros' => $cobros,
             'tarjetas' => $tarjetas,
+            'bancos' => $bancos,
             'csrf' => Csrf::token(),
             'pageTitle' => 'Cuentas propias',
         ]);
@@ -54,6 +60,11 @@ final class BancoCuentaController
         ];
         if ($data['banco'] === '') {
             $_SESSION['admin_flash'] = ['type'=>'danger','text'=>'El banco es obligatorio.'];
+            Response::redirect('/admin/banco-cuentas');
+        }
+        $nombresBancos = array_column((new BancoRepo())->findAll(), 'nombanc');
+        if (!in_array($data['banco'], $nombresBancos, true)) {
+            $_SESSION['admin_flash'] = ['type'=>'danger','text'=>'Elegí un banco de la lista (se cargan en Bancos).'];
             Response::redirect('/admin/banco-cuentas');
         }
         $repo = new BancoCuentaRepo();

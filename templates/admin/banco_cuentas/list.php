@@ -115,7 +115,16 @@
             <input type="hidden" name="id" id="cuentaId" value="0" />
             <div class="modal-header"><h5 class="modal-title" id="cuentaModalTitle">Nueva cuenta</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
-                <div class="mb-2"><label class="form-label small">Banco *</label><input type="text" name="banco" id="cuentaBanco" class="form-control form-control-sm" required /></div>
+                <div class="mb-2">
+                    <label class="form-label small">Banco *</label>
+                    <select name="banco" id="cuentaBanco" class="form-select form-select-sm" required>
+                        <option value="">— Seleccionar —</option>
+                        <?php foreach ($bancos ?? [] as $b): ?>
+                            <option value="<?= htmlspecialchars($b['nombanc'] ?? '') ?>"><?= htmlspecialchars($b['nombanc'] ?? '') ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <div class="form-text">Los bancos se cargan en <a href="/admin/bancos" target="_blank">Bancos</a>.</div>
+                </div>
                 <div class="row g-2 mb-2">
                     <div class="col-6"><label class="form-label small">Tipo cuenta</label><select name="tipo_cuenta" id="cuentaTipo" class="form-select form-select-sm"><option value="corriente">Corriente</option><option value="ahorro">Ahorro</option></select></div>
                     <div class="col-6"><label class="form-label small">Activa</label><div class="form-check mt-2"><input type="checkbox" name="activo" id="cuentaActivo" class="form-check-input" checked /><label class="form-check-label small" for="cuentaActivo">Activa</label></div></div>
@@ -132,5 +141,5 @@
 
 <script>
 function openCuentaModal(){ document.getElementById('cuentaId').value='0'; document.getElementById('cuentaBanco').value=''; document.getElementById('cuentaNumero').value=''; document.getElementById('cuentaCbu').value=''; document.getElementById('cuentaTitular').value=''; document.getElementById('cuentaSaldo').value='0'; document.getElementById('cuentaActivo').checked=true; document.getElementById('cuentaModalTitle').textContent='Nueva cuenta'; }
-function editCuenta(c){ document.getElementById('cuentaId').value=c.id||0; document.getElementById('cuentaBanco').value=c.banco||''; document.getElementById('cuentaTipo').value=c.tipo_cuenta||'corriente'; document.getElementById('cuentaNumero').value=c.numero_cuenta||''; document.getElementById('cuentaCbu').value=c.cbu||''; document.getElementById('cuentaTitular').value=c.titular||''; document.getElementById('cuentaSaldo').value=((c.saldo_inicial_cents||0)/100).toFixed(2); document.getElementById('cuentaActivo').checked=!!c.activo; document.getElementById('cuentaModalTitle').textContent='Editar cuenta'; new bootstrap.Modal(document.getElementById('cuentaModal')).show(); }
+function editCuenta(c){ document.getElementById('cuentaId').value=c.id||0; var sel=document.getElementById('cuentaBanco'); sel.value=c.banco||''; if(c.banco && sel.value!==c.banco){ var o=document.createElement('option'); o.value=c.banco; o.textContent=c.banco; sel.appendChild(o); sel.value=c.banco; } document.getElementById('cuentaTipo').value=c.tipo_cuenta||'corriente'; document.getElementById('cuentaNumero').value=c.numero_cuenta||''; document.getElementById('cuentaCbu').value=c.cbu||''; document.getElementById('cuentaTitular').value=c.titular||''; document.getElementById('cuentaSaldo').value=((c.saldo_inicial_cents||0)/100).toFixed(2); document.getElementById('cuentaActivo').checked=!!c.activo; document.getElementById('cuentaModalTitle').textContent='Editar cuenta'; new bootstrap.Modal(document.getElementById('cuentaModal')).show(); }
 </script>
