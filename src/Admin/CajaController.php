@@ -694,6 +694,54 @@ final class CajaController
         ]);
     }
 
+    public function cierrePrint(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requirePermiso('caja_movimientos');
+
+        $repo = new CajaRepo();
+        $sucursalId = $auth->getSucursalId();
+        $turno = $auth->getTurno();
+        $fecha = date('Y-m-d');
+        $apertura = $repo->aperturaActiva($sucursalId, $turno, $fecha);
+
+        $empresa = (new \Perfushopping\Web\Repo\EmpresaRepo())->getDefault();
+        $sucursalRepo = new \Perfushopping\Web\Repo\SucursalRepo();
+        $sucursal = null;
+        if (!empty($sucursalId)) {
+            $sucursal = $sucursalRepo->findById($sucursalId);
+        }
+
+        // Totales del turno
+        $apId = $apertura['id'] ?? 0;
+        $ventasEfectivo = $repo->totalVentasEfectivoTurno($apId, $fecha, $puntoVenta = $auth->getPuntoVenta(), $apCreada = (string)($apertura['created_at'] ?? date('Y-m-d') . ' 00:00:00'));
+        $totalesMov = $repo->totalMovimientos($apId);
+        $efectivoDisponible = (int)($apertura['monto_inicial_cents'] ?? 0) + $ventasEfectivo
+            + (int)($totalesMov['total_ingresos'] ?? 0) - (int)($totalesMov['total_egresos'] ?? 0);
+
+        $montoCierre = (int)($apertura['monto_cierre_cents'] ?? 0);
+        $montoRetirado = (int)($apertura['monto_retirado_cents'] ?? 0);
+        $proximaApertura = (int)($apertura['monto_proxima_apertura_cents'] ?? 0);
+
+        echo View::adminPage('admin/caja/cierre_print.php', [
+            'adminUser' => $adminUser,
+            'empresa' => $empresa,
+            'sucursal' => $sucursal,
+            'fecha' => $fecha,
+            'turno' => $turno,
+            'apertura' => $apertura,
+            'ventasEfectivo' => $ventasEfectivo,
+            'totalIngresos' => $totalesMov['total_ingresos'] ?? 0,
+            'totalEgresos' => $totalesMov['total_egresos'] ?? 0,
+            'efectivoDisponible' => $efectivoDisponible,
+            'montoCierre' => $montoCierre,
+            'montoRetirado' => $montoRetirado,
+            'proximaApertura' => $proximaApertura,
+            'csrf' => Csrf::token(),
+            'pageTitle' => 'Resumen de cierre de caja',
+        ]);
+    }
+
     public function resolverAjusteStore(array $params): void
     {
         $auth = new AdminAuthService();
