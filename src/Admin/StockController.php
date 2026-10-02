@@ -66,6 +66,60 @@ final class StockController
         ]);
     }
 
+    /** Trae TODAS las filas del listado con los filtros actuales (paginando de a 200). */
+    private function stockFiltradoCompleto(StockRepo $repo, string $q, int $codepar, string $stockFilter, int $codrub, int $codsub, string $codprove, ?int $iddepo, string $desde, string $hasta, ?string $enweb): array
+    {
+        $todo = [];
+        $page = 1;
+        do {
+            $rows = $repo->listarStock($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, 200, $iddepo, $desde, $hasta, $page, $enweb);
+            foreach ($rows as $r) {
+                $todo[] = $r;
+            }
+            $page++;
+        } while (count($rows) === 200);
+        return $todo;
+    }
+
+    public function imprimir(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requirePermiso('productos');
+
+        $repo = new StockRepo();
+        $q = trim((string)($_GET['q'] ?? ''));
+        $codepar = (int)($_GET['codepar'] ?? 0);
+        $stockFilter = trim((string)($_GET['stock'] ?? ''));
+        $codrub = (int)($_GET['codrub'] ?? 0);
+        $codsub = (int)($_GET['codsub'] ?? 0);
+        $codprove = trim((string)($_GET['codprove'] ?? ''));
+        $desde = trim((string)($_GET['desde'] ?? ''));
+        $hasta = trim((string)($_GET['hasta'] ?? ''));
+        $iddepo = (int)($_GET['iddepo'] ?? 0);
+        $enweb = trim((string)($_GET['enweb'] ?? ''));
+        if (!in_array($enweb, ['', '1', '0'], true)) $enweb = '';
+        if ($desde === '') $desde = date('Y-m-01');
+        if ($hasta === '') $hasta = date('Y-m-d');
+
+        $list = $this->stockFiltradoCompleto($repo, $q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $iddepo ?: null, $desde, $hasta, $enweb === '' ? null : $enweb);
+
+        echo View::adminPage('admin/stock/list_print.php', [
+            'adminUser' => $adminUser,
+            'list' => $list,
+            'q' => $q,
+            'codepar' => $codepar,
+            'stockFilter' => $stockFilter,
+            'codrub' => $codrub,
+            'codsub' => $codsub,
+            'codprove' => $codprove,
+            'iddepo' => $iddepo,
+            'desde' => $desde,
+            'hasta' => $hasta,
+            'csrf' => Csrf::token(),
+            'pageTitle' => 'Listado de Stock - Imprimir',
+        ]);
+    }
+
     public function exportarExcel(array $params): void
     {
         $auth = new AdminAuthService();
@@ -85,39 +139,47 @@ final class StockController
         if (!in_array($enweb, ['', '1', '0'], true)) $enweb = '';
         if ($desde === '') $desde = date('Y-m-01');
         if ($hasta === '') $hasta = date('Y-m-d');
-        $list = $repo->listarStock($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, 1000, $iddepo ?: null, $desde, $hasta, 1, $enweb === '' ? null : $enweb);
+        $list = $this->stockFiltradoCompleto($repo, $q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $iddepo ?: null, $desde, $hasta, $enweb === '' ? null : $enweb);
 
-        header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename="stock.csv"');
+        // Archivo Excel real (SpreadsheetML) con todo lo listado
+        header('Content-Type: application/vnd.ms-excel; charset=utf-8');
+        header('Content-Disposition: attachment; filename="stock.xls"');
 
-        $out = fopen('php://output', 'w');
-        fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
+        $xml = static function (string $v): string {
+            return htmlspecialchars($v, ENT_QUOTES | ENT_XML1, 'UTF-8');
+        };
+        $cell = static function (string $v) use ($xml): string {
+            return '<Cell><Data ss:Type="String">' . $xml($v) . '</Data></Cell>';
+        };
 
-        fputcsv($out, [
-            'Producto', 'Variedad', 'Sucursal', 'Código', 'Cód. barra', 'Cód. proveedor',
-            'Proveedor', 'Marca', 'Categoría',
-            'Precio', 'Costo', 'Stock', 'Ventas',
-        ]);
+        echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+        echo '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">' . "\n";
+        echo '<Worksheet ss:Name="Stock"><Table>' . "\n";
+        echo '<Row>';
+        foreach (['Producto', 'Variedad', 'Sucursal', 'Código', 'Cód. barra', 'Cód. proveedor', 'Proveedor', 'Marca', 'Categoría', 'Precio', 'Costo', 'Stock', 'Ventas'] as $h) {
+            echo $cell($h);
+        }
+        echo '</Row>' . "\n";
 
         foreach ($list as $p) {
-            fputcsv($out, [
-                $p['produ'] ?? '',
-                $p['nomgusto'] ?? '',
-                $p['nomdepo'] ?? '',
-                $p['codprodu'] ?? '',
-                $p['codscan'] ?? '',
-                $p['codprodup'] ?? '',
-                $p['nomprovee'] ?? '',
-                $p['nomsub'] ?? '',
-                $p['nomrub'] ?? '',
-                number_format((float)($p['precio'] ?? 0), 2, ',', '.'),
-                number_format((float)($p['precomp'] ?? 0), 2, ',', '.'),
-                (int)($p['stock_deposito'] ?? 0),
-                (int)($p['total_vendido'] ?? 0),
-            ]);
+            echo '<Row>';
+            echo $cell((string)($p['produ'] ?? ''));
+            echo $cell((string)($p['nomgusto'] ?? ''));
+            echo $cell((string)($p['nomdepo'] ?? ''));
+            echo $cell((string)($p['codprodu'] ?? ''));
+            echo $cell((string)($p['codscan'] ?? ''));
+            echo $cell((string)($p['codprodup'] ?? ''));
+            echo $cell((string)($p['nomprovee'] ?? ''));
+            echo $cell((string)($p['nomsub'] ?? ''));
+            echo $cell((string)($p['nomrub'] ?? ''));
+            echo $cell(number_format((float)($p['precio'] ?? 0), 2, ',', '.'));
+            echo $cell(number_format((float)($p['precomp'] ?? 0), 2, ',', '.'));
+            echo $cell((string)(int)($p['stock_deposito'] ?? 0));
+            echo $cell((string)(int)($p['total_vendido'] ?? 0));
+            echo '</Row>' . "\n";
         }
 
-        fclose($out);
+        echo '</Table></Worksheet></Workbook>';
         exit;
     }
 

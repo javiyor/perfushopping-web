@@ -440,6 +440,7 @@ $router->post('/admin/sesion/cerrar', [AdminSesionController::class, 'cerrar']);
 $router->get('/admin/badges', [AdminBadgeController::class, 'badges']);
 $router->get('/admin/stock', [AdminStockController::class, 'index']);
 $router->get('/admin/stock/exportar-excel', [AdminStockController::class, 'exportarExcel']);
+$router->get('/admin/stock/imprimir', [AdminStockController::class, 'imprimir']);
 $router->post('/admin/stock/recalcular', [AdminStockController::class, 'recalcular']);
 $router->get('/admin/stock/(?P<id>\d+)', [AdminStockController::class, 'show']);
 $router->get('/admin/stock/ajuste', [AdminStockController::class, 'ajuste']);

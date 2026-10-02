@@ -46,9 +46,11 @@ $qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $
             <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
             <button class="btn btn-outline-secondary btn-sm" type="submit"><i class="bi bi-arrow-repeat"></i> Recalcular</button>
         </form>
-        <button class="btn btn-accent btn-sm" id="btnNotaPedido" onclick="irANotaPedido()"><i class="bi bi-file-text"></i> Nota de pedido</button>
+        <button class="btn btn-accent btn-sm" id="btnNotaPedido" onclick="irANotaPedido()"><i class="bi bi-file-text"></i> Nota de pedido <span id="npCount" class="badge bg-light text-dark" style="display:none"></span></button>
+        <button class="btn btn-outline-secondary btn-sm" id="btnNpLimpiar" type="button" title="Limpiar cantidades acumuladas de todas las páginas"><i class="bi bi-x-lg"></i></button>
         <a class="btn btn-accent btn-sm" href="/admin/stock/ajuste"><i class="bi bi-pencil-square"></i> Ajuste manual</a>
         <a class="btn btn-outline-success btn-sm" href="/admin/stock/exportar-excel?<?= htmlspecialchars($_SERVER['QUERY_STRING'] ?? '') ?>"><i class="bi bi-file-earmark-excel"></i> Excel</a>
+            <a class="btn btn-outline-primary btn-sm" href="/admin/stock/imprimir?<?= htmlspecialchars($_SERVER['QUERY_STRING'] ?? '') ?>"><i class="bi bi-printer"></i> Imprimir</a>
         <?php if ($isSuper): ?>
             <button class="btn btn-outline-danger btn-sm" onclick="eliminarDiscontinuadas()"><i class="bi bi-trash"></i> Eliminar disc.</button>
         <?php endif; ?>
@@ -249,30 +251,84 @@ $qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $
 </div>
 
 <script>
-function irANotaPedido() {
-    const items = [];
-    document.querySelectorAll('.np-qty').forEach(function(inp) {
-        const qty = parseInt(inp.value) || 0;
-        if (qty <= 0) return;
-        items.push({
-            idprodu: parseInt(inp.dataset.idprodu) || 0,
-            idcodgusto: parseInt(inp.dataset.idcodgusto) || 0,
-            producto: inp.dataset.producto || '',
-            variedad: inp.dataset.variedad || '',
-            codscan: inp.dataset.codscan || '',
-            codprodup: inp.dataset.codprodup || '',
-            qty: qty,
-        });
+function npKey(idprodu, idcodgusto) { return String(idprodu) + '|' + String(idcodgusto); }
+function npLeerAcumulado() {
+    try {
+        const raw = sessionStorage.getItem('np_items');
+        const arr = raw ? JSON.parse(raw) : [];
+        return Array.isArray(arr) ? arr : [];
+    } catch(e) { return []; }
+}
+// Guarda las cantidades de la página visible dentro del acumulado (reemplaza, no duplica).
+function npGuardarPaginaActual() {
+    const map = {};
+    npLeerAcumulado().forEach(function(it) {
+        if ((it.qty || 0) > 0) map[npKey(it.idprodu, it.idcodgusto)] = it;
     });
+    document.querySelectorAll('.np-qty').forEach(function(inp) {
+        const key = npKey(parseInt(inp.dataset.idprodu) || 0, parseInt(inp.dataset.idcodgusto) || 0);
+        const qty = parseInt(inp.value) || 0;
+        if (qty > 0) {
+            map[key] = {
+                idprodu: parseInt(inp.dataset.idprodu) || 0,
+                idcodgusto: parseInt(inp.dataset.idcodgusto) || 0,
+                producto: inp.dataset.producto || '',
+                variedad: inp.dataset.variedad || '',
+                codscan: inp.dataset.codscan || '',
+                codprodup: inp.dataset.codprodup || '',
+                qty: qty,
+            };
+        } else {
+            delete map[key];
+        }
+    });
+    const items = Object.values(map);
+    try { sessionStorage.setItem('np_items', JSON.stringify(items)); } catch(e) {}
+    return items;
+}
+function npActualizarContador() {
+    const items = npLeerAcumulado();
+    const total = items.reduce(function(a, it) { return a + (parseInt(it.qty) || 0); }, 0);
+    const el = document.getElementById('npCount');
+    if (el) {
+        el.textContent = items.length ? ('(' + items.length + ' ítems · ' + total + ' u.)') : '';
+        el.style.display = items.length ? '' : 'none';
+    }
+}
+function npRestaurarPagina() {
+    const map = {};
+    npLeerAcumulado().forEach(function(it) { map[npKey(it.idprodu, it.idcodgusto)] = it.qty || 0; });
+    document.querySelectorAll('.np-qty').forEach(function(inp) {
+        const key = npKey(parseInt(inp.dataset.idprodu) || 0, parseInt(inp.dataset.idcodgusto) || 0);
+        if ((map[key] || 0) > 0) inp.value = map[key];
+    });
+    npActualizarContador();
+}
+function irANotaPedido() {
+    const items = npGuardarPaginaActual();
+    npActualizarContador();
     if (items.length === 0) {
         alert('Primero ingresá cantidades en la columna "Pedir".');
         return;
     }
-    try {
-        sessionStorage.setItem('np_items', JSON.stringify(items));
-    } catch(e) {}
     window.location.href = '/admin/nota-pedido/nueva';
 }
+function npLimpiar() {
+    try { sessionStorage.removeItem('np_items'); } catch(e) {}
+    document.querySelectorAll('.np-qty').forEach(function(inp) { inp.value = 0; });
+    npActualizarContador();
+}
+npRestaurarPagina();
+// Guardar lo cargado antes de cambiar de página o filtrar, para no perderlo
+document.querySelectorAll('.card-footer a.btn').forEach(function(a) {
+    a.addEventListener('click', function() { npGuardarPaginaActual(); });
+});
+(function() {
+    const f = document.querySelector('form[action="/admin/stock"]');
+    if (f) f.addEventListener('submit', function() { npGuardarPaginaActual(); });
+    const btnLimpiar = document.getElementById('btnNpLimpiar');
+    if (btnLimpiar) btnLimpiar.addEventListener('click', npLimpiar);
+})();
 
 const csrfToken = <?= json_encode($csrf ?? '') ?>;
 
