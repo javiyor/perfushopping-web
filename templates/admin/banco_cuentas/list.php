@@ -119,8 +119,8 @@
                     <label class="form-label small">Banco *</label>
                     <select name="banco" id="cuentaBanco" class="form-select form-select-sm" required>
                         <option value="">— Seleccionar —</option>
-                        <?php foreach ($bancos ?? [] as $b): ?>
-                            <option value="<?= htmlspecialchars($b['nombanc'] ?? '') ?>"><?= htmlspecialchars($b['nombanc'] ?? '') ?></option>
+                        <?php foreach ($bancos ?? [] as $b): $nb = \Perfushopping\Web\Repo\BancoRepo::nombreNormalizado($b['nombanc'] ?? ''); if ($nb === '') continue; ?>
+                            <option value="<?= htmlspecialchars($nb) ?>"><?= htmlspecialchars($nb) ?></option>
                         <?php endforeach; ?>
                     </select>
                     <div class="form-text">Los bancos se cargan en <a href="/admin/bancos" target="_blank">Bancos</a>.</div>
@@ -141,5 +141,5 @@
 
 <script>
 function openCuentaModal(){ document.getElementById('cuentaId').value='0'; document.getElementById('cuentaBanco').value=''; document.getElementById('cuentaNumero').value=''; document.getElementById('cuentaCbu').value=''; document.getElementById('cuentaTitular').value=''; document.getElementById('cuentaSaldo').value='0'; document.getElementById('cuentaActivo').checked=true; document.getElementById('cuentaModalTitle').textContent='Nueva cuenta'; }
-function editCuenta(c){ document.getElementById('cuentaId').value=c.id||0; var sel=document.getElementById('cuentaBanco'); sel.value=c.banco||''; if(c.banco && sel.value!==c.banco){ var o=document.createElement('option'); o.value=c.banco; o.textContent=c.banco; sel.appendChild(o); sel.value=c.banco; } document.getElementById('cuentaTipo').value=c.tipo_cuenta||'corriente'; document.getElementById('cuentaNumero').value=c.numero_cuenta||''; document.getElementById('cuentaCbu').value=c.cbu||''; document.getElementById('cuentaTitular').value=c.titular||''; document.getElementById('cuentaSaldo').value=((c.saldo_inicial_cents||0)/100).toFixed(2); document.getElementById('cuentaActivo').checked=!!c.activo; document.getElementById('cuentaModalTitle').textContent='Editar cuenta'; new bootstrap.Modal(document.getElementById('cuentaModal')).show(); }
+function editCuenta(c){ document.getElementById('cuentaId').value=c.id||0; var sel=document.getElementById('cuentaBanco'); sel.value=c.banco||''; if(c.banco && sel.value!==c.banco){ var o=document.createElement('option'); o.value=c.banco; o.textContent=c.banco+' (fuera de la lista)'; sel.appendChild(o); sel.value=c.banco; } document.getElementById('cuentaTipo').value=c.tipo_cuenta||'corriente'; document.getElementById('cuentaNumero').value=c.numero_cuenta||''; document.getElementById('cuentaCbu').value=c.cbu||''; document.getElementById('cuentaTitular').value=c.titular||''; document.getElementById('cuentaSaldo').value=((c.saldo_inicial_cents||0)/100).toFixed(2); document.getElementById('cuentaActivo').checked=!!c.activo; document.getElementById('cuentaModalTitle').textContent='Editar cuenta'; new bootstrap.Modal(document.getElementById('cuentaModal')).show(); }
 </script>

@@ -58,13 +58,26 @@ final class BancoCuentaController
             'saldo_inicial_cents' => (int)round((float)str_replace(',', '.', (string)($_POST['saldo_inicial'] ?? '0')) * 100),
             'activo' => isset($_POST['activo']) ? 1 : 0,
         ];
+        $norm = [BancoRepo::class, 'nombreNormalizado'];
+        $data['banco'] = $norm($_POST['banco'] ?? '');
         if ($data['banco'] === '') {
             $_SESSION['admin_flash'] = ['type'=>'danger','text'=>'El banco es obligatorio.'];
             Response::redirect('/admin/banco-cuentas');
         }
-        $nombresBancos = array_column((new BancoRepo())->findAll(), 'nombanc');
-        if (!in_array($data['banco'], $nombresBancos, true)) {
-            $_SESSION['admin_flash'] = ['type'=>'danger','text'=>'Elegí un banco de la lista (se cargan en Bancos).'];
+        $nombresBancos = array_map($norm, array_column((new BancoRepo())->findAll(), 'nombanc'));
+        $esValido = in_array($data['banco'], $nombresBancos, true);
+        if (!$esValido) {
+            $lower = mb_strtolower($data['banco']);
+            foreach ($nombresBancos as $nb) {
+                if (mb_strtolower($nb) === $lower) {
+                    $data['banco'] = $nb;
+                    $esValido = true;
+                    break;
+                }
+            }
+        }
+        if (!$esValido) {
+            $_SESSION['admin_flash'] = ['type'=>'danger','text'=>'Elegí un banco de la lista (se cargan en Bancos). Valor recibido: "' . $data['banco'] . '".'];
             Response::redirect('/admin/banco-cuentas');
         }
         $repo = new BancoCuentaRepo();

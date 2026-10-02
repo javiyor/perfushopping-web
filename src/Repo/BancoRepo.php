@@ -37,4 +37,15 @@ final class BancoRepo
     {
         Db::pdo()->prepare('DELETE FROM bancos WHERE idban = :id LIMIT 1')->execute([':id' => $idban]);
     }
+
+    /** Normaliza un nombre de banco para comparar/guardar (espacios, NBSP, BOM, caracteres de control). */
+    public static function nombreNormalizado($v): string
+    {
+        $v = (string)$v;
+        $v = str_replace(["\xEF\xBB\xBF", "\xE2\x80\x8B", "\xE2\x80\x8C", "\xE2\x80\x8D", "\xE2\x80\x8E", "\xE2\x80\x8F"], '', $v);
+        $v = str_replace("\xC2\xA0", ' ', $v);
+        $v = preg_replace('/[\x00-\x1F\x7F]/', '', $v) ?? '';
+        $v = preg_replace('/ {2,}/', ' ', $v) ?? '';
+        return trim($v);
+    }
 }
