@@ -487,6 +487,7 @@ final class CompraRepo
                 VALUES (:fc, :prod, :gusto, :name, :qty, :cost, :line' . ($hasBonif ? ', :bonif' : '') . ')
             ');
 
+            $cabIds = [];
             foreach ($items as $it) {
                 $idprodu = (int)($it['idprodu'] ?? 0);
                 if ($idprodu <= 0) {
@@ -529,6 +530,7 @@ final class CompraRepo
                         VALUES (:depoh, NULL, :fecha, :notas, \'compra\')
                     ')->execute([':depoh' => $iddepo, ':fecha' => $fecha, ':notas' => $notas]);
                     $cabId = (int)$pdo->lastInsertId();
+                    $cabIds[] = $cabId;
 
                     $pdo->prepare('
                         INSERT INTO stockdet (idstockcab, idprodu, idcodgusto, canti)
@@ -558,6 +560,15 @@ final class CompraRepo
         } catch (\Throwable $e) {
             $pdo->rollBack();
             throw $e;
+        }
+
+        // Un solo grupo por factura de compra (fuera de la transacción: el ensure hace DDL)
+        if (!empty($cabIds)) {
+            try {
+                (new StockRepo())->asegurarGrupo($cabIds);
+            } catch (\Throwable $e) {
+                error_log('CompraRepo::aplicarItems asegurarGrupo: ' . $e->getMessage());
+            }
         }
     }
 

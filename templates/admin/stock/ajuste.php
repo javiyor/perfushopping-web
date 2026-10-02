@@ -198,16 +198,17 @@ $esSuperadmin = $esSuperadmin ?? false;
     </div>
     <div class="table-responsive">
         <table class="table table-sm table-admin mb-0">
-            <thead><tr><th>#</th><th>Fecha</th><th>Motivo</th><th>Desde → Hasta</th><th class="text-center">Ítems</th><th class="text-center">Unid.</th><th style="width:90px"></th></tr></thead>
+            <thead><tr><th>#</th><th>Fecha</th><th>Tipo</th><th>Motivo</th><th>Desde → Hasta</th><th class="text-center">Ítems</th><th class="text-center">Unid.</th><th style="width:90px"></th></tr></thead>
             <tbody>
             <?php if (!$historialAjustes): ?>
-                <tr><td colspan="7" class="text-center text-muted">Sin ajustes registrados.</td></tr>
+                <tr><td colspan="8" class="text-center text-muted">Sin ajustes registrados.</td></tr>
             <?php else: foreach ($historialAjustes as $h): ?>
                 <tr>
                     <td><?= (int)$h['id'] ?></td>
                     <td class="small"><?= htmlspecialchars((string)($h['fecha'] ?? '')) ?></td>
+                    <td><span class="badge bg-info text-dark"><?= htmlspecialchars((string)($h['tipo_label'] ?? $h['tipo'] ?? '')) ?></span></td>
                     <td class="small"><?= htmlspecialchars(mb_substr((string)($h['motivo'] ?? ''), 0, 60)) ?></td>
-                    <td class="small"><?= htmlspecialchars((string)($h['depo_desde'] ?? '—')) ?> → <?= htmlspecialchars((string)($h['depo_hasta'] ?? '—')) ?></td>
+                    <td class="small"><?= htmlspecialchars((string)($h['depo_desde_label'] ?? $h['depo_desde'] ?? '—')) ?> → <?= htmlspecialchars((string)($h['depo_hasta_label'] ?? $h['depo_hasta'] ?? '—')) ?></td>
                     <td class="text-center"><?= (int)($h['items'] ?? 0) ?></td>
                     <td class="text-center"><?= (int)($h['unidades'] ?? 0) ?></td>
                     <td class="text-end text-nowrap">

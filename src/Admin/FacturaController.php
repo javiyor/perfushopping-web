@@ -347,17 +347,21 @@ final class FacturaController
             $puntosService->acreditarFactura($factura, $items);
         }
 
-        // Deduct stock from session deposit
+        // Deduct stock from session deposit (un solo movimiento por factura)
         $depoId = $auth->getDepositoId();
         if ($depoId > 0) {
             $stockRepo = new StockRepo();
+            $lote = [];
             foreach ($items as $it) {
                 $idprodu = $it['idprodu'];
                 $idcodgusto = $it['idcodgusto'];
                 $qty = $it['qty'];
                 if ($idprodu) {
-                    $stockRepo->registrarAjuste($idprodu, $idcodgusto, $depoId, 0, $qty, 'Factura ' . $codigo, (int)$adminUser['id'], 'venta');
+                    $lote[] = ['idprodu' => $idprodu, 'idcodgusto' => $idcodgusto, 'cantidad' => $qty];
                 }
+            }
+            if ($lote) {
+                $stockRepo->registrarAjusteLote($lote, $depoId, 0, 'Factura ' . $codigo, (int)$adminUser['id'], 'venta');
             }
         }
 
@@ -906,10 +910,12 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
             ->execute([':i' => $editarId]);
         $this->registrarBancoMov($pagos, $editarId, $codigo, $fecha, (int)$adminUser['id']);
 
-        // Stock: aplicar solo el delta viejo -> nuevo.
+        // Stock: aplicar solo el delta viejo -> nuevo (un movimiento por sentido).
         $depoId = $auth->getDepositoId();
         if ($depoId > 0) {
             $stockRepo = new StockRepo();
+            $loteVenta = [];
+            $loteDevol = [];
             $qtyViejo = [];
             $mapProd = [];
             foreach ($oldItems as $it) {
@@ -936,10 +942,16 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
                 }
                 [$pid, $gid] = $mapProd[$k];
                 if ($delta > 0) {
-                    $stockRepo->registrarAjuste($pid, $gid, $depoId, 0, $delta, 'Edición Factura ' . $codigo, (int)$adminUser['id'], 'venta');
+                    $loteVenta[] = ['idprodu' => $pid, 'idcodgusto' => $gid, 'cantidad' => $delta];
                 } else {
-                    $stockRepo->registrarAjuste($pid, $gid, 0, $depoId, -$delta, 'Edición Factura ' . $codigo, (int)$adminUser['id'], 'devolucion_venta');
+                    $loteDevol[] = ['idprodu' => $pid, 'idcodgusto' => $gid, 'cantidad' => -$delta];
                 }
+            }
+            if (!empty($loteVenta)) {
+                $stockRepo->registrarAjusteLote($loteVenta, $depoId, 0, 'Edición Factura ' . $codigo, (int)$adminUser['id'], 'venta');
+            }
+            if (!empty($loteDevol)) {
+                $stockRepo->registrarAjusteLote($loteDevol, 0, $depoId, 'Edición Factura ' . $codigo, (int)$adminUser['id'], 'devolucion_venta');
             }
         }
 
@@ -1061,19 +1073,23 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
 
         $repo->updateEstado($id, $estado);
 
-        // Restore stock if factura is anulated
+        // Restore stock if factura is anulated (un solo movimiento)
         if ($estado === 'anulada' && $oldEstado !== 'anulada') {
             $depoId = $auth->getDepositoId();
             if ($depoId > 0) {
                 $stockRepo = new StockRepo();
                 $facturaItems = $repo->items($id);
+                $lote = [];
                 foreach ($facturaItems as $it) {
                     $idprodu = (int)($it['idprodu'] ?? 0);
                     $idcodgusto = (int)($it['idcodgusto'] ?? 0) ?: null;
                     $qty = (int)($it['qty'] ?? 0);
                     if ($idprodu) {
-                        $stockRepo->registrarAjuste($idprodu, $idcodgusto, 0, $depoId, $qty, 'Anulación Factura ' . ($f['codigo'] ?? ''), (int)$adminUser['id'], 'devolucion_venta');
+                        $lote[] = ['idprodu' => $idprodu, 'idcodgusto' => $idcodgusto, 'cantidad' => $qty];
                     }
+                }
+                if ($lote) {
+                    $stockRepo->registrarAjusteLote($lote, 0, $depoId, 'Anulación Factura ' . ($f['codigo'] ?? ''), (int)$adminUser['id'], 'devolucion_venta');
                 }
             }
         }

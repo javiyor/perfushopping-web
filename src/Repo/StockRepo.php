@@ -788,7 +788,7 @@ final class StockRepo
     private static ?bool $grupoColReady = null;
 
     /** Crea grupo_id en stockcab si falta. Devuelve true si la columna existe. */
-    private function ensureGrupoColumn(): bool
+    public function ensureGrupoColumn(): bool
     {
         if (self::$grupoColReady !== null) {
             return self::$grupoColReady;
@@ -841,6 +841,77 @@ final class StockRepo
         return $ids;
     }
 
+    /**
+     * Agrupa cabeceras sueltas bajo un mismo grupo (usa el id menor).
+     * Para movimientos creados sin lote (facturas de compra, remitos viejos).
+     */
+    public function asegurarGrupo(array $ids): int
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+        if (!$ids) {
+            return 0;
+        }
+        $grupo = min($ids);
+        if (!$this->ensureGrupoColumn()) {
+            return $grupo;
+        }
+        try {
+            $in = implode(',', $ids);
+            Db::pdo()->prepare("UPDATE stockcab SET grupo_id = :g WHERE idcabstock IN ($in) AND grupo_id IS NULL")
+                ->execute([':g' => $grupo]);
+        } catch (\Throwable $e) {
+            error_log('StockRepo::asegurarGrupo: ' . $e->getMessage());
+        }
+        return $grupo;
+    }
+
+    /** Etiquetas cortas de tipo de movimiento. */
+    public static function tiposMovimiento(): array
+    {
+        return [
+            'venta' => 'Venta',
+            'devolucion_venta' => 'N.C. ventas',
+            'compra' => 'Compra',
+            'devolucion_compra' => 'Dev. compra',
+            'ajuste' => 'Ajuste',
+        ];
+    }
+
+    public static function etiquetaTipo(string $tipo): string
+    {
+        $t = strtolower(trim($tipo));
+        return self::tiposMovimiento()[$t] ?? ($t !== '' ? ucfirst($t) : 'Movimiento');
+    }
+
+    /**
+     * Etiqueta de depósito: si no hay depósito muestra el origen/destino
+     * comercial según el tipo (Ventas / Compras).
+     */
+    public static function etiquetaDeposito(?string $nombre, string $tipo, string $lado): string
+    {
+        $n = trim((string)$nombre);
+        if ($n !== '') {
+            return $n;
+        }
+        $t = strtolower(trim($tipo));
+        if ($lado === 'hasta') {
+            if ($t === 'venta') {
+                return 'Ventas';
+            }
+            if ($t === 'devolucion_compra') {
+                return 'Compras';
+            }
+        } else {
+            if ($t === 'compra') {
+                return 'Compras';
+            }
+            if ($t === 'devolucion_venta') {
+                return 'Ventas';
+            }
+        }
+        return '—';
+    }
+
     /** Grupo efectivo de una cabecera (viejas sin grupo = su propio id). */
     public function grupoDe(int $idcabstock): int
     {
@@ -889,7 +960,13 @@ final class StockRepo
             LIMIT {$limit}
         ");
         $st->execute($params);
-        return $st->fetchAll();
+        $rows = $st->fetchAll();
+        foreach ($rows as &$r) {
+            $r['tipo_label'] = self::etiquetaTipo((string)($r['tipo'] ?? ''));
+            $r['depo_desde_label'] = self::etiquetaDeposito($r['depo_desde'] ?? null, (string)($r['tipo'] ?? ''), 'desde');
+            $r['depo_hasta_label'] = self::etiquetaDeposito($r['depo_hasta'] ?? null, (string)($r['tipo'] ?? ''), 'hasta');
+        }
+        return $rows;
     }
 
     /** Cabecera + detalle de un ajuste con nombres de producto/variante/depósito. */
@@ -922,6 +999,9 @@ final class StockRepo
         ');
         $det->execute([':id' => $idcabstock]);
         $cabRow['items'] = $det->fetchAll();
+        $cabRow['tipo_label'] = self::etiquetaTipo((string)($cabRow['tipo'] ?? ''));
+        $cabRow['depo_desde_label'] = self::etiquetaDeposito($cabRow['depo_desde'] ?? null, (string)($cabRow['tipo'] ?? ''), 'desde');
+        $cabRow['depo_hasta_label'] = self::etiquetaDeposito($cabRow['depo_hasta'] ?? null, (string)($cabRow['tipo'] ?? ''), 'hasta');
         return $cabRow;
     }
 
@@ -965,6 +1045,9 @@ final class StockRepo
         if (!$cabRow['items']) {
             return null;
         }
+        $cabRow['tipo_label'] = self::etiquetaTipo((string)($cabRow['tipo'] ?? ''));
+        $cabRow['depo_desde_label'] = self::etiquetaDeposito($cabRow['depo_desde'] ?? null, (string)($cabRow['tipo'] ?? ''), 'desde');
+        $cabRow['depo_hasta_label'] = self::etiquetaDeposito($cabRow['depo_hasta'] ?? null, (string)($cabRow['tipo'] ?? ''), 'hasta');
         return $cabRow;
     }
 

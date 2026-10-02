@@ -144,19 +144,23 @@ final class RemitoController
             'created_by' => (int)$adminUser['id'],
         ], $items);
 
-        // Deduct/add stock from session deposit
+        // Deduct/add stock from session deposit (un solo movimiento por remito)
         $depoId = $auth->getDepositoId();
         if ($depoId > 0) {
             $stockRepo = new StockRepo();
             $sign = $tipo === 'entrada' ? 1 : -1;
+            $lote = [];
             foreach ($items as $it) {
                 $idprodu = $it['idprodu'];
                 $idcodgusto = $it['idcodgusto'];
                 $qty = $it['qty'];
                 if ($idprodu) {
-                    $tipoMov = $tipo === 'entrada' ? 'compra' : 'venta';
-                    $stockRepo->registrarAjuste($idprodu, $idcodgusto, $sign === -1 ? $depoId : 0, $sign === 1 ? $depoId : 0, $qty, 'Remito ' . $codigo, (int)$adminUser['id'], $tipoMov);
+                    $lote[] = ['idprodu' => $idprodu, 'idcodgusto' => $idcodgusto, 'cantidad' => $qty];
                 }
+            }
+            if ($lote) {
+                $tipoMov = $tipo === 'entrada' ? 'compra' : 'venta';
+                $stockRepo->registrarAjusteLote($lote, $sign === -1 ? $depoId : 0, $sign === 1 ? $depoId : 0, 'Remito ' . $codigo, (int)$adminUser['id'], $tipoMov);
             }
         }
 
@@ -222,14 +226,18 @@ final class RemitoController
                 $remitoTipo = $r['tipo'] ?? 'salida';
                 $sign = $remitoTipo === 'entrada' ? -1 : 1;
                 $remitoItems = $repo->items($id);
+                $lote = [];
                 foreach ($remitoItems as $it) {
                     $idprodu = (int)($it['idprodu'] ?? 0);
                     $idcodgusto = (int)($it['idcodgusto'] ?? 0) ?: null;
                     $qty = (int)($it['qty'] ?? 0);
                     if ($idprodu) {
-                        $tipoMov = $remitoTipo === 'entrada' ? 'devolucion_compra' : 'devolucion_venta';
-                        $stockRepo->registrarAjuste($idprodu, $idcodgusto, $sign === -1 ? $depoId : 0, $sign === 1 ? $depoId : 0, $qty, 'Anulación Remito ' . ($r['codigo'] ?? ''), (int)$adminUser['id'], $tipoMov);
+                        $lote[] = ['idprodu' => $idprodu, 'idcodgusto' => $idcodgusto, 'cantidad' => $qty];
                     }
+                }
+                if ($lote) {
+                    $tipoMov = $remitoTipo === 'entrada' ? 'devolucion_compra' : 'devolucion_venta';
+                    $stockRepo->registrarAjusteLote($lote, $sign === -1 ? $depoId : 0, $sign === 1 ? $depoId : 0, 'Anulación Remito ' . ($r['codigo'] ?? ''), (int)$adminUser['id'], $tipoMov);
                 }
             }
         }

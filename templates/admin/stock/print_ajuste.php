@@ -36,12 +36,12 @@ $sucursal = $sucursal ?? [];
     <div class="mov">
         <div class="header">
             <h1><?= htmlspecialchars($empresa['razon_social'] ?? 'PERFUSHOPPING') ?></h1>
-            <p>Movimiento de ajuste de stock #<?= (int)($aj['id'] ?? 0) ?></p>
+            <p>Movimiento de ajuste de stock #<?= (int)($aj['id'] ?? 0) ?> — <?= htmlspecialchars((string)($aj['tipo_label'] ?? $aj['tipo'] ?? '')) ?></p>
             <p><?= htmlspecialchars($sucursal['nombre'] ?? '') ?> · Fecha: <?= htmlspecialchars((string)($aj['fecha'] ?? '')) ?></p>
         </div>
         <div class="row"><span class="label">Motivo</span><span class="value"><?= htmlspecialchars((string)($aj['motivo'] ?? '')) ?></span></div>
-        <div class="row"><span class="label">Desde</span><span class="value"><?= htmlspecialchars((string)($aj['depo_desde'] ?? '—')) ?></span></div>
-        <div class="row"><span class="label">Hasta</span><span class="value"><?= htmlspecialchars((string)($aj['depo_hasta'] ?? '—')) ?></span></div>
+        <div class="row"><span class="label">Desde</span><span class="value"><?= htmlspecialchars((string)($aj['depo_desde_label'] ?? $aj['depo_desde'] ?? '—')) ?></span></div>
+        <div class="row"><span class="label">Hasta</span><span class="value"><?= htmlspecialchars((string)($aj['depo_hasta_label'] ?? $aj['depo_hasta'] ?? '—')) ?></span></div>
         <table class="det">
             <thead><tr><th>Producto</th><th>Variedad</th><th>Cód. barra</th><th style="text-align:center">Cant.</th></tr></thead>
             <tbody>
