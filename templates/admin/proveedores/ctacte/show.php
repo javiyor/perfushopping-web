@@ -36,7 +36,8 @@ $mon = static fn ($v) => number_format((float)$v, 2, ',', '.');
 <?php if ($comprobantes): ?>
 <div class="card shadow-sm mb-3">
     <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
-        <span>Comprobantes en cuenta corriente</span>
+        <h5 class="mb-0">Comprobantes en cuenta corriente</h5>
+        <p class="text-muted small mb-0">Comprobantes generados por facturas de compra con plazos de pago</p>
         <button class="btn btn-sm btn-success" type="button" onclick="cargarPagoComprobantes()" title="Pagar los comprobantes seleccionados (el monto se puede ajustar en la orden de pago)"><i class="bi bi-cash-stack"></i> Cargar pago</button>
     </div>
     <div class="table-responsive">
