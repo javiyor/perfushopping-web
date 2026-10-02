@@ -389,6 +389,8 @@ final class CtaCteProveedorRepo
             } else {
                 $estado = 'Pendiente';
             }
+            $cronograma = Plazo::cronograma($c);
+            $ultima = end($cronograma);
             $out[] = [
                 'id' => (int)$c['id'],
                 'tipo' => (string)($c['tipo'] ?? ''),
@@ -396,7 +398,8 @@ final class CtaCteProveedorRepo
                 'numero_desde' => (string)($c['numero_desde'] ?? ''),
                 'fecha' => $c['fecha'],
                 'imp_total' => $total,
-                'cronograma' => Plazo::cronograma($c),
+                'cronograma' => $cronograma,
+                'vencimiento' => ($ultima['fecha'] ?? null) ?: null,
                 'estado' => $estado,
                 'pendiente' => $pendiente,
             ];

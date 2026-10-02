@@ -47,6 +47,7 @@ $mon = static fn ($v) => number_format((float)$v, 2, ',', '.');
                     <th style="width:30px"></th>
                     <th>Comprobante</th>
                     <th>Fecha</th>
+                    <th>Vto.</th>
                     <th class="text-end">Total</th>
                     <th>Cuotas</th>
                     <th>Estado</th>
@@ -76,6 +77,7 @@ $mon = static fn ($v) => number_format((float)$v, 2, ',', '.');
                             </div>
                         </td>
                         <td class="small"><?= $c['fecha'] ? date('d/m/Y', strtotime((string)$c['fecha'])) : '—' ?></td>
+                        <td class="small <?= (!empty($c['vencimiento']) && ($c['pendiente'] ?? 0) > 0 && $c['vencimiento'] < date('Y-m-d')) ? 'text-danger fw-bold' : '' ?>"><?= !empty($c['vencimiento']) ? date('d/m/Y', strtotime((string)$c['vencimiento'])) : '—' ?></td>
                         <td class="text-end">$<?= $mon($c['imp_total']) ?></td>
                         <td class="text-center"><?= count($c['cronograma']) ?: 1 ?></td>
                         <td>
