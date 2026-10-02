@@ -42,18 +42,6 @@ $isTercero = $tipo === 'tercero';
                         </select>
                     </div>
 
-                    <?php if (!$isTercero): ?>
-                    <div class="mb-3">
-                        <label class="form-label small fw-semibold">Cuenta bancaria <span class="text-danger">*</span></label>
-                        <select class="form-select" name="banco_cuenta_id" required>
-                            <option value="">— Seleccionar —</option>
-                            <?php foreach ($bancos as $b): ?>
-                                <option value="<?= (int)$b['id'] ?>"><?= htmlspecialchars((string)($b['banco'] ?? '') . ' — ' . ($b['numero_cuenta'] ?? '')) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <?php endif; ?>
-
                     <div class="cheque-section">Datos del cheque</div>
                     <div class="row g-2 mb-3">
                         <div class="col-6">
@@ -61,7 +49,7 @@ $isTercero = $tipo === 'tercero';
                             <input class="form-control" name="numero_cheque" placeholder="Ej: 00012345" />
                         </div>
                         <div class="col-6">
-                            <label class="form-label small fw-semibold">Banco emisor</label>
+                            <label class="form-label small fw-semibold">Banco emisor<?php if (!$isTercero): ?> <span class="text-danger">*</span><?php endif; ?></label>
                             <?php if ($isTercero): ?>
                                 <div id="bancoDrop">
                                     <button type="button" class="form-select form-select-sm text-start d-flex justify-content-between align-items-center" id="bancoDropBtn">
@@ -90,7 +78,13 @@ $isTercero = $tipo === 'tercero';
                                     </div>
                                 </div>
                             <?php else: ?>
-                                <input class="form-control" name="banco_emisor" placeholder="Nombre del banco" />
+                                <select class="form-select" name="banco_cuenta_id" required>
+                                    <option value="">— Seleccionar —</option>
+                                    <?php foreach ($bancos as $b): ?>
+                                        <option value="<?= (int)$b['id'] ?>"><?= htmlspecialchars((string)($b['banco'] ?? '') . ' — ' . ($b['numero_cuenta'] ?? '')) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <div class="form-text">Cuenta propia desde la que se debita; se usa como banco emisor.</div>
                             <?php endif; ?>
                         </div>
                     </div>

@@ -107,10 +107,16 @@ final class ChequeController
                 $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Seleccioná una cuenta bancaria.'];
                 Response::redirect('/admin/cheques/emitir?tipo=propio');
             }
+            // Banco emisor derivado de la cuenta elegida (idem orden de pago)
+            $bancoEmisor = trim((string)($_POST['banco_emisor'] ?? ''));
+            if ($bancoEmisor === '') {
+                $cuentaBanco = (new BancoCuentaRepo())->findById($bancoCuentaId);
+                $bancoEmisor = trim((string)($cuentaBanco['banco'] ?? ''));
+            }
             $chequeId = $repo->create([
                 'tipo' => 'propio',
                 'estado' => 'emitido',
-                'banco_emisor' => trim((string)($_POST['banco_emisor'] ?? '')),
+                'banco_emisor' => $bancoEmisor !== '' ? $bancoEmisor : null,
                 'numero_cheque' => trim((string)($_POST['numero_cheque'] ?? '')),
                 'titular' => trim((string)($_POST['titular'] ?? '')),
                 'cuit_titular' => trim((string)($_POST['cuit_titular'] ?? '')),
