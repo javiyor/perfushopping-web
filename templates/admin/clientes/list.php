@@ -2,6 +2,7 @@
 use Perfushopping\Web\Support\Format;
 
 $list = $list ?? [];
+$presenciales = $presenciales ?? [];
 $q = (string)($q ?? '');
 $customerCategories = [
     'none' => 'Sin categoría', 'peluquero' => 'Peluquero/a', 'cosmetologa' => 'Cosmetóloga',
@@ -114,6 +115,47 @@ $customerCategories = [
     <?php if ($list && count($list) >= 60): ?>
         <div class="card-footer text-muted small text-center">Mostrando hasta 60 resultados. Refiná la búsqueda si no encontrás lo que buscás.</div>
     <?php endif; ?>
+</div>
+
+<div class="card shadow-sm mt-3">
+    <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+        <span>Clientes presenciales <span class="badge bg-info">Facturación</span></span>
+        <span class="badge bg-secondary"><?= count($presenciales) ?></span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-admin table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Razón social</th>
+                    <th>CUIT</th>
+                    <th>Teléfono</th>
+                    <th>Email</th>
+                    <th class="text-center">Facturas</th>
+                    <th class="text-end">Total facturado</th>
+                    <th>Última factura</th>
+                    <th>Tipo</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (!$presenciales): ?>
+                    <tr><td colspan="8" class="text-muted text-center py-4">Sin clientes presenciales.</td></tr>
+                <?php else: ?>
+                    <?php foreach ($presenciales as $p): ?>
+                        <tr>
+                            <td><strong><?= htmlspecialchars((string)($p['razon'] ?? 'Sin nombre')) ?></strong></td>
+                            <td class="small"><?= htmlspecialchars((string)($p['cuit'] ?? '-')) ?></td>
+                            <td class="small"><?= htmlspecialchars((string)($p['phone'] ?? '-')) ?></td>
+                            <td class="small"><?= htmlspecialchars((string)($p['email'] ?? '-')) ?></td>
+                            <td class="text-center"><?= (int)($p['facturas'] ?? 0) ?></td>
+                            <td class="text-end"><?= htmlspecialchars(Format::moneyFromCents((int)($p['total_cents'] ?? 0))) ?></td>
+                            <td class="small"><?= htmlspecialchars((string)($p['ultima_factura'] ?? '-')) ?></td>
+                            <td><span class="badge bg-info">Presencial</span></td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
 </div>
 
 <!-- ARCA search modal -->

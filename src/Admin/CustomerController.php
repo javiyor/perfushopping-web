@@ -22,10 +22,12 @@ final class CustomerController
 
         $q = trim((string)($_GET['q'] ?? ''));
         $list = (new CustomerRepo())->search($q);
+        $presenciales = (new CustomerRepo())->searchPresenciales($q);
 
         echo View::adminPage('admin/clientes/list.php', [
             'adminUser' => $adminUser,
             'list' => $list,
+            'presenciales' => $presenciales,
             'q' => $q,
             'csrf' => Csrf::token(),
             'flash' => $_SESSION['admin_flash'] ?? null,

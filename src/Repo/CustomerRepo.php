@@ -59,6 +59,47 @@ final class CustomerRepo
         return $st->fetchAll();
     }
 
+    /**
+     * Clientes cargados en facturación (tabla clientes) que no tienen usuario web.
+     * Se muestran con etiqueta "Presencial".
+     * @return array<int, array<string,mixed>>
+     */
+    public function searchPresenciales(string $q = '', int $limit = 60): array
+    {
+        $limit = max(1, min(200, $limit));
+        $q = trim($q);
+        $params = [];
+        $where = 'w.id IS NULL';
+        if ($q !== '') {
+            $where .= ' AND (c.razon LIKE :like OR c.cuit LIKE :like2 OR c.tele LIKE :like3 OR c.mail LIKE :like4)';
+            $params[':like'] = '%' . $q . '%';
+            $params[':like2'] = '%' . $q . '%';
+            $params[':like3'] = '%' . $q . '%';
+            $params[':like4'] = '%' . $q . '%';
+        }
+        try {
+            $st = Db::pdo()->prepare("
+                SELECT c.idclien, c.razon, c.cuit, c.tele AS phone, c.mail AS email,
+                       c.Localidad AS city,
+                       COUNT(f.id) AS facturas,
+                       COALESCE(SUM(f.total_cents), 0) AS total_cents,
+                       MAX(f.fecha) AS ultima_factura
+                FROM clientes c
+                LEFT JOIN web_users w ON w.cliente_id = c.idclien
+                LEFT JOIN facturas f ON f.idclien = c.idclien AND f.estado = 'emitida'
+                WHERE {$where}
+                GROUP BY c.idclien
+                ORDER BY MAX(f.fecha) DESC, c.razon ASC
+                LIMIT {$limit}
+            ");
+            $st->execute($params);
+            return $st->fetchAll();
+        } catch (\Throwable $e) {
+            error_log('CustomerRepo::searchPresenciales error: ' . $e->getMessage());
+            return [];
+        }
+    }
+
     /** @return array<string,mixed>|null */
     public function findById(int $id): ?array
     {
