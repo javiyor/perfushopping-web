@@ -92,6 +92,9 @@ final class ChequeController
         }
 
         $montoCents = (int)($_POST['monto_cents'] ?? 0);
+        if ($montoCents <= 0 && isset($_POST['monto']) && trim((string)$_POST['monto']) !== '') {
+            $montoCents = (int)round(((float)str_replace(',', '.', (string)$_POST['monto'])) * 100);
+        }
         if ($montoCents <= 0) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'El monto debe ser mayor a cero.'];
             Response::redirect('/admin/cheques/emitir?tipo=' . $tipo);
