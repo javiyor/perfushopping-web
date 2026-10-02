@@ -20,6 +20,10 @@ $saldoGeneral = (int)($saldoGeneral ?? 0);
 $ajustePendiente = $ajustePendiente ?? null;
 $esAdmin = (bool)($esAdmin ?? false);
 $ajustesPendientesCount = (int)($ajustesPendientesCount ?? 0);
+$cajasCerradas = (isset($cajasCerradas) && is_array($cajasCerradas)) ? $cajasCerradas : [];
+if (!$cajasCerradas && $historial) {
+    $cajasCerradas = array_values(array_filter($historial, static fn($h) => (($h['estado'] ?? '') === 'cerrada')));
+}
 ?>
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
@@ -42,8 +46,8 @@ $ajustesPendientesCount = (int)($ajustesPendientesCount ?? 0);
             <?php if (!$ajustePendiente): ?>
                 <a class="btn btn-outline-secondary btn-sm" href="/admin/caja/apertura/ajuste"><i class="bi bi-pencil-square"></i> Solicitar corrección</a>
             <?php endif; ?>
-            <?php if (count($cajasCerradas) > 0): ?>
-                <span class="small text-muted ms-1">
+            <?php if (!empty($cajasCerradas)): ?>
+                <span class="small text-muted ms-1 align-self-center">
                     <i class="bi bi-archive"></i> <?= count($cajasCerradas) ?> caja(s) cerrada(s)
                 </span>
             <?php endif; ?>
@@ -74,6 +78,41 @@ $ajustesPendientesCount = (int)($ajustesPendientesCount ?? 0);
         <a class="btn btn-accent" href="/admin/caja/abrir"><i class="bi bi-cash-stack"></i> Abrir caja</a>
     </div>
 </div>
+<?php if ($cajasCerradas): ?>
+<div class="card shadow-sm mt-3">
+    <div class="card-header bg-white fw-semibold">Cajas cerradas del turno</div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Turno</th>
+                    <th class="text-end">Apertura</th>
+                    <th class="text-end">Cierre</th>
+                    <th class="text-end">Retirado</th>
+                    <th>Estado</th>
+                    <th style="width:50px"></th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($cajasCerradas as $h): ?>
+                    <tr>
+                        <td class="small"><?= htmlspecialchars((string)($h['fecha'] ?? '')) ?></td>
+                        <td class="small"><?= htmlspecialchars($h['turno'] ?? '') ?></td>
+                        <td class="text-end small"><?= Format::moneyFromCents((int)($h['monto_inicial_cents'] ?? 0)) ?></td>
+                        <td class="text-end small"><?= Format::moneyFromCents((int)($h['monto_cierre_cents'] ?? 0)) ?></td>
+                        <td class="text-end small"><?= Format::moneyFromCents((int)($h['monto_retirado_cents'] ?? 0)) ?></td>
+                        <td><span class="badge bg-secondary"><?= htmlspecialchars($h['estado'] ?? '') ?></span></td>
+                        <td>
+                            <a class="btn btn-sm btn-outline-secondary py-0 px-1" title="Solicitar corrección del cierre" href="/admin/caja/cierre/<?= (int)$h['id'] ?>/ajuste"><i class="bi bi-pencil-square"></i></a>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+<?php endif; ?>
 <?php else: ?>
 <?php
 $montoInicial = (int)$apertura['monto_inicial_cents'];

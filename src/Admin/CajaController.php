@@ -26,17 +26,23 @@ $sucursalId = $auth->getSucursalId();
         $apertura = $repo->aperturaActiva($sucursalId, $turno, $fecha);
 
         // Listado de cajas cerradas (aunque la caja actual esté cerrada)
-        $stmtCerradas = Db::pdo()->prepare("
-            SELECT ca.*, a.nombre AS created_by_nombre
-            FROM caja_aperturas ca
-            LEFT JOIN admin_users a ON a.id = ca.created_by
-            WHERE ca.sucursal_id = :suc
-              AND ca.turno = :tur
-              AND ca.estado = 'cerrada'
-            ORDER BY ca.fecha DESC, ca.id DESC
-        ");
-        $stmtCerradas->execute([':suc' => $sucursalId, ':tur' => $turno]);
-        $cajasCerradas = $stmtCerradas->fetchAll();
+        $cajasCerradas = [];
+        try {
+            $stmtCerradas = Db::pdo()->prepare("
+                SELECT ca.*, a.nombre AS created_by_nombre
+                FROM caja_aperturas ca
+                LEFT JOIN admin_users a ON a.id = ca.created_by
+                WHERE ca.sucursal_id = :suc
+                  AND ca.turno = :tur
+                  AND ca.estado = 'cerrada'
+                ORDER BY ca.fecha DESC, ca.id DESC
+            ");
+            $stmtCerradas->execute([':suc' => $sucursalId, ':tur' => $turno]);
+            $cajasCerradas = $stmtCerradas->fetchAll() ?: [];
+        } catch (\Throwable $e) {
+            error_log('CajaController::index cajasCerradas: ' . $e->getMessage());
+            $cajasCerradas = [];
+        }
 
         $movimientos = [];
         $totalesMov = ['total_ingresos' => 0, 'total_egresos' => 0];
@@ -138,6 +144,7 @@ $sucursalId = $auth->getSucursalId();
             'ajustesPendientesCount' => $ajustesPendientesCount,
             'arqueos' => $arqueos,
             'historial' => $historial,
+            'cajasCerradas' => $cajasCerradas,
             'csrf' => Csrf::token(),
             'pageTitle' => 'Caja',
         ]);
