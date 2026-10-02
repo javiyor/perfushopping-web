@@ -426,4 +426,59 @@ final class StockController
         }
         Response::redirect('/admin/stock');
     }
+
+    public function print(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requirePermiso('productos');
+
+        $idAjuste = (int)($_GET['id'] ?? 0);
+        if ($idAjuste <= 0) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Ajuste inválido.'];
+            Response::redirect('/admin/stock/ajuste');
+        }
+
+        // Leer datos del ajuste desde los parámetros de URL (id, fecha, motivo, depósitos, items)
+        $fecha = (string)($_GET['f'] ?? '');
+        $motivo = (string)($_GET['m'] ?? '');
+        $depodesde = (int)($_GET['ds'] ?? 0);
+        $depohasta = (int)($_GET['dh'] ?? 0);
+        // Items: formato simplificado idprodu|cantidad,idprodu|cantidad,...
+        $itemsParam = (string)($_GET['i'] ?? '');
+        $items = [];
+        if ($itemsParam) {
+            foreach (explode(',', $itemsParam) as $item) {
+                $parts = explode('|', $item);
+                if (count($parts) === 2) {
+                    $items[] = [
+                        'idprodu' => (int)$parts[0],
+                        'cantidad' => (int)$parts[1],
+                    ];
+                }
+            }
+        }
+
+        $empresa = (new \Perfushopping\Web\Repo\EmpresaRepo())->getDefault();
+        $sucursalRepo = new \Perfushopping\Web\Repo\SucursalRepo();
+        $sucursal = null;
+        if (!empty($auth->getSucursalId())) {
+            $sucursal = $sucursalRepo->findById($auth->getSucursalId());
+        }
+
+        echo View::adminPage('admin/stock/print_ajuste.php', [
+            'adminUser' => $adminUser,
+            'empresa' => $empresa,
+            'sucursal' => $sucursal,
+            'ajuste' => [
+                'id' => $idAjuste,
+                'fecha' => $fecha,
+                'motivo' => $motivo,
+                'depodesde' => $depodesde,
+                'depohasta' => $depohasta,
+                'items' => $items,
+            ],
+            'csrf' => Csrf::token(),
+            'pageTitle' => 'Imprimir ajuste de stock',
+        ]);
+    }
 }
