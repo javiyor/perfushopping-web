@@ -9,6 +9,17 @@ $saldo = (int)($saldo ?? 0);
 $q = (string)($q ?? '');
 $mon = static fn ($v) => number_format((float)$v, 2, ',', '.');
 ?>
+<style>
+.ctacte-compact .table { font-size: 0.76rem; }
+.ctacte-compact .table > :not(caption) > * > * { padding: 0.16rem 0.4rem; line-height: 1.25; }
+.ctacte-compact .table td { vertical-align: middle; }
+.ctacte-compact .table .small { font-size: 0.68rem; line-height: 1.3; }
+.ctacte-compact .table .badge { font-size: 0.66rem; padding: 0.2em 0.45em; }
+.ctacte-compact .table .btn-sm { padding: 0.08rem 0.3rem; font-size: 0.7rem; }
+.ctacte-compact .table input[type="checkbox"] { width: 0.9em; height: 0.9em; }
+.ctacte-compact .card-header h5 { font-size: 0.95rem; }
+</style>
+<div class="ctacte-compact">
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
         <h4 class="fw-bold mb-1"><?= htmlspecialchars($proveedorNombre ?: 'Proveedor') ?></h4>
@@ -164,3 +175,4 @@ function cargarPagoComprobantes() {
     window.location.href = url;
 }
 </script>
+</div>
