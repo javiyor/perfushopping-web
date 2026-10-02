@@ -693,9 +693,11 @@ final class StockRepo
         int $cantidad,
         string $motivo,
         int $adminUserId,
-        string $tipoMovimiento = 'ajuste'
+        string $tipoMovimiento = 'ajuste',
+        ?int $grupoId = null
     ): int {
         $pdo = Db::pdo();
+        $hasGrupo = $this->ensureGrupoColumn();
         $pdo->beginTransaction();
         try {
             // VFP convention:
@@ -707,16 +709,30 @@ final class StockRepo
             $canti = max(1, $cantidad);
 
             // 1. Insert stockcab
-            $st = $pdo->prepare('
-                INSERT INTO stockcab (iddepoh, iddepod, fecha, notas, tipo_movimiento)
-                VALUES (:depoh, :depod, CURDATE(), :notas, :tipo)
-            ');
-            $st->execute([
-                ':depoh' => $iddepoh,
-                ':depod' => $iddepod,
-                ':notas' => $motivo,
-                ':tipo' => $tipoMovimiento,
-            ]);
+            if ($hasGrupo) {
+                $st = $pdo->prepare('
+                    INSERT INTO stockcab (iddepoh, iddepod, fecha, notas, tipo_movimiento, grupo_id)
+                    VALUES (:depoh, :depod, CURDATE(), :notas, :tipo, :grupo)
+                ');
+                $st->execute([
+                    ':depoh' => $iddepoh,
+                    ':depod' => $iddepod,
+                    ':notas' => $motivo,
+                    ':tipo' => $tipoMovimiento,
+                    ':grupo' => $grupoId,
+                ]);
+            } else {
+                $st = $pdo->prepare('
+                    INSERT INTO stockcab (iddepoh, iddepod, fecha, notas, tipo_movimiento)
+                    VALUES (:depoh, :depod, CURDATE(), :notas, :tipo)
+                ');
+                $st->execute([
+                    ':depoh' => $iddepoh,
+                    ':depod' => $iddepod,
+                    ':notas' => $motivo,
+                    ':tipo' => $tipoMovimiento,
+                ]);
+            }
             $cabId = (int)$pdo->lastInsertId();
 
             // 2. Insert stockdet
@@ -764,7 +780,77 @@ final class StockRepo
         }
     }
 
-    /** @return array<int, array<string,mixed>> */
+    private static ?bool $grupoColReady = null;
+
+    /** Crea grupo_id en stockcab si falta. Devuelve true si la columna existe. */
+    private function ensureGrupoColumn(): bool
+    {
+        if (self::$grupoColReady !== null) {
+            return self::$grupoColReady;
+        }
+        self::$grupoColReady = true;
+        try {
+            $cols = array_column(Db::pdo()->query('SHOW COLUMNS FROM stockcab')->fetchAll(), 'Field');
+            if (!in_array('grupo_id', $cols, true)) {
+                Db::pdo()->exec('ALTER TABLE stockcab ADD COLUMN grupo_id INT UNSIGNED NULL DEFAULT NULL, ADD KEY idx_grupo_id (grupo_id)');
+            }
+        } catch (\Throwable $e) {
+            error_log('StockRepo::ensureGrupoColumn: ' . $e->getMessage());
+            self::$grupoColReady = false;
+        }
+        return self::$grupoColReady;
+    }
+
+    /**
+     * Registra varios productos como UN grupo de ajuste (una registración).
+     * @param array<int, array{idprodu:int, idcodgusto:?int, cantidad:int}> $items
+     * @return array<int> ids de cabecera generados
+     */
+    public function registrarAjusteLote(array $items, int $iddepodesde, int $iddepohasta, string $motivo, int $adminUserId, string $tipoMovimiento = 'ajuste'): array
+    {
+        $ids = [];
+        $grupo = null;
+        foreach ($items as $it) {
+            $id = $this->registrarAjuste(
+                (int)$it['idprodu'],
+                $it['idcodgusto'] !== null ? (int)$it['idcodgusto'] : null,
+                $iddepodesde,
+                $iddepohasta,
+                max(1, (int)$it['cantidad']),
+                $motivo,
+                $adminUserId,
+                $tipoMovimiento,
+                $grupo
+            );
+            if ($grupo === null) {
+                $grupo = $id;
+                try {
+                    Db::pdo()->prepare('UPDATE stockcab SET grupo_id = :g WHERE idcabstock = :id LIMIT 1')
+                        ->execute([':g' => $grupo, ':id' => $id]);
+                } catch (\Throwable $e) {
+                    error_log('StockRepo::registrarAjusteLote grupo: ' . $e->getMessage());
+                }
+            }
+            $ids[] = $id;
+        }
+        return $ids;
+    }
+
+    /** Grupo efectivo de una cabecera (viejas sin grupo = su propio id). */
+    public function grupoDe(int $idcabstock): int
+    {
+        try {
+            $this->ensureGrupoColumn();
+            $st = Db::pdo()->prepare('SELECT COALESCE(grupo_id, idcabstock) FROM stockcab WHERE idcabstock = :id LIMIT 1');
+            $st->execute([':id' => $idcabstock]);
+            $g = (int)$st->fetchColumn();
+            return $g > 0 ? $g : $idcabstock;
+        } catch (\Throwable $e) {
+            return $idcabstock;
+        }
+    }
+
+    /** @return array<int, array<string,mixed>> un renglón por grupo de ajuste */
     public function ajustesRecientes(int $limit = 30, string $desde = '', string $hasta = ''): array
     {
         $limit = max(1, min(200, $limit));
@@ -778,18 +864,23 @@ final class StockRepo
             $where .= ' AND sc.fecha <= :hasta';
             $params[':hasta'] = $hasta;
         }
+        $grupoExpr = $this->ensureGrupoColumn()
+            ? 'COALESCE(sc.grupo_id, sc.idcabstock)'
+            : 'sc.idcabstock';
         $st = Db::pdo()->prepare("
-            SELECT sc.idcabstock AS id, sc.fecha, sc.notas AS motivo, sc.tipo_movimiento AS tipo,
-                   sc.iddepoh, sc.iddepod,
-                   dh.nomdepo AS depo_hasta, dd.nomdepo AS depo_desde,
+            SELECT {$grupoExpr} AS id,
+                   GROUP_CONCAT(sc.idcabstock ORDER BY sc.idcabstock ASC) AS ids,
+                   MAX(sc.fecha) AS fecha, MAX(sc.notas) AS motivo, MAX(sc.tipo_movimiento) AS tipo,
+                   MAX(sc.iddepoh) AS iddepoh, MAX(sc.iddepod) AS iddepod,
+                   MAX(dh.nomdepo) AS depo_hasta, MAX(dd.nomdepo) AS depo_desde,
                    COUNT(sd.idprodu) AS items, COALESCE(SUM(sd.canti), 0) AS unidades
             FROM stockcab sc
             LEFT JOIN stockdet sd ON sd.idstockcab = sc.idcabstock
             LEFT JOIN deposito dh ON dh.iddepo = sc.iddepoh
             LEFT JOIN deposito dd ON dd.iddepo = sc.iddepod
             WHERE 1 = 1{$where}
-            GROUP BY sc.idcabstock
-            ORDER BY sc.idcabstock DESC
+            GROUP BY {$grupoExpr}
+            ORDER BY MAX(sc.idcabstock) DESC
             LIMIT {$limit}
         ");
         $st->execute($params);
@@ -829,34 +920,73 @@ final class StockRepo
         return $cabRow;
     }
 
+    /** Grupo completo (todas las cabeceras generadas en la misma registración) con ítems. */
+    public function ajusteGrupoDetalle(int $grupoId): ?array
+    {
+        $pdo = Db::pdo();
+        $hasGrupo = $this->ensureGrupoColumn();
+        if ($hasGrupo) {
+            $cab = $pdo->prepare('
+                SELECT MIN(sc.idcabstock) AS id, MAX(sc.fecha) AS fecha, MAX(sc.notas) AS motivo,
+                       MAX(sc.tipo_movimiento) AS tipo, MAX(sc.iddepoh) AS iddepoh, MAX(sc.iddepod) AS iddepod,
+                       MAX(dh.nomdepo) AS depo_hasta, MAX(dd.nomdepo) AS depo_desde
+                FROM stockcab sc
+                LEFT JOIN deposito dh ON dh.iddepo = sc.iddepoh
+                LEFT JOIN deposito dd ON dd.iddepo = sc.iddepod
+                WHERE sc.idcabstock = :id OR sc.grupo_id = :id
+            ');
+            $cab->execute([':id' => $grupoId]);
+            $det = $pdo->prepare('
+                SELECT sd.idprodu, sd.idcodgusto, sd.canti,
+                       p.produ, p.codprodu,
+                       g.nomgusto, g.codscan
+                FROM stockdet sd
+                INNER JOIN stockcab sc ON sc.idcabstock = sd.idstockcab
+                LEFT JOIN producto p ON p.idprodu = sd.idprodu
+                LEFT JOIN gustos g ON g.idcodgusto = sd.idcodgusto
+                WHERE sc.idcabstock = :id OR sc.grupo_id = :id
+                ORDER BY p.produ ASC
+            ');
+            $det->execute([':id' => $grupoId]);
+        } else {
+            return $this->ajusteConDetalle($grupoId);
+        }
+        $cabRow = $cab->fetch();
+        if (!$cabRow || (int)($cabRow['id'] ?? 0) <= 0) {
+            return null;
+        }
+        $cabRow['id'] = $grupoId;
+        $cabRow['items'] = $det->fetchAll();
+        if (!$cabRow['items']) {
+            return null;
+        }
+        return $cabRow;
+    }
+
     /**
-     * Anula un ajuste generando el movimiento inverso (trazable).
+     * Anula un grupo de ajuste generando el movimiento inverso (trazable).
      * Devuelve los ids de las cabeceras de reversión.
      * @return array<int>
      */
     public function anularAjuste(int $idcabstock, int $adminUserId): array
     {
-        $aj = $this->ajusteConDetalle($idcabstock);
+        $grupo = $this->grupoDe($idcabstock);
+        $aj = $this->ajusteGrupoDetalle($grupo);
         if (!$aj || empty($aj['items'])) {
             throw new \RuntimeException('Ajuste no encontrado.');
         }
         $desde = (int)($aj['iddepoh'] ?? 0);
         $hasta = (int)($aj['iddepod'] ?? 0);
-        $motivo = 'Anulación ajuste #' . (int)$aj['id'] . ': ' . trim((string)($aj['motivo'] ?? ''));
-        $nuevos = [];
+        $motivo = 'Anulación ajuste #' . $grupo . ': ' . trim((string)($aj['motivo'] ?? ''));
+        $lote = [];
         foreach ($aj['items'] as $it) {
-            $nuevos[] = $this->registrarAjuste(
-                (int)$it['idprodu'],
-                $it['idcodgusto'] !== null ? (int)$it['idcodgusto'] : null,
-                $desde,
-                $hasta,
-                max(1, (int)$it['canti']),
-                $motivo,
-                $adminUserId,
-                'ajuste'
-            );
+            $lote[] = [
+                'idprodu' => (int)$it['idprodu'],
+                'idcodgusto' => $it['idcodgusto'] !== null ? (int)$it['idcodgusto'] : null,
+                'cantidad' => max(1, (int)$it['canti']),
+            ];
         }
-        return $nuevos;
+        return $this->registrarAjusteLote($lote, $desde, $hasta, $motivo, $adminUserId, 'ajuste');
     }
 
     private function updateStockDeposit(int $idprodu, ?int $idcodgusto, int $iddepo, int $delta): void

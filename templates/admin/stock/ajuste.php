@@ -193,7 +193,7 @@ $esSuperadmin = $esSuperadmin ?? false;
 
 <div class="card shadow-sm mt-3">
     <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
-        <span>Ajustes de stock generados</span>
+        <span>Grupos de ajuste generados</span>
         <span class="badge bg-secondary"><?= count($historialAjustes) ?></span>
     </div>
     <div class="table-responsive">
@@ -211,11 +211,11 @@ $esSuperadmin = $esSuperadmin ?? false;
                     <td class="text-center"><?= (int)($h['items'] ?? 0) ?></td>
                     <td class="text-center"><?= (int)($h['unidades'] ?? 0) ?></td>
                     <td class="text-end text-nowrap">
-                        <a class="btn btn-sm btn-outline-primary py-0 px-1" title="Reimprimir" href="/admin/stock/ajuste/imprimir?ids=<?= (int)$h['id'] ?>" target="_blank"><i class="bi bi-printer"></i></a>
-                        <form method="post" action="/admin/stock/ajuste/anular" style="display:inline" onsubmit="return confirm('Anular el ajuste #<?= (int)$h['id'] ?> generando el movimiento inverso?')">
+                        <a class="btn btn-sm btn-outline-primary py-0 px-1" title="Reimprimir grupo" href="/admin/stock/ajuste/imprimir?ids=<?= htmlspecialchars((string)($h['ids'] ?? $h['id'])) ?>" target="_blank"><i class="bi bi-printer"></i></a>
+                        <form method="post" action="/admin/stock/ajuste/anular" style="display:inline" onsubmit="return confirm('Anular el grupo #<?= (int)$h['id'] ?> generando el movimiento inverso?')">
                             <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
                             <input type="hidden" name="idcabstock" value="<?= (int)$h['id'] ?>" />
-                            <button class="btn btn-sm btn-outline-danger py-0 px-1" title="Anular (movimiento inverso)"><i class="bi bi-arrow-counterclockwise"></i></button>
+                            <button class="btn btn-sm btn-outline-danger py-0 px-1" title="Anular grupo (movimiento inverso)"><i class="bi bi-arrow-counterclockwise"></i></button>
                         </form>
                     </td>
                 </tr>

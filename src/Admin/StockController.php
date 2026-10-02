@@ -382,18 +382,15 @@ final class StockController
                 Response::redirect('/admin/stock/ajuste');
             }
 
-            $cabIds = [];
+            $lote = [];
             foreach ($items as $it) {
-                $cabIds[] = $repo->registrarAjuste(
-                    (int)$it['idprodu'],
-                    $it['idcodgusto'] !== null ? (int)$it['idcodgusto'] : null,
-                    $iddepodesde,
-                    $iddepohasta,
-                    (int)$it['cantidad'],
-                    $motivo,
-                    (int)$adminUser['id']
-                );
+                $lote[] = [
+                    'idprodu' => (int)$it['idprodu'],
+                    'idcodgusto' => $it['idcodgusto'] !== null ? (int)$it['idcodgusto'] : null,
+                    'cantidad' => (int)$it['cantidad'],
+                ];
             }
+            $cabIds = $repo->registrarAjusteLote($lote, $iddepodesde, $iddepohasta, $motivo, (int)$adminUser['id']);
             $cabIds = array_values(array_filter(array_map('intval', $cabIds)));
             $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Ajuste de stock registrado. Productos procesados: ' . count($cabIds) . '.'];
             Response::redirect('/admin/stock/ajuste/imprimir?ids=' . implode(',', $cabIds));
@@ -563,8 +560,14 @@ final class StockController
 
         $repo = new StockRepo();
         $ajustes = [];
+        $vistos = [];
         foreach ($ids as $id) {
-            $aj = $repo->ajusteConDetalle($id);
+            $grupo = $repo->grupoDe($id);
+            if (isset($vistos[$grupo])) {
+                continue;
+            }
+            $vistos[$grupo] = true;
+            $aj = $repo->ajusteGrupoDetalle($grupo);
             if ($aj) {
                 $ajustes[] = $aj;
             }
