@@ -951,7 +951,7 @@ final class StockRepo
         }
     }
 
-    // ── Grilla de reposición ──
+    // ── Datos para filtros del listado de stock ──
 
     public function grillaRubros(): array
     {
@@ -979,66 +979,6 @@ final class StockRepo
             WHERE p.enweb = 1 AND p.codprove IS NOT NULL AND p.codprove != ''
             ORDER BY pv.razon ASC
         ");
-        return $st->fetchAll();
-    }
-
-    public function grillaProductos(string $q = '', int $codrub = 0, int $codsub = 0, string $codprove = '', string $desde = '', string $hasta = '', int $limit = 500): array
-    {
-        $limit = max(1, min(1000, $limit));
-        $params = [];
-        $where = ['p.enweb = 1'];
-
-        if ($codrub > 0) {
-            $where[] = 'p.codrub = :cr';
-            $params[':cr'] = $codrub;
-        }
-        if ($codsub > 0) {
-            $where[] = 'p.codsub = :cs';
-            $params[':cs'] = $codsub;
-        }
-        if ($codprove !== '') {
-            $where[] = 'p.codprove = :cp';
-            $params[':cp'] = $codprove;
-        }
-
-        $q = trim($q);
-        if ($q !== '') {
-            $where[] = '(p.produ LIKE :q1 OR p.codprodu LIKE :q2 OR p.codprodup LIKE :q3 OR EXISTS (SELECT 1 FROM gustos g2 WHERE g2.idprodu = p.idprodu AND (g2.codscan LIKE :q4 OR g2.nomgusto LIKE :q5)))';
-            $params[':q1'] = '%' . $q . '%';
-            $params[':q2'] = '%' . $q . '%';
-            $params[':q3'] = '%' . $q . '%';
-            $params[':q4'] = '%' . $q . '%';
-            $params[':q5'] = '%' . $q . '%';
-        }
-
-        $desde = trim($desde);
-        $hasta = trim($hasta);
-        $ventasJoin = '';
-        if ($desde === '' && $hasta === '') {
-            $ventasJoin = 'LEFT JOIN (SELECT fi.idprodu, SUM(fi.qty) AS vendidos FROM factura_items fi INNER JOIN facturas f ON f.id = fi.factura_id AND f.estado = \'emitida\' AND f.fecha >= DATE_SUB(CURDATE(), INTERVAL 90 DAY) GROUP BY fi.idprodu) v ON v.idprodu = p.idprodu';
-        } else {
-            if ($desde === '') $desde = '2000-01-01';
-            if ($hasta === '') $hasta = date('Y-m-d');
-            $params[':vdesde'] = $desde;
-            $params[':vhasta'] = $hasta;
-            $ventasJoin = 'LEFT JOIN (SELECT fi.idprodu, SUM(fi.qty) AS vendidos FROM factura_items fi INNER JOIN facturas f ON f.id = fi.factura_id AND f.estado = \'emitida\' AND f.fecha BETWEEN :vdesde AND :vhasta GROUP BY fi.idprodu) v ON v.idprodu = p.idprodu';
-        }
-
-        $sql = "
-            SELECT p.idprodu, p.codprodu, p.produ, p.precomp, p.stocact, p.codprove, p.codprodup, p.precio, p.imagen,
-                   pv.razon AS nomprovee,
-                   (SELECT MIN(g.codscan) FROM gustos g WHERE g.idprodu = p.idprodu AND g.codscan IS NOT NULL AND g.codscan != '' LIMIT 1) AS codscan,
-                   COALESCE(v.vendidos, 0) AS vendidos
-            FROM producto p
-            LEFT JOIN proveedo pv ON pv.idprovee = p.codprove
-            {$ventasJoin}
-            WHERE " . implode(' AND ', $where) . "
-            ORDER BY v.vendidos DESC, p.produ ASC
-            LIMIT {$limit}
-        ";
-
-        $st = Db::pdo()->prepare($sql);
-        $st->execute($params);
         return $st->fetchAll();
     }
 }

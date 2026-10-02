@@ -56,7 +56,6 @@ use Perfushopping\Web\Admin\ReciboController as AdminReciboController;
 use Perfushopping\Web\Admin\CtaCteController as AdminCtaCteController;
 use Perfushopping\Web\Admin\SesionController as AdminSesionController;
 use Perfushopping\Web\Admin\StockController as AdminStockController;
-use Perfushopping\Web\Admin\StockGrillaController as AdminStockGrillaController;
 use Perfushopping\Web\Admin\PrintConfigController as AdminPrintConfigController;
 use Perfushopping\Web\Admin\ReporteController as AdminReporteController;
 use Perfushopping\Web\Admin\OrdenCompraController as AdminOrdenCompraController;
@@ -452,10 +451,6 @@ $router->get('/admin/stock/ajuste/buscar-productos', [AdminStockController::clas
 $router->get('/admin/stock/ajuste/variantes', [AdminStockController::class, 'ajusteVariantes']);
 $router->post('/admin/stock/discont', [AdminStockController::class, 'toggleDiscont']);
 $router->post('/admin/stock/eliminar-discontinuadas', [AdminStockController::class, 'eliminarDiscontinuadas']);
-$router->get('/admin/stock/grilla', [AdminStockGrillaController::class, 'index']);
-$router->post('/admin/stock/grilla/generar-oc', [AdminStockGrillaController::class, 'generarOC']);
-$router->get('/admin/stock/grilla/oc-pdf/(?P<id>\d+)', [AdminStockGrillaController::class, 'exportarPDF']);
-$router->get('/admin/stock/grilla/oc-excel/(?P<id>\d+)', [AdminStockGrillaController::class, 'exportarExcel']);
 
 // Admin - Notas de pedido
 $router->get('/admin/nota-pedido/nueva', [AdminNotaPedidoController::class, 'create']);
