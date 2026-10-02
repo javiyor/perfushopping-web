@@ -110,7 +110,7 @@ $esperadoEfectivo = (int)($esperadoEfectivo ?? 0);
                         El conteo de arriba queda guardado como arqueo del cierre. Al cerrar se finaliza el registro y no se podrán agregar más movimientos.
                     </div>
 
-                    <button class="btn btn-warning w-100" type="submit"><i class="bi bi-stop-fill"></i> Cerrar caja</button>
+                    <button class="btn btn-warning w-100" type="submit" onclick="return confirm('¿Confirmar el cierre de caja? Verificá los montos antes de continuar.')"><i class="bi bi-stop-fill"></i> Cerrar caja</button>
 
 <script>
 const DENOMINACIONES_SUGERIDAS = [20000, 10000, 5000, 2000, 1000, 500, 200, 100];
@@ -216,6 +216,17 @@ function calcQueda() {
     document.getElementById('quedaEnCaja').className = queda < 0 ? 'text-danger' : queda > 0 ? 'text-success' : '';
 }
 calcQueda();
+
+// Evita que el auto-update recargue la página mientras se cuentan billetes.
+window.__conteoEnProceso = function() {
+    var rows = document.querySelectorAll('#detalleBody tr');
+    for (var i = 0; i < rows.length; i++) {
+        var d = rows[i].querySelector('.denom-input');
+        var q = rows[i].querySelector('.qty-input');
+        if (d && q && (parseInt(d.value) || 0) > 0 && (parseInt(q.value) || 0) > 0) return true;
+    }
+    return false;
+};
 </script>
                 </form>
             </div>

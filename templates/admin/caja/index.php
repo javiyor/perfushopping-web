@@ -40,9 +40,6 @@ if (!$cajasCerradas && $historial) {
             <a class="btn btn-outline-primary btn-sm" href="/admin/caja/movimientos"><i class="bi bi-arrow-left-right"></i> Movimientos</a>
             <a class="btn btn-outline-info btn-sm" href="/admin/caja/arqueo"><i class="bi bi-calculator"></i> Arqueo</a>
             <a class="btn btn-outline-warning btn-sm" href="/admin/caja/cierre"><i class="bi bi-stop-fill"></i> Cerrar caja</a>
-            <?php if (empty($arqueos)): ?>
-                <span class="small text-warning ms-1 align-self-center" title="El cierre exige un arqueo previo"><i class="bi bi-exclamation-triangle"></i> Requiere arqueo</span>
-            <?php endif; ?>
             <?php if (!$ajustePendiente): ?>
                 <a class="btn btn-outline-secondary btn-sm" href="/admin/caja/apertura/ajuste"><i class="bi bi-pencil-square"></i> Solicitar corrección</a>
             <?php endif; ?>

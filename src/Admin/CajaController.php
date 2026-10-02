@@ -497,10 +497,6 @@ $sucursalId = $auth->getSucursalId();
         $apId = (int)$apertura['id'];
         $apCreada = (string)($apertura['created_at'] ?? date('Y-m-d') . ' 00:00:00');
         $fecha = date('Y-m-d');
-        if (!$repo->arqueos($apId)) {
-            $_SESSION['admin_flash'] = ['type' => 'warning', 'text' => 'Hacé un arqueo antes de cerrar la caja.'];
-            Response::redirect('/admin/caja/arqueo');
-        }
         $ventasEfectivo = $repo->totalVentasEfectivoTurno($apId, $fecha, $puntoVenta, $apCreada);
         $ventasTransferencia = $repo->totalVentasTransferenciaTurno($apId, $fecha, $puntoVenta, $apCreada);
         $totalRecibos = $repo->totalRecibosTurno($apId, $fecha, $puntoVenta, $apCreada);
@@ -545,10 +541,6 @@ $sucursalId = $auth->getSucursalId();
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No hay caja abierta.'];
             Response::redirect('/admin/caja');
         }
-        if (!$repo->arqueos((int)$apertura['id'])) {
-            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se puede cerrar sin arqueo. Registrá un arqueo primero.'];
-            Response::redirect('/admin/caja/arqueo');
-        }
 
         // Efectivo disponible del turno: solo efectivo puede pasar a Caja General.
         $apId = (int)$apertura['id'];
@@ -569,6 +561,25 @@ $sucursalId = $auth->getSucursalId();
         }
 
         $repo->cerrar($apId, $montoCierre, (int)$adminUser['id'], $montoRetirado, $proximaApertura);
+
+        // El conteo de billetes del cierre queda guardado como arqueo (conteo único).
+        $detalleCierre = trim((string)($_POST['detalle_efectivo'] ?? ''));
+        if ($detalleCierre !== '') {
+            $decodedCierre = json_decode($detalleCierre, true);
+            if (is_array($decodedCierre) && count($decodedCierre) > 0) {
+                $lineas = [];
+                foreach ($decodedCierre as $d) {
+                    $denom = (int)($d['denominacion'] ?? 0);
+                    $qty = (int)($d['cantidad'] ?? 0);
+                    if ($denom > 0 && $qty > 0) {
+                        $lineas[] = '$' . number_format($denom, 0, ',', '.') . ' x ' . $qty . ' = $' . number_format($denom * $qty, 0, ',', '.');
+                    }
+                }
+                if ($lineas) {
+                    $repo->registrarArqueo($apId, $montoCierre, 'Arqueo de cierre. Detalle conteo: ' . implode(' | ', $lineas), (int)$adminUser['id']);
+                }
+            }
+        }
 
         // Register in caja general as ingreso from cierre
         if ($montoRetirado > 0) {

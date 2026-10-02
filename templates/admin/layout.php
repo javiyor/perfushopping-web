@@ -441,6 +441,16 @@
             }
         }
 
+        // No recargar si hay trabajo en curso: factura del POS o conteo de billetes en caja.
+        function trabajoEnProceso() {
+            if (facturaEnProceso()) return true;
+            try {
+                return typeof window.__conteoEnProceso === 'function' && window.__conteoEnProceso();
+            } catch (e) {
+                return false;
+            }
+        }
+
         // Aviso no intrusivo: la actualización queda a la espera del usuario.
         function avisoActualizacion() {
             if (updateNoticeShown || document.getElementById('sw-update-notice')) return;
@@ -475,7 +485,7 @@
             // Auto-actualizar a la última versión sin pedir confirmación,
             // salvo que haya una factura en proceso: en ese caso se espera al usuario.
             if (waitingWorker) {
-                if (!updateRequested && facturaEnProceso()) {
+                if (!updateRequested && trabajoEnProceso()) {
                     avisoActualizacion();
                     return;
                 }
@@ -509,7 +519,7 @@
             }).catch(function() {});
 
             navigator.serviceWorker.addEventListener('controllerchange', function() {
-                if (!updateRequested && facturaEnProceso()) {
+                if (!updateRequested && trabajoEnProceso()) {
                     avisoActualizacion();
                     return;
                 }

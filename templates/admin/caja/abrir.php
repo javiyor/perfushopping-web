@@ -159,4 +159,15 @@ function getDetalle() {
 document.addEventListener('DOMContentLoaded', function() {
     DENOMINACIONES_SUGERIDAS.forEach(d => addRow(d, 0));
 });
+
+// Evita que el auto-update recargue la página mientras se cuentan billetes.
+window.__conteoEnProceso = function() {
+    var rows = document.querySelectorAll('#detalleBody tr');
+    for (var i = 0; i < rows.length; i++) {
+        var d = rows[i].querySelector('.denom-input');
+        var q = rows[i].querySelector('.qty-input');
+        if (d && q && (parseInt(d.value) || 0) > 0 && (parseInt(q.value) || 0) > 0) return true;
+    }
+    return false;
+};
 </script>
