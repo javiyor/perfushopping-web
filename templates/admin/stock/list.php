@@ -49,8 +49,8 @@ $qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $
         <button class="btn btn-accent btn-sm" id="btnNotaPedido" onclick="irANotaPedido()"><i class="bi bi-file-text"></i> Nota de pedido <span id="npCount" class="badge bg-light text-dark" style="display:none"></span></button>
         <button class="btn btn-outline-secondary btn-sm" id="btnNpLimpiar" type="button" title="Limpiar cantidades acumuladas de todas las páginas"><i class="bi bi-x-lg"></i></button>
         <a class="btn btn-accent btn-sm" href="/admin/stock/ajuste"><i class="bi bi-pencil-square"></i> Ajuste manual</a>
-        <a class="btn btn-outline-success btn-sm" href="/admin/stock/exportar-excel?<?= htmlspecialchars($_SERVER['QUERY_STRING'] ?? '') ?>"><i class="bi bi-file-earmark-excel"></i> Excel</a>
-            <a class="btn btn-outline-primary btn-sm" href="/admin/stock/imprimir?<?= htmlspecialchars($_SERVER['QUERY_STRING'] ?? '') ?>"><i class="bi bi-printer"></i> Imprimir</a>
+        <a class="btn btn-outline-success btn-sm" href="/admin/stock/exportar-excel?<?= htmlspecialchars($_SERVER['QUERY_STRING'] ?? '') ?>" onclick="return irStockExport(this.href)"><i class="bi bi-file-earmark-excel"></i> Excel</a>
+            <a class="btn btn-outline-primary btn-sm" href="/admin/stock/imprimir?<?= htmlspecialchars($_SERVER['QUERY_STRING'] ?? '') ?>" onclick="return irStockExport(this.href)"><i class="bi bi-printer"></i> Imprimir</a>
         <?php if ($isSuper): ?>
             <button class="btn btn-outline-danger btn-sm" onclick="eliminarDiscontinuadas()"><i class="bi bi-trash"></i> Eliminar disc.</button>
         <?php endif; ?>
@@ -122,6 +122,17 @@ $qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $
                 <?php if ($q !== '' || $codprove !== '' || $codsub > 0 || $codrub > 0 || $stockFilter !== '' || $iddepo > 0 || $enweb !== ''): ?>
                     <a class="btn btn-outline-secondary btn-sm w-100" href="/admin/stock?desde=<?= urlencode($desde) ?>&hasta=<?= urlencode($hasta) ?>">Limpiar</a>
                 <?php endif; ?>
+            </div>
+            <div class="col-12">
+                <details>
+                    <summary class="small text-muted" style="cursor:pointer">Columnas a descargar / imprimir (por defecto: Producto, Variedad, Código y Stock)</summary>
+                    <div class="d-flex flex-wrap gap-3 mt-1">
+                        <?php $colsMap = $colsMap ?? []; $colsSel = $colsSel ?? ['produ', 'nomgusto', 'codigo', 'stock_deposito']; ?>
+                        <?php foreach ($colsMap as $ck => $cl): ?>
+                            <label class="small"><input type="checkbox" class="form-check-input col-sel" name="cols[]" value="<?= htmlspecialchars($ck) ?>" <?= in_array($ck, $colsSel, true) ? 'checked' : '' ?> /> <?= htmlspecialchars($cl) ?></label>
+                        <?php endforeach; ?>
+                    </div>
+                </details>
             </div>
         </form>
     </div>
@@ -251,6 +262,24 @@ $qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $
 </div>
 
 <script>
+function stockColsQuery() {
+    const cols = [];
+    document.querySelectorAll('.col-sel:checked').forEach(function(cb) { cols.push(cb.value); });
+    const usados = cols.length ? cols : ['produ', 'nomgusto', 'codigo', 'stock_deposito'];
+    const p = new URLSearchParams();
+    usados.forEach(function(c) { p.append('cols[]', c); });
+    return p.toString();
+}
+function irStockExport(base) {
+    const qm = base.indexOf('?');
+    const url = qm >= 0 ? base.substring(0, qm) : base;
+    const params = new URLSearchParams(qm >= 0 ? base.substring(qm + 1) : '');
+    params.delete('cols[]');
+    const cur = params.toString();
+    const extra = stockColsQuery();
+    window.location.href = url + '?' + (cur ? cur + '&' : '') + extra;
+    return false;
+}
 function npKey(idprodu, idcodgusto) { return String(idprodu) + '|' + String(idcodgusto); }
 function npLeerAcumulado() {
     try {

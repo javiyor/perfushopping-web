@@ -2,6 +2,8 @@
 use Perfushopping\Web\Support\Format;
 
 $list = $list ?? [];
+$expHeaders = $expHeaders ?? [];
+$expRows = $expRows ?? [];
 $q = (string)($q ?? '');
 $codepar = (int)($codepar ?? 0);
 $stockFilter = (string)($stockFilter ?? '');
@@ -11,6 +13,7 @@ $codprove = (string)($codprove ?? '');
 $iddepo = (int)($iddepo ?? 0);
 $desde = (string)($desde ?? '');
 $hasta = (string)($hasta ?? '');
+$nCols = count($expHeaders) + 1;
 ?>
 <!DOCTYPE html>
 <html>
@@ -98,37 +101,22 @@ $hasta = (string)($hasta ?? '');
     <thead>
         <tr>
             <th style="width:40px">#</th>
-            <th style="width:200px">Producto</th>
-            <th style="width:100px">Variedad</th>
-            <th style="width:80px">Cód. Barras</th>
-            <th style="width:100px">Cód. Proveedor</th>
-            <th style="width:150px">Proveedor</th>
-            <th style="width:60px">Stock</th>
-            <th style="width:60px">Ventas</th>
-            <th style="width:80px">Precio</th>
-            <th style="width:80px">Costo</th>
+            <?php foreach ($expHeaders as $h): ?>
+                <th><?= htmlspecialchars($h) ?></th>
+            <?php endforeach; ?>
         </tr>
     </thead>
     <tbody>
-        <?php if (!$list): ?>
-        <tr><td colspan="10" class="text-center small">No hay stock con los filtros aplicados.</td></tr>
+        <?php if (!$expRows): ?>
+        <tr><td colspan="<?= $nCols ?>" class="text-center small">No hay stock con los filtros aplicados.</td></tr>
         <?php else: ?>
         <?php $i = 1; ?>
-        <?php foreach ($list as $p): ?>
+        <?php foreach ($expRows as $row): ?>
         <tr>
             <td class="small"><?= $i++ ?></td>
-            <td class="small" style="text-align:left;">
-                <?= htmlspecialchars($p['produ'] ?? '') ?><br>
-                <span class="text-muted small">Cód.: <?= htmlspecialchars($p['codprodu'] ?? '') ?></span>
-            </td>
-            <td class="small"><?= htmlspecialchars($p['nomgusto'] ?? '') ?: '—' ?></td>
-            <td class="small"><?= htmlspecialchars($p['codscan'] ?? '') ?: '—' ?></td>
-            <td class="small"><?= htmlspecialchars($p['codprodup'] ?? '') ?: '—' ?></td>
-            <td class="small"><?= htmlspecialchars($p['nomprovee'] ?? '') ?: '—' ?></td>
-            <td class="small text-center" style="color:<?= ($p['stock_deposito'] ?? 0) < 10 ? 'red' : 'black' ?>"><?= (int)($p['stock_deposito'] ?? 0) ?></td>
-            <td class="small text-center"><?= (int)($p['total_vendido'] ?? 0) ?></td>
-            <td class="small text-right">$<?= number_format((float)($p['precio'] ?? 0), 2, ',', '.') ?></td>
-            <td class="small text-right">$<?= number_format((float)($p['precomp'] ?? 0), 2, ',', '.') ?></td>
+            <?php foreach ($row as $v): ?>
+                <td class="small"><?= htmlspecialchars($v) === '' ? '—' : htmlspecialchars($v) ?></td>
+            <?php endforeach; ?>
         </tr>
         <?php endforeach; ?>
         <?php endif; ?>
@@ -137,7 +125,7 @@ $hasta = (string)($hasta ?? '');
 
 <div style="margin-top: 10px; font-size: 8px; color: #666; text-align: center;">
     Página generada el <?= date('d/m/Y H:i') ?><br>
-    Total de registros: <?= count($list) ?>
+    Total de registros: <?= count($expRows) ?>
 </div>
 </body>
 </html>

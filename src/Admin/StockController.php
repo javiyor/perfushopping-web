@@ -61,9 +61,74 @@ final class StockController
             'subrubros' => $subrubros,
             'proveedores' => $proveedores,
             'depositos' => $depositos,
+            'colsMap' => self::STOCK_COLS,
+            'colsSel' => $this->stockColsSel(),
             'csrf' => Csrf::token(),
             'pageTitle' => 'Stock',
         ]);
+    }
+
+    private const STOCK_COLS = [
+        'produ' => 'Producto',
+        'nomgusto' => 'Variedad',
+        'nomdepo' => 'Sucursal',
+        'codigo' => 'Código',
+        'codscan' => 'Cód. barra',
+        'codprodup' => 'Cód. proveedor',
+        'nomprovee' => 'Proveedor',
+        'nomsub' => 'Marca',
+        'nomrub' => 'Categoría',
+        'precio' => 'Precio',
+        'precomp' => 'Costo',
+        'stock_deposito' => 'Stock',
+        'total_vendido' => 'Ventas',
+    ];
+
+    private const STOCK_COLS_DEFAULT = ['produ', 'nomgusto', 'codigo', 'stock_deposito'];
+
+    /** Columnas pedidas por GET (cols[]) validadas; por defecto producto, variedad, código y stock. */
+    private function stockColsSel(): array
+    {
+        $cols = $_GET['cols'] ?? null;
+        if (!is_array($cols)) {
+            $cols = ($cols === null || $cols === '') ? [] : [(string)$cols];
+        }
+        $cols = array_values(array_intersect(array_map('strval', $cols), array_keys(self::STOCK_COLS)));
+        return $cols !== [] ? $cols : self::STOCK_COLS_DEFAULT;
+    }
+
+    private function stockColValor(array $p, string $key): string
+    {
+        switch ($key) {
+            case 'codigo':
+                return (string)(($p['codscan'] ?? '') !== '' ? $p['codscan'] : ($p['codprodu'] ?? ''));
+            case 'precio':
+            case 'precomp':
+                return number_format((float)($p[$key] ?? 0), 2, ',', '.');
+            case 'stock_deposito':
+            case 'total_vendido':
+                return (string)(int)($p[$key] ?? 0);
+            default:
+                return (string)($p[$key] ?? '');
+        }
+    }
+
+    /** [headers, rows] listos para Excel e impresión según las columnas elegidas. */
+    private function stockExportData(array $list, array $cols): array
+    {
+        $headers = [];
+        foreach ($cols as $c) {
+            $headers[] = self::STOCK_COLS[$c];
+        }
+        $rows = [];
+        foreach ($list as $p) {
+            $row = [];
+            foreach ($cols as $c) {
+                $row[] = $this->stockColValor($p, $c);
+            }
+            $rows[] = $row;
+        }
+        return [$headers, $rows];
     }
 
     /** Trae TODAS las filas del listado con los filtros actuales (paginando de a 200). */
@@ -102,10 +167,13 @@ final class StockController
         if ($hasta === '') $hasta = date('Y-m-d');
 
         $list = $this->stockFiltradoCompleto($repo, $q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $iddepo ?: null, $desde, $hasta, $enweb === '' ? null : $enweb);
+        [$expHeaders, $expRows] = $this->stockExportData($list, $this->stockColsSel());
 
         echo View::adminPage('admin/stock/list_print.php', [
             'adminUser' => $adminUser,
             'list' => $list,
+            'expHeaders' => $expHeaders,
+            'expRows' => $expRows,
             'q' => $q,
             'codepar' => $codepar,
             'stockFilter' => $stockFilter,
@@ -140,6 +208,7 @@ final class StockController
         if ($desde === '') $desde = date('Y-m-01');
         if ($hasta === '') $hasta = date('Y-m-d');
         $list = $this->stockFiltradoCompleto($repo, $q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $iddepo ?: null, $desde, $hasta, $enweb === '' ? null : $enweb);
+        [$expHeaders, $expRows] = $this->stockExportData($list, $this->stockColsSel());
 
         // Archivo Excel real (SpreadsheetML) con todo lo listado
         header('Content-Type: application/vnd.ms-excel; charset=utf-8');
@@ -156,26 +225,16 @@ final class StockController
         echo '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">' . "\n";
         echo '<Worksheet ss:Name="Stock"><Table>' . "\n";
         echo '<Row>';
-        foreach (['Producto', 'Variedad', 'Sucursal', 'Código', 'Cód. barra', 'Cód. proveedor', 'Proveedor', 'Marca', 'Categoría', 'Precio', 'Costo', 'Stock', 'Ventas'] as $h) {
+        foreach ($expHeaders as $h) {
             echo $cell($h);
         }
         echo '</Row>' . "\n";
 
-        foreach ($list as $p) {
+        foreach ($expRows as $row) {
             echo '<Row>';
-            echo $cell((string)($p['produ'] ?? ''));
-            echo $cell((string)($p['nomgusto'] ?? ''));
-            echo $cell((string)($p['nomdepo'] ?? ''));
-            echo $cell((string)($p['codprodu'] ?? ''));
-            echo $cell((string)($p['codscan'] ?? ''));
-            echo $cell((string)($p['codprodup'] ?? ''));
-            echo $cell((string)($p['nomprovee'] ?? ''));
-            echo $cell((string)($p['nomsub'] ?? ''));
-            echo $cell((string)($p['nomrub'] ?? ''));
-            echo $cell(number_format((float)($p['precio'] ?? 0), 2, ',', '.'));
-            echo $cell(number_format((float)($p['precomp'] ?? 0), 2, ',', '.'));
-            echo $cell((string)(int)($p['stock_deposito'] ?? 0));
-            echo $cell((string)(int)($p['total_vendido'] ?? 0));
+            foreach ($row as $v) {
+                echo $cell($v);
+            }
             echo '</Row>' . "\n";
         }
 
