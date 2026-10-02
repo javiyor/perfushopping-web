@@ -55,4 +55,11 @@ final class BancoMovimientoRepo
         $st->execute($params);
         return $st->fetchAll();
     }
+
+    /** Elimina los movimientos de banco generados por un gasto. */
+    public function eliminarMovimientosGasto(int $gastoId): void
+    {
+        Db::pdo()->prepare("DELETE FROM banco_movimientos WHERE origen = 'gasto' AND origen_id = :id")
+            ->execute([':id' => $gastoId]);
+    }
 }

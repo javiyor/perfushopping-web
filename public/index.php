@@ -555,6 +555,8 @@ $router->post('/admin/mensajes/nota', [AdminSocialInboxController::class, 'note'
  // Admin - Gastos varios
 $router->get('/admin/gastos', [AdminGastoController::class, 'index']);
 $router->post('/admin/gastos/guardar', [AdminGastoController::class, 'store']);
+$router->post('/admin/gastos/actualizar', [AdminGastoController::class, 'update']);
+$router->post('/admin/gastos/eliminar', [AdminGastoController::class, 'eliminar']);
 $router->get('/admin/caja/depositar', [AdminGastoController::class, 'depositarForm']);
 $router->post('/admin/caja/depositar', [AdminGastoController::class, 'depositarStore']);
 $router->get('/admin/bancos', [AdminBancoController::class, 'index']);

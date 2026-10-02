@@ -112,6 +112,36 @@ final class ChequeRepo
         $st->execute([':e' => $estado, ':i' => $id]);
     }
 
+    /** Elimina un cheque y sus movimientos (solo para gastos propios emitidos). */
+    public function delete(int $id): void
+    {
+        Db::pdo()->prepare('DELETE FROM cheque_movimientos WHERE cheque_id = :i')->execute([':i' => $id]);
+        Db::pdo()->prepare('DELETE FROM cheques WHERE id = :i LIMIT 1')->execute([':i' => $id]);
+    }
+
+    /** Actualiza los datos de un cheque propio emitido por un gasto. */
+    public function updateDatos(int $id, array $data): void
+    {
+        $st = Db::pdo()->prepare('
+            UPDATE cheques
+            SET banco_emisor = :banco, numero_cheque = :numero, titular = :titular,
+                monto_cents = :monto, fecha_emision = :fecha_emi, fecha_vencimiento = :fecha_ven,
+                banco_cuenta_id = :banco_cta, concepto = :concepto, updated_at = NOW()
+            WHERE id = :i LIMIT 1
+        ');
+        $st->execute([
+            ':banco' => $data['banco_emisor'] ?? null,
+            ':numero' => $data['numero_cheque'] ?? null,
+            ':titular' => $data['titular'] ?? null,
+            ':monto' => (int)($data['monto_cents'] ?? 0),
+            ':fecha_emi' => $data['fecha_emision'] ?? date('Y-m-d'),
+            ':fecha_ven' => $data['fecha_vencimiento'] ?? null,
+            ':banco_cta' => $data['banco_cuenta_id'] ?? null,
+            ':concepto' => $data['concepto'] ?? null,
+            ':i' => $id,
+        ]);
+    }
+
     public function agregarMovimiento(int $chequeId, string $tipo, ?string $origen = null, ?int $origenId = null, string $observaciones = '', int $createdBy = 0): int
     {
         $st = Db::pdo()->prepare('

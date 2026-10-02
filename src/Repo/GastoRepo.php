@@ -85,7 +85,7 @@ final class GastoRepo
         $joinCuenta = $hasIdcta1 ? ' LEFT JOIN contable1 c1 ON c1.idcta1 = g.idcta1 LEFT JOIN contable c ON c.idcta = c1.idcta' : '';
         $selectBanco = $hasBanco ? 'bc.banco AS banco_nombre,' : 'NULL AS banco_nombre,';
         $joinBanco = $hasBanco ? ' LEFT JOIN banco_cuentas bc ON bc.id = g.banco_cuenta_id' : '';
-        $selectCheque = $hasCheque ? 'ch.numero_cheque, ch.banco_emisor,' : 'NULL AS numero_cheque, NULL AS banco_emisor,';
+        $selectCheque = $hasCheque ? 'ch.numero_cheque, ch.banco_emisor, ch.fecha_vencimiento AS cheque_venc, ch.titular AS cheque_titular,' : 'NULL AS numero_cheque, NULL AS banco_emisor, NULL AS cheque_venc, NULL AS cheque_titular,';
         $joinCheque = $hasCheque ? ' LEFT JOIN cheques ch ON ch.id = g.cheque_id' : '';
         $selectCreated = $hasCreatedBy ? 'au.nombre AS created_by_nombre' : 'NULL AS created_by_nombre';
         $joinCreated = $hasCreatedBy ? ' LEFT JOIN admin_users au ON au.id = g.created_by' : '';
@@ -135,8 +135,8 @@ final class GastoRepo
         $joinCuenta = $hasIdcta1 ? ' LEFT JOIN contable1 c1 ON c1.idcta1=g.idcta1 LEFT JOIN contable c ON c.idcta=c1.idcta' : '';
         $selectBanco = $hasBanco ? 'bc.banco AS banco_nombre,' : 'NULL AS banco_nombre,';
         $joinBanco = $hasBanco ? ' LEFT JOIN banco_cuentas bc ON bc.id=g.banco_cuenta_id' : '';
-        $selectCheque = $hasCheque ? 'ch.numero_cheque, ch.banco_emisor,' : 'NULL AS numero_cheque, NULL AS banco_emisor,';
-        $joinCheque = $hasCheque ? ' LEFT JOIN cheques ch ON ch.id=g.cheque_id' : '';
+        $selectCheque = $hasCheque ? 'ch.numero_cheque, ch.banco_emisor, ch.fecha_vencimiento AS cheque_venc, ch.titular AS cheque_titular,' : 'NULL AS numero_cheque, NULL AS banco_emisor, NULL AS cheque_venc, NULL AS cheque_titular,';
+        $joinCheque = $hasCheque ? ' LEFT JOIN cheques ch ON ch.id = g.cheque_id' : '';
         $selectCreated = $hasCreatedBy ? 'au.nombre AS created_by_nombre' : 'NULL AS created_by_nombre';
         $joinCreated = $hasCreatedBy ? ' LEFT JOIN admin_users au ON au.id=g.created_by' : '';
         $sql = "SELECT g.*, g.`$pk` AS id, $selectCuenta $selectBanco $selectCheque $selectCreated FROM gastos g$joinCuenta$joinBanco$joinCheque$joinCreated WHERE g.`$pk`=:id LIMIT 1";
@@ -211,6 +211,47 @@ final class GastoRepo
     {
         $st = Db::pdo()->query('SELECT c.idcta, c.nomcta, c1.idcta1, c1.nomcta1 FROM contable1 c1 INNER JOIN contable c ON c.idcta=c1.idcta ORDER BY c.nomcta ASC, c1.nomcta1 ASC');
         return $st->fetchAll();
+    }
+
+    public function update(int $id, array $data): void
+    {
+        $pk = $this->pkColumn();
+        $set = [];
+        $params = [':id' => $id];
+        $map = [
+            'fecha' => 'fecha',
+            'idcta1' => 'idcta1',
+            'desc' => $this->descColumn(),
+            'importe' => $this->importeColumn(),
+            'forma_pago' => 'forma_pago',
+            'caja_destino' => 'caja_destino',
+            'banco_cuenta_id' => 'banco_cuenta_id',
+            'cheque_id' => 'cheque_id',
+        ];
+        $values = [
+            'fecha' => $data['fecha'],
+            'idcta1' => $data['idcta1'] ?? null,
+            'desc' => trim((string)($data['descripcion'] ?? '')),
+            'importe' => (int)($data['importe_cents'] ?? 0),
+            'forma_pago' => $data['forma_pago'],
+            'caja_destino' => $data['caja_destino'] ?? 'general',
+            'banco_cuenta_id' => ($data['banco_cuenta_id'] ?? 0) ?: null,
+            'cheque_id' => ($data['cheque_id'] ?? 0) ?: null,
+        ];
+        foreach ($map as $key => $col) {
+            if (!$this->hasGastosColumn($col)) continue;
+            $set[] = "`$col` = :$key";
+            $params[":$key"] = $values[$key];
+        }
+        if ($this->hasGastosColumn('updated_at')) $set[] = 'updated_at = NOW()';
+        elseif ($this->hasGastosColumn('updated')) $set[] = 'updated = NOW()';
+        if (!$set) return;
+        Db::pdo()->prepare("UPDATE gastos SET " . implode(', ', $set) . " WHERE `$pk` = :id LIMIT 1")->execute($params);
+    }
+
+    public function delete(int $id): void
+    {
+        Db::pdo()->prepare("DELETE FROM gastos WHERE `{$this->pkColumn()}` = :id LIMIT 1")->execute([':id' => $id]);
     }
 
     /** Gastos con caja_destino = general agrupados por forma de pago. */

@@ -426,6 +426,68 @@ final class CajaRepo
         }
     }
 
+    /** Elimina los movimientos de caja general generados por un gasto. */
+    public function eliminarMovimientosGasto(int $gastoId): void
+    {
+        try {
+            Db::pdo()->prepare("DELETE FROM caja_general_movimientos WHERE origen = 'gasto' AND origen_id = :id")
+                ->execute([':id' => $gastoId]);
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::eliminarMovimientosGasto error: ' . $e->getMessage());
+        }
+    }
+
+    /** Egreso de caja chica generado por un gasto (por concepto e importe). */
+    public function buscarMovimientoGastoChica(string $concepto, int $montoCents): ?array
+    {
+        try {
+            $st = Db::pdo()->prepare("
+                SELECT * FROM caja_movimientos
+                WHERE tipo = 'egreso' AND concepto = :c AND monto_cents = :m
+                ORDER BY created_at DESC
+                LIMIT 1
+            ");
+            $st->execute([':c' => $concepto, ':m' => $montoCents]);
+            $row = $st->fetch();
+            return $row ?: null;
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::buscarMovimientoGastoChica error: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /** Actualiza concepto/importe del egreso de caja chica de un gasto. */
+    public function actualizarMovimientoGastoChica(string $concepto, int $montoCents, string $conceptoNuevo, int $montoNuevo): bool
+    {
+        try {
+            $st = Db::pdo()->prepare("
+                UPDATE caja_movimientos
+                SET concepto = :cn, monto_cents = :mn
+                WHERE tipo = 'egreso' AND concepto = :c AND monto_cents = :m
+                LIMIT 1
+            ");
+            $st->execute([':cn' => $conceptoNuevo, ':mn' => $montoNuevo, ':c' => $concepto, ':m' => $montoCents]);
+            return $st->rowCount() > 0;
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::actualizarMovimientoGastoChica error: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /** Elimina el egreso de caja chica generado por un gasto. */
+    public function eliminarMovimientoGastoChica(string $concepto, int $montoCents): void
+    {
+        try {
+            Db::pdo()->prepare("
+                DELETE FROM caja_movimientos
+                WHERE tipo = 'egreso' AND concepto = :c AND monto_cents = :m
+                LIMIT 1
+            ")->execute([':c' => $concepto, ':m' => $montoCents]);
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::eliminarMovimientoGastoChica error: ' . $e->getMessage());
+        }
+    }
+
     public function movimientosGenerales(?string $tipo = null, ?string $desde = null, ?string $hasta = null, string $q = ''): array
     {
         try {

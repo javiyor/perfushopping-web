@@ -112,41 +112,214 @@ final class GastoController
         ]);
 
         // Movimientos caja / banco
-        $cajaRepo = new CajaRepo();
-        $bancoRepo = new BancoMovimientoRepo();
-        $concepto = 'Gasto: '.$descripcion;
-
-        if ($formaPago === 'efectivo') {
-            if ($cajaDestino === 'chica') {
-                $sucursalId = $auth->getSucursalId();
-                $turno = $auth->getTurno();
-                $apertura = $cajaRepo->aperturaActiva($sucursalId, $turno, date('Y-m-d'));
-                if ($apertura) {
-                    $cajaRepo->agregarMovimiento((int)$apertura['id'], 'egreso', $concepto, $importeCents, (int)$adminUser['id']);
-                } else {
-                    // Si no hay caja chica abierta, va a general
-                    $cajaRepo->agregarMovimientoGeneral('egreso', 'gasto', $gastoId, $concepto, $importeCents, (int)$adminUser['id']);
-                }
-            } else {
-                $cajaRepo->agregarMovimientoGeneral('egreso', 'gasto', $gastoId, $concepto, $importeCents, (int)$adminUser['id']);
-            }
-        } elseif ($formaPago === 'transferencia') {
-            // Caja general egreso + banco debito
-            $cajaRepo->agregarMovimientoGeneral('egreso', 'gasto', $gastoId, $concepto.' (transferencia)', $importeCents, (int)$adminUser['id']);
-            if ($bancoCuentaId) {
-                $bancoRepo->create($bancoCuentaId, 'debito', 'gasto', $gastoId, $concepto, $importeCents, $fecha, (int)$adminUser['id']);
-            }
-        } elseif ($formaPago === 'cheque') {
-            // Caja general egreso + banco debito (cuando se debite, pero lo registramos como pendiente; el débito real será al cambiar estado a debitado, aquí solo dejamos trazabilidad en caja general)
-            $cajaRepo->agregarMovimientoGeneral('egreso', 'gasto', $gastoId, $concepto.' (cheque)', $importeCents, (int)$adminUser['id']);
-            if ($bancoCuentaId) {
-                // No debitamos aún hasta que el cheque se acredite; pero si querés, descomentar:
-                // $bancoRepo->create($bancoCuentaId, 'debito', 'gasto', $gastoId, $concepto.' (cheque)', $importeCents, $fecha, (int)$adminUser['id']);
-            }
-        }
+        $this->registrarMovimientosGasto([
+            'fecha' => $fecha,
+            'descripcion' => $descripcion,
+            'importe_cents' => $importeCents,
+            'forma_pago' => $formaPago,
+            'caja_destino' => $cajaDestino,
+            'banco_cuenta_id' => $bancoCuentaId,
+        ], $gastoId, $auth, (int)$adminUser['id']);
 
         $_SESSION['admin_flash'] = ['type'=>'ok','text'=>'Gasto registrado.'];
         Response::redirect('/admin/gastos');
+    }
+
+    public function update(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requirePermiso('compras');
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $id = (int)($_POST['id'] ?? 0);
+        $repo = new GastoRepo();
+        $actual = $id > 0 ? $repo->findById($id) : null;
+        if (!$actual) {
+            $_SESSION['admin_flash'] = ['type'=>'danger','text'=>'Gasto no encontrado.'];
+            Response::redirect('/admin/gastos');
+        }
+
+        $fecha = trim((string)($_POST['fecha'] ?? date('Y-m-d')));
+        $idcta1 = (int)($_POST['idcta1'] ?? 0);
+        $descripcion = trim((string)($_POST['descripcion'] ?? ''));
+        $importeCents = (int)($_POST['importe_cents'] ?? 0);
+        if ($importeCents <= 0) {
+            $importe = (float)str_replace(',', '.', (string)($_POST['importe'] ?? '0'));
+            $importeCents = (int)round($importe * 100);
+        }
+        $formaPago = trim((string)($_POST['forma_pago'] ?? 'efectivo'));
+        $cajaDestino = trim((string)($_POST['caja_destino'] ?? 'general'));
+        $bancoCuentaId = (int)($_POST['banco_cuenta_id'] ?? 0);
+
+        if ($descripcion === '' || $importeCents <= 0 || $idcta1 <= 0) {
+            $_SESSION['admin_flash'] = ['type'=>'danger','text'=>'Completá cuenta, descripción e importe.'];
+            Response::redirect('/admin/gastos');
+        }
+        if (!in_array($formaPago, ['efectivo','transferencia','cheque'], true)) $formaPago='efectivo';
+        if (!in_array($cajaDestino, ['chica','general'], true)) $cajaDestino='general';
+
+        $conceptoNuevo = 'Gasto: '.$descripcion;
+        $conceptoViejo = 'Gasto: '.trim((string)($actual['descripcion'] ?? ''));
+        $importeViejo = (int)($actual['importe_cents'] ?? 0);
+        $esChicaVieja = ($actual['forma_pago'] ?? '') === 'efectivo' && ($actual['caja_destino'] ?? 'general') === 'chica';
+        $esChicaNueva = $formaPago === 'efectivo' && $cajaDestino === 'chica';
+
+        // Cheque propio vinculado
+        $chequeRepo = new ChequeRepo();
+        $chequeId = (int)($actual['cheque_id'] ?? 0) ?: null;
+        if ($formaPago === 'cheque') {
+            $datosCheque = [
+                'banco_emisor' => trim((string)($_POST['banco_emisor'] ?? '')),
+                'numero_cheque' => trim((string)($_POST['numero_cheque'] ?? '')),
+                'titular' => trim((string)($_POST['titular'] ?? '')) ?: trim((string)($actual['titular'] ?? '')),
+                'monto_cents' => $importeCents,
+                'fecha_emision' => $fecha,
+                'fecha_vencimiento' => trim((string)($_POST['fecha_vencimiento'] ?? '')) ?: null,
+                'banco_cuenta_id' => $bancoCuentaId ?: null,
+                'concepto' => 'Gasto: '.$descripcion,
+            ];
+            $chequeActual = $chequeId > 0 ? $chequeRepo->findById($chequeId) : null;
+            if ($chequeActual && ($chequeActual['tipo'] ?? '') === 'propio' && ($chequeActual['estado'] ?? '') === 'emitido') {
+                $chequeRepo->updateDatos($chequeId, $datosCheque);
+            } else {
+                $chequeId = $chequeRepo->create($datosCheque + ['tipo'=>'propio','estado'=>'emitido'], (int)$adminUser['id']);
+                $chequeRepo->agregarMovimiento($chequeId, 'emitido', 'gasto', $id, 'Gasto varios (edición)', (int)$adminUser['id']);
+            }
+        } else {
+            if ($chequeId > 0) {
+                $chequeActual = $chequeRepo->findById($chequeId);
+                if ($chequeActual && ($chequeActual['tipo'] ?? '') === 'propio' && ($chequeActual['estado'] ?? '') === 'emitido') {
+                    $chequeRepo->delete($chequeId);
+                }
+            }
+            $chequeId = null;
+        }
+
+        // Movimientos: caja chica se actualiza/elimina; caja general y banco se recrean.
+        $cajaRepo = new CajaRepo();
+        $chicaExistente = $esChicaVieja
+            ? $cajaRepo->buscarMovimientoGastoChica($conceptoViejo, $importeViejo)
+            : null;
+        if ($chicaExistente) {
+            if ($esChicaNueva) {
+                $cajaRepo->actualizarMovimientoGastoChica($conceptoViejo, $importeViejo, $conceptoNuevo, $importeCents);
+            } else {
+                $cajaRepo->eliminarMovimientoGastoChica($conceptoViejo, $importeViejo);
+            }
+        }
+        $cajaRepo->eliminarMovimientosGasto($id);
+        (new BancoMovimientoRepo())->eliminarMovimientosGasto($id);
+        $this->registrarMovimientosGasto([
+            'fecha' => $fecha,
+            'descripcion' => $descripcion,
+            'importe_cents' => $importeCents,
+            'forma_pago' => $formaPago,
+            'caja_destino' => $cajaDestino,
+            'banco_cuenta_id' => $bancoCuentaId,
+        ], $id, $auth, (int)$adminUser['id'], $esChicaNueva && !$chicaExistente);
+
+        $repo->update($id, [
+            'fecha' => $fecha,
+            'idcta1' => $idcta1,
+            'descripcion' => $descripcion,
+            'importe_cents' => $importeCents,
+            'forma_pago' => $formaPago,
+            'caja_destino' => ($formaPago === 'efectivo' ? $cajaDestino : 'general'),
+            'banco_cuenta_id' => ($formaPago !== 'efectivo' ? ($bancoCuentaId ?: null) : null),
+            'cheque_id' => $chequeId,
+        ]);
+
+        $_SESSION['admin_flash'] = ['type'=>'ok','text'=>'Gasto actualizado.'];
+        Response::redirect('/admin/gastos');
+    }
+
+    public function eliminar(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requirePermiso('compras');
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $id = (int)($_POST['id'] ?? 0);
+        $repo = new GastoRepo();
+        $gasto = $id > 0 ? $repo->findById($id) : null;
+        if (!$gasto) {
+            $_SESSION['admin_flash'] = ['type'=>'danger','text'=>'Gasto no encontrado.'];
+            Response::redirect('/admin/gastos');
+        }
+
+        // Autorización: credenciales de un admin activo con permiso.
+        $autoriza = $auth->verificarCredenciales(
+            (string)($_POST['auth_user'] ?? ''),
+            (string)($_POST['auth_pass'] ?? '')
+        );
+        if (!$autoriza) {
+            $_SESSION['admin_flash'] = ['type'=>'danger','text'=>'Autorización rechazada: usuario o contraseña de admin incorrectos.'];
+            Response::redirect('/admin/gastos');
+        }
+        if (!AdminAuthService::adminPuedeAutorizar($autoriza)) {
+            $_SESSION['admin_flash'] = ['type'=>'danger','text'=>'Autorización rechazada: ese admin no tiene permiso para eliminar gastos.'];
+            Response::redirect('/admin/gastos');
+        }
+
+        $concepto = 'Gasto: '.trim((string)($gasto['descripcion'] ?? ''));
+        $importe = (int)($gasto['importe_cents'] ?? 0);
+
+        $cajaRepo = new CajaRepo();
+        if (($gasto['forma_pago'] ?? '') === 'efectivo' && ($gasto['caja_destino'] ?? 'general') === 'chica') {
+            $cajaRepo->eliminarMovimientoGastoChica($concepto, $importe);
+        }
+        $cajaRepo->eliminarMovimientosGasto($id);
+        (new BancoMovimientoRepo())->eliminarMovimientosGasto($id);
+
+        $chequeId = (int)($gasto['cheque_id'] ?? 0);
+        if ($chequeId > 0) {
+            $chequeRepo = new ChequeRepo();
+            $cheque = $chequeRepo->findById($chequeId);
+            if ($cheque && ($cheque['tipo'] ?? '') === 'propio' && ($cheque['estado'] ?? '') === 'emitido') {
+                $chequeRepo->delete($chequeId);
+            }
+        }
+
+        $repo->delete($id);
+
+        $autorizaNombre = (string)($autoriza['nombre'] ?? $autoriza['username'] ?? 'admin');
+        $_SESSION['admin_flash'] = ['type'=>'ok','text'=>'Gasto eliminado. Autorizado por: '.$autorizaNombre.'.'];
+        Response::redirect('/admin/gastos');
+    }
+
+    /** Registra los movimientos de caja general / banco de un gasto (mismos criterios que al crear). */
+    private function registrarMovimientosGasto(array $g, int $gastoId, AdminAuthService $auth, int $userId, bool $incluirChica = true): void
+    {
+        $cajaRepo = new CajaRepo();
+        $bancoRepo = new BancoMovimientoRepo();
+        $formaPago = (string)$g['forma_pago'];
+        $importeCents = (int)$g['importe_cents'];
+        $cajaDestino = (string)$g['caja_destino'];
+        $bancoCuentaId = (int)($g['banco_cuenta_id'] ?? 0);
+        $fecha = (string)$g['fecha'];
+        $concepto = 'Gasto: '.(string)$g['descripcion'];
+
+        if ($formaPago === 'efectivo') {
+            if ($cajaDestino === 'chica') {
+                if (!$incluirChica) {
+                    // El movimiento de caja chica ya fue actualizado en update().
+                    return;
+                }
+                $apertura = $cajaRepo->aperturaActiva($auth->getSucursalId(), $auth->getTurno(), date('Y-m-d'));
+                if ($apertura) {
+                    $cajaRepo->agregarMovimiento((int)$apertura['id'], 'egreso', $concepto, $importeCents, $userId);
+                    return;
+                }
+            }
+            $cajaRepo->agregarMovimientoGeneral('egreso', 'gasto', $gastoId, $concepto, $importeCents, $userId);
+        } elseif ($formaPago === 'transferencia') {
+            $cajaRepo->agregarMovimientoGeneral('egreso', 'gasto', $gastoId, $concepto.' (transferencia)', $importeCents, $userId);
+            if ($bancoCuentaId) {
+                $bancoRepo->create($bancoCuentaId, 'debito', 'gasto', $gastoId, $concepto, $importeCents, $fecha, $userId);
+            }
+        } elseif ($formaPago === 'cheque') {
+            $cajaRepo->agregarMovimientoGeneral('egreso', 'gasto', $gastoId, $concepto.' (cheque)', $importeCents, $userId);
+        }
     }
 
     public function depositarForm(array $params): void

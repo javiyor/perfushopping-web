@@ -128,6 +128,47 @@ final class AdminAuthService
         session_destroy();
     }
 
+    /** Verifica credenciales de un admin activo (para autorizar acciones). */
+    public function verificarCredenciales(string $username, string $password): ?array
+    {
+        $username = trim($username);
+        if ($username === '' || $password === '') {
+            return null;
+        }
+        $u = (new AdminUserRepo())->findByUsername($username);
+        if (!$u || empty($u['activo'])) {
+            return null;
+        }
+        if (!password_verify($password, (string)($u['password_hash'] ?? ''))) {
+            return null;
+        }
+        return $u;
+    }
+
+    /** Un admin puede autorizar si es superadmin o tiene permiso de compras/pagos. */
+    public static function adminPuedeAutorizar(array $u): bool
+    {
+        if ((string)($u['rol'] ?? '') === 'superadmin') {
+            return true;
+        }
+        $custom = (string)($u['permisos'] ?? '');
+        if ($custom !== '') {
+            $userPerms = json_decode($custom, true);
+            if (is_array($userPerms)) {
+                foreach (['compras', 'pagos'] as $p) {
+                    if (in_array('*', $userPerms, true) || in_array($p, $userPerms, true)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        }
+        $rolePerms = self::$permisosPorRol[(string)($u['rol'] ?? '')] ?? [];
+        return in_array('*', $rolePerms, true)
+            || in_array('compras', $rolePerms, true)
+            || in_array('pagos', $rolePerms, true);
+    }
+
     // ── Sesion (sucursal + turno) ──
 
     public function hasSesion(): bool
