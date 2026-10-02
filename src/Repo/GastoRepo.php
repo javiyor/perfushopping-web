@@ -212,4 +212,18 @@ final class GastoRepo
         $st = Db::pdo()->query('SELECT c.idcta, c.nomcta, c1.idcta1, c1.nomcta1 FROM contable1 c1 INNER JOIN contable c ON c.idcta=c1.idcta ORDER BY c.nomcta ASC, c1.nomcta1 ASC');
         return $st->fetchAll();
     }
+
+    public function crearSubcuenta(string $nomcta1, int $idcta): int
+    {
+        $st = Db::pdo()->prepare('INSERT INTO contable1 (nomcta1, idcta) VALUES (:n, :c)');
+        $st->execute([':n' => trim($nomcta1), ':c' => $idcta]);
+        return (int)Db::pdo()->lastInsertId();
+    }
+
+    public function crearCuenta(string $nomcta): int
+    {
+        $st = Db::pdo()->prepare('INSERT INTO contable (nomcta) VALUES (:n)');
+        $st->execute([':n' => trim($nomcta)]);
+        return (int)Db::pdo()->lastInsertId();
+    }
 }
