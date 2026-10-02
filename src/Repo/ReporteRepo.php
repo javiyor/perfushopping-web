@@ -7,6 +7,29 @@ use Perfushopping\Web\Infra\Db;
 
 final class ReporteRepo
 {
+    /** Puntos de venta con facturación (0 = todos). Para el filtro de reportes. */
+    public function puntosVentaDisponibles(): array
+    {
+        try {
+            $st = Db::pdo()->query("
+                SELECT f.punto_venta,
+                       COALESCE(s.nomsuc, spv_suc.nomsuc, CONCAT('PV ', f.punto_venta)) AS nombre,
+                       COUNT(*) AS comprobantes
+                FROM facturas f
+                LEFT JOIN admin_sucursales s ON s.id = f.sucursal_id
+                LEFT JOIN admin_sucursal_puntos_venta spv ON spv.punto_venta = f.punto_venta
+                LEFT JOIN admin_sucursales spv_suc ON spv_suc.id = spv.sucursal_id
+                WHERE f.estado = 'emitida'
+                GROUP BY f.punto_venta
+                ORDER BY f.punto_venta ASC
+            ");
+            return $st->fetchAll();
+        } catch (\Throwable $e) {
+            error_log('ReporteRepo::puntosVentaDisponibles error: ' . $e->getMessage());
+            return [];
+        }
+    }
+
     public function resumenVentas(string $desde, string $hasta, int $puntoVenta = 0): array
     {
         $params = [':desde' => $desde, ':hasta' => $hasta];

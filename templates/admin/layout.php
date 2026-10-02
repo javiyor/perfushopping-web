@@ -219,7 +219,7 @@
             <?php if ($can('caja_movimientos')): ?><a href="/admin/caja/general" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Caja general: ingresos/egresos centralizados"><i class="bi bi-piggy-bank"></i>Caja General</a><?php endif; ?>
             <?php if ($can('caja_movimientos')): ?><a href="/admin/impresion/config" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Configuración de impresión de tickets"><i class="bi bi-printer"></i>Impresión</a><?php endif; ?>
             <?php if ($can('arca')): ?><a href="/admin/arca" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Factura electrónica ARCA / AFIP"><i class="bi bi-cloud-check"></i>ARCA</a><?php endif; ?>
-            <?php if (($adminRol ?? '') === 'superadmin'): ?><a href="/admin/reportes" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Reportes de ventas y estadísticas"><i class="bi bi-graph-up"></i>Reportes</a><?php endif; ?>
+            <?php if ($can('estadisticas')): ?><a href="/admin/reportes" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Reportes de ventas y estadísticas"><i class="bi bi-graph-up"></i>Reportes</a><?php endif; ?>
             <?php if (($adminRol ?? '') === 'superadmin'): ?><a href="/admin/ubicaciones" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Ubicación del personal en tiempo real"><i class="bi bi-geo-alt"></i>Ubicaciones</a><?php endif; ?>
 
             <?php if ($can('productos')): ?><div class="nav-section">Productos</div><?php endif; ?>

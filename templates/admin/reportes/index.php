@@ -3,6 +3,8 @@ use Perfushopping\Web\Support\Format;
 
 $desde = (string)($desde ?? date('Y-m-01'));
 $hasta = (string)($hasta ?? date('Y-m-d'));
+$puntoVenta = (int)($puntoVenta ?? 0);
+$puntosVenta = $puntosVenta ?? [];
 ?>
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
@@ -21,6 +23,15 @@ $hasta = (string)($hasta ?? date('Y-m-d'));
             <div class="col-lg-3">
                 <label class="form-label small">Hasta</label>
                 <input class="form-control form-control-sm" type="date" name="hasta" value="<?= htmlspecialchars($hasta) ?>" />
+            </div>
+            <div class="col-lg-3">
+                <label class="form-label small">Punto de venta</label>
+                <select class="form-control form-control-sm" name="punto_venta">
+                    <option value="0" <?= $puntoVenta === 0 ? 'selected' : '' ?>>Todos los puntos de venta</option>
+                    <?php foreach ($puntosVenta as $pv): ?>
+                        <option value="<?= (int)($pv['punto_venta'] ?? 0) ?>" <?= $puntoVenta === (int)($pv['punto_venta'] ?? 0) && $puntoVenta !== 0 ? 'selected' : '' ?>>PV <?= (int)($pv['punto_venta'] ?? 0) ?> — <?= htmlspecialchars((string)($pv['nombre'] ?? '')) ?> (<?= (int)($pv['comprobantes'] ?? 0) ?>)</option>
+                    <?php endforeach; ?>
+                </select>
             </div>
             <div class="col-lg-3 d-flex align-items-end">
                 <button class="btn btn-accent btn-sm w-100" type="submit"><i class="bi bi-search"></i> Consultar</button>

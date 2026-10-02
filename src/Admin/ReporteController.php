@@ -14,16 +14,18 @@ final class ReporteController
     public function index(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireRol('superadmin');
+        $adminUser = $auth->requirePermiso('estadisticas');
 
         $desde = (string)($_GET['desde'] ?? date('Y-m-01'));
         $hasta = (string)($_GET['hasta'] ?? date('Y-m-d'));
-        $puntoVenta = (int)($auth->getPuntoVenta());
+        $puntoVenta = (int)($_GET['punto_venta'] ?? 0);
 
         echo View::adminPage('admin/reportes/index.php', [
             'adminUser' => $adminUser,
             'desde' => $desde,
             'hasta' => $hasta,
+            'puntoVenta' => $puntoVenta,
+            'puntosVenta' => (new ReporteRepo())->puntosVentaDisponibles(),
             'csrf' => Csrf::token(),
             'pageTitle' => 'Reportes',
         ]);
@@ -42,11 +44,12 @@ final class ReporteController
     public function data(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requireRol('superadmin');
+        $adminUser = $auth->requirePermiso('estadisticas');
 
         $desde = (string)($_GET['desde'] ?? date('Y-m-01'));
         $hasta = (string)($_GET['hasta'] ?? date('Y-m-d'));
-        $puntoVenta = (int)($auth->getPuntoVenta());
+        // 0 = todos los puntos de venta
+        $puntoVenta = (int)($_GET['punto_venta'] ?? 0);
 
         $repo = new ReporteRepo();
 
