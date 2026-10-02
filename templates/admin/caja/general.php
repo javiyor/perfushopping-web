@@ -115,6 +115,7 @@ $q = (string)($q ?? '');
                                 <?php endif; ?>
                             </td>
                             <td>
+                                <a class="btn btn-outline-primary btn-sm" title="Imprimir resumen de cierre" href="/admin/caja/cierre/imprimir?id=<?= (int)($c['id'] ?? 0) ?>" target="_blank"><i class="bi bi-printer"></i></a>
                                 <form method="post" action="/admin/caja/cierre/controlar" style="display:inline">
                                     <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
                                     <input type="hidden" name="id" value="<?= (int)($c['id'] ?? 0) ?>" />

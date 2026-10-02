@@ -597,7 +597,7 @@ $sucursalId = $auth->getSucursalId();
         }
         $msg .= ' | Documentos del turno imputados al cierre #' . $apId . '.';
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => $msg];
-        Response::redirect('/admin/caja');
+        Response::redirect('/admin/caja/cierre/imprimir?id=' . $apId);
     }
 
     public function solicitarAjusteForm(array $params): void
@@ -759,45 +759,41 @@ $sucursalId = $auth->getSucursalId();
         $adminUser = $auth->requirePermiso('caja_movimientos');
 
         $repo = new CajaRepo();
-        $sucursalId = $auth->getSucursalId();
-        $turno = $auth->getTurno();
-        $fecha = date('Y-m-d');
-        $apertura = $repo->aperturaActiva($sucursalId, $turno, $fecha);
-
-        $empresa = (new \Perfushopping\Web\Repo\EmpresaRepo())->getDefault();
-        $sucursalRepo = new \Perfushopping\Web\Repo\SucursalRepo();
-        $sucursal = null;
-        if (!empty($sucursalId)) {
-            $sucursal = $sucursalRepo->findById($sucursalId);
+        $id = (int)($_GET['id'] ?? 0);
+        if ($id > 0) {
+            $apertura = $repo->findById($id);
+        } else {
+            $apertura = $repo->aperturaActiva($auth->getSucursalId(), $auth->getTurno(), date('Y-m-d'));
+        }
+        if (!$apertura) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Caja no encontrada.'];
+            Response::redirect('/admin/caja');
         }
 
-        // Totales del turno
-        $apId = $apertura['id'] ?? 0;
-        $ventasEfectivo = $repo->totalVentasEfectivoTurno($apId, $fecha, $puntoVenta = $auth->getPuntoVenta(), $apCreada = (string)($apertura['created_at'] ?? date('Y-m-d') . ' 00:00:00'));
-        $totalesMov = $repo->totalMovimientos($apId);
-        $efectivoDisponible = (int)($apertura['monto_inicial_cents'] ?? 0) + $ventasEfectivo
-            + (int)($totalesMov['total_ingresos'] ?? 0) - (int)($totalesMov['total_egresos'] ?? 0);
+        $sucursalId = (int)($apertura['sucursal_id'] ?? $auth->getSucursalId());
+        $sucursalRepo = new \Perfushopping\Web\Repo\SucursalRepo();
+        $sucursal = $sucursalId > 0 ? $sucursalRepo->findById($sucursalId) : null;
+        $ptoVta = (int)($sucursal['punto_venta'] ?? 0) ?: $auth->getPuntoVenta();
 
-        $montoCierre = (int)($apertura['monto_cierre_cents'] ?? 0);
-        $montoRetirado = (int)($apertura['monto_retirado_cents'] ?? 0);
-        $proximaApertura = (int)($apertura['monto_proxima_apertura_cents'] ?? 0);
+        // Desglose de efectivo del turno
+        $ef = $repo->efectivoCierre($apertura, $ptoVta);
 
-        echo View::adminPage('admin/caja/cierre_print.php', [
-            'adminUser' => $adminUser,
-            'empresa' => $empresa,
+        echo View::render('admin/caja/cierre_print.php', [
+            'empresa' => (new \Perfushopping\Web\Repo\EmpresaRepo())->getDefault(),
             'sucursal' => $sucursal,
-            'fecha' => $fecha,
-            'turno' => $turno,
-            'apertura' => $apertura,
-            'ventasEfectivo' => $ventasEfectivo,
-            'totalIngresos' => $totalesMov['total_ingresos'] ?? 0,
-            'totalEgresos' => $totalesMov['total_egresos'] ?? 0,
-            'efectivoDisponible' => $efectivoDisponible,
-            'montoCierre' => $montoCierre,
-            'montoRetirado' => $montoRetirado,
-            'proximaApertura' => $proximaApertura,
-            'csrf' => Csrf::token(),
-            'pageTitle' => 'Resumen de cierre de caja',
+            'ptoVta' => $ptoVta,
+            'fecha' => (string)($apertura['fecha'] ?? date('Y-m-d')),
+            'turno' => (string)($apertura['turno'] ?? $auth->getTurno()),
+            'cajaId' => (int)($apertura['id'] ?? 0),
+            'estado' => (string)($apertura['estado'] ?? ''),
+            'montoInicial' => $ef['inicial'],
+            'ventasEfectivo' => $ef['ventas_efectivo'],
+            'totalIngresos' => $ef['ingresos'],
+            'totalEgresos' => $ef['egresos'],
+            'saldoCaja' => $ef['saldo'],
+            'montoCierre' => (int)($apertura['monto_cierre_cents'] ?? 0),
+            'montoRetirado' => (int)($apertura['monto_retirado_cents'] ?? 0),
+            'proximaApertura' => (int)($apertura['monto_proxima_apertura_cents'] ?? 0),
         ]);
     }
 

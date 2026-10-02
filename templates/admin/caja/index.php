@@ -104,6 +104,7 @@ if (!$cajasCerradas && $historial) {
                         <td class="text-end small"><?= Format::moneyFromCents((int)($h['monto_retirado_cents'] ?? 0)) ?></td>
                         <td><span class="badge bg-secondary"><?= htmlspecialchars($h['estado'] ?? '') ?></span></td>
                         <td>
+                            <a class="btn btn-sm btn-outline-primary py-0 px-1" title="Imprimir resumen de cierre" href="/admin/caja/cierre/imprimir?id=<?= (int)$h['id'] ?>" target="_blank"><i class="bi bi-printer"></i></a>
                             <a class="btn btn-sm btn-outline-secondary py-0 px-1" title="Solicitar corrección del cierre" href="/admin/caja/cierre/<?= (int)$h['id'] ?>/ajuste"><i class="bi bi-pencil-square"></i></a>
                         </td>
                     </tr>
@@ -295,6 +296,7 @@ $saldoEsperado = $montoInicial + $ventasEfectivo + (int)$totalesMov['total_ingre
                                 <td class="text-end small"><?= Format::moneyFromCents((int)($h['monto_retirado_cents'] ?? 0)) ?></td>
                                 <td><span class="badge bg-<?= ($h['estado'] ?? '') === 'cerrada' ? 'secondary' : 'success' ?>"><?= htmlspecialchars($h['estado'] ?? '') ?></span></td>
                                 <td>
+                                    <a class="btn btn-sm btn-outline-primary py-0 px-1" title="Imprimir resumen de cierre" href="/admin/caja/cierre/imprimir?id=<?= (int)$h['id'] ?>" target="_blank"><i class="bi bi-printer"></i></a>
                                     <?php if (($h['estado'] ?? '') === 'cerrada'): ?>
                                     <a class="btn btn-sm btn-outline-secondary py-0 px-1" title="Solicitar corrección del cierre" href="/admin/caja/cierre/<?= (int)$h['id'] ?>/ajuste"><i class="bi bi-pencil-square"></i></a>
                                     <?php endif; ?>

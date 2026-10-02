@@ -12,7 +12,10 @@ $esperadoEfectivo = (int)($esperadoEfectivo ?? 0);
         <h4 class="fw-bold mb-1">Cierre de caja</h4>
         <p class="text-muted small">Finalizar la caja del turno actual</p>
     </div>
-    <a class="btn btn-outline-secondary btn-sm" href="/admin/caja">Volver</a>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-primary btn-sm" href="/admin/caja/cierre/imprimir" target="_blank"><i class="bi bi-printer"></i> Imprimir resumen</a>
+        <a class="btn btn-outline-secondary btn-sm" href="/admin/caja">Volver</a>
+    </div>
 </div>
 
 <div class="row g-3">

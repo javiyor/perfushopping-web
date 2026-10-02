@@ -492,6 +492,7 @@ $router->get('/admin/caja/arqueo', [AdminCajaController::class, 'arqueoForm']);
 $router->post('/admin/caja/arqueo/guardar', [AdminCajaController::class, 'storeArqueo']);
 $router->get('/admin/caja/cierre', [AdminCajaController::class, 'cierreForm']);
 $router->post('/admin/caja/cierre/guardar', [AdminCajaController::class, 'cierreStore']);
+$router->get('/admin/caja/cierre/imprimir', [AdminCajaController::class, 'cierrePrint']);
 $router->get('/admin/caja/general', [AdminCajaController::class, 'general']);
 $router->post('/admin/caja/general/guardar', [AdminCajaController::class, 'storeGeneralMovimiento']);
 $router->post('/admin/caja/general/controlar', [AdminCajaController::class, 'controlarMovimiento']);
