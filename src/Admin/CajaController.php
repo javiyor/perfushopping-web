@@ -17,12 +17,26 @@ final class CajaController
         $adminUser = $auth->requirePermiso('caja_movimientos');
 
         $repo = new CajaRepo();
-        $sucursalId = $auth->getSucursalId();
+$sucursalId = $auth->getSucursalId();
         $turno = $auth->getTurno();
         $fecha = date('Y-m-d');
         $puntoVenta = $auth->getPuntoVenta();
 
         $apertura = $repo->aperturaActiva($sucursalId, $turno, $fecha);
+
+        // Listado de cajas cerradas (aunque la caja actual esté cerrada)
+        $stmtCerradas = Db::pdo()->prepare("
+            SELECT ca.*, a.nombre AS created_by_nombre
+            FROM caja_aperturas ca
+            LEFT JOIN admin_users a ON a.id = ca.created_by
+            WHERE ca.sucursal_id = :suc
+              AND ca.turno = :tur
+              AND ca.estado = 'cerrada'
+            ORDER BY ca.fecha DESC, ca.id DESC
+        ");
+        $stmtCerradas->execute([':suc' => $sucursalId, ':tur' => $turno]);
+        $cajasCerradas = $stmtCerradas->fetchAll();
+
         $movimientos = [];
         $totalesMov = ['total_ingresos' => 0, 'total_egresos' => 0];
         $ventasEfectivo = 0;
@@ -67,6 +81,7 @@ final class CajaController
             }
             foreach ($movimientos as $m) {
                 $monto = (int)($m['monto_cents'] ?? 0);
+
                 $detalleTurno[] = [
                     'hora' => (string)($m['created_at'] ?? ''),
                     'tipo' => (string)($m['tipo'] ?? 'ingreso'),
@@ -102,7 +117,6 @@ final class CajaController
         $ajustePendiente = $apertura ? $repo->ajustePendienteDeCaja((int)$apertura['id']) : null;
         $esAdmin = ($adminUser['rol'] ?? '') === 'superadmin';
         $ajustesPendientesCount = $esAdmin ? count($repo->ajustesPendientes()) : 0;
-
         echo View::adminPage('admin/caja/index.php', [
             'adminUser' => $adminUser,
             'apertura' => $apertura,

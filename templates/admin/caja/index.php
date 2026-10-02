@@ -42,6 +42,11 @@ $ajustesPendientesCount = (int)($ajustesPendientesCount ?? 0);
             <?php if (!$ajustePendiente): ?>
                 <a class="btn btn-outline-secondary btn-sm" href="/admin/caja/apertura/ajuste"><i class="bi bi-pencil-square"></i> Solicitar corrección</a>
             <?php endif; ?>
+            <?php if (count($cajasCerradas) > 0): ?>
+                <span class="small text-muted ms-1">
+                    <i class="bi bi-archive"></i> <?= count($cajasCerradas) ?> caja(s) cerrada(s)
+                </span>
+            <?php endif; ?>
         <?php endif; ?>
     </div>
 </div>
