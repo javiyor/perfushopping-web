@@ -300,12 +300,26 @@ $sucursalId = $auth->getSucursalId();
         $repo = new CajaRepo();
         $movimientos = $repo->movimientosGenerales($tipo ?: null, $desde ?: null, $hasta ?: null, $q);
         $totales = $repo->totalMovimientosGenerales($desde ?: null, $hasta ?: null);
+        $totalesControl = $repo->totalesGeneralesControl($desde ?: null, $hasta ?: null);
         $saldo = $repo->saldoGeneral();
+
+        // Efectivo generado desde las cajas (fecha, hora, pto. vta., caja) + control
+        $cierres = $repo->cierresEfectivo($desde ?: null, $hasta ?: null, 50);
+        foreach ($cierres as &$c) {
+            $c['efectivo'] = $repo->efectivoCierre($c, (int)($c['pto_vta'] ?? 0));
+        }
+        unset($c);
+
+        // Gastos pagados con caja general discriminados por forma de pago
+        $gastosPorForma = (new \Perfushopping\Web\Repo\GastoRepo())->totalesCajaGeneralPorForma($desde ?: null, $hasta ?: null);
 
         echo View::adminPage('admin/caja/general.php', [
             'adminUser' => $adminUser,
             'movimientos' => $movimientos,
             'totales' => $totales,
+            'totalesControl' => $totalesControl,
+            'cierres' => $cierres,
+            'gastosPorForma' => $gastosPorForma,
             'saldo' => $saldo,
             'tipo' => $tipo,
             'desde' => $desde,
@@ -356,6 +370,29 @@ $sucursalId = $auth->getSucursalId();
             $repo->descontrolarMovimientoGeneral($id);
         } else {
             $repo->controlarMovimientoGeneral($id, (int)$adminUser['id']);
+        }
+
+        Response::redirect('/admin/caja/general');
+    }
+
+    public function controlarCierre(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requirePermiso('caja_movimientos');
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $id = (int)($_POST['id'] ?? 0);
+        $accion = (string)($_POST['accion'] ?? 'controlar');
+
+        if ($id <= 0) {
+            Response::redirect('/admin/caja/general');
+        }
+
+        $repo = new CajaRepo();
+        if ($accion === 'descontrolar') {
+            $repo->descontrolarCierre($id);
+        } else {
+            $repo->controlarCierre($id, (int)$adminUser['id']);
         }
 
         Response::redirect('/admin/caja/general');

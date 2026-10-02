@@ -213,6 +213,39 @@ final class GastoRepo
         return $st->fetchAll();
     }
 
+    /** Gastos con caja_destino = general agrupados por forma de pago. */
+    public function totalesCajaGeneralPorForma(?string $desde = null, ?string $hasta = null): array
+    {
+        if (!$this->hasGastosColumn('caja_destino') || !$this->hasGastosColumn('forma_pago')) {
+            return [];
+        }
+        $imp = $this->importeColumn();
+        if (!$this->hasGastosColumn($imp)) {
+            return [];
+        }
+        $hasFecha = $this->hasGastosColumn('fecha');
+        $sql = "SELECT forma_pago, COUNT(*) AS cantidad, COALESCE(SUM(`$imp`), 0) AS total
+                FROM gastos WHERE caja_destino = 'general'";
+        $params = [];
+        if ($desde !== null && $desde !== '' && $hasFecha) {
+            $sql .= ' AND fecha >= :desde';
+            $params[':desde'] = $desde;
+        }
+        if ($hasta !== null && $hasta !== '' && $hasFecha) {
+            $sql .= ' AND fecha <= :hasta';
+            $params[':hasta'] = $hasta;
+        }
+        $sql .= ' GROUP BY forma_pago ORDER BY total DESC';
+        try {
+            $st = Db::pdo()->prepare($sql);
+            $st->execute($params);
+            return $st->fetchAll();
+        } catch (\Throwable $e) {
+            error_log('GastoRepo::totalesCajaGeneralPorForma error: ' . $e->getMessage());
+            return [];
+        }
+    }
+
     public function crearSubcuenta(string $nomcta1, int $idcta): int
     {
         $st = Db::pdo()->prepare('INSERT INTO contable1 (nomcta1, idcta) VALUES (:n, :c)');

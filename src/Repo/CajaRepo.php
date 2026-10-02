@@ -522,6 +522,145 @@ final class CajaRepo
         }
     }
 
+    private static ?bool $cierreCtrlReady = null;
+
+    private function ensureCierreControles(): void
+    {
+        if (self::$cierreCtrlReady !== null) {
+            return;
+        }
+        self::$cierreCtrlReady = true;
+        try {
+            Db::pdo()->exec('
+                CREATE TABLE IF NOT EXISTS caja_cierre_controles (
+                    caja_id INT UNSIGNED NOT NULL,
+                    controlado_por INT UNSIGNED DEFAULT NULL,
+                    controlado_at DATETIME DEFAULT NULL,
+                    PRIMARY KEY (caja_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ');
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::ensureCierreControles error: ' . $e->getMessage());
+        }
+    }
+
+    /** Aperturas/cierres con sucursal, punto de venta y estado de control. */
+    public function cierresEfectivo(?string $desde = null, ?string $hasta = null, int $limit = 50): array
+    {
+        $this->ensureCierreControles();
+        $limit = max(1, min(200, $limit));
+        $params = [];
+        $where = '1=1';
+        if ($desde !== null && $desde !== '') {
+            $where .= ' AND ca.fecha >= :desde';
+            $params[':desde'] = $desde;
+        }
+        if ($hasta !== null && $hasta !== '') {
+            $where .= ' AND ca.fecha <= :hasta';
+            $params[':hasta'] = $hasta;
+        }
+        try {
+            $st = Db::pdo()->prepare("
+                SELECT ca.*, s.nomsuc AS sucursal_nombre, s.punto_venta AS pto_vta,
+                       cc.controlado_por, cc.controlado_at, a.nombre AS controlado_por_nombre
+                FROM caja_aperturas ca
+                LEFT JOIN admin_sucursales s ON s.id = ca.sucursal_id
+                LEFT JOIN caja_cierre_controles cc ON cc.caja_id = ca.id
+                LEFT JOIN admin_users a ON a.id = cc.controlado_por
+                WHERE {$where}
+                ORDER BY ca.fecha DESC, ca.id DESC
+                LIMIT {$limit}
+            ");
+            $st->execute($params);
+            return $st->fetchAll();
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::cierresEfectivo error: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /** Desglose de efectivo de una apertura/cierre. */
+    public function efectivoCierre(array $ap, int $puntoVenta): array
+    {
+        $apId = (int)($ap['id'] ?? 0);
+        $fecha = (string)($ap['fecha'] ?? date('Y-m-d'));
+        $apCreada = (string)($ap['created_at'] ?? $fecha . ' 00:00:00');
+        $inicial = (int)($ap['monto_inicial_cents'] ?? 0);
+        $ventas = $apId > 0 ? $this->totalVentasEfectivoTurno($apId, $fecha, $puntoVenta, $apCreada) : 0;
+        $mov = $apId > 0 ? $this->totalMovimientos($apId) : ['total_ingresos' => 0, 'total_egresos' => 0];
+        $ingresos = (int)($mov['total_ingresos'] ?? 0);
+        $egresos = (int)($mov['total_egresos'] ?? 0);
+        return [
+            'inicial' => $inicial,
+            'ventas_efectivo' => $ventas,
+            'ingresos' => $ingresos,
+            'egresos' => $egresos,
+            'saldo' => $inicial + $ventas + $ingresos - $egresos,
+        ];
+    }
+
+    public function controlarCierre(int $id, int $adminUserId): void
+    {
+        $this->ensureCierreControles();
+        try {
+            Db::pdo()->prepare('
+                INSERT INTO caja_cierre_controles (caja_id, controlado_por, controlado_at)
+                VALUES (:id, :cp, NOW())
+                ON DUPLICATE KEY UPDATE controlado_por = :cp, controlado_at = NOW()
+            ')->execute([':id' => $id, ':cp' => $adminUserId]);
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::controlarCierre error: ' . $e->getMessage());
+        }
+    }
+
+    public function descontrolarCierre(int $id): void
+    {
+        $this->ensureCierreControles();
+        try {
+            Db::pdo()->prepare('DELETE FROM caja_cierre_controles WHERE caja_id = :id LIMIT 1')->execute([':id' => $id]);
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::descontrolarCierre error: ' . $e->getMessage());
+        }
+    }
+
+    /** Ingresos/egresos de caja general discriminados por controlado. */
+    public function totalesGeneralesControl(?string $desde = null, ?string $hasta = null): array
+    {
+        $out = [
+            'ing_controlado' => 0, 'ing_no_controlado' => 0,
+            'egr_controlado' => 0, 'egr_no_controlado' => 0,
+        ];
+        try {
+            $sql = "
+                SELECT
+                    COALESCE(SUM(CASE WHEN tipo = 'ingreso' AND controlado = 1 THEN monto_cents ELSE 0 END), 0) AS ing_controlado,
+                    COALESCE(SUM(CASE WHEN tipo = 'ingreso' AND (controlado = 0 OR controlado IS NULL) THEN monto_cents ELSE 0 END), 0) AS ing_no_controlado,
+                    COALESCE(SUM(CASE WHEN tipo = 'egreso' AND controlado = 1 THEN monto_cents ELSE 0 END), 0) AS egr_controlado,
+                    COALESCE(SUM(CASE WHEN tipo = 'egreso' AND (controlado = 0 OR controlado IS NULL) THEN monto_cents ELSE 0 END), 0) AS egr_no_controlado
+                FROM caja_general_movimientos
+                WHERE 1=1
+            ";
+            $params = [];
+            if ($desde !== null && $desde !== '') {
+                $sql .= ' AND DATE(created_at) >= :desde';
+                $params[':desde'] = $desde;
+            }
+            if ($hasta !== null && $hasta !== '') {
+                $sql .= ' AND DATE(created_at) <= :hasta';
+                $params[':hasta'] = $hasta;
+            }
+            $st = Db::pdo()->prepare($sql);
+            $st->execute($params);
+            $row = $st->fetch() ?: [];
+            foreach ($out as $k => $v) {
+                $out[$k] = (int)($row[$k] ?? 0);
+            }
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::totalesGeneralesControl error: ' . $e->getMessage());
+        }
+        return $out;
+    }
+
     public function saldoGeneral(): int
     {
         try {

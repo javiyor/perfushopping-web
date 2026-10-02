@@ -2,6 +2,9 @@
 use Perfushopping\Web\Support\Format;
 $movimientos = $movimientos ?? [];
 $totales = $totales ?? ['total_ingresos' => 0, 'total_egresos' => 0];
+$totalesControl = $totalesControl ?? ['ing_controlado' => 0, 'ing_no_controlado' => 0, 'egr_controlado' => 0, 'egr_no_controlado' => 0];
+$cierres = $cierres ?? [];
+$gastosPorForma = $gastosPorForma ?? [];
 $saldo = (int)($saldo ?? 0);
 $tipo = (string)($tipo ?? '');
 $desde = (string)($desde ?? '');
@@ -36,6 +39,131 @@ $q = (string)($q ?? '');
         </div>
     </div>
 </div>
+
+<div class="row g-3 mb-3">
+    <div class="col-6 col-md-3">
+        <div class="card-dashboard text-center p-3">
+            <div class="h5 fw-bold mb-0 text-success"><?= Format::moneyFromCents((int)$totalesControl['ing_controlado']) ?></div>
+            <div class="small text-muted">Ingresos controlados</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card-dashboard text-center p-3">
+            <div class="h5 fw-bold mb-0 text-warning"><?= Format::moneyFromCents((int)$totalesControl['ing_no_controlado']) ?></div>
+            <div class="small text-muted">Ingresos no controlados</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card-dashboard text-center p-3">
+            <div class="h5 fw-bold mb-0 text-success"><?= Format::moneyFromCents((int)$totalesControl['egr_controlado']) ?></div>
+            <div class="small text-muted">Egresos controlados</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card-dashboard text-center p-3">
+            <div class="h5 fw-bold mb-0 text-warning"><?= Format::moneyFromCents((int)$totalesControl['egr_no_controlado']) ?></div>
+            <div class="small text-muted">Egresos no controlados</div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-3">
+    <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+        <span>Efectivo generado desde caja</span>
+        <span class="badge bg-secondary"><?= count($cierres) ?> caja(s)</span>
+    </div>
+    <div class="table-responsive" style="max-height:420px;overflow-y:auto">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Hora</th>
+                    <th>PtoVta</th>
+                    <th>Caja</th>
+                    <th class="text-end">Inicial</th>
+                    <th class="text-end">Ventas ef.</th>
+                    <th class="text-end">Ingr.</th>
+                    <th class="text-end">Egr.</th>
+                    <th class="text-end">Saldo</th>
+                    <th>Control</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (!$cierres): ?>
+                    <tr><td colspan="11" class="text-muted text-center">Sin cajas en el período</td></tr>
+                <?php else: ?>
+                    <?php foreach ($cierres as $c): ?>
+                        <?php $ef = $c['efectivo'] ?? ['inicial' => 0, 'ventas_efectivo' => 0, 'ingresos' => 0, 'egresos' => 0, 'saldo' => 0]; ?>
+                        <?php $fh = strtotime($c['updated_at'] ?? $c['created_at'] ?? ''); ?>
+                        <tr>
+                            <td class="small"><?= $fh ? date('d/m/Y', $fh) : htmlspecialchars((string)($c['fecha'] ?? '')) ?></td>
+                            <td class="small"><?= $fh ? date('H:i', $fh) : '—' ?></td>
+                            <td class="small"><?= (int)($c['pto_vta'] ?? 0) ?: '—' ?></td>
+                            <td class="small">Caja #<?= (int)($c['id'] ?? 0) ?> · <?= htmlspecialchars((string)($c['sucursal_nombre'] ?? '')) ?> (<?= htmlspecialchars((string)($c['turno'] ?? '')) ?>) <span class="badge bg-<?= ($c['estado'] ?? '') === 'abierta' ? 'success' : 'secondary' ?>"><?= htmlspecialchars((string)($c['estado'] ?? '')) ?></span></td>
+                            <td class="text-end small"><?= Format::moneyFromCents((int)$ef['inicial']) ?></td>
+                            <td class="text-end small text-success"><?= Format::moneyFromCents((int)$ef['ventas_efectivo']) ?></td>
+                            <td class="text-end small text-success"><?= Format::moneyFromCents((int)$ef['ingresos']) ?></td>
+                            <td class="text-end small text-danger"><?= Format::moneyFromCents((int)$ef['egresos']) ?></td>
+                            <td class="text-end small fw-bold"><?= Format::moneyFromCents((int)$ef['saldo']) ?></td>
+                            <td>
+                                <?php if (!empty($c['controlado_por'])): ?>
+                                    <span class="badge bg-success"><i class="bi bi-check-lg"></i> OK</span>
+                                    <div class="small text-muted"><?= htmlspecialchars((string)($c['controlado_por_nombre'] ?? '')) ?></div>
+                                <?php else: ?>
+                                    <span class="badge bg-warning text-dark">Pendiente</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <form method="post" action="/admin/caja/cierre/controlar" style="display:inline">
+                                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                                    <input type="hidden" name="id" value="<?= (int)($c['id'] ?? 0) ?>" />
+                                    <?php if (!empty($c['controlado_por'])): ?>
+                                        <input type="hidden" name="accion" value="descontrolar" />
+                                        <button class="btn btn-outline-warning btn-sm" title="Descontrolar"><i class="bi bi-x-lg"></i></button>
+                                    <?php else: ?>
+                                        <input type="hidden" name="accion" value="controlar" />
+                                        <button class="btn btn-outline-success btn-sm" title="Imputar como correcto"><i class="bi bi-check-lg"></i></button>
+                                    <?php endif; ?>
+                                </form>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<?php if ($gastosPorForma): ?>
+<div class="card shadow-sm mb-3">
+    <div class="card-header bg-white fw-semibold">Gastos pagados con caja general por forma de pago</div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Forma de pago</th>
+                    <th class="text-center">Cantidad</th>
+                    <th class="text-end">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php $tg = 0; foreach ($gastosPorForma as $g): $tg += (int)($g['total'] ?? 0); ?>
+                    <tr>
+                        <td><span class="badge bg-light text-dark border"><?= htmlspecialchars((string)($g['forma_pago'] ?? '')) ?></span></td>
+                        <td class="text-center"><?= (int)($g['cantidad'] ?? 0) ?></td>
+                        <td class="text-end fw-bold"><?= Format::moneyFromCents((int)($g['total'] ?? 0)) ?></td>
+                    </tr>
+                <?php endforeach; ?>
+                <tr class="table-light">
+                    <td class="fw-bold" colspan="2">Total gastos caja general</td>
+                    <td class="text-end fw-bold"><?= Format::moneyFromCents($tg) ?></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+<?php endif; ?>
 
 <div class="row g-3">
     <div class="col-lg-4">
