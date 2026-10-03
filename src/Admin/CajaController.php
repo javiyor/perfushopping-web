@@ -290,7 +290,7 @@ $sucursalId = $auth->getSucursalId();
     public function general(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requirePermiso('caja_movimientos');
+        $adminUser = $auth->requireRol('superadmin');
 
         $tipo = trim((string)($_GET['tipo'] ?? ''));
         $desde = trim((string)($_GET['desde'] ?? ''));
@@ -303,10 +303,10 @@ $sucursalId = $auth->getSucursalId();
         $totalesControl = $repo->totalesGeneralesControl($desde ?: null, $hasta ?: null);
         $saldo = $repo->saldoGeneral();
 
-        // Efectivo generado desde las cajas (fecha, hora, pto. vta., caja) + control
-        $cierres = $repo->cierresEfectivo($desde ?: null, $hasta ?: null, 50);
+        // Resumen de cajas: cierres con ingresos por forma de pago + control
+        $cierres = $repo->cierresEfectivo($desde ?: null, $hasta ?: null, 200);
         foreach ($cierres as &$c) {
-            $c['efectivo'] = $repo->efectivoCierre($c, (int)($c['pto_vta'] ?? 0));
+            $c['resumen'] = $repo->resumenCierre($c, (int)($c['pto_vta'] ?? 0));
         }
         unset($c);
 
@@ -333,7 +333,7 @@ $sucursalId = $auth->getSucursalId();
     public function storeGeneralMovimiento(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requirePermiso('caja_movimientos');
+        $adminUser = $auth->requireRol('superadmin');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $tipo = (string)($_POST['tipo'] ?? '');
@@ -355,7 +355,7 @@ $sucursalId = $auth->getSucursalId();
     public function controlarMovimiento(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requirePermiso('caja_movimientos');
+        $adminUser = $auth->requireRol('superadmin');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $id = (int)($_POST['id'] ?? 0);
@@ -378,7 +378,7 @@ $sucursalId = $auth->getSucursalId();
     public function controlarCierre(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requirePermiso('caja_movimientos');
+        $adminUser = $auth->requireRol('superadmin');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $id = (int)($_POST['id'] ?? 0);

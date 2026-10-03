@@ -52,7 +52,7 @@ final class CustomerRepo
         if ($where) {
             $sql .= ' WHERE ' . implode(' AND ', $where);
         }
-        $sql .= ' ORDER BY o_sum.last_order_at DESC, u.created_at DESC LIMIT ' . $limit;
+        $sql .= ' ORDER BY COALESCE(NULLIF(TRIM(u.name), \'\'), u.email) ASC, u.id ASC LIMIT ' . $limit;
 
         $st = Db::pdo()->prepare($sql);
         $st->execute($params);
@@ -98,7 +98,7 @@ final class CustomerRepo
                 LEFT JOIN facturas f ON f.idclien = c.idclien AND f.estado = 'emitida'
                 WHERE {$where}
                 GROUP BY c.idclien
-                ORDER BY MAX(f.fecha) DESC, c.razon ASC
+                ORDER BY c.razon ASC, c.idclien ASC
                 LIMIT {$limit}
             ");
             $st->execute($params);

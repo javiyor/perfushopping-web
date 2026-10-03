@@ -1,6 +1,6 @@
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="fw-bold mb-0">Depositar efectivo en banco</h4>
-    <a class="btn btn-sm btn-outline-secondary" href="/admin/caja/general">Volver</a>
+    <a class="btn btn-sm btn-outline-secondary" href="/admin/caja">Volver</a>
 </div>
 <div class="card shadow-sm">
     <div class="card-body">

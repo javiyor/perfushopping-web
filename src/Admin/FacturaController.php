@@ -12,6 +12,7 @@ use Perfushopping\Web\Repo\StockRepo;
 use Perfushopping\Web\Repo\ArcaRepo;
 use Perfushopping\Web\Service\AdminAuthService;
 use Perfushopping\Web\Service\AfipPadronService;
+use Perfushopping\Web\Service\ArcaValidacionService;
 use Perfushopping\Web\Support\Csrf;
 use Perfushopping\Web\Support\Format;
 use Perfushopping\Web\Support\Response;
@@ -164,6 +165,7 @@ final class FacturaController
             'formasPago' => (new \Perfushopping\Web\Repo\FormaPagoRepo())->findActivas(),
             'transferCuentaId' => $transferCuentaId,
             'tarjetaBancoMap' => $tarjetaBancoMap,
+            'emisorIva' => ArcaValidacionService::condicionEmisor(),
             'csrf' => Csrf::token(),
         ];
     }
@@ -301,6 +303,17 @@ final class FacturaController
                 $puntosUsados = (int)floor(($subtotal + $ivaTotal - $descuento) / 100);
                 $puntosUsadosCents = $puntosUsados * 100;
             }
+        }
+
+        $errorArca = ArcaValidacionService::validarFactura([
+            'tipo_comprobante' => $tipo,
+            'cliente_nombre' => $clienteNombre,
+            'cliente_cuit' => $clienteCuit,
+            'cliente_condicion_iva' => $clienteCondIva,
+        ]);
+        if ($errorArca !== null) {
+            Response::json(['ok' => false, 'error' => $errorArca], 422);
+            return;
         }
 
         $id = $repo->create([
@@ -810,6 +823,17 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
         $totalFacturado = $subtotal + $ivaTotal - $descuento - $puntosUsadosCents;
         if ($totalPagado < $totalFacturado) {
             Response::json(['ok' => false, 'error' => 'El total abonado es menor al total facturado.'], 422);
+            return;
+        }
+
+        $errorArca = ArcaValidacionService::validarFactura([
+            'tipo_comprobante' => $tipo,
+            'cliente_nombre' => $clienteNombre,
+            'cliente_cuit' => $clienteCuit,
+            'cliente_condicion_iva' => $clienteCondIva,
+        ]);
+        if ($errorArca !== null) {
+            Response::json(['ok' => false, 'error' => $errorArca], 422);
             return;
         }
 

@@ -15,13 +15,13 @@ $tipos = $tipos ?? [];
         <table class="table table-admin table-hover mb-0">
             <thead>
                 <tr>
-                    <th>Nombre</th>
-                    <th>Código</th>
-                    <th>Comportamiento</th>
-                    <th>Moneda</th>
-                    <th>Orden</th>
-                    <th>Activa</th>
-                    <th style="width:130px"></th>
+                    <th class="text-nowrap">Nombre</th>
+                    <th class="text-nowrap">Código</th>
+                    <th class="text-nowrap">Comportamiento</th>
+                    <th class="text-nowrap">Moneda</th>
+                    <th class="text-nowrap text-center">Orden</th>
+                    <th class="text-nowrap">Activa</th>
+                    <th class="text-nowrap text-end" style="width:150px"></th>
                 </tr>
             </thead>
             <tbody>
@@ -30,30 +30,32 @@ $tipos = $tipos ?? [];
                 <?php else: ?>
                     <?php foreach ($list as $f): ?>
                     <tr>
-                        <td class="fw-semibold"><?= htmlspecialchars((string)($f['nombre'] ?? '')) ?></td>
-                        <td><code><?= htmlspecialchars((string)($f['codigo'] ?? '')) ?></code></td>
-                        <td class="small"><?= htmlspecialchars($tipos[$f['tipo'] ?? ''] ?? ($f['tipo'] ?? '')) ?></td>
-                        <td class="small"><?= htmlspecialchars((string)($f['moneda'] ?? '—')) ?></td>
-                        <td class="small"><?= (int)($f['orden'] ?? 0) ?></td>
-                        <td>
+                        <td class="fw-semibold text-nowrap align-middle"><?= htmlspecialchars((string)($f['nombre'] ?? '')) ?></td>
+                        <td class="text-nowrap align-middle"><code><?= htmlspecialchars((string)($f['codigo'] ?? '')) ?></code></td>
+                        <td class="small text-nowrap align-middle"><?= htmlspecialchars($tipos[$f['tipo'] ?? ''] ?? ($f['tipo'] ?? '')) ?></td>
+                        <td class="small text-nowrap align-middle"><?= htmlspecialchars((string)($f['moneda'] ?? '—')) ?></td>
+                        <td class="small text-nowrap text-center align-middle"><?= (int)($f['orden'] ?? 0) ?></td>
+                        <td class="text-nowrap align-middle">
                             <?php if (!empty($f['activo'])): ?>
                                 <span class="badge bg-success">Sí</span>
                             <?php else: ?>
                                 <span class="badge bg-secondary">No</span>
                             <?php endif; ?>
                         </td>
-                        <td>
-                            <button class="btn btn-sm btn-outline-secondary" onclick="abrirModal(<?= (int)$f['id'] ?>)" title="Editar"><i class="bi bi-pencil"></i></button>
-                            <form method="post" action="/admin/formas-pago/toggle" class="d-inline">
-                                <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
-                                <input type="hidden" name="id" value="<?= (int)$f['id'] ?>" />
-                                <button type="submit" class="btn btn-sm btn-outline-warning" title="<?= !empty($f['activo']) ? 'Desactivar' : 'Activar' ?>"><i class="bi bi-power"></i></button>
-                            </form>
-                            <form method="post" action="/admin/formas-pago/delete" class="d-inline" onsubmit="return confirm('¿Eliminar esta forma de pago?')">
-                                <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
-                                <input type="hidden" name="id" value="<?= (int)$f['id'] ?>" />
-                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar"><i class="bi bi-trash"></i></button>
-                            </form>
+                        <td class="text-nowrap align-middle">
+                            <div class="d-flex justify-content-end align-items-center gap-1">
+                                <button class="btn btn-sm btn-outline-secondary" onclick="abrirModal(<?= (int)$f['id'] ?>)" title="Editar"><i class="bi bi-pencil"></i></button>
+                                <form method="post" action="/admin/formas-pago/toggle" class="m-0">
+                                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                                    <input type="hidden" name="id" value="<?= (int)$f['id'] ?>" />
+                                    <button type="submit" class="btn btn-sm btn-outline-warning" title="<?= !empty($f['activo']) ? 'Desactivar' : 'Activar' ?>"><i class="bi bi-power"></i></button>
+                                </form>
+                                <form method="post" action="/admin/formas-pago/delete" class="m-0" onsubmit="return confirm('¿Eliminar esta forma de pago?')">
+                                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                                    <input type="hidden" name="id" value="<?= (int)$f['id'] ?>" />
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar"><i class="bi bi-trash"></i></button>
+                                </form>
+                            </div>
                         </td>
                     </tr>
                     <?php endforeach; ?>

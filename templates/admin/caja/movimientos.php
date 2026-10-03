@@ -24,7 +24,7 @@ $totalesMov = $totalesMov ?? ['total_ingresos' => 0, 'total_egresos' => 0];
                         <label class="form-label small fw-semibold">Registrar en</label>
                         <select class="form-select" name="caja_destino" required>
                             <option value="chica">Caja chica (turno actual)</option>
-                            <option value="general">Caja general</option>
+                            <?php if (($adminUser['rol'] ?? '') === 'superadmin'): ?><option value="general">Caja general</option><?php endif; ?>
                         </select>
                     </div>
 

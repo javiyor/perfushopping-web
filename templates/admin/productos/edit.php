@@ -191,12 +191,12 @@ foreach ($proveedores as $prov) {
                                 </div>
                             </div>
 
-                            <div class="mb-1">
-                                <label class="form-label small">Neto calculado</label>
-                                <div class="form-control form-control-sm bg-light text-muted" style="cursor:default" readonly>
-                                    Minorista $<?= number_format((float)($product['precio'] ?? 0), 2, ',', '.') ?> | Mayorista $<?= number_format((float)($product['precio1'] ?? 0), 2, ',', '.') ?>
+                                <div class="mb-1">
+                                    <label class="form-label small">Neto calculado</label>
+                                    <div class="form-control form-control-sm bg-light text-muted" id="netoCalculado" style="cursor:default" readonly>
+                                        Minorista $<?= number_format((float)($product['precio'] ?? 0), 2, ',', '.') ?> | Mayorista $<?= number_format((float)($product['precio1'] ?? 0), 2, ',', '.') ?>
+                                    </div>
                                 </div>
-                            </div>
 
                             <div class="form-check mb-1">
                                 <input class="form-check-input" type="checkbox" name="enweb" id="enweb" <?= ((int)($product['enweb'] ?? 0) === 1) ? 'checked' : '' ?> />
@@ -601,15 +601,24 @@ function autoCalcPrices() {
     var g1 = parseFloat((document.querySelector('[name="ganan1"]').value || '0').replace(',', '.')) || 0;
     var g2 = parseFloat((document.querySelector('[name="ganan2"]').value || '0').replace(',', '.')) || 0;
     var ivaPct = <?= json_encode($selectedIva) ?>;
+    var elPrecio = document.querySelector('[name="precio_gross"]');
+    var elPrecio1 = document.querySelector('[name="precio1_gross"]');
     if (costo > 0 && g1 > 0) {
-        var neto1 = costo * (1 + g1 / 100);
-        var gross1 = neto1 * (1 + ivaPct / 100);
-        document.querySelector('[name="precio_gross"]').value = gross1.toFixed(2);
+        elPrecio.value = (costo * (1 + g1 / 100) * (1 + ivaPct / 100)).toFixed(2);
     }
     if (costo > 0 && g2 > 0) {
-        var neto2 = costo * (1 + g2 / 100);
-        var gross2 = neto2 * (1 + ivaPct / 100);
-        document.querySelector('[name="precio1_gross"]').value = gross2.toFixed(2);
+        elPrecio1.value = (costo * (1 + g2 / 100) * (1 + ivaPct / 100)).toFixed(2);
+    }
+    var netoEl = document.getElementById('netoCalculado');
+    if (netoEl) {
+        var n1 = (parseFloat((elPrecio.value || '0').replace(',', '.')) || 0) / (1 + ivaPct / 100);
+        var n2 = (parseFloat((elPrecio1.value || '0').replace(',', '.')) || 0) / (1 + ivaPct / 100);
+        netoEl.textContent = 'Minorista $' + fmtNeto(n1) + ' | Mayorista $' + fmtNeto(n2);
     }
 }
+function fmtNeto(n) {
+    var parts = (Math.round(n * 100) / 100).toFixed(2).split('.');
+    return parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + (parts[1] || '00');
+}
+autoCalcPrices();
 </script>

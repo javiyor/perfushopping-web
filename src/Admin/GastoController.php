@@ -373,6 +373,6 @@ final class GastoController
         $bancoRepo->create($bancoCuentaId, 'credito', 'deposito', null, $concepto, $montoCents, date('Y-m-d'), (int)$adminUser['id']);
 
         $_SESSION['admin_flash'] = ['type'=>'ok','text'=>'Depósito registrado.'];
-        Response::redirect('/admin/caja/general');
+        Response::redirect('/admin/caja');
     }
 }

@@ -150,6 +150,12 @@ final class ArcaController
             Response::redirect('/admin/arca');
         }
 
+        $errorArca = \Perfushopping\Web\Service\ArcaValidacionService::validarFactura($factura);
+        if ($errorArca !== null) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => $errorArca];
+            Response::redirect('/admin/arca');
+        }
+
         $items = $facturaRepo->items($facturaId);
 
         $wsfe = new \Perfushopping\Web\Service\AfipWsfe();

@@ -340,6 +340,7 @@ $saldoEsperado = $montoInicial + $ventasEfectivo + (int)$totalesMov['total_ingre
 </div>
 <?php endif; ?>
 
+<?php if ($esAdmin): ?>
 <div class="row g-3 mt-1">
     <div class="col-12">
         <div class="card shadow-sm">
@@ -353,4 +354,5 @@ $saldoEsperado = $montoInicial + $ventasEfectivo + (int)$totalesMov['total_ingre
         </div>
     </div>
 </div>
+<?php endif; ?>
 <?php endif; ?>

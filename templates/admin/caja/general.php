@@ -69,43 +69,37 @@ $q = (string)($q ?? '');
 
 <div class="card shadow-sm mb-3">
     <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
-        <span>Efectivo generado desde caja</span>
-        <span class="badge bg-secondary"><?= count($cierres) ?> caja(s)</span>
+        <span>Resumen de cajas</span>
+        <span class="badge bg-secondary"><?= count($cierres) ?> cierre(s)</span>
     </div>
-    <div class="table-responsive" style="max-height:420px;overflow-y:auto">
-        <table class="table table-sm mb-0">
+    <div class="table-responsive" style="max-height:700px;overflow-y:auto">
+        <table class="table table-sm mb-0" style="font-size:.8rem">
             <thead>
                 <tr>
                     <th>Fecha</th>
-                    <th>Hora</th>
-                    <th>PtoVta</th>
                     <th>Caja</th>
-                    <th class="text-end">Inicial</th>
-                    <th class="text-end">Ventas ef.</th>
-                    <th class="text-end">Ingr.</th>
-                    <th class="text-end">Egr.</th>
-                    <th class="text-end">Saldo</th>
+                    <th class="text-end">Ingr. efectivo</th>
+                    <th class="text-end">Ingr. tarjeta</th>
+                    <th class="text-end">Ingr. transferencia</th>
+                    <th class="text-end">Total</th>
                     <th>Control</th>
                     <th></th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (!$cierres): ?>
-                    <tr><td colspan="11" class="text-muted text-center">Sin cajas en el período</td></tr>
+                    <tr><td colspan="8" class="text-muted text-center">Sin cierres de caja en el período</td></tr>
                 <?php else: ?>
                     <?php foreach ($cierres as $c): ?>
-                        <?php $ef = $c['efectivo'] ?? ['inicial' => 0, 'ventas_efectivo' => 0, 'ingresos' => 0, 'egresos' => 0, 'saldo' => 0]; ?>
+                        <?php $rs = $c['resumen'] ?? ['efectivo' => 0, 'tarjeta' => 0, 'transferencia' => 0, 'total' => 0]; ?>
                         <?php $fh = strtotime($c['updated_at'] ?? $c['created_at'] ?? ''); ?>
                         <tr>
-                            <td class="small"><?= $fh ? date('d/m/Y', $fh) : htmlspecialchars((string)($c['fecha'] ?? '')) ?></td>
-                            <td class="small"><?= $fh ? date('H:i', $fh) : '—' ?></td>
-                            <td class="small"><?= (int)($c['pto_vta'] ?? 0) ?: '—' ?></td>
-                            <td class="small">Caja #<?= (int)($c['id'] ?? 0) ?> · <?= htmlspecialchars((string)($c['sucursal_nombre'] ?? '')) ?> (<?= htmlspecialchars((string)($c['turno'] ?? '')) ?>) <span class="badge bg-<?= ($c['estado'] ?? '') === 'abierta' ? 'success' : 'secondary' ?>"><?= htmlspecialchars((string)($c['estado'] ?? '')) ?></span></td>
-                            <td class="text-end small"><?= Format::moneyFromCents((int)$ef['inicial']) ?></td>
-                            <td class="text-end small text-success"><?= Format::moneyFromCents((int)$ef['ventas_efectivo']) ?></td>
-                            <td class="text-end small text-success"><?= Format::moneyFromCents((int)$ef['ingresos']) ?></td>
-                            <td class="text-end small text-danger"><?= Format::moneyFromCents((int)$ef['egresos']) ?></td>
-                            <td class="text-end small fw-bold"><?= Format::moneyFromCents((int)$ef['saldo']) ?></td>
+                            <td><?= $fh ? date('d/m/Y H:i', $fh) : htmlspecialchars((string)($c['fecha'] ?? '')) ?></td>
+                            <td>Caja #<?= (int)($c['id'] ?? 0) ?> · <?= htmlspecialchars((string)($c['sucursal_nombre'] ?? '')) ?> (<?= htmlspecialchars((string)($c['turno'] ?? '')) ?>) · PV <?= (int)($c['pto_vta'] ?? 0) ?: '—' ?></td>
+                            <td class="text-end text-success"><?= Format::moneyFromCents((int)$rs['efectivo']) ?></td>
+                            <td class="text-end text-success"><?= Format::moneyFromCents((int)$rs['tarjeta']) ?></td>
+                            <td class="text-end text-success"><?= Format::moneyFromCents((int)$rs['transferencia']) ?></td>
+                            <td class="text-end fw-bold"><?= Format::moneyFromCents((int)$rs['total']) ?></td>
                             <td>
                                 <?php if (!empty($c['controlado_por'])): ?>
                                     <span class="badge bg-success"><i class="bi bi-check-lg"></i> OK</span>
@@ -114,17 +108,17 @@ $q = (string)($q ?? '');
                                     <span class="badge bg-warning text-dark">Pendiente</span>
                                 <?php endif; ?>
                             </td>
-                            <td>
-                                <a class="btn btn-outline-primary btn-sm" title="Imprimir resumen de cierre" href="/admin/caja/cierre/imprimir?id=<?= (int)($c['id'] ?? 0) ?>" target="_blank"><i class="bi bi-printer"></i></a>
+                            <td class="text-nowrap">
+                                <a class="btn btn-outline-primary btn-sm py-0 px-1" title="Imprimir resumen de cierre" href="/admin/caja/cierre/imprimir?id=<?= (int)($c['id'] ?? 0) ?>" target="_blank"><i class="bi bi-printer"></i></a>
                                 <form method="post" action="/admin/caja/cierre/controlar" style="display:inline">
                                     <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
                                     <input type="hidden" name="id" value="<?= (int)($c['id'] ?? 0) ?>" />
                                     <?php if (!empty($c['controlado_por'])): ?>
                                         <input type="hidden" name="accion" value="descontrolar" />
-                                        <button class="btn btn-outline-warning btn-sm" title="Descontrolar"><i class="bi bi-x-lg"></i></button>
+                                        <button class="btn btn-outline-warning btn-sm py-0 px-1" title="Descontrolar"><i class="bi bi-x-lg"></i></button>
                                     <?php else: ?>
                                         <input type="hidden" name="accion" value="controlar" />
-                                        <button class="btn btn-outline-success btn-sm" title="Imputar como correcto"><i class="bi bi-check-lg"></i></button>
+                                        <button class="btn btn-outline-success btn-sm py-0 px-1" title="Imputar como correcto"><i class="bi bi-check-lg"></i></button>
                                     <?php endif; ?>
                                 </form>
                             </td>

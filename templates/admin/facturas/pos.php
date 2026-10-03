@@ -213,6 +213,7 @@ $pedidoDescPct = $pedidoDescPct ?? 0;
     <span id="clienteCatBadge" class="badge bg-warning text-dark" style="display:none;font-size:10px">Precios mayoristas</span>
     <span id="clienteCuit" class="text-muted small"></span>
     <input type="hidden" id="clienteCondIva" value="consumidor_final" />
+    <input type="hidden" id="emisorIva" value="<?= htmlspecialchars($emisorIva ?? '') ?>" />
     <button class="btn btn-sm btn-outline-secondary" type="button" onclick="clearCliente()" title="Consumidor Final"><i class="bi bi-person-x"></i></button>
     <button class="btn btn-sm btn-outline-success" type="button" data-bs-toggle="modal" data-bs-target="#nuevoClienteModal" title="Cargar nuevo cliente"><i class="bi bi-person-plus"></i> Nuevo</button>
 </div>
@@ -859,7 +860,14 @@ function selectCliente(c) {
         'monotributista': 'FACT-C',
         'exento': 'FACT-C',
     };
-    document.getElementById('tipoComprobante').value = tipoMap[iva] || 'FACT-B';
+    let tipoAutomatico = tipoMap[iva] || 'FACT-B';
+    const emisorIva = document.getElementById('emisorIva').value;
+    if (emisorIva === 'responsable_inscripto') {
+        tipoAutomatico = iva === 'responsable_inscripto' ? 'FACT-A' : 'FACT-B';
+    } else if (emisorIva === 'monotributo' || emisorIva === 'exento') {
+        tipoAutomatico = 'FACT-C';
+    }
+    document.getElementById('tipoComprobante').value = tipoAutomatico;
     renderCart();
 
     loadPuntosSaldo(c.idclien || 0);

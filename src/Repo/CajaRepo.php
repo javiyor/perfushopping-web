@@ -496,7 +496,7 @@ final class CajaRepo
                 FROM caja_general_movimientos cg
                 LEFT JOIN admin_users a ON a.id = cg.created_by
                 LEFT JOIN admin_users c ON c.id = cg.controlado_por
-                WHERE 1=1
+                WHERE cg.origen IN (\'cierre_caja\', \'directo\')
             ';
             $params = [];
             if ($tipo !== null && $tipo !== '') {
@@ -612,7 +612,7 @@ final class CajaRepo
         $this->ensureCierreControles();
         $limit = max(1, min(200, $limit));
         $params = [];
-        $where = '1=1';
+        $where = "ca.estado = 'cerrada'";
         if ($desde !== null && $desde !== '') {
             $where .= ' AND ca.fecha >= :desde';
             $params[':desde'] = $desde;
@@ -658,6 +658,56 @@ final class CajaRepo
             'ingresos' => $ingresos,
             'egresos' => $egresos,
             'saldo' => $inicial + $ventas + $ingresos - $egresos,
+        ];
+    }
+
+    /** Ingresos de una apertura (turno) discriminados por forma de pago. */
+    public function ingresosPorFormaTurno(int $cajaId, string $fecha, int $puntoVenta, string $aperturaCreada): array
+    {
+        $out = ['efectivo' => 0, 'tarjeta' => 0, 'transferencia' => 0];
+        if ($cajaId <= 0) {
+            return $out;
+        }
+        $this->ensureCajaColumnas();
+        try {
+            $extra = $this->efectivoNoCajaWhere();
+            $tipo = $this->formaPagoTipoExpr('fp');
+            $st = Db::pdo()->prepare("
+                SELECT COALESCE(SUM(CASE WHEN {$tipo} = 'efectivo' {$extra} THEN fp.monto_cents ELSE 0 END), 0) AS efectivo,
+                       COALESCE(SUM(CASE WHEN {$tipo} = 'tarjeta' THEN fp.monto_cents ELSE 0 END), 0) AS tarjeta,
+                       COALESCE(SUM(CASE WHEN {$tipo} = 'banco' THEN fp.monto_cents ELSE 0 END), 0) AS transferencia
+                FROM factura_pagos fp
+                INNER JOIN facturas f ON f.id = fp.factura_id
+                WHERE f.estado = 'emitida'
+                  AND f.fecha = :fec
+                  AND f.punto_venta = :pv
+                  AND " . $this->turnoWhere('f') . "
+            ");
+            $st->execute([':fec' => $fecha, ':pv' => $puntoVenta, ':caja' => $cajaId, ':apCreada' => $aperturaCreada]);
+            $row = $st->fetch() ?: [];
+            foreach ($out as $k => $v) {
+                $out[$k] = (int)($row[$k] ?? 0);
+            }
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::ingresosPorFormaTurno error: ' . $e->getMessage());
+        }
+        return $out;
+    }
+
+    /** Resumen de ingresos de un cierre: efectivo (ventas + movimientos de caja), tarjeta y transferencia. */
+    public function resumenCierre(array $ap, int $puntoVenta): array
+    {
+        $apId = (int)($ap['id'] ?? 0);
+        $fecha = (string)($ap['fecha'] ?? date('Y-m-d'));
+        $apCreada = (string)($ap['created_at'] ?? $fecha . ' 00:00:00');
+        $porForma = $this->ingresosPorFormaTurno($apId, $fecha, $puntoVenta, $apCreada);
+        $mov = $apId > 0 ? $this->totalMovimientos($apId) : ['total_ingresos' => 0, 'total_egresos' => 0];
+        $efectivo = (int)$porForma['efectivo'] + (int)($mov['total_ingresos'] ?? 0);
+        return [
+            'efectivo' => $efectivo,
+            'tarjeta' => (int)$porForma['tarjeta'],
+            'transferencia' => (int)$porForma['transferencia'],
+            'total' => $efectivo + (int)$porForma['tarjeta'] + (int)$porForma['transferencia'],
         ];
     }
 

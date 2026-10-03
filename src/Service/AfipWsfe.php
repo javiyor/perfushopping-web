@@ -304,7 +304,7 @@ final class AfipWsfe
         return 99;
     }
 
-    private static function cuitValido(string $doc): bool
+    public static function cuitValido(string $doc): bool
     {
         if (strlen($doc) !== 11 || !ctype_digit($doc)) {
             return false;
