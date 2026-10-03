@@ -114,6 +114,7 @@ final class ReporteRepo
         $st = Db::pdo()->prepare("
             SELECT
                 COALESCE(NULLIF(d.nomdepar, ''), 'Sin dep.') AS departamento,
+                d.codactiv,
                 SUM(fi.qty) AS qty_total,
                 SUM(fi.total_cents) AS total_cents
             FROM factura_items fi
@@ -123,7 +124,7 @@ final class ReporteRepo
             WHERE f.estado = 'emitida'
               AND f.fecha BETWEEN :desde AND :hasta
               $pvWhere
-            GROUP BY d.codepar
+            GROUP BY d.codepar, d.codactiv
             ORDER BY total_cents DESC
         ");
         $st->execute($params);

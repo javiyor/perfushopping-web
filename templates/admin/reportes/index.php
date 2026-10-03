@@ -235,7 +235,7 @@ $puntosVenta = $puntosVenta ?? [];
                 <div class="card-header bg-white fw-semibold">Ventas por departamento</div>
                 <div class="table-responsive">
                     <table class="table table-admin mb-0">
-                        <thead><tr><th>Departamento</th><th class="text-end">Cant.</th><th class="text-end">Total</th><th style="width:40%"></th></tr></thead>
+                        <thead><tr><th>Departamento</th><th>Actividad</th><th class="text-end">Cant.</th><th class="text-end">Total</th><th style="width:35%"></th></tr></thead>
                         <tbody id="deptoBody"></tbody>
                     </table>
                 </div>
@@ -522,12 +522,12 @@ function cargarReportes() {
             deptoBody.innerHTML = '';
             const deptos = d.porDepartamento || [];
             if (!deptos.length) {
-                deptoBody.innerHTML = '<tr><td colspan="4" class="text-muted text-center">Sin datos</td></tr>';
+                deptoBody.innerHTML = '<tr><td colspan="5" class="text-muted text-center">Sin datos</td></tr>';
             } else {
                 const maxTotal = Math.max(...deptos.map(x => parseInt(x.total_cents || 0)), 1);
                 deptos.forEach(dp => {
                     const pct = (parseInt(dp.total_cents || 0) / maxTotal * 100).toFixed(0);
-                    deptoBody.innerHTML += '<tr><td>' + escHtml(dp.departamento) + '</td><td class="text-end">' + parseInt(dp.qty_total || 0) + '</td><td class="text-end">' + fmtCents(parseInt(dp.total_cents || 0)) + '</td><td><div class="progress" style="height:6px"><div class="progress-bar bg-accent" style="width:' + pct + '%"></div></div></td></tr>';
+                    deptoBody.innerHTML += '<tr><td>' + escHtml(dp.departamento) + '</td><td>' + escHtml(dp.codactiv || '-') + '</td><td class="text-end">' + parseInt(dp.qty_total || 0) + '</td><td class="text-end">' + fmtCents(parseInt(dp.total_cents || 0)) + '</td><td><div class="progress" style="height:6px"><div class="progress-bar bg-accent" style="width:' + pct + '%"></div></div></td></tr>';
                 });
             }
 
@@ -591,9 +591,9 @@ function exportarCSV() {
             });
 
             csv += '\nPor Departamento\n';
-            csv += 'Departamento,Cantidad,Total\n';
+            csv += 'Departamento,Actividad,Cantidad,Total\n';
             (d.porDepartamento || []).forEach(dp => {
-                csv += (dp.departamento || '') + ',' + (dp.qty_total ?? 0) + ',' + (parseInt(dp.total_cents ?? 0) / 100).toFixed(2) + '\n';
+                csv += (dp.departamento || '') + ',' + (dp.codactiv || '') + ',' + (dp.qty_total ?? 0) + ',' + (parseInt(dp.total_cents ?? 0) / 100).toFixed(2) + '\n';
             });
 
             csv += '\nPor Forma de Pago\n';
