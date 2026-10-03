@@ -78,12 +78,21 @@ final class CustomerRepo
             $params[':like4'] = '%' . $q . '%';
         }
         try {
+            $cols = self::clientesColumnas();
+            $selCond = !empty($cols['condicion_iva']) ? 'c.condicion_iva,' : 'NULL AS condicion_iva,';
+            $selCat = !empty($cols['categoria']) ? 'c.categoria,' : 'NULL AS categoria,';
+            $selMayorista = !empty($cols['precio_mayorista']) ? 'c.precio_mayorista,' : 'NULL AS precio_mayorista,';
+            $selEspec = !empty($cols['especialidad']) ? 'c.especialidad,' : 'NULL AS especialidad,';
             $st = Db::pdo()->prepare("
-                SELECT c.idclien, c.razon, c.cuit, c.tele AS phone, c.mail AS email,
+                SELECT c.idclien, c.razon, c.cuit, c.direc, c.tele AS phone, c.mail AS email,
                        c.Localidad AS city,
+                       {$selCond} {$selCat} {$selMayorista} {$selEspec}
                        COUNT(f.id) AS facturas,
                        COALESCE(SUM(f.total_cents), 0) AS total_cents,
-                       MAX(f.fecha) AS ultima_factura
+                       MAX(f.fecha) AS ultima_factura,
+                       (SELECT COUNT(*) FROM ctacte_movimientos cm WHERE cm.idclien = c.idclien) AS mov_ctacte,
+                       (SELECT COUNT(*) FROM puntos_movimientos pm WHERE pm.idclien = c.idclien) AS mov_puntos,
+                       (SELECT COUNT(*) FROM recibos r WHERE r.idclien = c.idclien) AS mov_recibos
                 FROM clientes c
                 LEFT JOIN web_users w ON w.cliente_id = c.idclien
                 LEFT JOIN facturas f ON f.idclien = c.idclien AND f.estado = 'emitida'
@@ -181,19 +190,22 @@ final class CustomerRepo
         return (int)Db::pdo()->lastInsertId();
     }
 
-    /** @return array{facturas:int,pedidos:int,ctacte:int,puntos:int,total:int} */
+    /** @return array{facturas:int,pedidos:int,ctacte:int,puntos:int,recibos:int,total:int} */
     public function movimientos(int $userId, int $clienteId = 0): array
     {
         $erp = max(0, $clienteId);
         $sql = 'SELECT
             (SELECT COUNT(*) FROM facturas WHERE cliente_id = :u1' . ($erp > 0 ? ' OR idclien = :erp1' : '') . ') AS facturas,
             (SELECT COUNT(*) FROM orders WHERE user_id = :u2) AS pedidos,
-            (SELECT COUNT(*) FROM ctacte_movimientos WHERE cliente_id = :u3) AS ctacte'
+            (SELECT COUNT(*) FROM ctacte_movimientos WHERE cliente_id = :u3' . ($erp > 0 ? ' OR idclien = :erp3' : '') . ') AS ctacte,
+            (SELECT COUNT(*) FROM recibos WHERE cliente_id = :u4' . ($erp > 0 ? ' OR idclien = :erp4' : '') . ') AS recibos'
             . ($erp > 0 ? ', (SELECT COUNT(*) FROM puntos_movimientos WHERE idclien = :erp2) AS puntos' : ', 0 AS puntos');
-        $params = [':u1' => $userId, ':u2' => $userId, ':u3' => $userId];
+        $params = [':u1' => $userId, ':u2' => $userId, ':u3' => $userId, ':u4' => $userId];
         if ($erp > 0) {
             $params[':erp1'] = $erp;
             $params[':erp2'] = $erp;
+            $params[':erp3'] = $erp;
+            $params[':erp4'] = $erp;
         }
         $st = Db::pdo()->prepare($sql);
         $st->execute($params);
@@ -203,9 +215,54 @@ final class CustomerRepo
             'pedidos' => (int)($r['pedidos'] ?? 0),
             'ctacte' => (int)($r['ctacte'] ?? 0),
             'puntos' => (int)($r['puntos'] ?? 0),
+            'recibos' => (int)($r['recibos'] ?? 0),
         ];
-        $out['total'] = $out['facturas'] + $out['pedidos'] + $out['ctacte'] + $out['puntos'];
+        $out['total'] = $out['facturas'] + $out['pedidos'] + $out['ctacte'] + $out['puntos'] + $out['recibos'];
         return $out;
+    }
+
+    /**
+     * Movimientos de un cliente ERP (tabla clientes, sin usuario web).
+     * @return array{facturas:int,pedidos:int,ctacte:int,puntos:int,recibos:int,total:int}
+     */
+    public function movimientosErp(int $idclien): array
+    {
+        $st = Db::pdo()->prepare('SELECT
+            (SELECT COUNT(*) FROM facturas WHERE idclien = :i1) AS facturas,
+            (SELECT COUNT(*) FROM ctacte_movimientos WHERE idclien = :i2) AS ctacte,
+            (SELECT COUNT(*) FROM puntos_movimientos WHERE idclien = :i3) AS puntos,
+            (SELECT COUNT(*) FROM recibos WHERE idclien = :i4) AS recibos');
+        $st->execute([':i1' => $idclien, ':i2' => $idclien, ':i3' => $idclien, ':i4' => $idclien]);
+        $r = $st->fetch() ?: [];
+        $out = [
+            'facturas' => (int)($r['facturas'] ?? 0),
+            'pedidos' => 0,
+            'ctacte' => (int)($r['ctacte'] ?? 0),
+            'puntos' => (int)($r['puntos'] ?? 0),
+            'recibos' => (int)($r['recibos'] ?? 0),
+        ];
+        $out['total'] = $out['facturas'] + $out['pedidos'] + $out['ctacte'] + $out['puntos'] + $out['recibos'];
+        return $out;
+    }
+
+    /** ¿El cliente ERP tiene un usuario web vinculado? */
+    public function clienteErpTieneUsuarioWeb(int $idclien): bool
+    {
+        $st = Db::pdo()->prepare('SELECT COUNT(*) FROM web_users WHERE cliente_id = :i');
+        $st->execute([':i' => $idclien]);
+        return (int)$st->fetchColumn() > 0;
+    }
+
+    /** Elimina un cliente ERP (sin movimientos ni usuario web). */
+    public function deleteClienteErp(int $idclien): void
+    {
+        try {
+            Db::pdo()->prepare('DELETE FROM puntos_cuentas WHERE idclien = :i AND saldo_puntos = 0')
+                ->execute([':i' => $idclien]);
+        } catch (\Throwable $e) {
+            error_log('CustomerRepo::deleteClienteErp puntos_cuentas: ' . $e->getMessage());
+        }
+        Db::pdo()->prepare('DELETE FROM clientes WHERE idclien = :i LIMIT 1')->execute([':i' => $idclien]);
     }
 
     /** @param array<string,mixed> $data */

@@ -4,6 +4,7 @@ use Perfushopping\Web\Support\Format;
 $list = $list ?? [];
 $presenciales = $presenciales ?? [];
 $q = (string)($q ?? '');
+$erpCols = $erpCols ?? [];
 $customerCategories = [
     'none' => 'Sin categoría', 'peluquero' => 'Peluquero/a', 'cosmetologa' => 'Cosmetóloga',
     'esteticista' => 'Esteticista', 'manicura' => 'Manicura/o', 'masajista' => 'Masajista',
@@ -134,14 +135,33 @@ $customerCategories = [
                     <th class="text-end">Total facturado</th>
                     <th>Última factura</th>
                     <th>Tipo</th>
+                    <th style="width:70px"></th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (!$presenciales): ?>
-                    <tr><td colspan="8" class="text-muted text-center py-4">Sin clientes presenciales.</td></tr>
+                    <tr><td colspan="9" class="text-muted text-center py-4">Sin clientes presenciales.</td></tr>
                 <?php else: ?>
                     <?php foreach ($presenciales as $p): ?>
-                        <tr>
+                        <?php
+                        $movTotal = (int)($p['facturas'] ?? 0) + (int)($p['mov_ctacte'] ?? 0)
+                            + (int)($p['mov_puntos'] ?? 0) + (int)($p['mov_recibos'] ?? 0);
+                        $erpRow = [
+                            'idclien' => (int)($p['idclien'] ?? 0),
+                            'razon' => (string)($p['razon'] ?? ''),
+                            'cuit' => (string)($p['cuit'] ?? ''),
+                            'direc' => (string)($p['direc'] ?? ''),
+                            'city' => (string)($p['city'] ?? ''),
+                            'phone' => (string)($p['phone'] ?? ''),
+                            'email' => (string)($p['email'] ?? ''),
+                            'condicion_iva' => (string)($p['condicion_iva'] ?? ''),
+                            'categoria' => (string)($p['categoria'] ?? ''),
+                            'precio_mayorista' => (int)($p['precio_mayorista'] ?? 0),
+                            'especialidad' => (string)($p['especialidad'] ?? ''),
+                            'mov' => $movTotal,
+                        ];
+                        ?>
+                        <tr data-erp="<?= htmlspecialchars(json_encode($erpRow, JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG | JSON_UNESCAPED_UNICODE)) ?>">
                             <td><strong><?= htmlspecialchars((string)($p['razon'] ?? 'Sin nombre')) ?></strong></td>
                             <td class="small"><?= htmlspecialchars((string)($p['cuit'] ?? '-')) ?></td>
                             <td class="small"><?= htmlspecialchars((string)($p['phone'] ?? '-')) ?></td>
@@ -150,11 +170,114 @@ $customerCategories = [
                             <td class="text-end"><?= htmlspecialchars(Format::moneyFromCents((int)($p['total_cents'] ?? 0))) ?></td>
                             <td class="small"><?= htmlspecialchars((string)($p['ultima_factura'] ?? '-')) ?></td>
                             <td><span class="badge bg-info">Presencial</span></td>
+                            <td class="text-nowrap">
+                                <button class="btn btn-sm btn-outline-secondary py-0 px-1" title="Editar cliente" onclick="editarPresencial(this)"><i class="bi bi-pencil"></i></button>
+                                <?php if ($movTotal > 0): ?>
+                                    <button class="btn btn-sm btn-outline-danger py-0 px-1" disabled title="Tiene movimientos: no se puede eliminar"><i class="bi bi-trash"></i></button>
+                                <?php else: ?>
+                                    <button class="btn btn-sm btn-outline-danger py-0 px-1" title="Eliminar cliente" onclick="eliminarPresencial(this)"><i class="bi bi-trash"></i></button>
+                                <?php endif; ?>
+                            </td>
                         </tr>
                     <?php endforeach; ?>
                 <?php endif; ?>
             </tbody>
         </table>
+    </div>
+</div>
+
+<form method="post" action="/admin/clientes/eliminar" id="eliminarPresencialForm" class="d-none">
+    <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+    <input type="hidden" name="user_id" value="0" />
+    <input type="hidden" name="idclien" id="eliminarPresencialId" value="0" />
+    <input type="hidden" name="q" value="<?= htmlspecialchars($q) ?>" />
+</form>
+
+<!-- Modal editar cliente presencial -->
+<div class="modal fade" id="presencialModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post" action="/admin/clientes/editar" id="presencialForm">
+                <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                <input type="hidden" name="user_id" value="0" />
+                <input type="hidden" name="idclien" id="presencialIdclien" value="0" />
+                <input type="hidden" name="q" value="<?= htmlspecialchars($q) ?>" />
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-pencil"></i> Editar cliente presencial</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label small">Razón social / Nombre facturado *</label>
+                            <input type="text" class="form-control form-control-sm" name="erp_razon" required />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">CUIT / DNI</label>
+                            <input type="text" class="form-control form-control-sm" name="erp_cuit" maxlength="11" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Dirección</label>
+                            <input type="text" class="form-control form-control-sm" name="erp_direc" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Localidad</label>
+                            <input type="text" class="form-control form-control-sm" name="erp_localidad" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Teléfono</label>
+                            <input type="text" class="form-control form-control-sm" name="erp_tele" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Email</label>
+                            <input type="text" class="form-control form-control-sm" name="erp_mail" />
+                        </div>
+                        <?php if (!empty($erpCols['condicion_iva'])): ?>
+                        <div class="col-6">
+                            <label class="form-label small">Condición frente al IVA</label>
+                            <select class="form-select form-select-sm" name="erp_condicion_iva">
+                                <option value="consumidor_final">Consumidor Final</option>
+                                <option value="monotributista">Monotributista</option>
+                                <option value="responsable_inscripto">Responsable Inscripto</option>
+                                <option value="exento">Exento</option>
+                            </select>
+                        </div>
+                        <?php endif; ?>
+                        <?php if (!empty($erpCols['categoria'])): ?>
+                        <div class="col-6">
+                            <label class="form-label small">Categoría comercial</label>
+                            <select class="form-select form-select-sm" name="erp_categoria">
+                                <option value="minorista">Minorista</option>
+                                <option value="mayorista">Mayorista</option>
+                                <option value="profesional">Profesional</option>
+                            </select>
+                        </div>
+                        <?php if (!empty($erpCols['precio_mayorista'])): ?>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="erp_precio_mayorista" value="1" id="presencialMayorista" />
+                                <label class="form-check-label small" for="presencialMayorista">Aplica precios mayoristas</label>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+                        <?php if (!empty($erpCols['especialidad'])): ?>
+                        <div class="col-12">
+                            <label class="form-label small">Especialidad</label>
+                            <input type="text" class="form-control form-control-sm" name="erp_especialidad" />
+                        </div>
+                        <?php endif; ?>
+                        <?php endif; ?>
+                    </div>
+                    <div class="alert alert-info py-2 px-2 small mb-0">
+                        Los comprobantes ya emitidos conservan sus propios datos (copia por factura).
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-sm btn-accent"><i class="bi bi-check-lg"></i> Guardar</button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 
@@ -265,4 +388,39 @@ function crearDesdeArca() {
 }
 
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function erpDataDe(btn) {
+    return JSON.parse(btn.closest('tr').getAttribute('data-erp'));
+}
+
+function editarPresencial(btn) {
+    const d = erpDataDe(btn);
+    const f = document.getElementById('presencialForm');
+    f.reset();
+    document.getElementById('presencialIdclien').value = d.idclien || '0';
+    f.erp_razon.value = d.razon || '';
+    f.erp_cuit.value = d.cuit || '';
+    f.erp_direc.value = d.direc || '';
+    f.erp_localidad.value = d.city || '';
+    f.erp_tele.value = d.phone || '';
+    f.erp_mail.value = d.email || '';
+    if (f.erp_condicion_iva) f.erp_condicion_iva.value = d.condicion_iva || 'consumidor_final';
+    if (f.erp_categoria) f.erp_categoria.value = d.categoria || 'minorista';
+    const chk = document.getElementById('presencialMayorista');
+    if (chk) chk.checked = !!d.precio_mayorista;
+    if (f.erp_especialidad) f.erp_especialidad.value = d.especialidad || '';
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('presencialModal')).show();
+}
+
+function eliminarPresencial(btn) {
+    const d = erpDataDe(btn);
+    if ((d.mov || 0) > 0) {
+        alert('No se puede eliminar: el cliente tiene movimientos.');
+        return;
+    }
+    const ok = confirm('¿Eliminar al cliente "' + (d.razon || '') + '"?\n\nNo tiene movimientos asociados. Esta acción no se puede deshacer.');
+    if (!ok) return;
+    document.getElementById('eliminarPresencialId').value = d.idclien || '0';
+    document.getElementById('eliminarPresencialForm').submit();
+}
 </script>

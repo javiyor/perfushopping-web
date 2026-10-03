@@ -69,7 +69,8 @@ $erpCategorias = ['minorista' => 'Minorista', 'mayorista' => 'Mayorista', 'profe
                         <?= (int)$mov['facturas'] ?> factura(s) ·
                         <?= (int)$mov['pedidos'] ?> pedido(s) ·
                         <?= (int)$mov['ctacte'] ?> mov. cta. cte. ·
-                        <?= (int)$mov['puntos'] ?> mov. puntos
+                        <?= (int)$mov['puntos'] ?> mov. puntos ·
+                        <?= (int)($mov['recibos'] ?? 0) ?> recibo(s)
                     </span>
                     <?php if ((int)$mov['total'] > 0): ?>
                         <span class="badge bg-warning text-dark">No se puede eliminar</span>
@@ -294,7 +295,8 @@ $erpCategorias = ['minorista' => 'Minorista', 'mayorista' => 'Mayorista', 'profe
                         <strong><?= (int)$mov['facturas'] ?></strong> factura(s),
                         <strong><?= (int)$mov['pedidos'] ?></strong> pedido(s),
                         <strong><?= (int)$mov['ctacte'] ?></strong> mov. cta. cte.,
-                        <strong><?= (int)$mov['puntos'] ?></strong> mov. puntos.
+                        <strong><?= (int)$mov['puntos'] ?></strong> mov. puntos,
+                        <strong><?= (int)($mov['recibos'] ?? 0) ?></strong> recibo(s).
                         Los comprobantes ya emitidos conservan sus propios datos (copia por factura).
                     </div>
 

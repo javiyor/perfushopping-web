@@ -31,6 +31,7 @@ final class CustomerController
             'q' => $q,
             'csrf' => Csrf::token(),
             'flash' => $_SESSION['admin_flash'] ?? null,
+            'erpCols' => CustomerRepo::clientesColumnas(),
             'pageTitle' => 'Clientes',
         ]);
         unset($_SESSION['admin_flash']);
@@ -111,7 +112,28 @@ final class CustomerController
         Csrf::check($_POST['_csrf'] ?? null);
 
         $userId = (int)($_POST['user_id'] ?? 0);
+        $idclien = (int)($_POST['idclien'] ?? 0);
+        $q = trim((string)($_POST['q'] ?? ''));
+        $backList = '/admin/clientes' . ($q !== '' ? '?q=' . rawurlencode($q) : '');
         $repo = new CustomerRepo();
+
+        // Cliente presencial (solo tabla clientes, sin usuario web)
+        if ($idclien > 0 && $userId <= 0) {
+            $erp = $repo->clienteErp($idclien);
+            if (!$erp) {
+                $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Cliente no encontrado.'];
+                Response::redirect($backList);
+            }
+            $razon = trim((string)($_POST['erp_razon'] ?? ''));
+            if ($razon === '') {
+                $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'La razón social es obligatoria.'];
+                Response::redirect($backList);
+            }
+            $repo->updateClienteErp($idclien, $this->erpDataFromPost($razon));
+            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Cliente actualizado.'];
+            Response::redirect($backList);
+        }
+
         $customer = $repo->findById($userId);
         if (!$customer) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Cliente no encontrado.'];
@@ -149,29 +171,35 @@ final class CustomerController
         $erpId = (int)($customer['cliente_id'] ?? 0);
         if ($erpId > 0 && $repo->clienteErp($erpId)) {
             $erpRazon = trim((string)($_POST['erp_razon'] ?? ''));
-            $erpData = [
-                'razon' => $erpRazon !== '' ? $erpRazon : $name,
-                'cuit' => (string)(preg_replace('/[^0-9]/', '', (string)($_POST['erp_cuit'] ?? '')) ?? ''),
-                'direc' => trim((string)($_POST['erp_direc'] ?? '')),
-                'localidad' => trim((string)($_POST['erp_localidad'] ?? '')),
-                'tele' => trim((string)($_POST['erp_tele'] ?? '')),
-                'mail' => trim((string)($_POST['erp_mail'] ?? '')),
-            ];
-            $ci = trim((string)($_POST['erp_condicion_iva'] ?? ''));
-            if ($ci !== '') {
-                $erpData['condicion_iva'] = FacturaRepo::normalizeCondIva($ci);
-            }
-            $erpCat = trim((string)($_POST['erp_categoria'] ?? ''));
-            if ($erpCat !== '') {
-                $erpData['categoria'] = FacturaRepo::normalizeCategoria($erpCat);
-                $erpData['precio_mayorista'] = !empty($_POST['erp_precio_mayorista']) ? 1 : 0;
-                $erpData['especialidad'] = mb_substr(trim((string)($_POST['erp_especialidad'] ?? '')), 0, 60) ?: null;
-            }
-            $repo->updateClienteErp($erpId, $erpData);
+            $repo->updateClienteErp($erpId, $this->erpDataFromPost($erpRazon !== '' ? $erpRazon : $name));
         }
 
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Cliente actualizado.'];
         Response::redirect('/admin/clientes/' . $userId);
+    }
+
+    /** Datos ERP (tabla clientes) desde el POST del formulario de edición. */
+    private function erpDataFromPost(string $razon): array
+    {
+        $erpData = [
+            'razon' => $razon,
+            'cuit' => (string)(preg_replace('/[^0-9]/', '', (string)($_POST['erp_cuit'] ?? '')) ?? ''),
+            'direc' => trim((string)($_POST['erp_direc'] ?? '')),
+            'localidad' => trim((string)($_POST['erp_localidad'] ?? '')),
+            'tele' => trim((string)($_POST['erp_tele'] ?? '')),
+            'mail' => trim((string)($_POST['erp_mail'] ?? '')),
+        ];
+        $ci = trim((string)($_POST['erp_condicion_iva'] ?? ''));
+        if ($ci !== '') {
+            $erpData['condicion_iva'] = FacturaRepo::normalizeCondIva($ci);
+        }
+        $erpCat = trim((string)($_POST['erp_categoria'] ?? ''));
+        if ($erpCat !== '') {
+            $erpData['categoria'] = FacturaRepo::normalizeCategoria($erpCat);
+            $erpData['precio_mayorista'] = !empty($_POST['erp_precio_mayorista']) ? 1 : 0;
+            $erpData['especialidad'] = mb_substr(trim((string)($_POST['erp_especialidad'] ?? '')), 0, 60) ?: null;
+        }
+        return $erpData;
     }
 
     public function eliminar(array $params): void
@@ -181,7 +209,38 @@ final class CustomerController
         Csrf::check($_POST['_csrf'] ?? null);
 
         $userId = (int)($_POST['user_id'] ?? 0);
+        $idclien = (int)($_POST['idclien'] ?? 0);
+        $q = trim((string)($_POST['q'] ?? ''));
+        $backList = '/admin/clientes' . ($q !== '' ? '?q=' . rawurlencode($q) : '');
         $repo = new CustomerRepo();
+
+        // Cliente presencial (solo tabla clientes, sin usuario web)
+        if ($idclien > 0 && $userId <= 0) {
+            $erp = $repo->clienteErp($idclien);
+            if (!$erp) {
+                $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Cliente no encontrado.'];
+                Response::redirect($backList);
+            }
+            if ($repo->clienteErpTieneUsuarioWeb($idclien)) {
+                $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se puede eliminar: tiene un usuario web vinculado. Editalo o eliminá ese usuario primero.'];
+                Response::redirect($backList);
+            }
+            $mov = $repo->movimientosErp($idclien);
+            if ($mov['total'] > 0) {
+                $detalle = $mov['facturas'] . ' factura(s), ' . $mov['ctacte'] . ' mov. cta. cte., ' . $mov['puntos'] . ' mov. puntos, ' . $mov['recibos'] . ' recibo(s)';
+                $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se puede eliminar: el cliente tiene movimientos (' . $detalle . ').'];
+                Response::redirect($backList);
+            }
+            try {
+                $repo->deleteClienteErp($idclien);
+            } catch (\PDOException $e) {
+                $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se pudo eliminar: el cliente está referenciado por otros datos.'];
+                Response::redirect($backList);
+            }
+            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Cliente eliminado.'];
+            Response::redirect($backList);
+        }
+
         $customer = $repo->findById($userId);
         if (!$customer) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Cliente no encontrado.'];
@@ -190,7 +249,7 @@ final class CustomerController
 
         $mov = $repo->movimientos($userId, (int)($customer['cliente_id'] ?? 0));
         if ($mov['total'] > 0) {
-            $detalle = $mov['facturas'] . ' factura(s), ' . $mov['pedidos'] . ' pedido(s), ' . $mov['ctacte'] . ' mov. cta. cte., ' . $mov['puntos'] . ' mov. puntos';
+            $detalle = $mov['facturas'] . ' factura(s), ' . $mov['pedidos'] . ' pedido(s), ' . $mov['ctacte'] . ' mov. cta. cte., ' . $mov['puntos'] . ' mov. puntos, ' . $mov['recibos'] . ' recibo(s)';
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se puede eliminar: el cliente tiene movimientos (' . $detalle . '). Podés bloquearlo en su lugar.'];
             Response::redirect('/admin/clientes/' . $userId);
         }
