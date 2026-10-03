@@ -349,7 +349,7 @@ $pedidoDescPct = $pedidoDescPct ?? 0;
                     <span>Puntos a canjear (1 pto = $1)</span>
                     <span><input type="number" id="posPuntosUsar" value="0" min="0" step="1" style="width:80px;text-align:right;font-size:14px;border:1px solid #ccc;border-radius:4px;padding:2px 4px" onchange="recalcTotals()" /></span>
                 </div>
-                <div class="pt-row" id="posPuntosSaldo" style="display:none;font-size:12px;color:#6c757d"><span>Saldo disponible</span><span id="posPuntosSaldoVal">0</span></div>
+                <div class="pt-row" id="posPuntosSaldo" style="display:none;font-size:12px;color:#6c757d"><span>Saldo disponible</span><span><span id="posPuntosSaldoVal">0</span> <button type="button" class="btn btn-outline-warning btn-sm" style="padding:1px 7px;font-size:11px;line-height:1.4;vertical-align:middle" onclick="canjearPuntos()">Canjear puntos</button></span></div>
                 <div class="pt-row pt-total"><span>TOTAL</span><span id="posTotal">$0</span></div>
             </div>
         </div>
@@ -873,11 +873,21 @@ function selectCliente(c) {
     loadPuntosSaldo(c.idclien || 0);
 }
 
+let puntosSaldoCliente = 0;
+
+function canjearPuntos() {
+    const usar = document.getElementById('posPuntosUsar');
+    if (!usar || puntosSaldoCliente <= 0) return;
+    usar.value = puntosSaldoCliente;
+    recalcTotals();
+}
+
 function loadPuntosSaldo(idclien) {
     const row = document.getElementById('posPuntosRow');
     const saldoRow = document.getElementById('posPuntosSaldo');
     const usar = document.getElementById('posPuntosUsar');
     if (usar) usar.value = 0;
+    puntosSaldoCliente = 0;
     if (!idclien) {
         row.style.display = 'none';
         saldoRow.style.display = 'none';
@@ -888,6 +898,7 @@ function loadPuntosSaldo(idclien) {
         .then(r => r.json())
         .then(data => {
             const saldo = (data && data.saldo) ? parseInt(data.saldo) : 0;
+            puntosSaldoCliente = saldo;
             document.getElementById('posPuntosSaldoVal').textContent = saldo.toLocaleString('es-AR');
             row.style.display = saldo > 0 ? 'flex' : 'none';
             saldoRow.style.display = saldo > 0 ? 'flex' : 'none';

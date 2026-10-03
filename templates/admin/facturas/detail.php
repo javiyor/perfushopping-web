@@ -123,6 +123,17 @@ $discriminaIva = in_array($factura['tipo_comprobante'] ?? '', ['FACT-A']);
                             <span>Total:</span>
                             <span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($factura['total_cents'] ?? 0))) ?></span>
                         </div>
+                        <?php $cliNombre = trim((string)($factura['cliente_nombre'] ?? '')); ?>
+                        <?php if ($cliNombre !== '' && strcasecmp($cliNombre, 'Consumidor Final') !== 0): ?>
+                        <div class="d-flex justify-content-between small mt-1" style="color:#b8860b">
+                            <span>Puntos de esta compra:</span>
+                            <span><?= (int)($puntosObtenidos ?? 0) ?> pts</span>
+                        </div>
+                        <div class="d-flex justify-content-between small" style="color:#b8860b">
+                            <span>Total de puntos del cliente:</span>
+                            <span><?= (int)($puntosTotales ?? 0) ?> pts</span>
+                        </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>

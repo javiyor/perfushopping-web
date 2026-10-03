@@ -1067,6 +1067,8 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
             'arcaComprobante' => $arcaComprobante,
             'qrUrl' => $qrUrl,
             'formasPagoLabels' => (new \Perfushopping\Web\Repo\FormaPagoRepo())->labels(),
+            'puntosObtenidos' => (new \Perfushopping\Web\Repo\PuntosRepo())->acumulacionFactura($id),
+            'puntosTotales' => (new \Perfushopping\Web\Repo\PuntosRepo())->saldo((int)($factura['idclien'] ?? 0)),
             'csrf' => Csrf::token(),
             'pageTitle' => 'Factura ' . ($factura['codigo'] ?? ''),
         ]);
