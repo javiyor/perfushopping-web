@@ -6,6 +6,7 @@ namespace Perfushopping\Web\Admin;
 use Perfushopping\Web\Repo\BancoCuentaRepo;
 use Perfushopping\Web\Repo\BancoRepo;
 use Perfushopping\Web\Repo\ChequeRepo;
+use Perfushopping\Web\Repo\ProveedorRepo;
 use Perfushopping\Web\Service\AdminAuthService;
 use Perfushopping\Web\Support\Csrf;
 use Perfushopping\Web\Support\Response;
@@ -77,6 +78,15 @@ final class ChequeController
             'csrf' => Csrf::token(),
             'pageTitle' => $tipo === 'tercero' ? 'Cargar cheque de tercero' : 'Emitir cheque propio',
         ]);
+    }
+
+    public function searchProveedores(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $auth->requirePermiso('cheques');
+
+        $q = trim((string)($_GET['q'] ?? ''));
+        Response::json((new ProveedorRepo())->findProveedores($q));
     }
 
     public function emitirStore(array $params): void

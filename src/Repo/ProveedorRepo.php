@@ -68,6 +68,18 @@ final class ProveedorRepo
         $st->execute([':i' => $idprovee]);
     }
 
+    public function findProveedores(string $q, int $limit = 10): array
+    {
+        $limit = max(1, min(20, $limit));
+        $st = Db::pdo()->prepare('
+            SELECT idprovee, codprove, razon, cuit FROM proveedo
+            WHERE razon LIKE :like OR codprove LIKE :like OR cuit LIKE :like
+            ORDER BY razon ASC LIMIT ' . $limit
+        );
+        $st->execute([':like' => '%' . $q . '%']);
+        return $st->fetchAll();
+    }
+
     public function productCount(int $idprovee): int
     {
         $st = Db::pdo()->prepare('

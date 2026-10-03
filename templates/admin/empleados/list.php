@@ -3,7 +3,10 @@
         <h4 class="fw-bold mb-1">Configuración de empleados</h4>
         <p class="text-muted small">Asigná tipo de liquidación, sueldo base y comisiones por marca</p>
     </div>
-    <a class="btn btn-accent btn-sm" href="/admin/empleados/nuevo"><i class="bi bi-plus-lg"></i> Nueva config</a>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-primary btn-sm" href="/admin/empleados/comisiones"><i class="bi bi-graph-up"></i> Comisiones</a>
+        <a class="btn btn-accent btn-sm" href="/admin/empleados/nuevo"><i class="bi bi-plus-lg"></i> Nueva config</a>
+    </div>
 </div>
 
 <div class="card shadow-sm">

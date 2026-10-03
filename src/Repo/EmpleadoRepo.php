@@ -153,6 +153,117 @@ final class EmpleadoRepo
         }
     }
 
+    /**
+     * Comisiones ganadas por marca y total por empleado en un periodo (YYYY-MM).
+     * Mismos criterios que la liquidación: facturas emitidas con CAE, redondeo por item.
+     * Si $soloUid viene informado, devuelve solo ese empleado.
+     */
+    public function comisionesGanadas(string $periodo, ?int $soloUid = null): array
+    {
+        $pdo = Db::pdo();
+
+        $sql = "
+            SELECT ec.admin_user_id, a.nombre, ec.tipo
+            FROM empleado_config ec
+            INNER JOIN admin_users a ON a.id = ec.admin_user_id
+            WHERE a.activo = 1 AND a.rol IN ('ventas','superadmin')
+        ";
+        $params = [];
+        if ($soloUid !== null && $soloUid > 0) {
+            $sql .= ' AND ec.admin_user_id = :uidEmp';
+            $params[':uidEmp'] = $soloUid;
+        }
+        $sql .= ' ORDER BY a.nombre ASC';
+        $st = $pdo->prepare($sql);
+        $st->execute($params);
+
+        $empleados = [];
+        foreach ($st->fetchAll() as $r) {
+            $uid = (int)$r['admin_user_id'];
+            $empleados[$uid] = [
+                'admin_user_id' => $uid,
+                'nombre' => (string)$r['nombre'],
+                'tipo' => (string)$r['tipo'],
+                'marcas' => [],
+                'total_cents' => 0,
+            ];
+        }
+
+        $sql = "
+            SELECT ec.admin_user_id, ec.codsub, ec.porcentaje, s.nomsub
+            FROM empleado_comisiones ec
+            INNER JOIN empleado_config cfg ON cfg.admin_user_id = ec.admin_user_id
+            LEFT JOIN subrubro s ON s.codsub = ec.codsub
+        ";
+        $params = [];
+        if ($soloUid !== null && $soloUid > 0) {
+            $sql .= ' WHERE ec.admin_user_id = :uidCom';
+            $params[':uidCom'] = $soloUid;
+        }
+        $sql .= ' ORDER BY ec.admin_user_id, s.nomsub ASC';
+        $st = $pdo->prepare($sql);
+        $st->execute($params);
+
+        $seed = [];
+        foreach ($st->fetchAll() as $r) {
+            $uid = (int)$r['admin_user_id'];
+            if (!isset($empleados[$uid])) {
+                continue;
+            }
+            $cod = (int)$r['codsub'];
+            $pct = (float)$r['porcentaje'];
+            $seed[$uid][$cod] = count($empleados[$uid]['marcas']);
+            $empleados[$uid]['marcas'][] = [
+                'codsub' => $cod,
+                'marca' => $r['nomsub'] !== null && $r['nomsub'] !== '' ? (string)$r['nomsub'] : ('Marca #' . $cod),
+                'porcentaje' => $pct,
+                'ventas_cents' => 0,
+                'comision_cents' => 0,
+            ];
+        }
+
+        $sql = "
+            SELECT f.vendedor_id, COALESCE(p.codsub, 0) AS codsub, fi.total_cents
+            FROM factura_items fi
+            INNER JOIN facturas f ON f.id = fi.factura_id
+            LEFT JOIN producto p ON p.idprodu = fi.idprodu
+            WHERE f.estado = 'emitida'
+              AND f.cae IS NOT NULL
+              AND f.vendedor_id IS NOT NULL
+              AND DATE_FORMAT(f.fecha, '%Y-%m') = :periodo
+        ";
+        $params = [':periodo' => $periodo];
+        if ($soloUid !== null && $soloUid > 0) {
+            $sql .= ' AND f.vendedor_id = :uidVent';
+            $params[':uidVent'] = $soloUid;
+        }
+        $st = $pdo->prepare($sql);
+        $st->execute($params);
+
+        foreach ($st->fetchAll() as $r) {
+            $uid = (int)$r['vendedor_id'];
+            $cod = (int)$r['codsub'];
+            if (!isset($seed[$uid][$cod])) {
+                continue;
+            }
+            $total = (int)$r['total_cents'];
+            $row = &$empleados[$uid]['marcas'][$seed[$uid][$cod]];
+            $row['ventas_cents'] += $total;
+            $row['comision_cents'] += (int)round($total * $row['porcentaje'] / 100);
+            unset($row);
+        }
+
+        foreach ($empleados as $uid => $emp) {
+            $totalEmp = 0;
+            foreach ($emp['marcas'] as $m) {
+                $totalEmp += (int)$m['comision_cents'];
+            }
+            $empleados[$uid]['total_cents'] = $totalEmp;
+        }
+
+        return array_values($empleados);
+    }
+
     public function listMarcas(): array
     {
         return Db::pdo()->query('SELECT codsub, nomsub FROM subrubro ORDER BY nomsub ASC')->fetchAll();

@@ -261,6 +261,7 @@
             <?php if ($can('compras') || $can('caja_movimientos')): ?><a href="/admin/cuentas-contables" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Cuentas principales y subcuentas contables"><i class="bi bi-journal-bookmark"></i>Cuentas contables</a><?php endif; ?>
             <?php if ($can('caja_movimientos')): ?><a href="/admin/caja/depositar" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Depositar efectivo en banco"><i class="bi bi-bank"></i>Depósito banco</a><?php endif; ?>
 
+            <?php if (!$can('usuarios_admin')): ?><a href="/admin/empleados/comisiones" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Tus comisiones ganadas por marca"><i class="bi bi-graph-up"></i>Mis comisiones</a><?php endif; ?>
             <?php $hasAdmin = $can('usuarios_admin') || $can('pagos') || $can('cheques') || $can('estadisticas') || $can('arca'); if ($hasAdmin): ?><div class="nav-section">Administración</div><?php endif; ?>
             <?php if ($can('usuarios_admin')): ?><a href="/admin/usuarios" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Usuarios del panel admin y permisos"><i class="bi bi-shield-lock"></i>Admins</a><?php endif; ?>
             <?php if ($can('usuarios_admin')): ?><a href="/admin/empleados" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Legajos, sueldos y liquidaciones"><i class="bi bi-person-badge"></i>Empleados</a><?php endif; ?>

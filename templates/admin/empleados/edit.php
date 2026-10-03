@@ -92,7 +92,7 @@
                     <p class="text-muted small mb-0">Sin comisiones configuradas.</p>
                     <?php endif; ?>
                     <?php foreach ($comisiones as $c): ?>
-                    <div class="d-flex justify-content-between align-items-center mb-1 comision-row">
+                    <div class="d-flex justify-content-between align-items-center mb-1 comision-row" data-codsub="<?= (int)$c['codsub'] ?>">
                         <span class="small"><?= htmlspecialchars($c['nomsub'] ?? 'Marca #' . $c['codsub']) ?>:</span>
                         <span class="fw-semibold small"><?= htmlspecialchars((string)$c['porcentaje']) ?>%</span>
                         <button class="btn btn-sm btn-outline-danger py-0 px-1" type="button" onclick="eliminarComision(<?= (int)$c['codsub'] ?>)">&times;</button>
@@ -161,8 +161,27 @@ function guardarComision() {
     })
     .then(r => r.json())
     .then(res => {
-        if (res.ok) location.reload();
-        else alert(res.error);
+        if (!res.ok) { alert(res.error); return; }
+        const sel = document.getElementById('nuevaMarca');
+        const nombre = sel.selectedOptions.length ? sel.selectedOptions[0].textContent : ('Marca #' + codsub);
+        const wrap = document.getElementById('comisionesWrap');
+        let row = wrap.querySelector('.comision-row[data-codsub="' + codsub + '"]');
+        if (row) {
+            row.querySelector('.fw-semibold').textContent = pct + '%';
+        } else {
+            const ph = wrap.querySelector('p');
+            if (ph) ph.remove();
+            row = document.createElement('div');
+            row.className = 'd-flex justify-content-between align-items-center mb-1 comision-row';
+            row.dataset.codsub = codsub;
+            row.innerHTML = '<span class="small"></span><span class="fw-semibold small"></span><button class="btn btn-sm btn-outline-danger py-0 px-1" type="button">&times;</button>';
+            row.children[0].textContent = nombre + ':';
+            row.children[1].textContent = pct + '%';
+            row.children[2].onclick = function() { eliminarComision(codsub); };
+            wrap.appendChild(row);
+        }
+        const m = bootstrap.Modal.getInstance(document.getElementById('comisionModal'));
+        if (m) m.hide();
     });
 }
 
@@ -175,8 +194,13 @@ function eliminarComision(codsub) {
     })
     .then(r => r.json())
     .then(res => {
-        if (res.ok) location.reload();
-        else alert(res.error);
+        if (!res.ok) { alert(res.error); return; }
+        const row = document.querySelector('.comision-row[data-codsub="' + codsub + '"]');
+        if (row) row.remove();
+        const wrap = document.getElementById('comisionesWrap');
+        if (wrap && !wrap.querySelector('.comision-row')) {
+            wrap.innerHTML = '<p class="text-muted small mb-0">Sin comisiones configuradas.</p>';
+        }
     });
 }
 

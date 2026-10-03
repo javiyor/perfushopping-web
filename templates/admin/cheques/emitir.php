@@ -14,6 +14,11 @@ $isTercero = $tipo === 'tercero';
 .banco-opt { border-bottom: 1px solid #eee; border-radius: 0; padding: 6px 10px; width: 100%; text-align: left; background: #fff; }
 .banco-opt:last-child { border-bottom: none; }
 .banco-opt:hover { background: #fdf6e3; }
+#titularSuggestions { position: absolute; z-index: 1050; width: 100%; max-height: 240px; overflow-y: auto; }
+#titularSuggestions:not(:empty) { border: 1px solid #ddd; border-top: none; box-shadow: 0 4px 10px rgba(0,0,0,.08); background: #fff; }
+.suggestion-item { padding: 6px 10px; cursor: pointer; font-size: 13px; border-bottom: 1px solid #eee; background: #fff; }
+.suggestion-item:hover { background: #fdf6e3; }
+.suggestion-item:last-child { border-bottom: none; }
 </style>
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div class="d-flex gap-2 align-items-center">
@@ -97,7 +102,11 @@ $isTercero = $tipo === 'tercero';
                     <?php else: ?>
                     <div class="mb-3">
                         <label class="form-label small fw-semibold">Beneficiario <span class="text-danger">*</span></label>
-                        <input class="form-control" name="titular" required placeholder="Nombre o razón social" />
+                        <div style="position:relative">
+                            <input class="form-control" name="titular" id="titularSearch" required autocomplete="off" placeholder="Buscar proveedor o escribir nombre" />
+                            <div id="titularSuggestions"></div>
+                        </div>
+                        <div class="form-text">Buscá en la tabla de proveedores o cargá el nombre a mano</div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label small fw-semibold">CUIT del beneficiario</label>
@@ -169,6 +178,53 @@ $isTercero = $tipo === 'tercero';
             label.classList.remove('text-muted');
             menu.style.display = 'none';
         });
+    });
+})();
+</script>
+
+<script>
+(function() {
+    var input = document.getElementById('titularSearch');
+    var sug = document.getElementById('titularSuggestions');
+    if (!input || !sug) return;
+    var timer;
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+    input.addEventListener('input', function() {
+        clearTimeout(timer);
+        var val = this.value.trim();
+        if (val.length < 2) { sug.innerHTML = ''; return; }
+        timer = setTimeout(function() {
+            fetch('/admin/cheques/buscar-proveedores?q=' + encodeURIComponent(val))
+                .then(r => r.json())
+                .then(function(data) {
+                    sug.innerHTML = '';
+                    if (!data || data.length === 0) {
+                        sug.innerHTML = '<div class="suggestion-item text-muted">Sin resultados</div>';
+                        return;
+                    }
+                    data.forEach(function(p) {
+                        var div = document.createElement('div');
+                        div.className = 'suggestion-item';
+                        div.innerHTML = '<strong>' + esc(p.razon) + '</strong> <span class="text-muted">(' + esc(p.codprove || '') + ') ' + esc(p.cuit || '') + '</span>';
+                        div.addEventListener('mousedown', function(e) {
+                            e.preventDefault();
+                            input.value = p.razon || '';
+                            var cuitInput = document.querySelector('[name="cuit_titular"]');
+                            if (cuitInput && p.cuit) cuitInput.value = p.cuit;
+                            sug.innerHTML = '';
+                        });
+                        sug.appendChild(div);
+                    });
+                })
+                .catch(function() { sug.innerHTML = ''; });
+        }, 300);
+    });
+    input.addEventListener('blur', function() {
+        setTimeout(function() { sug.innerHTML = ''; }, 300);
     });
 })();
 </script>

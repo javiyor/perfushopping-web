@@ -528,6 +528,7 @@ $router->get('/admin/reportes/data', [AdminReporteController::class, 'data']);
 $router->get('/admin/cheques', [AdminChequeController::class, 'index']);
 $router->get('/admin/cheques/emitir', [AdminChequeController::class, 'emitirForm']);
 $router->post('/admin/cheques/emitir/guardar', [AdminChequeController::class, 'emitirStore']);
+$router->get('/admin/cheques/buscar-proveedores', [AdminChequeController::class, 'searchProveedores']);
 $router->get('/admin/cheques/(?P<id>\d+)', [AdminChequeController::class, 'show']);
 $router->post('/admin/cheques/estado', [AdminChequeController::class, 'estado']);
 
@@ -594,6 +595,7 @@ $router->get('/admin/ordenes-pago/deuda-proveedor', [AdminOrdenPagoController::c
 $router->get('/admin/empleados', [AdminEmpleadoController::class, 'index']);
 $router->get('/admin/empleados/nuevo', [AdminEmpleadoController::class, 'edit']);
 $router->get('/admin/empleados/(?P<id>\d+)', [AdminEmpleadoController::class, 'edit']);
+$router->get('/admin/empleados/comisiones', [AdminEmpleadoController::class, 'comisionesInforme']);
 $router->post('/admin/empleados/guardar', [AdminEmpleadoController::class, 'save']);
 $router->post('/admin/empleados/comisiones/guardar', [AdminEmpleadoController::class, 'saveComision']);
 $router->post('/admin/empleados/comisiones/eliminar', [AdminEmpleadoController::class, 'deleteComision']);

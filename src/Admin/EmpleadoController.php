@@ -133,6 +133,38 @@ final class EmpleadoController
         Response::json(['ok' => true, 'empleados' => $empleados]);
     }
 
+    public function comisionesInforme(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $user = $auth->requireLogin();
+
+        $esAdmin = ($user['rol'] ?? '') === 'superadmin' || $auth->checkPermiso('usuarios_admin');
+
+        $periodo = trim((string)($_GET['periodo'] ?? ''));
+        if (!preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $periodo)) {
+            $periodo = date('Y-m');
+        }
+
+        $uidSel = (int)($_GET['uid'] ?? 0);
+        if (!$esAdmin) {
+            $uidSel = (int)($user['id'] ?? 0);
+        }
+
+        $repo = new EmpleadoRepo();
+        $informe = $repo->comisionesGanadas($periodo, $uidSel > 0 ? $uidSel : null);
+        $empleadosSel = $esAdmin ? $repo->listConfig() : [];
+
+        echo View::adminPage('admin/empleados/comisiones.php', [
+            'adminUser' => $user,
+            'informe' => $informe,
+            'empleadosSel' => $empleadosSel,
+            'periodo' => $periodo,
+            'uidSel' => $uidSel,
+            'esAdmin' => $esAdmin,
+            'pageTitle' => $esAdmin ? 'Comisiones ganadas' : 'Mis comisiones',
+        ]);
+    }
+
     public function horas(array $params): void
     {
         $auth = new AdminAuthService();
