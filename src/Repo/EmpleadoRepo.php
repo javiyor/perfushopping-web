@@ -109,6 +109,50 @@ final class EmpleadoRepo
         $st->execute([':uid' => $adminUserId, ':codsub' => $codsub]);
     }
 
+    /** Copia las comisiones del empleado a todos los demás empleados activos (ventas/superadmin). Devuelve a cuántos. */
+    public function compartirComisiones(int $sourceUserId): int
+    {
+        $pdo = Db::pdo();
+        try {
+            $pdo->beginTransaction();
+
+            $st = $pdo->prepare("
+                DELETE ec FROM empleado_comisiones ec
+                INNER JOIN admin_users a ON a.id = ec.admin_user_id
+                WHERE a.activo = 1 AND a.rol IN ('ventas','superadmin') AND ec.admin_user_id <> :src
+            ");
+            $st->execute([':src' => $sourceUserId]);
+
+            $st = $pdo->prepare("
+                INSERT INTO empleado_comisiones (admin_user_id, codsub, porcentaje, created_at)
+                SELECT a.id, src.codsub, src.porcentaje, NOW()
+                FROM empleado_comisiones src
+                CROSS JOIN admin_users a
+                WHERE src.admin_user_id = :src
+                  AND a.activo = 1 AND a.rol IN ('ventas','superadmin') AND a.id <> :src
+                ON DUPLICATE KEY UPDATE porcentaje = VALUES(porcentaje)
+            ");
+            $st->execute([':src' => $sourceUserId]);
+
+            $st = $pdo->prepare("
+                SELECT COUNT(DISTINCT ec.admin_user_id)
+                FROM empleado_comisiones ec
+                INNER JOIN admin_users a ON a.id = ec.admin_user_id
+                WHERE a.activo = 1 AND a.rol IN ('ventas','superadmin') AND ec.admin_user_id <> :src
+            ");
+            $st->execute([':src' => $sourceUserId]);
+            $empleados = (int)$st->fetchColumn();
+
+            $pdo->commit();
+            return $empleados;
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
+
     public function listMarcas(): array
     {
         return Db::pdo()->query('SELECT codsub, nomsub FROM subrubro ORDER BY nomsub ASC')->fetchAll();

@@ -597,6 +597,7 @@ $router->get('/admin/empleados/(?P<id>\d+)', [AdminEmpleadoController::class, 'e
 $router->post('/admin/empleados/guardar', [AdminEmpleadoController::class, 'save']);
 $router->post('/admin/empleados/comisiones/guardar', [AdminEmpleadoController::class, 'saveComision']);
 $router->post('/admin/empleados/comisiones/eliminar', [AdminEmpleadoController::class, 'deleteComision']);
+$router->post('/admin/empleados/comisiones/compartir', [AdminEmpleadoController::class, 'compartirComisiones']);
 $router->get('/admin/empleados/horas', [AdminEmpleadoController::class, 'horas']);
 $router->post('/admin/empleados/horas/guardar', [AdminEmpleadoController::class, 'horasStore']);
 $router->get('/admin/empleados/liquidar', [AdminEmpleadoController::class, 'liquidar']);

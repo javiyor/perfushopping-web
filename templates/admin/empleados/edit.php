@@ -80,7 +80,12 @@
             <div class="card shadow-sm mt-3">
                 <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
                     <span>Comisiones por marca</span>
-                    <button class="btn btn-sm btn-outline-primary" type="button" onclick="agregarComision()"><i class="bi bi-plus"></i></button>
+                    <span class="d-flex gap-1">
+                        <?php if ($comisiones): ?>
+                        <button class="btn btn-sm btn-outline-success" type="button" onclick="compartirComisiones()" title="Copiar estas comisiones a todos los demás empleados"><i class="bi bi-people"></i> Compartir</button>
+                        <?php endif; ?>
+                        <button class="btn btn-sm btn-outline-primary" type="button" onclick="agregarComision()"><i class="bi bi-plus"></i></button>
+                    </span>
                 </div>
                 <div class="card-body" id="comisionesWrap">
                     <?php if (!$comisiones): ?>
@@ -171,6 +176,20 @@ function eliminarComision(codsub) {
     .then(r => r.json())
     .then(res => {
         if (res.ok) location.reload();
+        else alert(res.error);
+    });
+}
+
+function compartirComisiones() {
+    if (!confirm('¿Compartir estas comisiones con todos los demás empleados?\n\nSe reemplazarán las comisiones existentes de cada uno por las de este empleado.')) return;
+    fetch('/admin/empleados/comisiones/compartir', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ _csrf: csrf, admin_user_id: editId }),
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.ok) alert(res.empleados > 0 ? ('Comisiones compartidas con ' + res.empleados + ' empleado(s).') : 'No hay otros empleados para compartir.');
         else alert(res.error);
     });
 }

@@ -111,6 +111,28 @@ final class EmpleadoController
         Response::json(['ok' => true]);
     }
 
+    public function compartirComisiones(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $auth->requirePermiso('usuarios_admin');
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $adminUserId = (int)($_POST['admin_user_id'] ?? 0);
+        if ($adminUserId <= 0) {
+            Response::json(['ok' => false, 'error' => 'Datos inválidos.']);
+            return;
+        }
+
+        $repo = new EmpleadoRepo();
+        if (!$repo->getComisiones($adminUserId)) {
+            Response::json(['ok' => false, 'error' => 'Este empleado no tiene comisiones para compartir.']);
+            return;
+        }
+
+        $empleados = $repo->compartirComisiones($adminUserId);
+        Response::json(['ok' => true, 'empleados' => $empleados]);
+    }
+
     public function horas(array $params): void
     {
         $auth = new AdminAuthService();
