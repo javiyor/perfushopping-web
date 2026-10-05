@@ -406,6 +406,7 @@ final class CajaRepo
 
     public function agregarMovimientoGeneral(string $tipo, ?string $origen, ?int $origenId, string $concepto, int $montoCents, int $createdBy): int
     {
+        $this->ensureGeneralMovimientos();
         try {
             $st = Db::pdo()->prepare('
                 INSERT INTO caja_general_movimientos (tipo, origen, origen_id, concepto, monto_cents, created_by, created_at)
@@ -609,7 +610,9 @@ final class CajaRepo
     /** Aperturas/cierres con sucursal, punto de venta y estado de control. */
     public function cierresEfectivo(?string $desde = null, ?string $hasta = null, int $limit = 50): array
     {
+        $this->ensureCajaColumnas();
         $this->ensureCierreControles();
+        $this->ensureGeneralMovimientos();
         $limit = max(1, min(200, $limit));
         $params = [];
         $where = "ca.estado = 'cerrada'";
@@ -621,24 +624,45 @@ final class CajaRepo
             $where .= ' AND ca.fecha <= :hasta';
             $params[':hasta'] = $hasta;
         }
-        try {
-            $st = Db::pdo()->prepare("
+        $select = "
                 SELECT ca.*, s.nomsuc AS sucursal_nombre, s.punto_venta AS pto_vta,
-                       cc.controlado_por, cc.controlado_at, a.nombre AS controlado_por_nombre
+                       cc.controlado_por, cc.controlado_at, a.nombre AS controlado_por_nombre,
+                       %RETIRO% AS retiro_mov_cents
                 FROM caja_aperturas ca
                 LEFT JOIN admin_sucursales s ON s.id = ca.sucursal_id
                 LEFT JOIN caja_cierre_controles cc ON cc.caja_id = ca.id
                 LEFT JOIN admin_users a ON a.id = cc.controlado_por
-                WHERE {$where}
-                ORDER BY ca.fecha DESC, ca.id DESC
-                LIMIT {$limit}
-            ");
+        ";
+        $joinMov = "
+                LEFT JOIN (
+                    SELECT origen_id, SUM(monto_cents) AS retiro_cents
+                    FROM caja_general_movimientos
+                    WHERE origen = 'cierre_caja' AND origen_id IS NOT NULL
+                    GROUP BY origen_id
+                ) cgm ON cgm.origen_id = ca.id
+        ";
+        $tail = " WHERE {$where} ORDER BY ca.fecha DESC, ca.id DESC LIMIT {$limit}";
+        try {
+            $st = Db::pdo()->prepare(str_replace('%RETIRO%', 'COALESCE(cgm.retiro_cents, 0)', $select) . $joinMov . $tail);
             $st->execute($params);
-            return $st->fetchAll();
+            $rows = $st->fetchAll() ?: [];
         } catch (\Throwable $e) {
-            error_log('CajaRepo::cierresEfectivo error: ' . $e->getMessage());
-            return [];
+            error_log('CajaRepo::cierresEfectivo (con movimientos) error: ' . $e->getMessage());
+            try {
+                $st = Db::pdo()->prepare(str_replace('%RETIRO%', '0', $select) . $tail);
+                $st->execute($params);
+                $rows = $st->fetchAll() ?: [];
+            } catch (\Throwable $e2) {
+                error_log('CajaRepo::cierresEfectivo error: ' . $e2->getMessage());
+                return [];
+            }
         }
+        foreach ($rows as $i => $row) {
+            $columna = (int)($row['monto_retirado_cents'] ?? 0);
+            $movimiento = (int)($row['retiro_mov_cents'] ?? 0);
+            $rows[$i]['monto_retirado_cents'] = max($columna, $movimiento);
+        }
+        return $rows;
     }
 
     /** Desglose de efectivo de una apertura/cierre. */
@@ -826,8 +850,55 @@ final class CajaRepo
             if (!in_array('monto_proxima_apertura_cents', $fields, true)) {
                 Db::pdo()->exec('ALTER TABLE caja_aperturas ADD COLUMN monto_proxima_apertura_cents INT NOT NULL DEFAULT 0');
             }
+            if (!in_array('monto_retirado_cents', $fields, true)) {
+                Db::pdo()->exec('ALTER TABLE caja_aperturas ADD COLUMN monto_retirado_cents INT NOT NULL DEFAULT 0 AFTER monto_cierre_cents');
+            }
         } catch (\Throwable $e) {
             error_log('CajaRepo::ensureCajaColumnas aperturas error: ' . $e->getMessage());
+        }
+    }
+
+    private static ?bool $generalMovReady = null;
+
+    private function ensureGeneralMovimientos(): void
+    {
+        if (self::$generalMovReady !== null) {
+            return;
+        }
+        self::$generalMovReady = true;
+        try {
+            Db::pdo()->exec('
+                CREATE TABLE IF NOT EXISTS caja_general_movimientos (
+                    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                    tipo ENUM(\'ingreso\',\'egreso\') NOT NULL,
+                    origen VARCHAR(30) DEFAULT NULL,
+                    origen_id INT UNSIGNED DEFAULT NULL,
+                    concepto VARCHAR(255) NOT NULL,
+                    monto_cents INT NOT NULL DEFAULT 0,
+                    controlado TINYINT(1) NOT NULL DEFAULT 0,
+                    controlado_por INT UNSIGNED DEFAULT NULL,
+                    controlado_at DATETIME DEFAULT NULL,
+                    created_by INT UNSIGNED DEFAULT NULL,
+                    created_at DATETIME NOT NULL,
+                    KEY idx_cg_origen (origen, origen_id),
+                    KEY idx_cg_controlado (controlado),
+                    KEY idx_cg_fecha (created_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ');
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::ensureGeneralMovimientos create error: ' . $e->getMessage());
+        }
+        try {
+            $cols = Db::pdo()->query('SHOW COLUMNS FROM caja_general_movimientos')->fetchAll();
+            $fields = array_column($cols, 'Field');
+            if (!in_array('origen', $fields, true)) {
+                Db::pdo()->exec('ALTER TABLE caja_general_movimientos ADD COLUMN origen VARCHAR(30) DEFAULT NULL AFTER tipo');
+            }
+            if (!in_array('origen_id', $fields, true)) {
+                Db::pdo()->exec('ALTER TABLE caja_general_movimientos ADD COLUMN origen_id INT UNSIGNED DEFAULT NULL AFTER origen');
+            }
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::ensureGeneralMovimientos columnas error: ' . $e->getMessage());
         }
     }
 
