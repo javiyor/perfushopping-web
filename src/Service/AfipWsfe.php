@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Perfushopping\Web\Service;
 
 use Perfushopping\Web\Repo\ArcaRepo;
+use Perfushopping\Web\Repo\FacturaRepo;
 
 final class AfipWsfe
 {
@@ -137,7 +138,7 @@ final class AfipWsfe
 
     public function solicitarCAE(array $factura, array $items): array
     {
-        $tipoCbte = self::$tipoCbteMap[$factura['tipo_comprobante']] ?? 6;
+        $tipoCbte = self::tipoCbteDeFactura($factura);
         $puntoVenta = $this->resolvePuntoVentaArca($factura);
         $ultimo = $this->getUltimoComprobanteAutorizado($puntoVenta, $tipoCbte);
         $cbteNro = $ultimo + 1;
@@ -193,7 +194,9 @@ final class AfipWsfe
             $grupos = [];
         }
 
-        $condIvaReceptor = self::$condIvaReceptorMap[$factura['cliente_condicion_iva'] ?? ''] ?? 5;
+        $condNorm = FacturaRepo::normalizeCondIva((string)($factura['cliente_condicion_iva'] ?? ''));
+        $condIvaReceptor = self::$condIvaReceptorMap[$condNorm]
+            ?? (in_array($tipoCbte, [1, 2, 3], true) ? 1 : 5);
 
         $detalle = '<FECAEDetRequest>';
         $detalle .= '<Concepto>1</Concepto>';
@@ -250,9 +253,33 @@ final class AfipWsfe
         return self::$tipoCbteMap[$tipoComprobante] ?? 6;
     }
 
+    /**
+     * CbteTipo para ARCA. NC/ND se resuelven por clase según emisor y
+     * condición de IVA del receptor: A (NCA/NDA) para receptor RI con
+     * emisor RI, C (NCC/NDC) con emisor monotributo/exento, y B en el
+     * resto (NCB/NDB). El mapa fijo NC=8/ND=9 (NCB/Recibo B) no sirve
+     * para receptores RI: la clase B rechaza CondicionIvaReceptorId 1.
+     */
+    public static function tipoCbteDeFactura(array $factura): int
+    {
+        $tipo = (string)($factura['tipo_comprobante'] ?? '');
+        if ($tipo !== 'NC' && $tipo !== 'ND') {
+            return self::$tipoCbteMap[$tipo] ?? 6;
+        }
+        $condNorm = FacturaRepo::normalizeCondIva((string)($factura['cliente_condicion_iva'] ?? ''));
+        $emisor = ArcaValidacionService::condicionEmisor();
+        if ($emisor === 'monotributo' || $emisor === 'exento') {
+            return $tipo === 'NC' ? 13 : 12;
+        }
+        if ($condNorm === 'responsable_inscripto') {
+            return $tipo === 'NC' ? 3 : 2;
+        }
+        return $tipo === 'NC' ? 8 : 7;
+    }
+
     public function getUrlQr(array $factura, int $codigoEmision, string $cae): string
     {
-        $tipoCbte = self::getTipoCbteCode($factura['tipo_comprobante'] ?? 'FACT-B');
+        $tipoCbte = self::tipoCbteDeFactura($factura);
         $puntoVenta = $this->resolvePuntoVentaArca($factura);
 
         $descuento = (int)($factura['descuento_cents'] ?? 0);
