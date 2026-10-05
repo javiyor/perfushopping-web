@@ -84,7 +84,7 @@ final class AdminProductRepo
         // Data
         $offset = ($page - 1) * $perPage;
         $dataSql = '
-            SELECT DISTINCT p.idprodu, p.codprodu, p.produ, p.precio, p.precio1, p.imagen, p.enweb, p.fecompra, p.observ,
+            SELECT DISTINCT p.idprodu, p.codprodu, p.produ, p.precio, p.precio1, p.precomp, p.ganan1, p.ganan2, p.imagen, p.enweb, p.fecompra, p.observ,
               r.nomrub,
               s.nomsub,
               i.tiva,
@@ -270,6 +270,19 @@ final class AdminProductRepo
         $st->execute([':observ' => $description, ':id' => $idprodu]);
     }
 
+    public function updatePrecios(int $idprodu, float $precioNeto, float $precio1Neto, float $ganan1, float $ganan2, float $precomp): void
+    {
+        $st = Db::pdo()->prepare('UPDATE producto SET precio = :precio, precio1 = :precio1, ganan1 = :ganan1, ganan2 = :ganan2, precomp = :precomp WHERE idprodu = :id LIMIT 1');
+        $st->execute([
+            ':precio' => $precioNeto,
+            ':precio1' => $precio1Neto,
+            ':ganan1' => $ganan1,
+            ':ganan2' => $ganan2,
+            ':precomp' => $precomp,
+            ':id' => $idprodu,
+        ]);
+    }
+
     public function deleteProduct(int $idprodu): void
     {
         $pdo = Db::pdo();
@@ -348,12 +361,21 @@ final class AdminProductRepo
     }
 
     /** @return array{items: array, total: int} */
-    public function searchForPriceUpdate(string $q = '', int $codsub = 0, string $codprove = '', string $fecompraDesde = '', string $fecompraHasta = '', int $page = 1, int $perPage = 50): array
+    public function searchForPriceUpdate(string $q = '', int $codsub = 0, string $codprove = '', string $fecompraDesde = '', string $fecompraHasta = '', int $page = 1, int $perPage = 50, string $sort = 'id', string $order = 'desc'): array
     {
         $pdo = Db::pdo();
         $page = max(1, $page);
         $perPage = max(10, min(200, $perPage));
         $q = trim($q);
+
+        $sortMap = [
+            'id' => 'p.idprodu', 'codprodu' => 'p.codprodu', 'produ' => 'p.produ',
+            'marca' => 's.nomsub', 'proveedor' => 'pv.razon',
+            'precomp' => 'p.precomp', 'precio' => 'p.precio', 'precio1' => 'p.precio1',
+            'fecompra' => 'p.fecompra',
+        ];
+        $sortCol = $sortMap[$sort] ?? 'p.idprodu';
+        $sortDir = strtolower($order) === 'asc' ? 'ASC' : 'DESC';
 
         $params = [];
         $where = [];
@@ -407,7 +429,7 @@ final class AdminProductRepo
             SELECT p.idprodu, p.codprodu, p.produ, p.precomp, p.precio, p.precio1, p.fecompra, p.codprove,
                    s.nomsub, r.nomrub, pv.razon AS nomprove
             ' . $from . $whereClause . '
-            ORDER BY p.idprodu DESC
+            ORDER BY ' . $sortCol . ' ' . $sortDir . ', p.idprodu DESC
             LIMIT ' . $perPage . ' OFFSET ' . $offset
         );
         $stData->execute($params);

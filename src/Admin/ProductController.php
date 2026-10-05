@@ -325,6 +325,44 @@ final class ProductController
         Response::json(['ok' => true]);
     }
 
+    public function savePrecios(array $params): void
+    {
+        $this->auth->requirePermiso('productos');
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $idprodu = (int)($_POST['idprodu'] ?? 0);
+        $product = $this->repo->find($idprodu);
+        if (!$product) {
+            Response::json(['ok' => false, 'error' => 'Producto no encontrado.'], 404);
+            return;
+        }
+
+        $precioBruto = $this->parseMoney((string)($_POST['precio_gross'] ?? ''));
+        $precio1Bruto = $this->parseMoney((string)($_POST['precio1_gross'] ?? ''));
+        if ($precioBruto === null || $precio1Bruto === null) {
+            Response::json(['ok' => false, 'error' => 'Carga precios válidos.'], 422);
+            return;
+        }
+
+        $ganan1 = (float)str_replace(',', '.', trim((string)($_POST['ganan1'] ?? '0')));
+        $ganan2 = (float)str_replace(',', '.', trim((string)($_POST['ganan2'] ?? '0')));
+        $precomp = $this->parseMoney((string)($_POST['precomp'] ?? '')) ?? 0;
+        if ($precomp < 0) $precomp = 0;
+
+        $ivaRate = (float)($product['tiva'] ?? 0);
+        $precioNeto = $this->grossToNet($precioBruto, $ivaRate);
+        $precio1Neto = $this->grossToNet($precio1Bruto, $ivaRate);
+        $this->repo->updatePrecios($idprodu, $precioNeto, $precio1Neto, $ganan1, $ganan2, $precomp);
+
+        Response::json([
+            'ok' => true,
+            'precio' => $precioNeto,
+            'precio1' => $precio1Neto,
+            'precio_gross' => $precioBruto,
+            'precio1_gross' => $precio1Bruto,
+        ]);
+    }
+
     public function uploadMainImage(array $params): void
     {
         $this->auth->requirePermiso('productos');

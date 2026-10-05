@@ -12,10 +12,15 @@ $proveedores = $proveedores ?? [];
 $products = $products ?? [];
 $page = (int)($page ?? 1);
 $perPage = (int)($perPage ?? 50);
+$sort = (string)($sort ?? 'id');
+$order = (string)($order ?? 'desc');
 $total = (int)($total ?? 0);
 $totalPages = $perPage > 0 ? (int)ceil($total / $perPage) : 1;
 $from = $total > 0 ? (($page - 1) * $perPage + 1) : 0;
 $to = min($page * $perPage, $total);
+
+$sortable = ['id' => 'ID', 'codprodu' => 'Código', 'produ' => 'Producto', 'marca' => 'Marca', 'proveedor' => 'Proveedor', 'precomp' => 'Precomp', 'precio' => 'Precio', 'precio1' => 'Precio1', 'fecompra' => 'F.Compra'];
+$rightCols = ['precomp', 'precio', 'precio1'];
 
 $preserve = [];
 if ($q !== '') $preserve['q'] = $q;
@@ -23,8 +28,11 @@ if ($codsub > 0) $preserve['codsub'] = (string)$codsub;
 if ($codprove !== '') $preserve['codprove'] = $codprove;
 if ($fecompraDesde !== '') $preserve['fecompra_desde'] = $fecompraDesde;
 if ($fecompraHasta !== '') $preserve['fecompra_hasta'] = $fecompraHasta;
+$preserve['sort'] = $sort;
+$preserve['order'] = $order;
 
 $pageUrl = fn(array $extra) => '/admin/productos/actualizar-precios?' . http_build_query(array_merge($preserve, $extra));
+$sortLink = fn(string $col) => '/admin/productos/actualizar-precios?' . http_build_query(array_merge($preserve, ['sort' => $col, 'order' => ($sort === $col && $order === 'asc') ? 'desc' : 'asc', 'page' => '1']));
 ?>
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
@@ -62,6 +70,8 @@ $pageUrl = fn(array $extra) => '/admin/productos/actualizar-precios?' . http_bui
             <div class="col-lg-2">
                 <input class="form-control form-control-sm" type="date" name="fecompra_hasta" value="<?= htmlspecialchars($fecompraHasta) ?>" placeholder="F.compra hasta" />
             </div>
+            <input type="hidden" name="sort" value="<?= htmlspecialchars($sort) ?>" />
+            <input type="hidden" name="order" value="<?= htmlspecialchars($order) ?>" />
             <div class="col-lg-1 d-flex gap-1">
                 <button class="btn btn-accent btn-sm flex-fill" type="submit"><i class="bi bi-search"></i></button>
                 <?php if ($q !== '' || $codsub > 0 || $codprove !== '' || $fecompraDesde !== '' || $fecompraHasta !== ''): ?>
@@ -133,15 +143,19 @@ $pageUrl = fn(array $extra) => '/admin/productos/actualizar-precios?' . http_bui
                         <th style="width:40px">
                             <input class="form-check-input" type="checkbox" id="select-all" />
                         </th>
-                        <th>ID</th>
-                        <th>Código</th>
-                        <th>Producto</th>
-                        <th>Marca</th>
-                        <th>Proveedor</th>
-                        <th class="text-end">Precomp</th>
-                        <th class="text-end">Precio</th>
-                        <th class="text-end">Precio1</th>
-                        <th>F.Compra</th>
+                        <?php foreach ($sortable as $col => $label):
+                            $active = $sort === $col;
+                            $isRight = in_array($col, $rightCols, true);
+                        ?>
+                            <th class="<?= $active ? 'sort-active ' : '' ?><?= $isRight ? 'text-end' : '' ?>">
+                                <a href="<?= htmlspecialchars($sortLink($col)) ?>" class="text-decoration-none d-flex align-items-center gap-1 <?= $isRight ? 'justify-content-end' : '' ?>">
+                                    <?= htmlspecialchars($label) ?>
+                                    <?php if ($active): ?>
+                                        <i class="bi bi-chevron-<?= $order === 'asc' ? 'up' : 'down' ?>"></i>
+                                    <?php endif; ?>
+                                </a>
+                            </th>
+                        <?php endforeach; ?>
                     </tr>
                 </thead>
                 <tbody>

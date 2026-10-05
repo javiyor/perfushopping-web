@@ -31,12 +31,16 @@ final class PriceUpdateController
         $fecompraHasta = trim((string)($_GET['fecompra_hasta'] ?? ''));
         $page = max(1, (int)($_GET['page'] ?? 1));
         $perPage = max(10, min(200, (int)($_GET['per_page'] ?? 50)));
+        $sort = (string)($_GET['sort'] ?? 'id');
+        $order = (string)($_GET['order'] ?? 'desc');
+        if (!in_array($sort, ['id', 'codprodu', 'produ', 'marca', 'proveedor', 'precomp', 'precio', 'precio1', 'fecompra'], true)) $sort = 'id';
+        if (!in_array($order, ['asc', 'desc'], true)) $order = 'desc';
 
         $brands = $this->repo->brandOptions();
         $categories = $this->repo->categoryOptions();
         $proveedores = (new \Perfushopping\Web\Repo\ProveedorRepo())->findAll();
 
-        $result = $this->repo->searchForPriceUpdate($q, $codsub, $codprove, $fecompraDesde, $fecompraHasta, $page, $perPage);
+        $result = $this->repo->searchForPriceUpdate($q, $codsub, $codprove, $fecompraDesde, $fecompraHasta, $page, $perPage, $sort, $order);
 
         echo View::adminPage('admin/productos/price_update.php', [
             'adminUser' => $adminUser,
@@ -47,6 +51,8 @@ final class PriceUpdateController
             'fecompraHasta' => $fecompraHasta,
             'page' => $page,
             'perPage' => $perPage,
+            'sort' => $sort,
+            'order' => $order,
             'total' => $result['total'],
             'brands' => $brands,
             'categories' => $categories,
