@@ -211,7 +211,8 @@ $pedidoDescPct = $pedidoDescPct ?? 0;
     <input type="hidden" id="clienteErpId" value="0" />
     <span id="clienteNombre" class="fw-semibold small">Consumidor Final</span>
     <span id="clienteCatBadge" class="badge bg-warning text-dark" style="display:none;font-size:10px">Precios mayoristas</span>
-    <span id="clienteCuit" class="text-muted small"></span>
+    <span id="clienteInfo" class="text-muted small"></span>
+    <span id="clienteCuit" class="d-none"></span>
     <input type="hidden" id="clienteCondIva" value="consumidor_final" />
     <input type="hidden" id="emisorIva" value="<?= htmlspecialchars($emisorIva ?? '') ?>" />
     <button class="btn btn-sm btn-outline-secondary" type="button" onclick="clearCliente()" title="Consumidor Final"><i class="bi bi-person-x"></i></button>
@@ -838,11 +839,20 @@ cliInput.addEventListener('blur', function() {
     setTimeout(() => cliSuggestions.innerHTML = '', 300);
 });
 
+function condIvaTexto(cond) {
+    const mapa = {
+        responsable_inscripto: 'Responsable Inscripto',
+        monotributista: 'Monotributista',
+        exento: 'Exento',
+        consumidor_final: 'Consumidor Final',
+    };
+    return mapa[cond] || '';
+}
+
 function selectCliente(c) {
     document.getElementById('clienteId').value = c.id || 0;
     document.getElementById('clienteErpId').value = c.idclien || 0;
     clienteNombreSel = (c.name || '').trim();
-    document.getElementById('clienteNombre').textContent = c.name || 'Consumidor Final';
     document.getElementById('clienteCuit').textContent = c.cuit || '';
     document.getElementById('clienteCondIva').value = c.condicion_iva || 'consumidor_final';
     const cat = c.categoria || 'minorista';
@@ -850,7 +860,9 @@ function selectCliente(c) {
     actualizarBadgeMayorista();
     const displayName = (c.name || 'Consumidor Final') + (c.cuit ? ' - ' + c.cuit : '') + categoriaBadge(c);
     document.getElementById('clienteNombre').textContent = displayName;
-    cliInput.value = c.name || '';
+    const dir = [c.direc || '', c.city || ''].filter(Boolean).join(', ');
+    document.getElementById('clienteInfo').textContent = [condIvaTexto(c.condicion_iva || ''), dir].filter(Boolean).join(' · ');
+    cliInput.value = '';
     cliSuggestions.innerHTML = '';
 
     const iva = c.condicion_iva || 'consumidor_final';
@@ -917,6 +929,7 @@ function clearCliente() {
     clienteNombreSel = '';
     document.getElementById('clienteNombre').textContent = 'Consumidor Final';
     document.getElementById('clienteCuit').textContent = '';
+    document.getElementById('clienteInfo').textContent = '';
     document.getElementById('clienteCondIva').value = 'consumidor_final';
     clienteMayorista = false;
     actualizarBadgeMayorista();
@@ -1251,15 +1264,19 @@ function editarPrefill() {
             name: f.cliente_nombre || '',
             cuit: f.cliente_cuit || '',
             condicion_iva: f.cliente_condicion_iva || 'consumidor_final',
+            direc: f.cliente_direc || '',
+            city: '',
         });
     } else {
         if (f.cliente_nombre) {
             clienteNombreSel = (f.cliente_nombre || '').trim();
             document.getElementById('clienteNombre').textContent = f.cliente_nombre;
-            cliInput.value = f.cliente_nombre;
+            cliInput.value = '';
         }
         if (f.cliente_cuit) document.getElementById('clienteCuit').textContent = f.cliente_cuit;
         if (f.cliente_condicion_iva) document.getElementById('clienteCondIva').value = f.cliente_condicion_iva;
+        document.getElementById('clienteInfo').textContent =
+            [condIvaTexto(f.cliente_condicion_iva || ''), f.cliente_direc || ''].filter(Boolean).join(' · ');
     }
     // selectCliente puede cambiar el tipo según la condición: prevalece el original
     const tc = document.getElementById('tipoComprobante');

@@ -8,9 +8,10 @@ use Perfushopping\Web\Infra\Db;
 final class CustomerRepo
 {
     /** @return array<int, array<string,mixed>> */
-    public function search(string $q = '', int $limit = 60): array
+    public function search(string $q = '', int $limit = 60, int $offset = 0): array
     {
         $limit = max(1, min(200, $limit));
+        $offset = max(0, $offset);
         $q = trim($q);
 
         $select = '
@@ -52,11 +53,33 @@ final class CustomerRepo
         if ($where) {
             $sql .= ' WHERE ' . implode(' AND ', $where);
         }
-        $sql .= ' ORDER BY COALESCE(NULLIF(TRIM(u.name), \'\'), u.email) ASC, u.id ASC LIMIT ' . $limit;
+        $sql .= ' ORDER BY COALESCE(NULLIF(TRIM(u.name), \'\'), u.email) ASC, u.id ASC LIMIT ' . $limit . ' OFFSET ' . $offset;
 
         $st = Db::pdo()->prepare($sql);
         $st->execute($params);
         return $st->fetchAll();
+    }
+
+    public function countSearch(string $q = ''): int
+    {
+        $q = trim($q);
+        $params = [];
+        $where = [];
+        if ($q !== '') {
+            $digits = preg_replace('/[^0-9]/', '', $q) ?? '';
+            $where[] = '(u.name LIKE :like OR u.email LIKE :like OR u.phone LIKE :like OR u.phone_key LIKE :pk'
+                . ' OR c.razon LIKE :like OR c.cuit LIKE :cuit_like)';
+            $params[':like'] = '%' . $q . '%';
+            $params[':pk'] = $digits;
+            $params[':cuit_like'] = $digits !== '' ? '%' . $digits . '%' : '%' . $q . '%';
+        }
+        $sql = 'SELECT COUNT(*) FROM web_users u LEFT JOIN clientes c ON c.idclien = u.cliente_id';
+        if ($where) {
+            $sql .= ' WHERE ' . implode(' AND ', $where);
+        }
+        $st = Db::pdo()->prepare($sql);
+        $st->execute($params);
+        return (int)$st->fetchColumn();
     }
 
     /**
@@ -64,9 +87,10 @@ final class CustomerRepo
      * Se muestran con etiqueta "Presencial".
      * @return array<int, array<string,mixed>>
      */
-    public function searchPresenciales(string $q = '', int $limit = 60): array
+    public function searchPresenciales(string $q = '', int $limit = 60, int $offset = 0): array
     {
         $limit = max(1, min(200, $limit));
+        $offset = max(0, $offset);
         $q = trim($q);
         $params = [];
         $where = 'w.id IS NULL';
@@ -99,13 +123,39 @@ final class CustomerRepo
                 WHERE {$where}
                 GROUP BY c.idclien
                 ORDER BY c.razon ASC, c.idclien ASC
-                LIMIT {$limit}
+                LIMIT {$limit} OFFSET {$offset}
             ");
             $st->execute($params);
             return $st->fetchAll();
         } catch (\Throwable $e) {
             error_log('CustomerRepo::searchPresenciales error: ' . $e->getMessage());
             return [];
+        }
+    }
+
+    public function countPresenciales(string $q = ''): int
+    {
+        $q = trim($q);
+        $params = [];
+        $where = 'w.id IS NULL';
+        if ($q !== '') {
+            $where .= ' AND (c.razon LIKE :like OR c.cuit LIKE :like2 OR c.tele LIKE :like3 OR c.mail LIKE :like4)';
+            $params[':like'] = '%' . $q . '%';
+            $params[':like2'] = '%' . $q . '%';
+            $params[':like3'] = '%' . $q . '%';
+            $params[':like4'] = '%' . $q . '%';
+        }
+        try {
+            $st = Db::pdo()->prepare("
+                SELECT COUNT(*)
+                FROM clientes c
+                LEFT JOIN web_users w ON w.cliente_id = c.idclien
+                WHERE {$where}
+            ");
+            $st->execute($params);
+            return (int)$st->fetchColumn();
+        } catch (\Throwable $e) {
+            return 0;
         }
     }
 
@@ -289,7 +339,31 @@ final class CustomerRepo
         static $cols = null;
         if ($cols === null) {
             try {
-                $cols = array_fill_keys(array_column(Db::pdo()->query('SHOW COLUMNS FROM clientes')->fetchAll(), 'Field'), true);
+                $pdo = Db::pdo();
+                $cols = array_fill_keys(array_column($pdo->query('SHOW COLUMNS FROM clientes')->fetchAll(), 'Field'), true);
+                $asegurar = [
+                    'condicion_iva' => "VARCHAR(20) DEFAULT 'consumidor_final'",
+                    'localidad' => 'VARCHAR(60) DEFAULT NULL',
+                ];
+                foreach ($asegurar as $col => $ddl) {
+                    $encontrada = null;
+                    foreach (array_keys($cols) as $k) {
+                        if (strtolower((string)$k) === $col) {
+                            $encontrada = (string)$k;
+                            break;
+                        }
+                    }
+                    if ($encontrada === null) {
+                        try {
+                            $pdo->exec("ALTER TABLE clientes ADD COLUMN {$col} {$ddl}");
+                            $cols[$col] = true;
+                        } catch (\Throwable $e) {
+                            error_log('CustomerRepo::clientesColumnas ensure ' . $col . ': ' . $e->getMessage());
+                        }
+                    } elseif ($encontrada !== $col) {
+                        $cols[$col] = true;
+                    }
+                }
             } catch (\Throwable $e) {
                 $cols = [];
             }
@@ -306,7 +380,7 @@ final class CustomerRepo
             'direc' => 'direc',
             'tele' => 'tele',
             'mail' => 'mail',
-            'localidad' => 'Localidad',
+            'localidad' => 'localidad',
             'condicion_iva' => 'condicion_iva',
             'categoria' => 'categoria',
             'precio_mayorista' => 'precio_mayorista',

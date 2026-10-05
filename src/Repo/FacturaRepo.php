@@ -9,9 +9,14 @@ final class FacturaRepo
 {
     public static function normalizeCondIva(?string $value): string
     {
-        $normalized = strtolower(trim((string)$value));
+        $lower = strtolower(trim((string)$value));
+        $collapsed = preg_replace('/\s+/', ' ', $lower);
+        $normalized = trim(is_string($collapsed) ? $collapsed : $lower);
         $map = [
             'responsable inscripto' => 'responsable_inscripto',
+            'iva responsable inscripto' => 'responsable_inscripto',
+            'resp inscripto' => 'responsable_inscripto',
+            'resp. inscripto' => 'responsable_inscripto',
             'ri' => 'responsable_inscripto',
             'consumidor final' => 'consumidor_final',
             'cf' => 'consumidor_final',
@@ -830,10 +835,20 @@ final class FacturaRepo
     {
         if (self::$clientesCondicionIva === null) {
             try {
-                $cols = Db::pdo()->query('SHOW COLUMNS FROM clientes');
-                self::$clientesCondicionIva = in_array('condicion_iva', array_column($cols->fetchAll(), 'Field'), true);
+                $cols = Db::pdo()->query('SHOW COLUMNS FROM clientes')->fetchAll();
+                $fieldsLower = array_map('strtolower', array_column($cols, 'Field'));
+                if (!in_array('condicion_iva', $fieldsLower, true)) {
+                    Db::pdo()->exec("ALTER TABLE clientes ADD COLUMN condicion_iva VARCHAR(20) DEFAULT 'consumidor_final'");
+                }
+                self::$clientesCondicionIva = true;
             } catch (\Throwable $e) {
-                self::$clientesCondicionIva = false;
+                try {
+                    $cols = Db::pdo()->query('SHOW COLUMNS FROM clientes')->fetchAll();
+                    $fieldsLower = array_map('strtolower', array_column($cols, 'Field'));
+                    self::$clientesCondicionIva = in_array('condicion_iva', $fieldsLower, true);
+                } catch (\Throwable $e2) {
+                    self::$clientesCondicionIva = false;
+                }
             }
         }
         return self::$clientesCondicionIva;
@@ -932,46 +947,62 @@ final class FacturaRepo
         $razon = trim($data['razon'] ?? $data['razonSocial'] ?? '');
         $direc = trim($data['direc'] ?? '');
         $localidad = trim($data['localidad'] ?? '');
+        $condIva = self::normalizeCondIva((string)($data['condicion_iva'] ?? ''));
+        CustomerRepo::clientesColumnas(); // asegura localidad/condicion_iva antes de escribir
+        $hasCond = self::clientesTieneCondicionIva();
         // Check if exists by CUIT
         $st = Db::pdo()->prepare('SELECT * FROM clientes WHERE cuit = :c LIMIT 1');
         $st->execute([':c' => $cuit]);
         $existing = $st->fetch();
 
         if ($existing) {
-            $st = Db::pdo()->prepare('
-                UPDATE clientes SET razon = :r, direc = :d, Localidad = :l
-                WHERE idclien = :id LIMIT 1
-            ');
-            $st->execute([
-                ':r' => $razon,
-                ':d' => $direc,
-                ':l' => $localidad,
-                ':id' => $existing['idclien'],
-            ]);
+            $sets = ['razon = :r'];
+            $params = [':r' => $razon, ':id' => $existing['idclien']];
+            if ($direc !== '') {
+                $sets[] = 'direc = :d';
+                $params[':d'] = $direc;
+            }
+            if ($localidad !== '') {
+                $sets[] = 'Localidad = :l';
+                $params[':l'] = $localidad;
+            }
+            if ($hasCond) {
+                $sets[] = "condicion_iva = COALESCE(NULLIF(TRIM(condicion_iva), ''), :ci)";
+                $params[':ci'] = $condIva;
+            }
+            $st = Db::pdo()->prepare('UPDATE clientes SET ' . implode(', ', $sets) . ' WHERE idclien = :id LIMIT 1');
+            $st->execute($params);
             $idclien = (int)$existing['idclien'];
         } else {
-            $st = Db::pdo()->prepare('
-                INSERT INTO clientes (razon, cuit, direc, Localidad, activo, fealta)
-                VALUES (:r, :c, :d, :l, 1, NOW())
-            ');
-            $st->execute([
+            $condCols = $hasCond ? ', condicion_iva' : '';
+            $condVals = $hasCond ? ', :ci' : '';
+            $st = Db::pdo()->prepare("
+                INSERT INTO clientes (razon, cuit, direc, Localidad{$condCols}, activo, fealta)
+                VALUES (:r, :c, :d, :l{$condVals}, 1, NOW())
+            ");
+            $params = [
                 ':r' => $razon,
                 ':c' => $cuit,
                 ':d' => $direc,
                 ':l' => $localidad,
-            ]);
+            ];
+            if ($hasCond) {
+                $params[':ci'] = $condIva;
+            }
+            $st->execute($params);
             $idclien = (int)Db::pdo()->lastInsertId();
         }
 
         // Return in same format as findClienteWeb
-        $st = Db::pdo()->prepare('
+        $condSelect = $hasCond ? "COALESCE(c.condicion_iva, 'consumidor_final')" : "'consumidor_final'";
+        $st = Db::pdo()->prepare("
             SELECT 0 AS id, c.idclien,
                    c.razon AS name, c.cuit, c.direc, c.tele AS phone, c.mail AS email,
                    c.Localidad AS city,
-                   COALESCE(c.condicion_iva, \'consumidor_final\') AS condicion_iva
+                   {$condSelect} AS condicion_iva
             FROM clientes c
             WHERE c.idclien = :id LIMIT 1
-        ');
+        ");
         $st->execute([':id' => $idclien]);
         $r = $st->fetch();
         if ($r) {

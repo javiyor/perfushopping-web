@@ -5,6 +5,42 @@ $list = $list ?? [];
 $presenciales = $presenciales ?? [];
 $q = (string)($q ?? '');
 $erpCols = $erpCols ?? [];
+$page = max(1, (int)($page ?? 1));
+$pages = max(1, (int)($pages ?? 1));
+$total = (int)($total ?? count($list));
+$pagePres = max(1, (int)($pagePres ?? 1));
+$pagesPres = max(1, (int)($pagesPres ?? 1));
+$totalPres = (int)($totalPres ?? count($presenciales));
+$pageUrl = function ($p) use ($q) {
+    return '/admin/clientes?page=' . $p . ($q !== '' ? '&q=' . rawurlencode($q) : '');
+};
+$paginador = function (int $pag, int $pags, callable $url): void {
+    if ($pags <= 1) {
+        return;
+    }
+    $winStart = max(1, min($pag - 3, $pags - 6));
+    $winEnd = min($pags, $winStart + 6);
+    $winStart = max(1, $winEnd - 6);
+    ?>
+    <div class="card-footer bg-white d-flex justify-content-between align-items-center">
+        <nav>
+            <ul class="pagination pagination-sm mb-0">
+                <li class="page-item <?= $pag <= 1 ? 'disabled' : '' ?>">
+                    <a class="page-link" href="<?= $pag <= 1 ? '#' : htmlspecialchars($url($pag - 1)) ?>">‹</a>
+                </li>
+                <?php for ($p = $winStart; $p <= $winEnd; $p++): ?>
+                <li class="page-item <?= $p === $pag ? 'active' : '' ?>">
+                    <a class="page-link" href="<?= htmlspecialchars($url($p)) ?>"><?= $p ?></a>
+                </li>
+                <?php endfor; ?>
+                <li class="page-item <?= $pag >= $pags ? 'disabled' : '' ?>">
+                    <a class="page-link" href="<?= $pag >= $pags ? '#' : htmlspecialchars($url($pag + 1)) ?>">›</a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+    <?php
+};
 $customerCategories = [
     'none' => 'Sin categoría', 'peluquero' => 'Peluquero/a', 'cosmetologa' => 'Cosmetóloga',
     'esteticista' => 'Esteticista', 'manicura' => 'Manicura/o', 'masajista' => 'Masajista',
@@ -113,15 +149,18 @@ $customerCategories = [
             </tbody>
         </table>
     </div>
-    <?php if ($list && count($list) >= 60): ?>
-        <div class="card-footer text-muted small text-center">Mostrando hasta 60 resultados. Refiná la búsqueda si no encontrás lo que buscás.</div>
+    <?php if ($pages > 1): ?>
+        <div class="card-footer bg-white d-flex justify-content-between align-items-center">
+            <span class="small text-muted"><?= $total ?> clientes · Página <?= $page ?> de <?= $pages ?></span>
+            <?php $paginador($page, $pages, $pageUrl); ?>
+        </div>
     <?php endif; ?>
 </div>
 
 <div class="card shadow-sm mt-3">
     <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
         <span>Clientes presenciales <span class="badge bg-info">Facturación</span></span>
-        <span class="badge bg-secondary"><?= count($presenciales) ?></span>
+        <span class="badge bg-secondary"><?= $totalPres ?></span>
     </div>
     <div class="table-responsive">
         <table class="table table-admin table-hover mb-0">
@@ -184,6 +223,12 @@ $customerCategories = [
             </tbody>
         </table>
     </div>
+    <?php if ($pagesPres > 1): ?>
+        <div class="card-footer bg-white d-flex justify-content-between align-items-center">
+            <span class="small text-muted"><?= $totalPres ?> presenciales · Página <?= $pagePres ?> de <?= $pagesPres ?></span>
+            <?php $paginador($pagePres, $pagesPres, $pageUrl); ?>
+        </div>
+    <?php endif; ?>
 </div>
 
 <form method="post" action="/admin/clientes/eliminar" id="eliminarPresencialForm" class="d-none">

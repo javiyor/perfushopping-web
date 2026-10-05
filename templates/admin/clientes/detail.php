@@ -140,7 +140,7 @@ $erpCategorias = ['minorista' => 'Minorista', 'mayorista' => 'Mayorista', 'profe
                     <dt class="col-sm-4">Dirección</dt>
                     <dd class="col-sm-8"><?= htmlspecialchars((string)($clienteErp['direc'] ?? '-')) ?></dd>
                     <dt class="col-sm-4">Localidad</dt>
-                    <dd class="col-sm-8"><?= htmlspecialchars((string)($clienteErp['Localidad'] ?? '-')) ?></dd>
+                    <dd class="col-sm-8"><?= htmlspecialchars((string)($clienteErp['localidad'] ?? $clienteErp['Localidad'] ?? '-')) ?></dd>
                     <dt class="col-sm-4">C.P.</dt>
                     <dd class="col-sm-8"><?= htmlspecialchars((string)($clienteErp['codpost'] ?? '-')) ?></dd>
                     <dt class="col-sm-4">Teléfono</dt>
@@ -354,7 +354,7 @@ $erpCategorias = ['minorista' => 'Minorista', 'mayorista' => 'Mayorista', 'profe
                         </div>
                         <div class="col-6">
                             <label class="form-label small">Localidad</label>
-                            <input type="text" class="form-control form-control-sm" name="erp_localidad" value="<?= htmlspecialchars((string)($clienteErp['Localidad'] ?? '')) ?>" />
+                            <input type="text" class="form-control form-control-sm" name="erp_localidad" value="<?= htmlspecialchars((string)($clienteErp['localidad'] ?? $clienteErp['Localidad'] ?? '')) ?>" />
                         </div>
                         <div class="col-6">
                             <label class="form-label small">Teléfono</label>

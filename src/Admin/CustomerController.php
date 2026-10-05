@@ -21,14 +21,33 @@ final class CustomerController
         $adminUser = $auth->requirePermiso('clientes');
 
         $q = trim((string)($_GET['q'] ?? ''));
-        $list = (new CustomerRepo())->search($q);
-        $presenciales = (new CustomerRepo())->searchPresenciales($q);
+        $page = max(1, (int)($_GET['page'] ?? 1));
+        $perPage = 60;
+        $repo = new CustomerRepo();
+
+        $total = $repo->countSearch($q);
+        $pages = max(1, (int)ceil($total / $perPage));
+        if ($page > $pages) {
+            $page = $pages;
+        }
+        $list = $repo->search($q, $perPage, ($page - 1) * $perPage);
+
+        $totalPres = $repo->countPresenciales($q);
+        $pagesPres = max(1, (int)ceil($totalPres / $perPage));
+        $pagePres = min($page, $pagesPres);
+        $presenciales = $repo->searchPresenciales($q, $perPage, ($pagePres - 1) * $perPage);
 
         echo View::adminPage('admin/clientes/list.php', [
             'adminUser' => $adminUser,
             'list' => $list,
             'presenciales' => $presenciales,
             'q' => $q,
+            'page' => $page,
+            'pages' => $pages,
+            'total' => $total,
+            'pagePres' => $pagePres,
+            'pagesPres' => $pagesPres,
+            'totalPres' => $totalPres,
             'csrf' => Csrf::token(),
             'flash' => $_SESSION['admin_flash'] ?? null,
             'erpCols' => CustomerRepo::clientesColumnas(),
