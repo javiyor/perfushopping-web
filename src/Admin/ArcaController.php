@@ -132,13 +132,13 @@ final class ArcaController
     public function reenviar(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requirePermiso('arca');
+        $adminUser = $auth->requirePermiso('facturacion', 'arca');
         Csrf::check($_POST['_csrf'] ?? null);
 
         $facturaId = (int)($_POST['factura_id'] ?? 0);
         if ($facturaId <= 0) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'ID de factura inválido.'];
-            Response::redirect('/admin/arca');
+            Response::redirect('/admin/facturas/comprobantes');
         }
 
         $repo = new ArcaRepo();
@@ -147,13 +147,13 @@ final class ArcaController
 
         if (!$factura) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Factura no encontrada.'];
-            Response::redirect('/admin/arca');
+            Response::redirect('/admin/facturas/comprobantes');
         }
 
         $errorArca = \Perfushopping\Web\Service\ArcaValidacionService::validarFactura($factura);
         if ($errorArca !== null) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => $errorArca];
-            Response::redirect('/admin/arca');
+            Response::redirect('/admin/facturas/comprobantes');
         }
 
         $items = $facturaRepo->items($facturaId);
