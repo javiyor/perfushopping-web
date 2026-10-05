@@ -496,7 +496,7 @@ final class CajaRepo
                 FROM caja_general_movimientos cg
                 LEFT JOIN admin_users a ON a.id = cg.created_by
                 LEFT JOIN admin_users c ON c.id = cg.controlado_por
-                WHERE cg.origen IN (\'cierre_caja\', \'directo\')
+                WHERE 1=1
             ';
             $params = [];
             if ($tipo !== null && $tipo !== '') {

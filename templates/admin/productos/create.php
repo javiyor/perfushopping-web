@@ -172,21 +172,41 @@ document.querySelectorAll('.calc-trigger').forEach(el => {
     el.addEventListener('input', autoCalcPrices);
     el.addEventListener('change', autoCalcPrices);
 });
-function autoCalcPrices() {
-    var costo = parseFloat(document.querySelector('[name="precomp"]').value.replace(',', '.')) || 0;
-    var g1 = parseFloat(document.querySelector('[name="ganan1"]').value.replace(',', '.')) || 0;
-    var g2 = parseFloat(document.querySelector('[name="ganan2"]').value.replace(',', '.')) || 0;
+function parseImporte(v) {
+    return parseFloat((v || '0').replace(',', '.')) || 0;
+}
+function ivaActualPct() {
     var ivaSel = document.querySelector('[name="iva"]');
-    var ivaPct = parseFloat(ivaSel.options[ivaSel.selectedIndex].getAttribute('data-iva-pct')) || 0;
+    return parseFloat(ivaSel.options[ivaSel.selectedIndex].getAttribute('data-iva-pct')) || 0;
+}
+function autoCalcPrices() {
+    var costo = parseImporte(document.querySelector('[name="precomp"]').value);
+    var g1 = parseImporte(document.querySelector('[name="ganan1"]').value);
+    var g2 = parseImporte(document.querySelector('[name="ganan2"]').value);
+    var ivaPct = ivaActualPct();
     if (costo > 0 && g1 > 0) {
-        var neto1 = costo * (1 + g1 / 100);
-        var gross1 = neto1 * (1 + ivaPct / 100);
-        document.querySelector('[name="precio_gross"]').value = gross1.toFixed(2);
+        document.querySelector('[name="precio_gross"]').value = (costo * (1 + g1 / 100) * (1 + ivaPct / 100)).toFixed(2);
     }
     if (costo > 0 && g2 > 0) {
-        var neto2 = costo * (1 + g2 / 100);
-        var gross2 = neto2 * (1 + ivaPct / 100);
-        document.querySelector('[name="precio1_gross"]').value = gross2.toFixed(2);
+        document.querySelector('[name="precio1_gross"]').value = (costo * (1 + g2 / 100) * (1 + ivaPct / 100)).toFixed(2);
     }
 }
+function autoCalcMargins() {
+    var costo = parseImporte(document.querySelector('[name="precomp"]').value);
+    if (costo <= 0) return;
+    var ivaPct = ivaActualPct();
+    var p1 = parseImporte(document.querySelector('[name="precio_gross"]').value);
+    var p2 = parseImporte(document.querySelector('[name="precio1_gross"]').value);
+    if (p1 > 0) {
+        document.querySelector('[name="ganan1"]').value = (((p1 / (1 + ivaPct / 100)) / costo - 1) * 100).toFixed(2);
+    }
+    if (p2 > 0) {
+        document.querySelector('[name="ganan2"]').value = (((p2 / (1 + ivaPct / 100)) / costo - 1) * 100).toFixed(2);
+    }
+}
+[document.querySelector('[name="precio_gross"]'), document.querySelector('[name="precio1_gross"]')].forEach(el => {
+    if (!el) return;
+    el.addEventListener('input', autoCalcMargins);
+    el.addEventListener('change', autoCalcMargins);
+});
 </script>

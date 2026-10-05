@@ -596,10 +596,21 @@ document.querySelectorAll('.calc-trigger').forEach(function(el) {
     el.addEventListener('input', autoCalcPrices);
     el.addEventListener('change', autoCalcPrices);
 });
+function parseImporte(v) {
+    return parseFloat((v || '0').replace(',', '.')) || 0;
+}
+function actualizarNeto() {
+    var netoEl = document.getElementById('netoCalculado');
+    if (!netoEl) return;
+    var ivaPct = <?= json_encode($selectedIva) ?>;
+    var n1 = parseImporte(document.querySelector('[name="precio_gross"]').value) / (1 + ivaPct / 100);
+    var n2 = parseImporte(document.querySelector('[name="precio1_gross"]').value) / (1 + ivaPct / 100);
+    netoEl.textContent = 'Minorista $' + fmtNeto(n1) + ' | Mayorista $' + fmtNeto(n2);
+}
 function autoCalcPrices() {
-    var costo = parseFloat((document.querySelector('[name="precomp"]').value || '0').replace(',', '.')) || 0;
-    var g1 = parseFloat((document.querySelector('[name="ganan1"]').value || '0').replace(',', '.')) || 0;
-    var g2 = parseFloat((document.querySelector('[name="ganan2"]').value || '0').replace(',', '.')) || 0;
+    var costo = parseImporte(document.querySelector('[name="precomp"]').value);
+    var g1 = parseImporte(document.querySelector('[name="ganan1"]').value);
+    var g2 = parseImporte(document.querySelector('[name="ganan2"]').value);
     var ivaPct = <?= json_encode($selectedIva) ?>;
     var elPrecio = document.querySelector('[name="precio_gross"]');
     var elPrecio1 = document.querySelector('[name="precio1_gross"]');
@@ -609,16 +620,30 @@ function autoCalcPrices() {
     if (costo > 0 && g2 > 0) {
         elPrecio1.value = (costo * (1 + g2 / 100) * (1 + ivaPct / 100)).toFixed(2);
     }
-    var netoEl = document.getElementById('netoCalculado');
-    if (netoEl) {
-        var n1 = (parseFloat((elPrecio.value || '0').replace(',', '.')) || 0) / (1 + ivaPct / 100);
-        var n2 = (parseFloat((elPrecio1.value || '0').replace(',', '.')) || 0) / (1 + ivaPct / 100);
-        netoEl.textContent = 'Minorista $' + fmtNeto(n1) + ' | Mayorista $' + fmtNeto(n2);
-    }
+    actualizarNeto();
 }
+function autoCalcMargins() {
+    var costo = parseImporte(document.querySelector('[name="precomp"]').value);
+    if (costo <= 0) { actualizarNeto(); return; }
+    var ivaPct = <?= json_encode($selectedIva) ?>;
+    var p1 = parseImporte(document.querySelector('[name="precio_gross"]').value);
+    var p2 = parseImporte(document.querySelector('[name="precio1_gross"]').value);
+    if (p1 > 0) {
+        document.querySelector('[name="ganan1"]').value = (((p1 / (1 + ivaPct / 100)) / costo - 1) * 100).toFixed(2);
+    }
+    if (p2 > 0) {
+        document.querySelector('[name="ganan2"]').value = (((p2 / (1 + ivaPct / 100)) / costo - 1) * 100).toFixed(2);
+    }
+    actualizarNeto();
+}
+[document.querySelector('[name="precio_gross"]'), document.querySelector('[name="precio1_gross"]')].forEach(function(el) {
+    if (!el) return;
+    el.addEventListener('input', autoCalcMargins);
+    el.addEventListener('change', autoCalcMargins);
+});
 function fmtNeto(n) {
     var parts = (Math.round(n * 100) / 100).toFixed(2).split('.');
     return parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + (parts[1] || '00');
 }
-autoCalcPrices();
+actualizarNeto();
 </script>

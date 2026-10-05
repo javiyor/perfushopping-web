@@ -297,6 +297,12 @@ $sucursalId = $auth->getSucursalId();
         $hasta = trim((string)($_GET['hasta'] ?? ''));
         $q = trim((string)($_GET['q'] ?? ''));
 
+        // Por defecto: mes en curso.
+        if ($desde === '' && $hasta === '') {
+            $desde = date('Y-m-01');
+            $hasta = date('Y-m-t');
+        }
+
         $repo = new CajaRepo();
         $movimientos = $repo->movimientosGenerales($tipo ?: null, $desde ?: null, $hasta ?: null, $q);
         $totales = $repo->totalMovimientosGenerales($desde ?: null, $hasta ?: null);

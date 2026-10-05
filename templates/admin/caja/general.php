@@ -250,7 +250,7 @@ $q = (string)($q ?? '');
                             <tr><td colspan="7" class="text-muted text-center">Sin movimientos</td></tr>
                         <?php else: ?>
                             <?php foreach ($movimientos as $m): ?>
-                                <?php $origenLabels = ['cierre_caja'=>'Cierre caja','directo'=>'Directo']; ?>
+                                <?php $origenLabels = ['cierre_caja'=>'Cierre caja','directo'=>'Directo','gasto'=>'Gasto','deposito_banco'=>'Depósito banco','envio'=>'Envío']; ?>
                                 <tr>
                                     <td class="small"><?= date('d/m/Y H:i', strtotime($m['created_at'] ?? '')) ?></td>
                                     <td><span class="badge bg-<?= $m['tipo'] === 'ingreso' ? 'success' : 'danger' ?>"><?= htmlspecialchars($m['tipo']) ?></span></td>
