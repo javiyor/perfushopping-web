@@ -84,7 +84,7 @@ $esperadoEfectivo = (int)($esperadoEfectivo ?? 0);
                         <label class="form-label small fw-semibold">Pasaje a Caja General (solo efectivo)</label>
                         <div class="input-group">
                             <span class="input-group-text">$</span>
-                            <input class="form-control" name="monto_retirado_cents" id="montoRetirado" type="number" value="0" min="0" step="0.01" />
+                            <input class="form-control" name="monto_retirado_cents" id="montoRetirado" type="number" value="0" min="0" max="<?= (int)round($esperadoEfectivo / 100) ?>" step="0.01" />
                         </div>
                         <div class="form-text">Solo efectivo. Máximo disponible: <?= Format::moneyFromCents($esperadoEfectivo) ?>.</div>
                     </div>
@@ -95,7 +95,7 @@ $esperadoEfectivo = (int)($esperadoEfectivo ?? 0);
                             <span class="input-group-text">$</span>
                             <input class="form-control" name="monto_proxima_cents" id="montoProxima" type="number" value="0" min="0" step="0.01" />
                         </div>
-                        <div class="form-text">Efectivo que queda como fondo para la próxima apertura, en pesos.</div>
+                        <div class="form-text">Se calcula solo: efectivo contado menos el pasaje. Podés ajustarlo a mano.</div>
                     </div>
 
                     <div class="mb-3 bg-light p-3 rounded small">
@@ -214,6 +214,10 @@ function calcQueda() {
     const queda = cierre - retiro;
     document.getElementById('quedaEnCaja').textContent = '$' + (queda / 100).toLocaleString('es-AR', {minimumFractionDigits:2});
     document.getElementById('quedaEnCaja').className = queda < 0 ? 'text-danger' : queda > 0 ? 'text-success' : '';
+    const proximaEl = document.getElementById('montoProxima');
+    if (proximaEl && document.activeElement !== proximaEl) {
+        proximaEl.value = (Math.max(0, queda) / 100).toFixed(2);
+    }
 }
 calcQueda();
 

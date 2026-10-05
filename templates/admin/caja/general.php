@@ -82,13 +82,14 @@ $q = (string)($q ?? '');
                     <th class="text-end">Ingr. tarjeta</th>
                     <th class="text-end">Ingr. transferencia</th>
                     <th class="text-end">Total</th>
+                    <th class="text-end">Pasaje a Caja Gral</th>
                     <th>Control</th>
                     <th></th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (!$cierres): ?>
-                    <tr><td colspan="8" class="text-muted text-center">Sin cierres de caja en el período</td></tr>
+                    <tr><td colspan="9" class="text-muted text-center">Sin cierres de caja en el período</td></tr>
                 <?php else: ?>
                     <?php foreach ($cierres as $c): ?>
                         <?php $rs = $c['resumen'] ?? ['efectivo' => 0, 'tarjeta' => 0, 'transferencia' => 0, 'total' => 0]; ?>
@@ -100,6 +101,7 @@ $q = (string)($q ?? '');
                             <td class="text-end text-success"><?= Format::moneyFromCents((int)$rs['tarjeta']) ?></td>
                             <td class="text-end text-success"><?= Format::moneyFromCents((int)$rs['transferencia']) ?></td>
                             <td class="text-end fw-bold"><?= Format::moneyFromCents((int)$rs['total']) ?></td>
+                            <td class="text-end <?= (int)($c['monto_retirado_cents'] ?? 0) > 0 ? 'fw-bold text-warning' : 'text-muted' ?>"><?= Format::moneyFromCents((int)($c['monto_retirado_cents'] ?? 0)) ?></td>
                             <td>
                                 <?php if (!empty($c['controlado_por'])): ?>
                                     <span class="badge bg-success"><i class="bi bi-check-lg"></i> OK</span>
