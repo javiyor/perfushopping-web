@@ -340,9 +340,14 @@ final class CustomerRepo
         if ($cols === null) {
             try {
                 $pdo = Db::pdo();
-                $cols = array_fill_keys(array_column($pdo->query('SHOW COLUMNS FROM clientes')->fetchAll(), 'Field'), true);
+                $rows = $pdo->query('SHOW COLUMNS FROM clientes')->fetchAll();
+                $cols = array_fill_keys(array_column($rows, 'Field'), true);
+                $tipos = [];
+                foreach ($rows as $r) {
+                    $tipos[(string)$r['Field']] = (string)($r['Type'] ?? '');
+                }
                 $asegurar = [
-                    'condicion_iva' => "VARCHAR(20) DEFAULT 'consumidor_final'",
+                    'condicion_iva' => "VARCHAR(30) DEFAULT 'consumidor_final'",
                     'localidad' => 'VARCHAR(60) DEFAULT NULL',
                 ];
                 foreach ($asegurar as $col => $ddl) {
@@ -360,8 +365,21 @@ final class CustomerRepo
                         } catch (\Throwable $e) {
                             error_log('CustomerRepo::clientesColumnas ensure ' . $col . ': ' . $e->getMessage());
                         }
-                    } elseif ($encontrada !== $col) {
+                        continue;
+                    }
+                    if ($encontrada !== $col) {
                         $cols[$col] = true;
+                    }
+                    if ($col === 'condicion_iva'
+                        && preg_match('/^varchar\((\d+)\)$/i', $tipos[$encontrada] ?? '', $m)
+                        && (int)$m[1] < 30
+                    ) {
+                        try {
+                            $pdo->exec("ALTER TABLE clientes MODIFY condicion_iva VARCHAR(30) DEFAULT 'consumidor_final'");
+                            $pdo->exec("UPDATE clientes SET condicion_iva = 'responsable_inscripto' WHERE condicion_iva = 'responsable_inscript'");
+                        } catch (\Throwable $e) {
+                            error_log('CustomerRepo::clientesColumnas widen condicion_iva: ' . $e->getMessage());
+                        }
                     }
                 }
             } catch (\Throwable $e) {

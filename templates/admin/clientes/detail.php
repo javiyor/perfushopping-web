@@ -369,7 +369,7 @@ $erpCategorias = ['minorista' => 'Minorista', 'mayorista' => 'Mayorista', 'profe
                             <label class="form-label small">Condición frente al IVA</label>
                             <select class="form-select form-select-sm" name="erp_condicion_iva">
                                 <?php foreach ($erpCondIvas as $ck => $cl): ?>
-                                    <option value="<?= htmlspecialchars($ck) ?>" <?= (($clienteErp['condicion_iva'] ?? 'consumidor_final') === $ck) ? 'selected' : '' ?>><?= htmlspecialchars($cl) ?></option>
+                                    <option value="<?= htmlspecialchars($ck) ?>" <?= (\Perfushopping\Web\Repo\FacturaRepo::normalizeCondIva((string)($clienteErp['condicion_iva'] ?? '')) === $ck) ? 'selected' : '' ?>><?= htmlspecialchars($cl) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>

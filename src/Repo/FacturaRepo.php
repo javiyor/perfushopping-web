@@ -17,6 +17,7 @@ final class FacturaRepo
             'iva responsable inscripto' => 'responsable_inscripto',
             'resp inscripto' => 'responsable_inscripto',
             'resp. inscripto' => 'responsable_inscripto',
+            'responsable_inscript' => 'responsable_inscripto',
             'ri' => 'responsable_inscripto',
             'consumidor final' => 'consumidor_final',
             'cf' => 'consumidor_final',
@@ -829,29 +830,9 @@ final class FacturaRepo
         return self::$clientesTieneCategoria;
     }
 
-    private static ?bool $clientesCondicionIva = null;
-
     private function clientesTieneCondicionIva(): bool
     {
-        if (self::$clientesCondicionIva === null) {
-            try {
-                $cols = Db::pdo()->query('SHOW COLUMNS FROM clientes')->fetchAll();
-                $fieldsLower = array_map('strtolower', array_column($cols, 'Field'));
-                if (!in_array('condicion_iva', $fieldsLower, true)) {
-                    Db::pdo()->exec("ALTER TABLE clientes ADD COLUMN condicion_iva VARCHAR(20) DEFAULT 'consumidor_final'");
-                }
-                self::$clientesCondicionIva = true;
-            } catch (\Throwable $e) {
-                try {
-                    $cols = Db::pdo()->query('SHOW COLUMNS FROM clientes')->fetchAll();
-                    $fieldsLower = array_map('strtolower', array_column($cols, 'Field'));
-                    self::$clientesCondicionIva = in_array('condicion_iva', $fieldsLower, true);
-                } catch (\Throwable $e2) {
-                    self::$clientesCondicionIva = false;
-                }
-            }
-        }
-        return self::$clientesCondicionIva;
+        return !empty(CustomerRepo::clientesColumnas()['condicion_iva']);
     }
 
     public function findRemitosDisponibles(string $q, int $limit = 10): array
