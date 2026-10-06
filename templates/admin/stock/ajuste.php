@@ -426,6 +426,20 @@ item.addEventListener('click', function(e) {
                                             }
                                         }
                                     }
+                                    // Focus cantidad y ciclo de escaneo
+                                    const qtyInput = newRow.querySelector('input[name="cantidad[]"]');
+                                    if (qtyInput) {
+                                        qtyInput.focus();
+                                        qtyInput.select();
+                                        qtyInput.addEventListener('keydown', function onQtyKeydown(e) {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                qtyInput.removeEventListener('keydown', onQtyKeydown);
+                                                searchInput.focus();
+                                                searchInput.select();
+                                            }
+                                        });
+                                    }
                                     searchInput.value = '';
                                     resultsDiv.style.display = 'none';
                                 });
