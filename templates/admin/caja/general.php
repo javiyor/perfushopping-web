@@ -16,7 +16,10 @@ $q = (string)($q ?? '');
         <h4 class="fw-bold mb-1">Caja General</h4>
         <p class="text-muted small">Movimientos globales de dinero — ingresos y egresos</p>
     </div>
-    <a class="btn btn-outline-secondary btn-sm" href="/admin/caja">Volver a Caja</a>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-primary btn-sm" href="/admin/movimientos-bancarios"><i class="bi bi-arrow-left-right"></i> Movimientos bancarios</a>
+        <a class="btn btn-outline-secondary btn-sm" href="/admin/caja">Volver a Caja</a>
+    </div>
 </div>
 
 <div class="row g-3 mb-3">
@@ -29,7 +32,7 @@ $q = (string)($q ?? '');
     <div class="col-4">
         <div class="card-dashboard text-center p-3">
             <div class="h5 fw-bold mb-0 text-danger"><?= Format::moneyFromCents((int)$totales['total_egresos']) ?></div>
-            <div class="small text-muted">Total egresos</div>
+            <div class="small text-muted">Total egresos (efectivo)</div>
         </div>
     </div>
     <div class="col-4">
@@ -134,7 +137,7 @@ $q = (string)($q ?? '');
 
 <?php if ($gastosPorForma): ?>
 <div class="card shadow-sm mb-3">
-    <div class="card-header bg-white fw-semibold">Gastos pagados con caja general por forma de pago</div>
+    <div class="card-header bg-white fw-semibold">Gastos en efectivo de caja general por forma de pago</div>
     <div class="table-responsive">
         <table class="table table-sm mb-0">
             <thead>

@@ -8,6 +8,7 @@ use Perfushopping\Web\Repo\BancoMovimientoRepo;
 use Perfushopping\Web\Repo\CajaRepo;
 use Perfushopping\Web\Repo\ChequeRepo;
 use Perfushopping\Web\Repo\CompraRepo;
+use Perfushopping\Web\Repo\CobroCuentaRepo;
 use Perfushopping\Web\Repo\GastoRepo;
 use Perfushopping\Web\Service\AdminAuthService;
 use Perfushopping\Web\Support\Csrf;
@@ -297,6 +298,7 @@ final class GastoController
         $cajaDestino = (string)$g['caja_destino'];
         $bancoCuentaId = (int)($g['banco_cuenta_id'] ?? 0);
         $fecha = (string)$g['fecha'];
+        $fh = ($fecha !== '') ? $fecha . ' ' . date('H:i:s') : null;
         $concepto = 'Gasto: '.(string)$g['descripcion'];
 
         if ($formaPago === 'efectivo') {
@@ -311,15 +313,19 @@ final class GastoController
                     return;
                 }
             }
-            $cajaRepo->agregarMovimientoGeneral('egreso', 'gasto', $gastoId, $concepto, $importeCents, $userId);
+            $cajaRepo->agregarMovimientoGeneral('egreso', 'gasto', $gastoId, $concepto, $importeCents, $userId, $fh);
         } elseif ($formaPago === 'transferencia') {
-            $cajaRepo->agregarMovimientoGeneral('egreso', 'gasto', $gastoId, $concepto.' (transferencia)', $importeCents, $userId);
+            // Caja general es solo efectivo: la transferencia impacta solo en movimientos bancarios.
+            if (!$bancoCuentaId) {
+                $bancoCuentaId = (int)((new CobroCuentaRepo())->getTransferenciaCuentaId() ?: 0);
+            }
             if ($bancoCuentaId) {
                 $bancoRepo->create($bancoCuentaId, 'debito', 'gasto', $gastoId, $concepto, $importeCents, $fecha, $userId);
+            } else {
+                error_log('GastoController::registrarMovimientosGasto: gasto ' . $gastoId . ' sin cuenta bancaria para transferencia');
             }
-        } elseif ($formaPago === 'cheque') {
-            $cajaRepo->agregarMovimientoGeneral('egreso', 'gasto', $gastoId, $concepto.' (cheque)', $importeCents, $userId);
         }
+        // cheque: sin egreso en caja general (el flujo queda en el módulo de cheques).
     }
 
     public function depositarForm(array $params): void

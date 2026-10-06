@@ -86,6 +86,7 @@ use Perfushopping\Web\Admin\SocialInboxController as AdminSocialInboxController;
 use Perfushopping\Web\Admin\GastoController as AdminGastoController;
 use Perfushopping\Web\Admin\BancoController as AdminBancoController;
 use Perfushopping\Web\Admin\BancoCuentaController as AdminBancoCuentaController;
+use Perfushopping\Web\Admin\BancoMovimientoController as AdminBancoMovimientoController;
 use Perfushopping\Web\Admin\CuentaContableController as AdminCuentaContableController;
 use Perfushopping\Web\Admin\Marketing\AnalyticsController as AdminMarketingAnalyticsController;
 use Perfushopping\Web\Admin\Marketing\ArticleController as AdminMarketingArticleController;
@@ -569,6 +570,7 @@ $router->post('/admin/banco-cuentas/save', [AdminBancoCuentaController::class, '
 $router->post('/admin/banco-cuentas/delete', [AdminBancoCuentaController::class, 'delete']);
 $router->post('/admin/banco-cuentas/cobro/save', [AdminBancoCuentaController::class, 'saveCobro']);
 $router->post('/admin/banco-cuentas/cobro/delete-tarjeta', [AdminBancoCuentaController::class, 'deleteCobroTarjeta']);
+$router->get('/admin/movimientos-bancarios', [AdminBancoMovimientoController::class, 'index']);
 
 // Admin - Cuentas contables
 $router->get('/admin/cuentas-contables', [AdminCuentaContableController::class, 'index']);

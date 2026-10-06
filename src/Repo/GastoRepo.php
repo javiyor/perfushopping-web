@@ -254,7 +254,7 @@ final class GastoRepo
         Db::pdo()->prepare("DELETE FROM gastos WHERE `{$this->pkColumn()}` = :id LIMIT 1")->execute([':id' => $id]);
     }
 
-    /** Gastos con caja_destino = general agrupados por forma de pago. */
+    /** Gastos en efectivo con caja_destino = general agrupados por forma de pago. */
     public function totalesCajaGeneralPorForma(?string $desde = null, ?string $hasta = null): array
     {
         if (!$this->hasGastosColumn('caja_destino') || !$this->hasGastosColumn('forma_pago')) {
@@ -266,7 +266,7 @@ final class GastoRepo
         }
         $hasFecha = $this->hasGastosColumn('fecha');
         $sql = "SELECT forma_pago, COUNT(*) AS cantidad, COALESCE(SUM(`$imp`), 0) AS total
-                FROM gastos WHERE caja_destino = 'general'";
+                FROM gastos WHERE caja_destino = 'general' AND forma_pago = 'efectivo'";
         $params = [];
         if ($desde !== null && $desde !== '' && $hasFecha) {
             $sql .= ' AND fecha >= :desde';

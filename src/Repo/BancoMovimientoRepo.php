@@ -41,19 +41,41 @@ final class BancoMovimientoRepo
         return $ini + $mov;
     }
 
-    public function allMovimientos(?int $bancoCuentaId = null, ?string $desde = null, ?string $hasta = null): array
+    public function allMovimientos(?int $bancoCuentaId = null, ?string $desde = null, ?string $hasta = null, ?string $tipo = null): array
     {
         $params = [];
         $where = [];
         if ($bancoCuentaId) { $where[]='bm.banco_cuenta_id=:b'; $params[':b']=$bancoCuentaId; }
         if ($desde) { $where[]='bm.fecha >= :desde'; $params[':desde']=$desde; }
         if ($hasta) { $where[]='bm.fecha <= :hasta'; $params[':hasta']=$hasta; }
-        $sql = 'SELECT bm.*, bc.banco AS banco_nombre, au.nombre AS created_by_nombre FROM banco_movimientos bm LEFT JOIN banco_cuentas bc ON bc.id=bm.banco_cuenta_id LEFT JOIN admin_users au ON au.id=bm.created_by';
+        if ($tipo === 'credito' || $tipo === 'debito') { $where[]='bm.tipo=:tipo'; $params[':tipo']=$tipo; }
+        $sql = 'SELECT bm.*, bc.banco AS banco_nombre, bc.numero_cuenta AS numero_cuenta, au.nombre AS created_by_nombre FROM banco_movimientos bm LEFT JOIN banco_cuentas bc ON bc.id=bm.banco_cuenta_id LEFT JOIN admin_users au ON au.id=bm.created_by';
         if ($where) $sql .= ' WHERE '.implode(' AND ',$where);
         $sql .= ' ORDER BY bm.fecha DESC, bm.id DESC LIMIT 500';
         $st = Db::pdo()->prepare($sql);
         $st->execute($params);
         return $st->fetchAll();
+    }
+
+    /** Totales del período: débitos, créditos y neto (en cents). */
+    public function totales(?int $bancoCuentaId = null, ?string $desde = null, ?string $hasta = null, ?string $tipo = null): array
+    {
+        $params = [];
+        $where = [];
+        if ($bancoCuentaId) { $where[]='banco_cuenta_id=:b'; $params[':b']=$bancoCuentaId; }
+        if ($desde) { $where[]='fecha >= :desde'; $params[':desde']=$desde; }
+        if ($hasta) { $where[]='fecha <= :hasta'; $params[':hasta']=$hasta; }
+        if ($tipo === 'credito' || $tipo === 'debito') { $where[]='tipo=:tipo'; $params[':tipo']=$tipo; }
+        $sql = "SELECT COALESCE(SUM(CASE WHEN tipo='debito' THEN monto_cents ELSE 0 END),0) AS debitos,
+                       COALESCE(SUM(CASE WHEN tipo='credito' THEN monto_cents ELSE 0 END),0) AS creditos
+                FROM banco_movimientos";
+        if ($where) $sql .= ' WHERE '.implode(' AND ',$where);
+        $st = Db::pdo()->prepare($sql);
+        $st->execute($params);
+        $row = $st->fetch() ?: [];
+        $debitos = (int)($row['debitos'] ?? 0);
+        $creditos = (int)($row['creditos'] ?? 0);
+        return ['debitos'=>$debitos, 'creditos'=>$creditos, 'neto'=>$creditos - $debitos];
     }
 
     /** Elimina los movimientos de banco generados por un gasto. */

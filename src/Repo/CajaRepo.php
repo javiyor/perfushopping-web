@@ -404,22 +404,26 @@ final class CajaRepo
         }
     }
 
-    public function agregarMovimientoGeneral(string $tipo, ?string $origen, ?int $origenId, string $concepto, int $montoCents, int $createdBy): int
+    public function agregarMovimientoGeneral(string $tipo, ?string $origen, ?int $origenId, string $concepto, int $montoCents, int $createdBy, ?string $fecha = null): int
     {
         $this->ensureGeneralMovimientos();
         try {
-            $st = Db::pdo()->prepare('
+            $fh = ($fecha !== null && $fecha !== '') ? $fecha : null;
+            $createdCol = $fh !== null ? ':fh' : 'NOW()';
+            $st = Db::pdo()->prepare("
                 INSERT INTO caja_general_movimientos (tipo, origen, origen_id, concepto, monto_cents, created_by, created_at)
-                VALUES (:tip, :ori, :oid, :con, :mon, :cb, NOW())
-            ');
-            $st->execute([
+                VALUES (:tip, :ori, :oid, :con, :mon, :cb, {$createdCol})
+            ");
+            $params = [
                 ':tip' => $tipo,
                 ':ori' => $origen,
                 ':oid' => $origenId,
                 ':con' => $concepto,
                 ':mon' => $montoCents,
                 ':cb' => $createdBy,
-            ]);
+            ];
+            if ($fh !== null) $params[':fh'] = $fh;
+            $st->execute($params);
             return (int)Db::pdo()->lastInsertId();
         } catch (\Throwable $e) {
             error_log('CajaRepo::agregarMovimientoGeneral error: ' . $e->getMessage());
