@@ -138,6 +138,30 @@ final class FacturaRepo
         return self::$facturasOrderHasCol;
     }
 
+    private function ensureComprobanteAsociadoColumn(): bool
+    {
+        if (self::$facturasEntregaChecked !== null) {
+            return self::$facturasEntregaHasCols || in_array('comprobante_asociado_id', array_column(Db::pdo()->query('SHOW COLUMNS FROM facturas')->fetchAll(), 'Field'), true);
+        }
+        self::$facturasEntregaChecked = true;
+        try {
+            $cols = Db::pdo()->query('SHOW COLUMNS FROM facturas')->fetchAll();
+            $fields = array_column($cols, 'Field');
+            if (!in_array('comprobante_asociado_id', $fields, true)) {
+                Db::pdo()->exec('ALTER TABLE facturas ADD COLUMN comprobante_asociado_id INT UNSIGNED DEFAULT NULL');
+            }
+            self::$facturasEntregaHasCols = in_array('comprobante_asociado_id', array_column($cols, 'Field'), true) || self::$facturasEntregaHasCols;
+        } catch (\Throwable $e) {
+            try {
+                $cols = Db::pdo()->query('SHOW COLUMNS FROM facturas')->fetchAll();
+                self::$facturasEntregaHasCols = in_array('comprobante_asociado_id', array_column($cols, 'Field'), true) || self::$facturasEntregaHasCols;
+            } catch (\Throwable $e2) {
+                self::$facturasEntregaHasCols = false;
+            }
+        }
+        return self::$facturasEntregaHasCols;
+    }
+
     public function facturaIdByOrder(int $orderId): ?int
     {
         if (!$this->ensureOrderColumn()) {
@@ -162,7 +186,7 @@ final class FacturaRepo
             'envio_estado' => "ADD COLUMN envio_estado ENUM('pendiente','en_transito','entregado','cancelado') DEFAULT NULL",
             'envio_direccion' => 'ADD COLUMN envio_direccion VARCHAR(255) DEFAULT NULL',
             'envio_observacion' => 'ADD COLUMN envio_observacion TEXT DEFAULT NULL',
-            'envio_numero' => 'ADD COLUMN envio_numero VARCHAR(60) DEFAULT NULL'
+            'comprobante_asociado_id' => 'ADD COLUMN comprobante_asociado_id INT UNSIGNED DEFAULT NULL'
         ];
         try {
             $cols = Db::pdo()->query('SHOW COLUMNS FROM facturas')->fetchAll();
@@ -284,10 +308,13 @@ final class FacturaRepo
         $this->ensureEntregaColumns();
         $hasOrder = $this->ensureOrderColumn();
         $hasSucursal = $this->ensureSucursalColumn();
+        $hasComprobanteAsociado = $this->ensureComprobanteAsociadoColumn();
         $orderCol = $hasOrder ? ', order_id' : '';
         $orderVal = $hasOrder ? ', :order_id' : '';
         $sucursalCol = $hasSucursal ? ', sucursal_id' : '';
         $sucursalVal = $hasSucursal ? ', :sucursal_id' : '';
+        $comprobanteAsociadoCol = $hasComprobanteAsociado ? ', comprobante_asociado_id' : '';
+        $comprobanteAsociadoVal = $hasComprobanteAsociado ? ', :comprobante_asociado_id' : '';
         $pdo = Db::pdo();
         $pdo->beginTransaction();
         try {
@@ -317,7 +344,9 @@ final class FacturaRepo
                 ':notas' => $data['notas'],
                 ':created_by' => $data['created_by'],
                 ':vendedor_id' => $data['vendedor_id'] ?? null,
+                ':comprobante_asociado_id' => $data['comprobante_asociado_id'] ?? null,
             ];
+            $params[':comprobante_asociado_id'] = $data['comprobante_asociado_id'] ?? null;
             if ($hasOrder) {
                 $fparams[':order_id'] = $data['order_id'] ?? null;
             }
@@ -325,9 +354,9 @@ final class FacturaRepo
                 unset($fparams[':sucursal_id']);
             }
             if (self::$facturasEntregaHasCols) {
-                $st = $pdo->prepare('
-                    INSERT INTO facturas (codigo, tipo_comprobante, punto_venta' . $sucursalCol . ', remito_id, presupuesto_id' . $orderCol . ', cliente_id, idclien, cliente_nombre, cliente_cuit, cliente_direc, cliente_tele, cliente_mail, cliente_condicion_iva, fecha, subtotal_cents, iva_cents, descuento_cents, puntos_cents, total_cents, estado, forma_pago, entrega_tipo, transporte, envio_estado, envio_direccion, envio_observacion, notas, created_by, vendedor_id, created_at, updated_at)
-                    VALUES (:codigo, :tipo, :punto_venta' . $sucursalVal . ', :remito_id, :presupuesto_id' . $orderVal . ', :cliente_id, :idclien, :cliente_nombre, :cliente_cuit, :cliente_direc, :cliente_tele, :cliente_mail, :cliente_condicion_iva, :fecha, :subtotal, :iva, :descuento, :puntos, :total, :estado, :forma_pago, :entrega_tipo, :transporte, :envio_estado, :envio_direccion, :envio_obs, :notas, :created_by, :vendedor_id, NOW(), NOW())
+$st = $pdo->prepare('
+                    INSERT INTO facturas (codigo, tipo_comprobante, punto_venta' . $sucursalCol . $comprobanteAsociadoCol . ', remito_id, presupuesto_id' . $orderCol . ', cliente_id, idclien, cliente_nombre, cliente_cuit, cliente_direc, cliente_tele, cliente_mail, cliente_condicion_iva, fecha, subtotal_cents, iva_cents, descuento_cents, puntos_cents, total_cents, estado, forma_pago, entrega_tipo, transporte, envio_estado, envio_direccion, envio_obs, notas, created_by, vendedor_id, created_at, updated_at)
+                    VALUES (:codigo, :tipo, :punto_venta' . $sucursalVal . $comprobanteAsociadoVal . ', :remito_id, :presupuesto_id' . $orderVal . ', :cliente_id, :idclien, :cliente_nombre, :cliente_cuit, :cliente_direc, :cliente_tele, :cliente_mail, :cliente_condicion_iva, :fecha, :subtotal, :iva, :descuento, :puntos, :total, :estado, :forma_pago, :entrega_tipo, :transporte, :envio_estado, :envio_direccion, :envio_obs, :notas, :created_by, :vendedor_id, NOW(), NOW())
                 ');
                 $fparams[':entrega_tipo'] = $data['entrega_tipo'] ?? 'local';
                 $fparams[':transporte'] = $data['transporte'] ?? null;
@@ -337,8 +366,8 @@ final class FacturaRepo
                 $st->execute($fparams);
             } else {
                 $st = $pdo->prepare('
-                    INSERT INTO facturas (codigo, tipo_comprobante, punto_venta' . $sucursalCol . ', remito_id, presupuesto_id, cliente_id, idclien, cliente_nombre, cliente_cuit, cliente_direc, cliente_tele, cliente_mail, cliente_condicion_iva, fecha, subtotal_cents, iva_cents, descuento_cents, puntos_cents, total_cents, estado, forma_pago, notas, created_by, vendedor_id, created_at, updated_at)
-                    VALUES (:codigo, :tipo, :punto_venta' . $sucursalVal . ', :remito_id, :presupuesto_id, :cliente_id, :idclien, :cliente_nombre, :cliente_cuit, :cliente_direc, :cliente_tele, :cliente_mail, :cliente_condicion_iva, :fecha, :subtotal, :iva, :descuento, :puntos, :total, :estado, :forma_pago, :notas, :created_by, :vendedor_id, NOW(), NOW())
+                    INSERT INTO facturas (codigo, tipo_comprobante, punto_venta' . $sucursalCol . $comprobanteAsociadoCol . ', remito_id, presupuesto_id, cliente_id, idclien, cliente_nombre, cliente_cuit, cliente_direc, cliente_tele, cliente_mail, cliente_condicion_iva, fecha, subtotal_cents, iva_cents, descuento_cents, puntos_cents, total_cents, estado, forma_pago, notas, created_by, vendedor_id, created_at, updated_at)
+                    VALUES (:codigo, :tipo, :punto_venta' . $sucursalVal . $comprobanteAsociadoVal . ', :remito_id, :presupuesto_id, :cliente_id, :idclien, :cliente_nombre, :cliente_cuit, :cliente_direc, :cliente_tele, :cliente_mail, :cliente_condicion_iva, :fecha, :subtotal, :iva, :descuento, :puntos, :total, :estado, :forma_pago, :notas, :created_by, :vendedor_id, NOW(), NOW())
                 ');
                 unset($fparams[':order_id']);
                 $st->execute($fparams);
@@ -854,6 +883,23 @@ final class FacturaRepo
               AND r.tipo = \'salida\'
               AND (r.codigo LIKE :like OR r.cliente_nombre LIKE :like)
             ORDER BY r.created_at DESC
+            LIMIT ' . $limit
+        );
+        $st->execute([':like' => '%' . $q . '%']);
+        return $st->fetchAll();
+    }
+
+    public function findFacturasDisponibles(string $q, int $limit = 10): array
+    {
+        $limit = max(1, min(20, $limit));
+        $q = trim($q);
+        $st = Db::pdo()->prepare('
+            SELECT f.id, f.codigo, f.cliente_nombre, f.total_cents, f.fecha, f.tipo_comprobante
+            FROM facturas f
+            WHERE f.estado = \'emitida\'
+              AND f.tipo_comprobante IN (\'FACT-A\', \'FACT-B\', \'FACT-C\')
+              AND (f.codigo LIKE :like OR f.cliente_nombre LIKE :like)
+            ORDER BY f.created_at DESC
             LIMIT ' . $limit
         );
         $st->execute([':like' => '%' . $q . '%']);

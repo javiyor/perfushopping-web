@@ -1555,6 +1555,17 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
         Response::json($results);
     }
 
+    public function searchComprobantes(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requirePermiso('facturacion');
+
+        $q = trim((string)($_GET['q'] ?? ''));
+        $results = (new FacturaRepo())->findFacturasDisponibles($q);
+
+        Response::json($results);
+    }
+
     public function searchPresupuestos(array $params): void
     {
         $auth = new AdminAuthService();
