@@ -690,6 +690,28 @@ final class StockRepo
         return $st->fetchAll();
     }
 
+    /**
+     * Obtiene el stock actual de un producto/variante en un depósito específico.
+     * Si idcodgusto es 0 o null, suma el stock de todas las variantes del producto en ese depósito.
+     */
+    public function stockEnDeposito(int $idprodu, int $iddepo, int $idcodgusto = 0): int
+    {
+        if ($idcodgusto > 0) {
+            $st = Db::pdo()->prepare('
+                SELECT COALESCE(SUM(stock), 0) FROM stock
+                WHERE idprodu = :idprodu AND iddepo = :iddepo AND idcodgusto = :idcodgusto
+            ');
+            $st->execute([':idprodu' => $idprodu, ':iddepo' => $iddepo, ':idcodgusto' => $idcodgusto]);
+        } else {
+            $st = Db::pdo()->prepare('
+                SELECT COALESCE(SUM(stock), 0) FROM stock
+                WHERE idprodu = :idprodu AND iddepo = :iddepo
+            ');
+            $st->execute([':idprodu' => $idprodu, ':iddepo' => $iddepo]);
+        }
+        return (int)$st->fetchColumn();
+    }
+
     public function registrarAjuste(
         int $idprodu,
         ?int $idcodgusto,

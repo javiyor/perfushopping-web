@@ -61,6 +61,7 @@ $histWinStart = max(1, $histWinEnd - 6);
                                     <tr>
                                         <th style="min-width:220px">Producto</th>
                                         <th style="min-width:180px">Variante</th>
+                                        <th style="width:140px">Stock en destino</th>
                                         <th style="width:110px">Cantidad</th>
                                         <th style="width:70px"></th>
                                     </tr>
@@ -74,7 +75,7 @@ $histWinStart = max(1, $histWinEnd - 6);
                     <div class="row g-2 mb-3">
                         <div class="col-md-6">
                             <label class="form-label small fw-semibold">Depósito desde <span class="text-muted">(resta)</span></label>
-                            <select class="form-select form-select-sm" name="iddepodesde">
+                            <select class="form-select form-select-sm" name="iddepodesde" id="iddepodesde">
                                 <option value="">Ninguno (solo ingreso)</option>
                                 <?php foreach ($depositos as $d): ?>
                                     <option value="<?= (int)$d['iddepo'] ?>"><?= htmlspecialchars($d['nomdepo'] ?? '') ?></option>
@@ -83,7 +84,7 @@ $histWinStart = max(1, $histWinEnd - 6);
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small fw-semibold">Depósito hasta <span class="text-muted">(suma)</span></label>
-                            <select class="form-select form-select-sm" name="iddepohasta">
+                            <select class="form-select form-select-sm" name="iddepohasta" id="iddepohasta">
                                 <option value="">Ninguno (solo egreso)</option>
                                 <?php foreach ($depositos as $d): ?>
                                     <option value="<?= (int)$d['iddepo'] ?>"><?= htmlspecialchars($d['nomdepo'] ?? '') ?></option>
@@ -338,6 +339,9 @@ function addItemRow(product) {
         '<td>' +
             '<select class="form-select form-select-sm" name="idcodgusto[]">' + buildVariantOptions(variants) + '</select>' +
         '</td>' +
+        '<td class="text-center">' +
+            '<span class="badge bg-secondary stock-destino" data-stock="0">—</span>' +
+        '</td>' +
         '<td>' +
             '<input class="form-control form-control-sm" type="number" name="cantidad[]" min="1" step="1" value="1" required />' +
         '</td>' +
@@ -349,6 +353,25 @@ function addItemRow(product) {
         tr.remove();
     });
     itemsBody.appendChild(tr);
+
+    // Auto-select variant
+    const variantSelect = tr.querySelector('select[name="idcodgusto[]"]');
+    if (variantSelect) {
+        const matchedId = product.matched_variant_id;
+        if (matchedId && matchedId > 0) {
+            variantSelect.value = matchedId;
+        } else {
+            const firstVariant = Array.from(variantSelect.options).find(o => o.value > 0);
+            if (firstVariant) {
+                variantSelect.value = firstVariant.value;
+            }
+        }
+    }
+
+    // Update stock when variant changes
+    variantSelect?.addEventListener('change', () => updateRowStock(tr));
+
+    return tr;
 }
 
 function escHtml(s) {
@@ -432,9 +455,11 @@ ajusteForm.addEventListener('submit', function(e) {
 
 if (Array.isArray(initialItems) && initialItems.length) {
     initialItems.forEach(addItemRow);
+    // Pequeña pausa para que el DOM se actualice
+    setTimeout(updateAllRowsStock, 100);
 }
 
-// ── Auto-actualización de solicitudes (no toca el formulario) ──
+// ✦✦✦ Auto-actualización de solicitudes (no toca el formulario) ✦✦✦
 function actualizarSolicitudes() {
     fetch('/admin/stock/ajuste')
         .then(r => r.text())
@@ -454,4 +479,97 @@ function actualizarSolicitudes() {
 
 document.getElementById('btnActualizarSolicitudes').addEventListener('click', actualizarSolicitudes);
 setInterval(actualizarSolicitudes, 20000);
+
+// Event listeners para actualizar stock al cambiar depósito destino
+document.getElementById('iddepohasta').addEventListener('change', updateAllRowsStock);
+document.getElementById('iddepodesde').addEventListener('change', updateAllRowsStock);
+
+// Función para actualizar el stock en el depósito destino de una fila
+function updateRowStock(tr) {
+    const idprodu = tr.dataset.productId;
+    const variantSelect = tr.querySelector('select[name="idcodgusto[]"]');
+    const idcodgusto = variantSelect ? parseInt(variantSelect.value) : 0;
+    const iddepo = document.getElementById('iddepohasta').value;
+    const stockBadge = tr.querySelector('.stock-destino');
+
+    if (!idprodu || !iddepo) {
+        if (stockBadge) {
+            stockBadge.textContent = '—';
+            stockBadge.className = 'badge bg-secondary stock-destino';
+        }
+        return;
+    }
+
+    // Mostrar estado de carga
+    if (stockBadge) {
+        stockBadge.textContent = '⟳';
+        stockBadge.className = 'badge bg-info stock-destino';
+    }
+
+    const params = new URLSearchParams({
+        idprodu: idprodu,
+        iddepo: iddepo,
+        idcodgusto: variantSelect ? parseInt(variantSelect.value) : 0
+    });
+
+    fetch('/admin/stock/ajuste/stock-deposito?' + params.toString())
+        .then(r => r.json())
+        .then(data => {
+            const stock = parseInt(data.stock) || 0;
+            if (stockBadge) {
+                stockBadge.textContent = stock.toLocaleString('es-AR');
+                if (stock <= 0) {
+                    stockBadge.className = 'badge bg-danger stock-destino';
+                } else if (stock <= 5) {
+                    stockBadge.className = 'badge bg-warning text-dark stock-destino';
+                } else {
+                    stockBadge.className = 'badge bg-success stock-destino';
+                }
+            }
+        })
+        .catch(function() {
+            if (stockBadge) {
+                stockBadge.textContent = '?';
+                stockBadge.className = 'badge bg-secondary stock-destino';
+            }
+        });
+}
+
+// Actualizar stock de todas las filas cuando cambia el depósito destino
+function updateAllRowsStock() {
+    const rows = itemsBody.querySelectorAll('tr');
+    rows.forEach(updateRowStock);
+}
+
+// ✦✦✦ Auto-actualización de solicitudes (no toca el formulario) ✦✦✦
+function actualizarSolicitudes() {
+    fetch('/admin/stock/ajuste')
+        .then(r => r.text())
+        .then(html => {
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const pend = doc.getElementById('solicitudesPendientes');
+            const mis = doc.getElementById('misSolicitudes');
+            if (pend) {
+                document.getElementById('solicitudesPendientes').innerHTML = pend.innerHTML;
+            }
+            if (mis) {
+                document.getElementById('misSolicitudes').innerHTML = mis.innerHTML;
+            }
+        })
+        .catch(function() {});
+}
+
+document.getElementById('btnActualizarSolicitudes').addEventListener('click', actualizarSolicitudes);
+setInterval(actualizarSolicitudes, 20000);
+
+// Event listeners para actualizar stock al cambiar depósito destino
+document.getElementById('iddepohasta').addEventListener('change', updateAllRowsStock);
+document.getElementById('iddepodesde').addEventListener('change', updateAllRowsStock);
+
+// Actualizar stock inicial para items pre-cargados
+if (Array.isArray(initialItems) && initialItems.length) {
+    initialItems.forEach(addItemRow);
+    // Pequeña pausa para que el DOM se actualice
+    setTimeout(updateAllRowsStock, 100);
+}
 </script>

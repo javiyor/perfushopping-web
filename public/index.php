@@ -453,6 +453,7 @@ $router->post('/admin/stock/ajuste/aprobar', [AdminStockController::class, 'apro
 $router->post('/admin/stock/ajuste/rechazar', [AdminStockController::class, 'rechazarSolicitudAjuste']);
 $router->get('/admin/stock/ajuste/buscar-productos', [AdminStockController::class, 'searchAjusteProductos']);
 $router->get('/admin/stock/ajuste/variantes', [AdminStockController::class, 'ajusteVariantes']);
+$router->get('/admin/stock/ajuste/stock-deposito', [AdminStockController::class, 'stockEnDeposito']);
 $router->get('/admin/stock/ajuste/imprimir', [AdminStockController::class, 'imprimirAjuste']);
 $router->post('/admin/stock/ajuste/anular', [AdminStockController::class, 'anularAjuste']);
 $router->post('/admin/stock/discont', [AdminStockController::class, 'toggleDiscont']);

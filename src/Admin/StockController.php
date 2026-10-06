@@ -522,7 +522,7 @@ final class StockController
         Response::json($products);
     }
 
-    public function ajusteVariantes(array $params): void
+public function ajusteVariantes(array $params): void
     {
         $auth = new AdminAuthService();
         $adminUser = $auth->requirePermiso('productos');
@@ -532,6 +532,25 @@ final class StockController
 
         $repo = new StockRepo();
         Response::json($repo->variantesPorProducto($id));
+    }
+
+    public function stockEnDeposito(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requirePermiso('productos');
+
+        $idprodu = (int)($_GET['idprodu'] ?? 0);
+        $iddepo = (int)($_GET['iddepo'] ?? 0);
+        $idcodgusto = (int)($_GET['idcodgusto'] ?? 0);
+
+        if ($idprodu <= 0 || $iddepo <= 0) {
+            Response::json(['stock' => 0]);
+            return;
+        }
+
+        $repo = new StockRepo();
+        $stock = $repo->stockEnDeposito($idprodu, $iddepo, $idcodgusto);
+        Response::json(['stock' => $stock]);
     }
 
     public function toggleDiscont(array $params): void
