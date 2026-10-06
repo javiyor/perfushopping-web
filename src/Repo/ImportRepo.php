@@ -106,7 +106,11 @@ final class ImportRepo
 
     public function updatePrecios(int $idprodu, float $precioNet, float $precompNet, ?float $ganan1 = null, ?float $ganan2 = null, ?float $precio1Net = null): void
     {
-        $set = ['precio = :p', 'precomp = :pc'];
+        // fecompra se refresca solo si cambió precio de venta o costo (va primero:
+        // MySQL evalúa el SET de izquierda a derecha y hay que comparar antes de pisar).
+        $cond = 'ROUND(precio,4) <> ROUND(:p,4) OR ROUND(precomp,4) <> ROUND(:pc,4)';
+        if ($precio1Net !== null) $cond .= ' OR ROUND(precio1,4) <> ROUND(:p1,4)';
+        $set = ['fecompra = IF(' . $cond . ', CURDATE(), fecompra)', 'precio = :p', 'precomp = :pc'];
         $params = [':p' => $precioNet, ':pc' => $precompNet, ':id' => $idprodu];
         if ($ganan1 !== null) { $set[] = 'ganan1 = :g1'; $params[':g1'] = $ganan1; }
         if ($ganan2 !== null) { $set[] = 'ganan2 = :g2'; $params[':g2'] = $ganan2; }

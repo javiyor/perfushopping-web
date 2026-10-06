@@ -246,7 +246,9 @@ final class AdminProductRepo
 
     public function updateProduct(int $idprodu, string $observ, float $precioNeto, float $precio1Neto, bool $enweb, string $produ = '', int $codrub = 0, int $codsub = 0, int $codepar = 0, string $codprove = '', float $ganan1 = 0, float $ganan2 = 0, float $precomp = 0): void
     {
-        $st = Db::pdo()->prepare('UPDATE producto SET observ = :observ, precio = :precio, precio1 = :precio1, precomp = :precomp, enweb = :enweb, produ = :produ, codrub = :codrub, codsub = :codsub, codepar = :codepar, codprove = :codprove, ganan1 = :ganan1, ganan2 = :ganan2 WHERE idprodu = :id LIMIT 1');
+        // fecompra se refresca solo si cambió precio de venta o costo (va primero:
+        // MySQL evalúa el SET de izquierda a derecha y hay que comparar antes de pisar).
+        $st = Db::pdo()->prepare('UPDATE producto SET fecompra = IF(ROUND(precio,4) <> ROUND(:precio,4) OR ROUND(precio1,4) <> ROUND(:precio1,4) OR ROUND(precomp,4) <> ROUND(:precomp,4), CURDATE(), fecompra), observ = :observ, precio = :precio, precio1 = :precio1, precomp = :precomp, enweb = :enweb, produ = :produ, codrub = :codrub, codsub = :codsub, codepar = :codepar, codprove = :codprove, ganan1 = :ganan1, ganan2 = :ganan2 WHERE idprodu = :id LIMIT 1');
         $st->execute([
             ':observ' => $observ,
             ':precio' => $precioNeto,
@@ -272,7 +274,9 @@ final class AdminProductRepo
 
     public function updatePrecios(int $idprodu, float $precioNeto, float $precio1Neto, float $ganan1, float $ganan2, float $precomp): void
     {
-        $st = Db::pdo()->prepare('UPDATE producto SET precio = :precio, precio1 = :precio1, ganan1 = :ganan1, ganan2 = :ganan2, precomp = :precomp WHERE idprodu = :id LIMIT 1');
+        // fecompra se refresca solo si cambió precio de venta o costo (va primero:
+        // MySQL evalúa el SET de izquierda a derecha y hay que comparar antes de pisar).
+        $st = Db::pdo()->prepare('UPDATE producto SET fecompra = IF(ROUND(precio,4) <> ROUND(:precio,4) OR ROUND(precio1,4) <> ROUND(:precio1,4) OR ROUND(precomp,4) <> ROUND(:precomp,4), CURDATE(), fecompra), precio = :precio, precio1 = :precio1, ganan1 = :ganan1, ganan2 = :ganan2, precomp = :precomp WHERE idprodu = :id LIMIT 1');
         $st->execute([
             ':precio' => $precioNeto,
             ':precio1' => $precio1Neto,

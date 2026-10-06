@@ -181,7 +181,7 @@ $sortLink = fn(string $col) => '/admin/productos?' . http_build_query(array_merg
                             <td class="small"><?= htmlspecialchars((string)($item['nomsub'] ?? '-')) ?></td>
                             <td class="small"><?= htmlspecialchars((string)($item['nomrub'] ?? '-')) ?></td>
                             <td class="text-end js-precio-cell"><?= htmlspecialchars(Format::moneyRoundedFromCents((int)round($itemGross * 100))) ?></td>
-                            <td class="small"><?php $fcompra = (string)($item['fecompra'] ?? ''); ?><?= htmlspecialchars(in_array($fcompra, ['', '0000-00-00'], true) ? '—' : $fcompra) ?></td>
+                            <td class="small td-fecompra"><?php $fcompra = (string)($item['fecompra'] ?? ''); ?><?= htmlspecialchars(in_array($fcompra, ['', '0000-00-00'], true) ? '—' : $fcompra) ?></td>
                             <td class="text-center"><?= (int)($item['variants_count'] ?? 0) ?></td>
                             <td class="text-center">
                                 <span class="badge <?= ((int)($item['enweb'] ?? 0) === 1) ? 'bg-success' : 'bg-secondary' ?>" style="font-size:10px"><?= ((int)($item['enweb'] ?? 0) === 1) ? 'ON' : 'OFF' ?></span>
@@ -452,6 +452,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 tr.dataset.precio1 = res.precio1;
                 var cell = tr.querySelector('.js-precio-cell');
                 if (cell) cell.textContent = '$' + new Intl.NumberFormat('es-AR', {maximumFractionDigits: 0}).format(Math.round(res.precio_gross));
+                if (res.fecompra) {
+                    var fcell = tr.querySelector('.td-fecompra');
+                    if (fcell) fcell.textContent = res.fecompra;
+                }
                 status.textContent = '✓ Guardado';
                 status.className = 'small fw-semibold q-status text-success';
                 setTimeout(function () {

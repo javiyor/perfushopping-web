@@ -354,12 +354,17 @@ final class ProductController
         $precio1Neto = $this->grossToNet($precio1Bruto, $ivaRate);
         $this->repo->updatePrecios($idprodu, $precioNeto, $precio1Neto, $ganan1, $ganan2, $precomp);
 
+        $cambioPrecio = round((float)($product['precio'] ?? 0), 4) !== round($precioNeto, 4)
+            || round((float)($product['precio1'] ?? 0), 4) !== round($precio1Neto, 4)
+            || round((float)($product['precomp'] ?? 0), 4) !== round($precomp, 4);
+
         Response::json([
             'ok' => true,
             'precio' => $precioNeto,
             'precio1' => $precio1Neto,
             'precio_gross' => $precioBruto,
             'precio1_gross' => $precio1Bruto,
+            'fecompra' => $cambioPrecio ? date('Y-m-d') : (string)($product['fecompra'] ?? ''),
         ]);
     }
 
