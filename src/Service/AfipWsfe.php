@@ -151,35 +151,111 @@ final class AfipWsfe
 
         $descuento = (int)($factura['descuento_cents'] ?? 0);
 
-        // Agrupar neto/iva por alícuota
+        // Agrupar neto por alícuota. La key debe ser string: PHP castea keys
+        // float a int (10.5 -> 10) y eso descuadra importes/mapa de alícuotas.
         $grupos = [];
         foreach ($items as $it) {
-            $rate = (float)($it['iva_rate'] ?? 0);
+            $rate = round((float)($it['iva_rate'] ?? 0), 2);
+            $key = (string)$rate;
             $lineIva = (int)($it['iva_cents'] ?? 0);
             $lineTotal = (int)($it['total_cents'] ?? 0);
             $lineNet = $lineTotal - $lineIva;
             if ($lineNet < 0) {
                 $lineNet = 0;
             }
-            if (!isset($grupos[$rate])) {
-                $grupos[$rate] = ['base' => 0, 'iva' => 0];
+            if (!isset($grupos[$key])) {
+                $grupos[$key] = ['rate' => $rate, 'base' => 0];
             }
-            $grupos[$rate]['base'] += $lineNet;
-            $grupos[$rate]['iva'] += $lineIva;
+            $grupos[$key]['base'] += $lineNet;
         }
 
-        // Distribuir descuento proporcionalmente sobre las bases
-        if ($descuento > 0) {
-            $totalBase = array_sum(array_column($grupos, 'base'));
-            if ($totalBase > 0) {
-                foreach ($grupos as $rate => &$g) {
-                    $g['base'] -= (int)round($descuento * $g['base'] / $totalBase);
-                    if ($g['base'] < 0) {
-                        $g['base'] = 0;
+        // ARCA valida que cada AlicIVA tenga Importe == round(BaseImp * alicuota / 100)
+        // (error 10051): el importe se recalcula desde la base que se envía.
+        foreach ($grupos as &$g) {
+            $g['iva'] = (int)round($g['base'] * $g['rate'] / 100);
+        }
+        unset($g);
+
+        // Total cobrado = subtotal + iva - descuento (los puntos de fidelidad
+        // reducen el pago, no el comprobante y no se informan a ARCA).
+        $subtotalF = isset($factura['subtotal_cents']) ? (int)$factura['subtotal_cents'] : null;
+        $ivaF = isset($factura['iva_cents']) ? (int)$factura['iva_cents'] : null;
+        $impNetoFull = array_sum(array_column($grupos, 'base'));
+        $impIvaFull = array_sum(array_column($grupos, 'iva'));
+        $target = ($subtotalF !== null && $ivaF !== null)
+            ? max(0, $subtotalF + $ivaF - $descuento)
+            : max(0, $impNetoFull + $impIvaFull - $descuento);
+
+        // El descuento del POS es un % sobre el bruto (neto + IVA): la parte
+        // neta a descontar de las bases es descuento * neto / bruto.
+        if ($descuento > 0 && $impNetoFull > 0 && ($impNetoFull + $impIvaFull) > 0) {
+            $dNeto = (int)round($descuento * $impNetoFull / ($impNetoFull + $impIvaFull));
+            $mejor = null;
+            $desde = max(0, $dNeto - 3);
+            $hasta = min($impNetoFull, $dNeto + 3);
+            if ($desde > $hasta) {
+                $desde = $hasta;
+            }
+            for ($d = $desde; $d <= $hasta; $d++) {
+                $neto = 0;
+                $ivaAux = 0;
+                foreach ($grupos as $g) {
+                    $b = $g['base'] - (int)round($d * $g['base'] / $impNetoFull);
+                    if ($b < 0) {
+                        $b = 0;
+                    }
+                    $neto += $b;
+                    $ivaAux += (int)round($b * $g['rate'] / 100);
+                }
+                $err = abs($neto + $ivaAux - $target);
+                if ($mejor === null || $err < $mejor['err']) {
+                    $mejor = ['d' => $d, 'err' => $err];
+                }
+                if ($err === 0) {
+                    break;
+                }
+            }
+            $d = $mejor['d'];
+            foreach ($grupos as &$g) {
+                $g['base'] -= (int)round($d * $g['base'] / $impNetoFull);
+                if ($g['base'] < 0) {
+                    $g['base'] = 0;
+                }
+                $g['iva'] = (int)round($g['base'] * $g['rate'] / 100);
+            }
+            unset($g);
+        }
+
+        // Alinear el total enviado con el total cobrado: el IVA se redondea
+        // por línea al guardar y por grupo al facturar (± unos centavos).
+        for ($i = 0; $i < 60; $i++) {
+            $neto = array_sum(array_column($grupos, 'base'));
+            $ivaAux = array_sum(array_column($grupos, 'iva'));
+            $err = $target - ($neto + $ivaAux);
+            if ($err === 0) {
+                break;
+            }
+            $step = $err > 0 ? 1 : -1;
+            $mejor = null;
+            foreach ($grupos as $k => $g) {
+                if ($g['base'] + $step < 0) {
+                    continue;
+                }
+                $b2 = $g['base'] + $step;
+                $iva2 = (int)round($b2 * $g['rate'] / 100);
+                $err2 = $target - ($neto + $step + $ivaAux - $g['iva'] + $iva2);
+                if (abs($err2) < abs($err)) {
+                    $mejor = ['k' => $k, 'b' => $b2, 'iva' => $iva2, 'err' => $err2];
+                    if ($err2 === 0) {
+                        break;
                     }
                 }
-                unset($g);
             }
+            if ($mejor === null) {
+                break;
+            }
+            $grupos[$mejor['k']]['base'] = $mejor['b'];
+            $grupos[$mejor['k']]['iva'] = $mejor['iva'];
         }
 
         $impNeto = array_sum(array_column($grupos, 'base'));
@@ -217,11 +293,11 @@ final class AfipWsfe
         $detalle .= '<CondicionIVAReceptorId>' . $condIvaReceptor . '</CondicionIVAReceptorId>';
 
         $ivaXml = '';
-        foreach ($grupos as $rate => $g) {
-            if ($g['iva'] <= 0) {
+        foreach ($grupos as $g) {
+            if ($g['base'] <= 0 && $g['iva'] <= 0) {
                 continue;
             }
-            $id = self::$alicuotaIvaMap[(string)$rate] ?? 5;
+            $id = self::$alicuotaIvaMap[(string)$g['rate']] ?? 5;
             $ivaXml .= '<AlicIva>';
             $ivaXml .= '<Id>' . $id . '</Id>';
             $ivaXml .= '<BaseImp>' . $this->centsToDecimal($g['base']) . '</BaseImp>';
