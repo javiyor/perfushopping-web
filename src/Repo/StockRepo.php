@@ -664,7 +664,11 @@ final class StockRepo
                 (SELECT g2.idcodgusto
                  FROM gustos g2
                  WHERE g2.idprodu = p.idprodu AND g2.codscan = :exactVariant AND g2.discont = 0
-                 ORDER BY g2.idcodgusto ASC LIMIT 1) AS matched_variant_id
+                 ORDER BY g2.idcodgusto ASC LIMIT 1) AS matched_variant_id,
+                (SELECT g3.idcodgusto
+                 FROM gustos g3
+                 WHERE g3.idprodu = p.idprodu AND g3.discont = 0
+                 ORDER BY g3.idcodgusto ASC LIMIT 1) AS first_variant_id
             FROM producto p
             WHERE ' . implode(' OR ', $where) . '
                 OR EXISTS (SELECT 1 FROM gustos g WHERE g.idprodu = p.idprodu AND g.codscan LIKE :likeBarcode)

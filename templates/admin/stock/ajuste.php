@@ -408,13 +408,16 @@ searchInput.addEventListener('input', function() {
 item.addEventListener('click', function(e) {
                     e.preventDefault();
                                     addItemRow(p);
-                                    // Auto-select the variant: use matched_variant_id if available, otherwise first variant > 0
+                                    // Auto-select the variant: matched_variant_id (coincidencia exacta codscan) -> first_variant_id (primera variante del producto) -> primera variante > 0
                                     const newRow = itemsBody.lastElementChild;
                                     const variantSelect = newRow ? newRow.querySelector('select[name="idcodgusto[]"]') : null;
                                     if (variantSelect) {
                                         const matchedId = p.matched_variant_id;
+                                        const firstVariantId = p.first_variant_id;
                                         if (matchedId && matchedId > 0) {
                                             variantSelect.value = matchedId;
+                                        } else if (firstVariantId && firstVariantId > 0) {
+                                            variantSelect.value = firstVariantId;
                                         } else {
                                             // Seleccionar la primera variante con value > 0
                                             const firstVariant = Array.from(variantSelect.options).find(o => o.value > 0);
