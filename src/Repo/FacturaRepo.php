@@ -353,14 +353,14 @@ final class FacturaRepo
             }
             if (self::$facturasEntregaHasCols) {
 $st = $pdo->prepare('
-                    INSERT INTO facturas (codigo, tipo_comprobante, punto_venta' . $sucursalCol . $comprobanteAsociadoCol . ', remito_id, presupuesto_id' . $orderCol . ', cliente_id, idclien, cliente_nombre, cliente_cuit, cliente_direc, cliente_tele, cliente_mail, cliente_condicion_iva, fecha, subtotal_cents, iva_cents, descuento_cents, puntos_cents, total_cents, estado, forma_pago, entrega_tipo, transporte, envio_estado, envio_direccion, envio_obs, notas, created_by, vendedor_id, created_at, updated_at)
-                    VALUES (:codigo, :tipo, :punto_venta' . $sucursalVal . $comprobanteAsociadoVal . ', :remito_id, :presupuesto_id' . $orderVal . ', :cliente_id, :idclien, :cliente_nombre, :cliente_cuit, :cliente_direc, :cliente_tele, :cliente_mail, :cliente_condicion_iva, :fecha, :subtotal, :iva, :descuento, :puntos, :total, :estado, :forma_pago, :entrega_tipo, :transporte, :envio_estado, :envio_direccion, :envio_obs, :notas, :created_by, :vendedor_id, NOW(), NOW())
+                    INSERT INTO facturas (codigo, tipo_comprobante, punto_venta' . $sucursalCol . $comprobanteAsociadoCol . ', remito_id, presupuesto_id' . $orderCol . ', cliente_id, idclien, cliente_nombre, cliente_cuit, cliente_direc, cliente_tele, cliente_mail, cliente_condicion_iva, fecha, subtotal_cents, iva_cents, descuento_cents, puntos_cents, total_cents, estado, forma_pago, entrega_tipo, transporte, envio_estado, envio_direccion, envio_observacion, notas, created_by, vendedor_id, created_at, updated_at)
+                    VALUES (:codigo, :tipo, :punto_venta' . $sucursalVal . $comprobanteAsociadoVal . ', :remito_id, :presupuesto_id' . $orderVal . ', :cliente_id, :idclien, :cliente_nombre, :cliente_cuit, :cliente_direc, :cliente_tele, :cliente_mail, :cliente_condicion_iva, :fecha, :subtotal, :iva, :descuento, :puntos, :total, :estado, :forma_pago, :entrega_tipo, :transporte, :envio_estado, :envio_direccion, :envio_observacion, :notas, :created_by, :vendedor_id, NOW(), NOW())
                 ');
                 $fparams[':entrega_tipo'] = $data['entrega_tipo'] ?? 'local';
                 $fparams[':transporte'] = $data['transporte'] ?? null;
                 $fparams[':envio_estado'] = $data['envio_estado'] ?? null;
                 $fparams[':envio_direccion'] = $data['envio_direccion'] ?? null;
-                $fparams[':envio_obs'] = $data['envio_observacion'] ?? null;
+                $fparams[':envio_observacion'] = $data['envio_observacion'] ?? null;
                 $st->execute($fparams);
             } else {
                 $st = $pdo->prepare('
@@ -542,12 +542,12 @@ $st = $pdo->prepare('
             ];
             if (self::$facturasEntregaHasCols) {
                 $cols .= ', entrega_tipo = :entrega_tipo, transporte = :transporte, envio_estado = :envio_estado, '
-                    . 'envio_direccion = :envio_direccion, envio_observacion = :envio_obs';
+                    . 'envio_direccion = :envio_direccion, envio_observacion = :envio_observacion';
                 $params[':entrega_tipo'] = $data['entrega_tipo'] ?? 'local';
                 $params[':transporte'] = $data['transporte'] ?? null;
                 $params[':envio_estado'] = $data['envio_estado'] ?? null;
                 $params[':envio_direccion'] = $data['envio_direccion'] ?? null;
-                $params[':envio_obs'] = $data['envio_observacion'] ?? null;
+                $params[':envio_observacion'] = $data['envio_observacion'] ?? null;
             }
             $st = $pdo->prepare("UPDATE facturas SET {$cols} WHERE id = :i LIMIT 1");
             $params[':i'] = $id;
