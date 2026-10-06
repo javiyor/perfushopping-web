@@ -382,12 +382,27 @@ searchInput.addEventListener('input', function() {
                             html += '<div class="small text-info">' + p.variants.length + ' variante(s)</div>';
                         }
                         item.innerHTML = html;
-                        item.addEventListener('click', function(e) {
-                            e.preventDefault();
-                            addItemRow(p);
-                            searchInput.value = '';
-                            resultsDiv.style.display = 'none';
-                        });
+item.addEventListener('click', function(e) {
+                    e.preventDefault();
+                                    addItemRow(p);
+                                    // Auto-select the variant: use matched_variant_id if available, otherwise first variant > 0
+                                    const newRow = itemsBody.lastElementChild;
+                                    const variantSelect = newRow ? newRow.querySelector('select[name="idcodgusto[]"]') : null;
+                                    if (variantSelect) {
+                                        const matchedId = p.matched_variant_id;
+                                        if (matchedId && matchedId > 0) {
+                                            variantSelect.value = matchedId;
+                                        } else {
+                                            // Seleccionar la primera variante con value > 0
+                                            const firstVariant = Array.from(variantSelect.options).find(o => o.value > 0);
+                                            if (firstVariant) {
+                                                variantSelect.value = firstVariant.value;
+                                            }
+                                        }
+                                    }
+                                    searchInput.value = '';
+                                    resultsDiv.style.display = 'none';
+                                });
                         resultsDiv.appendChild(item);
                     });
                 }
