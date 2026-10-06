@@ -177,13 +177,23 @@ final class CajaRepo
         return $this->formaPagoTipoLegacySql($fpAlias);
     }
 
+    /**
+     * Importe con signo para sumas de caja: las Notas de Crédito descuentan;
+     * facturas y Notas de Débito suman. fp = factura_pagos, f = facturas.
+     */
+    private function montoSignadoSql(string $fpAlias = 'fp', string $fAlias = 'f'): string
+    {
+        return "CASE WHEN {$fAlias}.tipo_comprobante = 'NC' THEN -{$fpAlias}.monto_cents ELSE {$fpAlias}.monto_cents END";
+    }
+
     public function totalVentasEfectivo(string $fecha, int $puntoVenta): int
     {
         try {
             $extra = $this->efectivoNoCajaWhere();
             $tipo = $this->formaPagoTipoExpr('fp');
+            $monto = $this->montoSignadoSql();
             $st = Db::pdo()->prepare("
-                SELECT COALESCE(SUM(fp.monto_cents), 0)
+                SELECT COALESCE(SUM({$monto}), 0)
                 FROM factura_pagos fp
                 INNER JOIN facturas f ON f.id = fp.factura_id
                 WHERE f.estado = 'emitida'
@@ -204,8 +214,9 @@ final class CajaRepo
     {
         try {
             $tipo = $this->formaPagoTipoExpr('fp');
+            $monto = $this->montoSignadoSql();
             $st = Db::pdo()->prepare("
-                SELECT COALESCE(SUM(fp.monto_cents), 0)
+                SELECT COALESCE(SUM({$monto}), 0)
                 FROM factura_pagos fp
                 INNER JOIN facturas f ON f.id = fp.factura_id
                 WHERE f.estado = 'emitida'
@@ -245,9 +256,10 @@ final class CajaRepo
     {
         try {
             $extra = $this->efectivoNoCajaWhere();
+            $monto = $this->montoSignadoSql();
             $st = Db::pdo()->prepare("
-                SELECT fp.id, f.codigo, f.cliente_nombre, f.created_at,
-                       fp.forma_pago, fp.monto_cents
+                SELECT fp.id, f.codigo, f.cliente_nombre, f.created_at, f.tipo_comprobante,
+                       fp.forma_pago, {$monto} AS monto_cents
                 FROM factura_pagos fp
                 INNER JOIN facturas f ON f.id = fp.factura_id
                 WHERE f.estado = 'emitida'
@@ -384,12 +396,13 @@ final class CajaRepo
         try {
             $extraEfectivo = $this->facturasTieneEntrega() ? " AND NOT (f.entrega_tipo='envio' AND f.envio_estado IN ('pendiente','en_transito') AND fp.forma_pago='efectivo')" : "";
             $tipo = $this->formaPagoTipoExpr('fp');
+            $monto = $this->montoSignadoSql();
             // For total_efectivo we exclude pendiente efectivo envios; others count normally
             $st = Db::pdo()->prepare("
                 SELECT f.punto_venta, COALESCE(s.nomsuc, CONCAT('Punto ', f.punto_venta)) AS sucursal_nombre,
-                       COALESCE(SUM(CASE WHEN {$tipo} = 'efectivo' {$extraEfectivo} THEN fp.monto_cents ELSE 0 END), 0) AS total_efectivo,
-                       COALESCE(SUM(CASE WHEN {$tipo} = 'banco' THEN fp.monto_cents ELSE 0 END), 0) AS total_transferencia,
-                       COALESCE(SUM(CASE WHEN {$tipo} = 'efectivo' {$extraEfectivo} THEN fp.monto_cents WHEN {$tipo} = 'banco' THEN fp.monto_cents ELSE 0 END), 0) AS total
+                       COALESCE(SUM(CASE WHEN {$tipo} = 'efectivo' {$extraEfectivo} THEN {$monto} ELSE 0 END), 0) AS total_efectivo,
+                       COALESCE(SUM(CASE WHEN {$tipo} = 'banco' THEN {$monto} ELSE 0 END), 0) AS total_transferencia,
+                       COALESCE(SUM(CASE WHEN {$tipo} = 'efectivo' {$extraEfectivo} THEN {$monto} WHEN {$tipo} = 'banco' THEN {$monto} ELSE 0 END), 0) AS total
                 FROM facturas f
                 INNER JOIN factura_pagos fp ON fp.factura_id = f.id
                 LEFT JOIN sucursales s ON s.id = f.punto_venta
@@ -700,10 +713,11 @@ final class CajaRepo
         try {
             $extra = $this->efectivoNoCajaWhere();
             $tipo = $this->formaPagoTipoExpr('fp');
+            $monto = $this->montoSignadoSql();
             $st = Db::pdo()->prepare("
-                SELECT COALESCE(SUM(CASE WHEN {$tipo} = 'efectivo' {$extra} THEN fp.monto_cents ELSE 0 END), 0) AS efectivo,
-                       COALESCE(SUM(CASE WHEN {$tipo} = 'tarjeta' THEN fp.monto_cents ELSE 0 END), 0) AS tarjeta,
-                       COALESCE(SUM(CASE WHEN {$tipo} = 'banco' THEN fp.monto_cents ELSE 0 END), 0) AS transferencia
+                SELECT COALESCE(SUM(CASE WHEN {$tipo} = 'efectivo' {$extra} THEN {$monto} ELSE 0 END), 0) AS efectivo,
+                       COALESCE(SUM(CASE WHEN {$tipo} = 'tarjeta' THEN {$monto} ELSE 0 END), 0) AS tarjeta,
+                       COALESCE(SUM(CASE WHEN {$tipo} = 'banco' THEN {$monto} ELSE 0 END), 0) AS transferencia
                 FROM factura_pagos fp
                 INNER JOIN facturas f ON f.id = fp.factura_id
                 WHERE f.estado = 'emitida'
@@ -918,8 +932,9 @@ final class CajaRepo
         try {
             $extra = $this->efectivoNoCajaWhere();
             $tipo = $this->formaPagoTipoExpr('fp');
+            $monto = $this->montoSignadoSql();
             $st = Db::pdo()->prepare("
-                SELECT COALESCE(SUM(fp.monto_cents), 0)
+                SELECT COALESCE(SUM({$monto}), 0)
                 FROM factura_pagos fp
                 INNER JOIN facturas f ON f.id = fp.factura_id
                 WHERE f.estado = 'emitida'
@@ -942,8 +957,9 @@ final class CajaRepo
         $this->ensureCajaColumnas();
         try {
             $tipo = $this->formaPagoTipoExpr('fp');
+            $monto = $this->montoSignadoSql();
             $st = Db::pdo()->prepare("
-                SELECT COALESCE(SUM(fp.monto_cents), 0)
+                SELECT COALESCE(SUM({$monto}), 0)
                 FROM factura_pagos fp
                 INNER JOIN facturas f ON f.id = fp.factura_id
                 WHERE f.estado = 'emitida'
@@ -1008,6 +1024,7 @@ final class CajaRepo
         try {
             $extra = $this->efectivoNoCajaWhere();
             $tipoSel = $this->formaPagoTipoExpr('fp') . ' AS forma_tipo';
+            $monto = $this->montoSignadoSql();
             $equipoSel = 'NULL AS equipo_id, NULL AS equipo_nombre';
             $equipoJoin = '';
             if ($this->pagosTieneEquipo()) {
@@ -1015,8 +1032,8 @@ final class CajaRepo
                 $equipoJoin = 'LEFT JOIN equipotar e ON e.idequipo = fp.equipo_id';
             }
             $st = Db::pdo()->prepare("
-                SELECT fp.id, f.codigo, f.cliente_nombre, f.created_at,
-                       fp.forma_pago, fp.monto_cents, {$tipoSel}, {$equipoSel}
+                SELECT fp.id, f.codigo, f.cliente_nombre, f.created_at, f.tipo_comprobante,
+                       fp.forma_pago, {$monto} AS monto_cents, {$tipoSel}, {$equipoSel}
                 FROM factura_pagos fp
                 INNER JOIN facturas f ON f.id = fp.factura_id
                 {$equipoJoin}

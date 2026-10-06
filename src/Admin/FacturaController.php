@@ -382,7 +382,7 @@ final class FacturaController
         }
 
         // Registrar movimientos bancarios para transferencias y tarjetas
-        $this->registrarBancoMov($pagos, $id, $codigo, $fecha, (int)$adminUser['id']);
+        $this->registrarBancoMov($pagos, $id, $codigo, $fecha, (int)$adminUser['id'], $tipo);
 
         // Encolar impresión en tickets para la impresora del punto de venta.
         try {
@@ -396,14 +396,15 @@ final class FacturaController
         // Auto-post to current account if forma_pago = cuenta_corriente
         if ($clienteId && $formaPago === 'cuenta_corriente') {
             $ctaCte = new \Perfushopping\Web\Repo\CtaCteRepo();
+            // Una NC en cuenta corriente acredita (descuenta deuda); facturas y ND debitan.
             $ctaCte->agregarMovimiento(
-                'debito',
+                $tipo === 'NC' ? 'credito' : 'debito',
                 'factura',
                 $id,
                 $clienteId,
                 $clienteErpId,
                 $subtotal + $ivaTotal - $descuento,
-                'Factura ' . $codigo . ' — ' . $clienteNombre,
+                ($tipo === 'NC' ? 'NC ' : 'Factura ') . $codigo . ' — ' . $clienteNombre,
                 (int)$adminUser['id']
             );
         }
@@ -623,12 +624,15 @@ final class FacturaController
         }));
     }
 
-    /** Registra movimientos bancarios por cobros de transferencia/tarjeta. */
-    private function registrarBancoMov(array $pagos, int $id, string $codigo, string $fecha, int $adminId): void
+    /** Registra movimientos bancarios por cobros de transferencia/tarjeta. En NC invierte el sentido (débito). */
+    private function registrarBancoMov(array $pagos, int $id, string $codigo, string $fecha, int $adminId, string $tipoComprobante = ''): void
     {
         try {
             $bancoMovRepo = new \Perfushopping\Web\Repo\BancoMovimientoRepo();
             $cobroRepo = new CobroCuentaRepo();
+            $esNC = $tipoComprobante === 'NC';
+            $tipoMov = $esNC ? 'debito' : 'credito';
+            $ref = $esNC ? 'Devolución NC ' : 'Cobro factura ';
             foreach ($pagos as $pg) {
                 $fp = $pg['forma_pago'];
                 $fpTipo = \Perfushopping\Web\Repo\FormaPagoRepo::tipoDe((string)$fp);
@@ -637,7 +641,7 @@ final class FacturaController
                     $bancoCuentaId = $pg['banco_cuenta_id'] ?? null;
                     if (!$bancoCuentaId) $bancoCuentaId = $cobroRepo->getTransferenciaCuentaId();
                     if ($bancoCuentaId) {
-                        $bancoMovRepo->create((int)$bancoCuentaId, 'credito', 'factura', $id, 'Cobro factura ' . $codigo . ' (transferencia)', (int)$pg['monto_cents'], $fecha, $adminId);
+                        $bancoMovRepo->create((int)$bancoCuentaId, $tipoMov, 'factura', $id, $ref . $codigo . ' (transferencia)', (int)$pg['monto_cents'], $fecha, $adminId);
                     }
                 } elseif ($fp === 'tarjeta') {
                     $tarjetaId = $pg['tarjeta_id'] ?? null;
@@ -646,7 +650,7 @@ final class FacturaController
                     // fallback a cuenta seleccionada explícitamente
                     if (!$bancoCuentaId) $bancoCuentaId = $pg['banco_cuenta_id'] ?? null;
                     if ($bancoCuentaId) {
-                        $bancoMovRepo->create((int)$bancoCuentaId, 'credito', 'factura', $id, 'Cobro factura ' . $codigo . ' (tarjeta ' . ($pg['tarjeta_id'] ?? '') . ')', (int)$pg['monto_cents'], $fecha, $adminId);
+                        $bancoMovRepo->create((int)$bancoCuentaId, $tipoMov, 'factura', $id, $ref . $codigo . ' (tarjeta ' . ($pg['tarjeta_id'] ?? '') . ')', (int)$pg['monto_cents'], $fecha, $adminId);
                     }
                 }
             }
@@ -952,13 +956,13 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
         $ctaCte->anularMovimientosPorOrigen('factura', $editarId);
         if ($clienteId && $formaPago === 'cuenta_corriente') {
             $ctaCte->agregarMovimiento(
-                'debito',
+                $tipo === 'NC' ? 'credito' : 'debito',
                 'factura',
                 $editarId,
                 $clienteId,
                 $clienteErpId,
                 $subtotal + $ivaTotal - $descuento,
-                'Factura ' . $codigo . ' — ' . $clienteNombre,
+                ($tipo === 'NC' ? 'NC ' : 'Factura ') . $codigo . ' — ' . $clienteNombre,
                 (int)$adminUser['id']
             );
         }
@@ -966,7 +970,7 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
         // Movimientos bancarios: borrar los viejos y registrar los nuevos.
         $pdo->prepare("DELETE FROM banco_movimientos WHERE origen = 'factura' AND origen_id = :i")
             ->execute([':i' => $editarId]);
-        $this->registrarBancoMov($pagos, $editarId, $codigo, $fecha, (int)$adminUser['id']);
+        $this->registrarBancoMov($pagos, $editarId, $codigo, $fecha, (int)$adminUser['id'], $tipo);
 
         // Stock: aplicar solo el delta viejo -> nuevo (un movimiento por sentido).
         $depoId = $auth->getDepositoId();
@@ -1157,14 +1161,16 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
         // Reverse ctacte movement if factura is anulated and was cta.cte.
         if ($estado === 'anulada' && $oldEstado !== 'anulada' && ($f['forma_pago'] ?? '') === 'cuenta_corriente' && $f['cliente_id']) {
             $ctaCte = new \Perfushopping\Web\Repo\CtaCteRepo();
+            // Anular una NC revierte al revés: re-debita la deuda que la NC había acreditado.
+            $esNC = (string)($f['tipo_comprobante'] ?? '') === 'NC';
             $ctaCte->agregarMovimiento(
-                'credito',
+                $esNC ? 'debito' : 'credito',
                 'factura',
                 $id,
                 (int)$f['cliente_id'],
                 (int)($f['idclien'] ?? 0) ?: null,
                 (int)($f['total_cents'] ?? 0),
-                'Anulación Factura ' . ($f['codigo'] ?? ''),
+                'Anulación ' . ($esNC ? 'NC ' : 'Factura ') . ($f['codigo'] ?? ''),
                 (int)$adminUser['id']
             );
         }

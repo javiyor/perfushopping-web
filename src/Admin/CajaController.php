@@ -67,10 +67,12 @@ $sucursalId = $auth->getSucursalId();
             $arqueos = $repo->arqueos($apId);
 
             foreach ($repo->ventasDetalleTurno($apId, $fecha, $puntoVenta, $apCreada) as $v) {
+                $tc = (string)($v['tipo_comprobante'] ?? '');
+                $prefijo = $tc === 'NC' ? 'NC ' : ($tc === 'ND' ? 'ND ' : 'Factura ');
                 $detalleTurno[] = [
                     'hora' => (string)($v['created_at'] ?? ''),
-                    'tipo' => 'venta',
-                    'detalle' => 'Factura ' . ($v['codigo'] ?? '') . ' — ' . ($v['cliente_nombre'] ?? 'Consumidor Final'),
+                    'tipo' => $tc === 'NC' ? 'nc' : 'venta',
+                    'detalle' => $prefijo . ($v['codigo'] ?? '') . ' — ' . ($v['cliente_nombre'] ?? 'Consumidor Final'),
                     'forma' => (string)($v['forma_pago'] ?? ''),
                     'forma_tipo' => (string)($v['forma_tipo'] ?? ''),
                     'equipo_nombre' => (string)($v['equipo_nombre'] ?? ''),
@@ -101,17 +103,18 @@ $sucursalId = $auth->getSucursalId();
             $detalleTurno = array_slice($detalleTurno, 0, 300);
 
             foreach ($detalleTurno as $d) {
-                if ($d['monto'] < 0) {
-                    $egresosTurno += -$d['monto'];
-                } elseif ($d['forma'] !== '') {
+                if ($d['forma'] !== '') {
+                    // Las NC (monto negativo) restan de su forma de pago.
                     $totalesForma[$d['forma']] = ($totalesForma[$d['forma']] ?? 0) + $d['monto'];
-                    if (($d['forma_tipo'] ?? '') === 'tarjeta' && $d['monto'] > 0) {
+                    if (($d['forma_tipo'] ?? '') === 'tarjeta') {
                         $eq = trim((string)($d['equipo_nombre'] ?? ''));
                         if ($eq === '') {
                             $eq = 'Sin equipo';
                         }
                         $totalesTarjetaEquipo[$eq] = ($totalesTarjetaEquipo[$eq] ?? 0) + $d['monto'];
                     }
+                } elseif ($d['monto'] < 0) {
+                    $egresosTurno += -$d['monto'];
                 }
             }
             ksort($totalesTarjetaEquipo);
