@@ -210,8 +210,6 @@ final class FacturaController
 
         $pagos = $this->normalizarPagos($input['pagos'] ?? [], $input, (int)$adminUser['id'], $clienteNombre, $subtotal + $ivaTotal);
 
-        $formaPago = $pagos[0]['forma_pago'] ?? 'efectivo';
-
         $entrega = $input['entrega'] ?? [];
         $entregaTipo = in_array($entrega['tipo'] ?? 'local', ['local','envio'], true) ? $entrega['tipo'] : 'local';
         $transporte = null;
@@ -304,6 +302,11 @@ final class FacturaController
                 $puntosUsadosCents = $puntosUsados * 100;
             }
         }
+
+        // Vuelto: registrar lo cobrado en efectivo, no el billete entregado.
+        $totalFacturado = $subtotal + $ivaTotal - $descuento - $puntosUsadosCents;
+        $pagos = $this->absorberVuelto($pagos, $totalFacturado);
+        $formaPago = $pagos[0]['forma_pago'] ?? 'efectivo';
 
         $errorArca = ArcaValidacionService::validarFactura([
             'tipo_comprobante' => $tipo,
@@ -593,6 +596,33 @@ final class FacturaController
         return $pagos;
     }
 
+    /**
+     * Si los pagos superan el total facturado, absorbe el exceso (vuelto) del efectivo:
+     * factura_pagos queda con lo cobrado, no con el billete entregado.
+     */
+    private function absorberVuelto(array $pagos, int $totalFacturado): array
+    {
+        if (!$pagos || $totalFacturado < 0) {
+            return $pagos;
+        }
+        $exceso = array_sum(array_column($pagos, 'monto_cents')) - $totalFacturado;
+        if ($exceso <= 0) {
+            return $pagos;
+        }
+        for ($i = count($pagos) - 1; $i >= 0 && $exceso > 0; $i--) {
+            if (\Perfushopping\Web\Repo\FormaPagoRepo::tipoDe((string)$pagos[$i]['forma_pago']) !== 'efectivo') {
+                continue;
+            }
+            $monto = (int)$pagos[$i]['monto_cents'];
+            $quita = min($monto, $exceso);
+            $pagos[$i]['monto_cents'] = $monto - $quita;
+            $exceso -= $quita;
+        }
+        return array_values(array_filter($pagos, static function ($p): bool {
+            return (int)$p['monto_cents'] > 0;
+        }));
+    }
+
     /** Registra movimientos bancarios por cobros de transferencia/tarjeta. */
     private function registrarBancoMov(array $pagos, int $id, string $codigo, string $fecha, int $adminId): void
     {
@@ -818,9 +848,13 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
             }
         }
 
+        // Vuelto: registrar lo cobrado en efectivo, no el billete entregado.
+        $totalFacturado = $subtotal + $ivaTotal - $descuento - $puntosUsadosCents;
+        $pagos = $this->absorberVuelto($pagos, $totalFacturado);
+        $formaPago = $pagos[0]['forma_pago'] ?? $formaPago;
+
         // Validación: no permitir guardar si el total pagado es menor al facturado
         $totalPagado = array_sum(array_column($pagos, 'monto_cents'));
-        $totalFacturado = $subtotal + $ivaTotal - $descuento - $puntosUsadosCents;
         if ($totalPagado < $totalFacturado) {
             Response::json(['ok' => false, 'error' => 'El total abonado es menor al total facturado.'], 422);
             return;
