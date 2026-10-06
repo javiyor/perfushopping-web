@@ -184,9 +184,7 @@ final class FacturaRepo
             'entrega_tipo' => "ADD COLUMN entrega_tipo ENUM('local','envio') NOT NULL DEFAULT 'local'",
 'transporte' => "ADD COLUMN transporte ENUM('propio','delivery','correo_argentino') DEFAULT NULL",
             'envio_estado' => "ADD COLUMN envio_estado ENUM('pendiente','en_transito','entregado','cancelado') DEFAULT NULL",
-            'envio_direccion' => 'ADD COLUMN envio_direccion VARCHAR(255) DEFAULT NULL',
-            'envio_observacion' => 'ADD COLUMN envio_observacion TEXT DEFAULT NULL',
-            'comprobante_asociado_id' => 'ADD COLUMN comprobante_asociado_id INT UNSIGNED DEFAULT NULL'
+            'envio_direccion' => 'ADD COLUMN envio_direccion VARCHAR(255) DEFAULT NULL'
         ];
         try {
             $cols = Db::pdo()->query('SHOW COLUMNS FROM facturas')->fetchAll();
