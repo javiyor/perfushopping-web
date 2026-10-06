@@ -39,7 +39,7 @@ $discriminaIva = in_array($factura['tipo_comprobante'] ?? '', ['FACT-A']);
     </span>
     <span class="badge bg-info fs-6"><?= htmlspecialchars($formaPagoLabels[$factura['forma_pago'] ?? ''] ?? $factura['forma_pago'] ?? '') ?></span>
     <?php if (($factura['entrega_tipo'] ?? 'local') === 'envio'): ?>
-        <span class="badge bg-warning text-dark fs-6">Envío: <?= htmlspecialchars($factura['transporte'] ?? '') ?> — <?= htmlspecialchars($factura['envio_estado'] ?? 'pendiente') ?></span>
+        <span class="badge bg-warning text-dark fs-6">Envío: <?= htmlspecialchars($factura['transporte'] ?? '') ?> — <?= htmlspecialchars($factura['envio_estado'] ?? 'pendiente') ?><?= $factura['envio_numero'] ? ' — Nº ' . htmlspecialchars($factura['envio_numero']) : '' ?></span>
     <?php else: ?>
         <span class="badge bg-dark fs-6">Retiro en local</span>
     <?php endif; ?>

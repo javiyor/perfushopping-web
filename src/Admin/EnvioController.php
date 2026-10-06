@@ -83,4 +83,22 @@ final class EnvioController
         $_SESSION['admin_flash'] = ['type'=>'ok','text'=>'Envío cancelado.'];
         Response::redirect('/admin/envios');
     }
+
+    public function guardarNumero(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requirePermiso('facturacion');
+        Csrf::check($_POST['_csrf'] ?? null);
+        $id = (int)($_POST['id'] ?? 0);
+        $numero = trim((string)($_POST['numero'] ?? ''));
+        if ($id <= 0 || strlen($numero) > 60) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Datos inválidos.'];
+            Response::redirect('/admin/envios');
+            return;
+        }
+        $repo = new FacturaRepo();
+        $repo->updateEnvioNumero($id, $numero);
+        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Número de envío guardado.'];
+        Response::redirect('/admin/envios');
+    }
 }

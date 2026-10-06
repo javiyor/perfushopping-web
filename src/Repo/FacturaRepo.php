@@ -158,10 +158,11 @@ final class FacturaRepo
         // Columna por columna: si una falla (ej. ya existe), igual se crean las demás.
         $ddls = [
             'entrega_tipo' => "ADD COLUMN entrega_tipo ENUM('local','envio') NOT NULL DEFAULT 'local'",
-            'transporte' => "ADD COLUMN transporte ENUM('propio','delivery','correo_argentino') DEFAULT NULL",
+'transporte' => "ADD COLUMN transporte ENUM('propio','delivery','correo_argentino') DEFAULT NULL",
             'envio_estado' => "ADD COLUMN envio_estado ENUM('pendiente','en_transito','entregado','cancelado') DEFAULT NULL",
             'envio_direccion' => 'ADD COLUMN envio_direccion VARCHAR(255) DEFAULT NULL',
             'envio_observacion' => 'ADD COLUMN envio_observacion TEXT DEFAULT NULL',
+            'envio_numero' => 'ADD COLUMN envio_numero VARCHAR(60) DEFAULT NULL'
         ];
         try {
             $cols = Db::pdo()->query('SHOW COLUMNS FROM facturas')->fetchAll();
@@ -565,6 +566,13 @@ final class FacturaRepo
     {
         $this->ensureEntregaColumns();
         Db::pdo()->prepare("UPDATE facturas SET envio_estado=:e, updated_at=NOW() WHERE id=:i LIMIT 1")->execute([':e' => $estado, ':i' => $id]);
+    }
+
+    public function updateEnvioNumero(int $id, string $numero): void
+    {
+        $this->ensureEntregaColumns();
+        $st = Db::pdo()->prepare("UPDATE facturas SET envio_numero = :n, updated_at = NOW() WHERE id = :i AND entrega_tipo = 'envio'");
+        $st->execute([':n' => $numero, ':i' => $id]);
     }
 
     public function countEnviosPendientes(): int

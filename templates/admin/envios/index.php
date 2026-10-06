@@ -50,6 +50,19 @@
                             <input type="hidden" name="id" value="<?= (int)$f['id'] ?>" />
                             <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-x-lg"></i></button>
                         </form>
+                        <?php if ($f['transporte'] === 'correo_argentino'): ?>
+                        <span class="small">
+                            Nº envío: <?= htmlspecialchars($f['envio_numero'] ?? '—') ?>
+                            <?php if ($f['envio_estado'] === 'pendiente' || $f['envio_estado'] === 'en_transito'): ?>
+                            <form method="post" action="/admin/envios/numero" style="display:inline;margin-left:10px" onsubmit="return confirm('Guardar número?')">
+                                <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>" />
+                                <input type="hidden" name="id" value="<?= (int)$f['id'] ?>" />
+                                <input type="text" name="numero" value="<?= htmlspecialchars($f['envio_numero'] ?? '') ?>" class="form-control form-control-sm" style="width:100px" />
+                                <button class="btn btn-sm btn-outline-primary" type="submit"><i class="bi bi-save"></i></button>
+                            </form>
+                            <?php endif; ?>
+                        </span>
+                        <?php endif; ?>
                         <?php else: ?>
                         <span class="text-muted small">—</span>
                         <?php endif; ?>

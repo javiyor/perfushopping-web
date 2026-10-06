@@ -413,6 +413,7 @@ $router->post('/admin/facturas/(?P<id>\d+)/enviar-email', [AdminFacturaControlle
 $router->get('/admin/envios', [AdminEnvioController::class, 'index']);
 $router->post('/admin/envios/entregar', [AdminEnvioController::class, 'entregar']);
 $router->post('/admin/envios/cancelar', [AdminEnvioController::class, 'cancelar']);
+$router->post('/admin/envios/numero', [AdminEnvioController::class, 'guardarNumero']);
 $router->get('/admin/recibos', [AdminReciboController::class, 'create']);
 $router->get('/admin/recibos/comprobantes', [AdminReciboController::class, 'index']);
 $router->get('/admin/recibos/nuevo', [AdminReciboController::class, 'create']);
