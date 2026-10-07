@@ -135,7 +135,17 @@ final class ProductController
 
         $brands = $this->repo->brandOptions();
         $categories = $this->repo->categoryOptions();
-        $result = $this->repo->search($q, $codsub, $codrub, $perPage, $sort, $order, $page, $perPage);
+
+        try {
+            $result = $this->repo->search($q, $codsub, $codrub, $perPage, $sort, $order, $page, $perPage);
+        } catch (\Throwable $e) {
+            error_log('ProductController::index search error: ' . $e->getMessage());
+            $result = ['items' => [], 'total' => 0, 'page' => 1, 'perPage' => $perPage];
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Error al buscar productos: ' . $e->getMessage()];
+        }
+
+        $brands = $this->repo->brandOptions();
+        $categories = $this->repo->categoryOptions();
 
         echo View::adminPage('admin/productos/list.php', [
             'adminUser' => $adminUser,
