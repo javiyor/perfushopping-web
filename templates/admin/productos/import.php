@@ -102,6 +102,7 @@ $errors = (int)($stats['errors'] ?? 0);
             <?php endif; ?>
             <?php if ($notFound > 0): ?>
                 <span class="badge bg-warning"><?= $notFound ?> sin match</span>
+                <button type="button" class="btn btn-outline-secondary btn-sm py-0" id="toggleSinMatch" onclick="return toggleSinMatch()">Mostrar sin match</button>
             <?php endif; ?>
             <span class="badge bg-secondary"><?= $total ?> filas</span>
         </div>
@@ -152,7 +153,7 @@ $errors = (int)($stats['errors'] ?? 0);
                                 $costoDiff = $item['costo_diff'] ?? null;
                                 $stockDiff = $item['stock_diff'] ?? null;
                             ?>
-                            <tr class="<?= !$matched ? 'table-warning' : ($hasChanges ? '' : 'table-light') ?>">
+                            <tr class="<?= !$matched ? 'table-warning row-sin-match' : ($hasChanges ? '' : 'table-light') ?>"<?= !$matched ? ' style="display:none"' : '' ?>>
                                 <?php if ($found > 0): ?>
                                     <td>
                                         <?php if ($matched && $hasChanges): ?>
@@ -284,6 +285,14 @@ $errors = (int)($stats['errors'] ?? 0);
 function toggleAll(master) {
     document.querySelectorAll('.row-select').forEach(cb => cb.checked = master.checked);
     updateSelectedCount();
+}
+function toggleSinMatch() {
+    const rows = document.querySelectorAll('.row-sin-match');
+    const btn = document.getElementById('toggleSinMatch');
+    const show = rows.length > 0 && rows[0].style.display === 'none';
+    rows.forEach(tr => tr.style.display = show ? '' : 'none');
+    if (btn) btn.textContent = show ? 'Ocultar sin match' : 'Mostrar sin match';
+    return false;
 }
 function updateSelectedCount() {
     const el = document.getElementById('selectedCount');
