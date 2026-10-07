@@ -516,6 +516,7 @@ public function searchAjusteProductos(array $params): void
 
         try {
             $products = $repo->searchProducts($q, 15);
+            error_log('StockController::searchAjusteProductos q=' . $q . ' | found=' . count($products) . ' products');
         } catch (\Throwable $e) {
             error_log('StockController::searchAjusteProductos error: ' . $e->getMessage() . ' | Trace: ' . $e->getTraceAsString());
             Response::json(['error' => 'Error al buscar productos: ' . $e->getMessage()], 500);
