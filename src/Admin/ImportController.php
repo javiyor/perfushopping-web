@@ -66,8 +66,8 @@ final class ImportController
         $conIva = isset($_POST['precios_con_iva']);
         if (!$rows) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => $conIva
-                ? 'No se pudieron leer filas del CSV. Verifica que tenga las columnas: codscan, precio_con_iva (opcional: costo_con_iva, stock)'
-                : 'No se pudieron leer filas del CSV. Verifica que tenga las columnas: codprodup, codscan, precio_sin_iva, costo_sin_iva, stock'];
+                ? 'No se pudieron leer filas del CSV. Verifica que tenga las columnas: codscan, precio_con_iva (opcional: costo_con_iva, stock). Si es un Excel (.xlsx), guardalo como CSV primero.'
+                : 'No se pudieron leer filas del CSV. Verifica que tenga las columnas: codprodup, codscan, precio_sin_iva, costo_sin_iva, stock. Si es un Excel (.xlsx), guardalo como CSV primero.'];
             Response::redirect('/admin/productos/importar');
         }
 
@@ -305,16 +305,23 @@ final class ImportController
             fclose($f);
             return [];
         }
-        $raw = trim($raw);
+        // Quitar BOM UTF-8 (los CSV guardados desde Excel suelen traerlo y rompe el primer encabezado).
+        $raw = preg_replace('/^\xEF\xBB\xBF/', '', trim($raw));
 
-        $delimiter = str_contains($raw, ';') ? ';' : ',';
+        if (str_contains($raw, ';')) {
+            $delimiter = ';';
+        } elseif (str_contains($raw, "\t")) {
+            $delimiter = "\t";
+        } else {
+            $delimiter = ',';
+        }
 
         $headers = str_getcsv($raw, $delimiter);
         if (!$headers || !is_array($headers)) {
             fclose($f);
             return [];
         }
-        $headers = array_map(static fn (string $h): string => trim(mb_strtolower(str_replace([' ', '-'], '_', $h))), $headers);
+        $headers = array_map([$this, 'normalizeImportHeader'], $headers);
 
         $required = ['codprodup', 'codscan'];
         $hasAny = false;
@@ -348,6 +355,42 @@ final class ImportController
 
         fclose($f);
         return $rows;
+    }
+
+    /**
+     * Normaliza un encabezado del CSV: minúsculas, sin acentos ni BOM, y con
+     * alias para los nombres que suelen venir de planillas de Excel.
+     */
+    private function normalizeImportHeader(string $h): string
+    {
+        $h = preg_replace('/^\xEF\xBB\xBF/', '', trim($h));
+        $h = mb_strtolower($h);
+        $h = str_replace(
+            ['á', 'é', 'í', 'ó', 'ú', 'ñ', 'ü', 'à', 'è', 'ì', 'ò', 'ù', 'â', 'ê', 'î', 'ô', 'û', 'ä', 'ë', 'ï', 'ö'],
+            ['a', 'e', 'i', 'o', 'u', 'n', 'u', 'a', 'e', 'i', 'o', 'u', 'a', 'e', 'i', 'o', 'u', 'a', 'e', 'i', 'o'],
+            $h
+        );
+        $h = str_replace([' ', '-', '.', '/'], '_', $h);
+        $h = preg_replace('/[^a-z0-9_]/', '', $h) ?? '';
+
+        static $aliases = [
+            'codprodup' => ['codprodup', 'codigo_proveedor', 'cod_proveedor', 'codigo_prov', 'codprov'],
+            'codscan' => ['codscan', 'codbarra', 'codigo_barra', 'codigo_barras', 'codigo_de_barra', 'codigo_de_barras', 'barra', 'barras', 'ean', 'ean13', 'ean_13', 'codigo', 'cod', 'codigo_producto'],
+            'precio_con_iva' => ['precio_con_iva', 'precio_iva', 'precio_final', 'precio_publico', 'precio_minorista', 'precio_venta', 'precio', 'pvp', 'precio_lista'],
+            'costo_con_iva' => ['costo_con_iva', 'costo_iva', 'costo', 'costo_final'],
+            'precio_sin_iva' => ['precio_sin_iva', 'precio_neto', 'precio_siniva'],
+            'costo_sin_iva' => ['costo_sin_iva', 'costo_neto', 'costo_siniva'],
+            'precio1_sin_iva' => ['precio1_sin_iva', 'precio1', 'precio_mayorista', 'mayorista'],
+            'ganan1' => ['ganan1', 'margen1', 'margen_minorista'],
+            'ganan2' => ['ganan2', 'margen2', 'margen_mayorista'],
+            'stock' => ['stock', 'cantidad', 'cant', 'existencia', 'existencias'],
+        ];
+        foreach ($aliases as $canonical => $names) {
+            if (in_array($h, $names, true)) {
+                return $canonical;
+            }
+        }
+        return $h;
     }
 
     private function parseFloat(string $v): ?float
