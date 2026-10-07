@@ -63,8 +63,11 @@ final class ImportController
         }
 
         $rows = $this->parseCsv($tmp);
+        $conIva = isset($_POST['precios_con_iva']);
         if (!$rows) {
-            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se pudieron leer filas del CSV. Verifica que tenga las columnas: codprodup, codscan, precio_sin_iva, costo_sin_iva, stock'];
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => $conIva
+                ? 'No se pudieron leer filas del CSV. Verifica que tenga las columnas: codscan, precio_con_iva (opcional: costo_con_iva, stock)'
+                : 'No se pudieron leer filas del CSV. Verifica que tenga las columnas: codprodup, codscan, precio_sin_iva, costo_sin_iva, stock'];
             Response::redirect('/admin/productos/importar');
         }
 
@@ -89,14 +92,37 @@ final class ImportController
         foreach ($rows as $idx => $row) {
             $codprodup = trim((string)($row['codprodup'] ?? ''));
             $codscan = trim((string)($row['codscan'] ?? ''));
-            $precioNew = $this->parseFloat((string)($row['precio_sin_iva'] ?? ''));
-            $costoNew = $this->parseFloat((string)($row['costo_sin_iva'] ?? ''));
             $stockNew = $this->parseInt((string)($row['stock'] ?? ''));
-            $ganan1New = $this->parseFloat((string)($row['ganan1'] ?? ''));
-            $ganan2New = $this->parseFloat((string)($row['ganan2'] ?? ''));
-            $precio1New = $this->parseFloat((string)($row['precio1_sin_iva'] ?? ''));
-
-            $match = $this->repo->findByCodprodupOrCodscan($codprodup, $codscan, $idprovee);
+            if ($conIva) {
+                // Modo precios con IVA: se busca por código de barra de la variedad y
+                // los netos se calculan contra IVA y márgenes existentes dentro del bloque matched.
+                $precioConIvaNew = $this->parseFloat((string)($row['precio_con_iva'] ?? $row['precio_iva'] ?? ''));
+                $costoConIvaNew = $this->parseFloat((string)($row['costo_con_iva'] ?? ''));
+                $precioNew = null;
+                $costoNew = null;
+                $ganan1New = null;
+                $ganan2New = null;
+                $precio1New = null;
+                $match = null;
+                if ($codscan !== '') {
+                    $match = $this->repo->findByCodscan($codscan, $idprovee);
+                }
+                if ($match === null && $codprodup !== '') {
+                    $match = $this->repo->findByCodprodup($codprodup, $idprovee);
+                    if ($match) {
+                        $match['_match_type'] = 'codprodup';
+                    }
+                }
+            } else {
+                $precioNew = $this->parseFloat((string)($row['precio_sin_iva'] ?? ''));
+                $costoNew = $this->parseFloat((string)($row['costo_sin_iva'] ?? ''));
+                $ganan1New = $this->parseFloat((string)($row['ganan1'] ?? ''));
+                $ganan2New = $this->parseFloat((string)($row['ganan2'] ?? ''));
+                $precio1New = $this->parseFloat((string)($row['precio1_sin_iva'] ?? ''));
+                $precioConIvaNew = null;
+                $costoConIvaNew = null;
+                $match = $this->repo->findByCodprodupOrCodscan($codprodup, $codscan, $idprovee);
+            }
 
             $item = [
                 'row' => $idx + 2,
@@ -108,6 +134,8 @@ final class ImportController
                 'ganan1_new' => $ganan1New,
                 'ganan2_new' => $ganan2New,
                 'precio1_new' => $precio1New,
+                'precio_con_iva_new' => $precioConIvaNew ?? null,
+                'costo_con_iva_new' => $costoConIvaNew ?? null,
                 'matched' => $match !== null,
             ];
 
@@ -142,6 +170,27 @@ final class ImportController
                 $item['ganan2_old'] = $ganan2Old;
                 $item['iva_rate'] = $ivaRate;
 
+                if ($conIva) {
+                    // El Excel trae el precio minorista con IVA: se guarda el neto y se
+                    // recalculan costo y mayorista con los márgenes ya cargados (ganan1/ganan2).
+                    $divisor = 1 + $ivaRate / 100;
+                    if ($precioConIvaNew !== null && $divisor > 0) {
+                        $precioNew = round($precioConIvaNew / $divisor, 2);
+                    }
+                    if ($costoConIvaNew !== null && $divisor > 0) {
+                        $costoNew = round($costoConIvaNew / $divisor, 2);
+                    } elseif ($precioNew !== null && $ganan1Old > 0) {
+                        $costoNew = round($precioNew / (1 + $ganan1Old / 100), 2);
+                    }
+                    $costoBase = $costoNew ?? $costoOld;
+                    if ($costoBase > 0 && $ganan2Old > 0) {
+                        $precio1New = round($costoBase * (1 + $ganan2Old / 100), 2);
+                    }
+                    $item['precio_new'] = $precioNew;
+                    $item['costo_new'] = $costoNew;
+                    $item['precio1_new'] = $precio1New;
+                }
+
                 $item['precio_diff'] = $precioNew !== null ? round($precioNew - $precioOld, 2) : null;
                 $item['costo_diff'] = $costoNew !== null ? round($costoNew - $costoOld, 2) : null;
                 $item['stock_diff'] = $stockNew !== null ? $stockNew - $stockOld : null;
@@ -169,6 +218,7 @@ final class ImportController
             'notFound' => $notFound,
             'idprovee' => $idprovee,
             'proveedor' => $proveedorNombre,
+            'precios_con_iva' => $conIva,
         ];
 
         Response::redirect('/admin/productos/importar');
@@ -204,12 +254,12 @@ final class ImportController
 
             try {
                 $idprodu = (int)$item['idprodu'];
-                $precioVal = $item['precio_new'];
-                $costoVal = $item['costo_new'];
+                $precioVal = $item['precio_new'] ?? $item['precio_old'] ?? null;
+                $costoVal = $item['costo_new'] ?? $item['costo_old'] ?? null;
                 $stockVal = $item['stock_new'];
                 $ganan1Val = $item['ganan1_new'] ?? null;
                 $ganan2Val = $item['ganan2_new'] ?? null;
-                $precio1Val = $item['precio1_new'] ?? null;
+                $precio1Val = $item['precio1_new'] ?? $item['precio1_old'] ?? null;
                 $idcodgusto = (int)$item['idcodgusto'];
 
                 $hasPriceChange = $item['precio_diff'] !== null && abs((float)$item['precio_diff']) > 0.001;
@@ -217,9 +267,10 @@ final class ImportController
                 $hasStockChange = $item['stock_diff'] !== null && (int)$item['stock_diff'] !== 0;
                 $hasGanan1Change = $item['ganan1_diff'] !== null && abs((float)$item['ganan1_diff']) > 0.001;
                 $hasGanan2Change = $item['ganan2_diff'] !== null && abs((float)$item['ganan2_diff']) > 0.001;
+                $hasPrecio1Change = ($item['precio1_diff'] ?? null) !== null && abs((float)$item['precio1_diff']) > 0.001;
 
-                if ($hasPriceChange || $hasCostChange || $hasGanan1Change || $hasGanan2Change || $precio1Val !== null) {
-                    $this->repo->updatePrecios($idprodu, (float)$precioVal, (float)$costoVal, $ganan1Val, $ganan2Val, $precio1Val);
+                if ($hasPriceChange || $hasCostChange || $hasGanan1Change || $hasGanan2Change || $hasPrecio1Change) {
+                    $this->repo->updatePrecios($idprodu, (float)($precioVal ?? 0), (float)($costoVal ?? 0), $ganan1Val, $ganan2Val, $precio1Val);
                 }
                 if ($hasStockChange && $idcodgusto > 0) {
                     $this->repo->updateStock($idcodgusto, (int)$stockVal);

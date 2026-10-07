@@ -645,6 +645,9 @@ final class StockRepo
             ':exactVariant' => $q,
             ':exactNombre' => $q,
         ];
+        if ($hasCodbarra) {
+            $params[':exactCodbarra'] = $q;
+        }
         $where = ['p.produ LIKE :likeProdu', 'p.codprodu LIKE :likeCod', 'p.codprodup LIKE :likeProv'];
         $exactRank = ['p.codprodu = :exactCod', 'p.codprodup = :exactProv'];
         if (ctype_digit($q)) {
