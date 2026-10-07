@@ -169,6 +169,26 @@ final class CompraRepo
             $extraCols[] = 'plazo_dias';
             $extraVals[] = ':plazo_dias';
         }
+        if (in_array('fecha_recepcion', $cols, true)) {
+            $extraCols[] = 'fecha_recepcion';
+            $extraVals[] = ':frecep';
+        }
+        if (in_array('flete_cents', $cols, true)) {
+            $extraCols[] = 'flete_cents';
+            $extraVals[] = ':flete_cents';
+        }
+        if (in_array('flete_pct', $cols, true)) {
+            $extraCols[] = 'flete_pct';
+            $extraVals[] = ':flete_pct';
+        }
+        if (in_array('flete_transporte_id', $cols, true)) {
+            $extraCols[] = 'flete_transporte_id';
+            $extraVals[] = ':flete_tid';
+        }
+        if (in_array('flete_transporte', $cols, true)) {
+            $extraCols[] = 'flete_transporte';
+            $extraVals[] = ':flete_tnom';
+        }
         $extraColsSql = $extraCols ? ', ' . implode(', ', $extraCols) : '';
         $extraValsSql = $extraVals ? ', ' . implode(', ', $extraVals) : '';
         $st = Db::pdo()->prepare('
@@ -183,7 +203,7 @@ final class CompraRepo
                :obs, :cb)
         ');
         $p = $this->params($d);
-        foreach (['ret_ing_brutos' => ':ret_ib', 'ret_iva' => ':ret_iva', 'plazo_cuotas' => ':plazo_cuotas', 'plazo_dias' => ':plazo_dias'] as $col => $ph) {
+        foreach (['ret_ing_brutos' => ':ret_ib', 'ret_iva' => ':ret_iva', 'plazo_cuotas' => ':plazo_cuotas', 'plazo_dias' => ':plazo_dias', 'fecha_recepcion' => ':frecep', 'flete_cents' => ':flete_cents', 'flete_pct' => ':flete_pct', 'flete_transporte_id' => ':flete_tid', 'flete_transporte' => ':flete_tnom'] as $col => $ph) {
             if (!in_array($col, $cols, true)) {
                 unset($p[$ph]);
             }
@@ -209,6 +229,21 @@ final class CompraRepo
         if (in_array('plazo_dias', $cols, true)) {
             $extraSet .= ', plazo_dias = :plazo_dias';
         }
+        if (in_array('fecha_recepcion', $cols, true)) {
+            $extraSet .= ', fecha_recepcion = :frecep';
+        }
+        if (in_array('flete_cents', $cols, true)) {
+            $extraSet .= ', flete_cents = :flete_cents';
+        }
+        if (in_array('flete_pct', $cols, true)) {
+            $extraSet .= ', flete_pct = :flete_pct';
+        }
+        if (in_array('flete_transporte_id', $cols, true)) {
+            $extraSet .= ', flete_transporte_id = :flete_tid';
+        }
+        if (in_array('flete_transporte', $cols, true)) {
+            $extraSet .= ', flete_transporte = :flete_tnom';
+        }
         $st = Db::pdo()->prepare('
             UPDATE factura_compra SET
               estado = :estado, fecha = :fecha, tipo = :tipo, punto_venta = :pv,
@@ -223,7 +258,7 @@ final class CompraRepo
         $p = $this->params($d);
         // El UPDATE no toca origen ni created_by: deben salir del binding.
         unset($p[':origen'], $p[':cb']);
-        foreach (['ret_ing_brutos' => ':ret_ib', 'ret_iva' => ':ret_iva', 'plazo_cuotas' => ':plazo_cuotas', 'plazo_dias' => ':plazo_dias'] as $col => $ph) {
+        foreach (['ret_ing_brutos' => ':ret_ib', 'ret_iva' => ':ret_iva', 'plazo_cuotas' => ':plazo_cuotas', 'plazo_dias' => ':plazo_dias', 'fecha_recepcion' => ':frecep', 'flete_cents' => ':flete_cents', 'flete_pct' => ':flete_pct', 'flete_transporte_id' => ':flete_tid', 'flete_transporte' => ':flete_tnom'] as $col => $ph) {
             if (!in_array($col, $cols, true)) {
                 unset($p[$ph]);
             }
@@ -244,6 +279,11 @@ final class CompraRepo
             ':origen' => (string)($d['origen'] ?? 'manual'),
             ':estado' => (string)($d['estado'] ?? 'pendiente'),
             ':fecha' => ($d['fecha'] ?? '') !== '' ? (string)$d['fecha'] : null,
+            ':frecep' => (($d['fecha_recepcion'] ?? '') !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$d['fecha_recepcion'])) ? (string)$d['fecha_recepcion'] : null,
+            ':flete_cents' => max(0, (int)($d['flete_cents'] ?? 0)),
+            ':flete_pct' => isset($d['flete_pct']) && $d['flete_pct'] !== '' && $d['flete_pct'] !== null ? round((float)$d['flete_pct'], 2) : null,
+            ':flete_tid' => ((int)($d['flete_transporte_id'] ?? 0)) > 0 ? (int)$d['flete_transporte_id'] : null,
+            ':flete_tnom' => trim((string)($d['flete_transporte'] ?? '')) !== '' ? trim((string)$d['flete_transporte']) : null,
             ':tipo' => (string)($d['tipo'] ?? ''),
             ':pv' => (string)($d['punto_venta'] ?? ''),
             ':nd' => (string)($d['numero_desde'] ?? ''),
@@ -355,6 +395,27 @@ final class CompraRepo
     }
 
     // ── Proveedores ──
+
+    /** Busca transportes en la tabla legacy `transporte` (puede no existir: devuelve []). */
+    public function searchTransportes(string $q, int $limit = 10): array
+    {
+        $limit = max(1, min(20, $limit));
+        $q = trim($q);
+        if ($q === '') {
+            return [];
+        }
+        try {
+            $st = Db::pdo()->prepare('
+                SELECT idtranspor, nomtranspor FROM transporte
+                WHERE nomtranspor LIKE :like
+                ORDER BY nomtranspor ASC LIMIT ' . $limit
+            );
+            $st->execute([':like' => '%' . $q . '%']);
+            return $st->fetchAll();
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
 
     public function proveedorByCuit(string $cuit): ?array
     {

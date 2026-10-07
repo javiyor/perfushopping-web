@@ -659,6 +659,7 @@ $router->get('/admin/compras/nueva', [AdminCompraController::class, 'create']);
 $router->post('/admin/compras/qr', [AdminCompraController::class, 'qr']);
 $router->get('/admin/compras/productos', [AdminCompraController::class, 'searchProducts']);
 $router->get('/admin/compras/buscar-proveedores', [AdminCompraController::class, 'searchProveedores']);
+$router->get('/admin/compras/buscar-transportes', [AdminCompraController::class, 'searchTransportes']);
 $router->post('/admin/compras/guardar', [AdminCompraController::class, 'store']);
 $router->post('/admin/compras/cuenta', [AdminCompraController::class, 'setCuenta']);
 $router->post('/admin/compras/delete', [AdminCompraController::class, 'delete']);

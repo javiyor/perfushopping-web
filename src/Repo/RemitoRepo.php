@@ -72,14 +72,34 @@ final class RemitoRepo
         return $prefix . '-' . date('Y') . '-' . str_pad((string)($count + 1), 5, '0', STR_PAD_LEFT);
     }
 
+    private static ?bool $fechaIngresoChecked = null;
+
+    private function ensureFechaIngresoColumn(): void
+    {
+        if (self::$fechaIngresoChecked !== null) {
+            return;
+        }
+        self::$fechaIngresoChecked = true;
+        try {
+            $cols = Db::pdo()->query('SHOW COLUMNS FROM remitos')->fetchAll();
+            $fields = array_column($cols, 'Field');
+            if (!in_array('fecha_ingreso', $fields, true)) {
+                Db::pdo()->exec('ALTER TABLE remitos ADD COLUMN fecha_ingreso DATE DEFAULT NULL AFTER fecha');
+            }
+        } catch (\Throwable $e) {
+            error_log('RemitoRepo::ensureFechaIngresoColumn: ' . $e->getMessage());
+        }
+    }
+
     public function create(array $data, array $items): int
     {
+        $this->ensureFechaIngresoColumn();
         $pdo = Db::pdo();
         $pdo->beginTransaction();
         try {
             $st = $pdo->prepare('
-                INSERT INTO remitos (codigo, tipo, cliente_id, idclien, cliente_nombre, proveedor_id, proveedor_nombre, presupuesto_id, fecha, total_cents, estado, notas, created_by, created_at, updated_at)
-                VALUES (:codigo, :tipo, :cliente_id, :idclien, :cliente_nombre, :proveedor_id, :proveedor_nombre, :presupuesto_id, :fecha, :total_cents, :estado, :notas, :created_by, NOW(), NOW())
+                INSERT INTO remitos (codigo, tipo, cliente_id, idclien, cliente_nombre, proveedor_id, proveedor_nombre, presupuesto_id, fecha, fecha_ingreso, total_cents, estado, notas, created_by, created_at, updated_at)
+                VALUES (:codigo, :tipo, :cliente_id, :idclien, :cliente_nombre, :proveedor_id, :proveedor_nombre, :presupuesto_id, :fecha, :fecha_ingreso, :total_cents, :estado, :notas, :created_by, NOW(), NOW())
             ');
             $st->execute([
                 ':codigo' => $data['codigo'],
@@ -91,6 +111,7 @@ final class RemitoRepo
                 ':proveedor_nombre' => $data['proveedor_nombre'],
                 ':presupuesto_id' => $data['presupuesto_id'],
                 ':fecha' => $data['fecha'],
+                ':fecha_ingreso' => (($data['fecha_ingreso'] ?? '') !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$data['fecha_ingreso'])) ? (string)$data['fecha_ingreso'] : null,
                 ':total_cents' => $data['total_cents'],
                 ':estado' => $data['estado'] ?? 'pendiente',
                 ':notas' => $data['notas'],

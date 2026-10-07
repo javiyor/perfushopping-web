@@ -97,11 +97,15 @@ $idcta1Sel = (int)($compra['idcta1'] ?? 0);
                 <div class="card-header bg-white fw-semibold">Comprobante</div>
                 <div class="card-body">
                     <div class="row g-2">
-                        <div class="col-6">
+                        <div class="col-4">
                             <label class="form-label small">Fecha <span class="text-danger">*</span></label>
-                            <input class="form-control form-control-sm" name="fecha" type="date" value="<?= htmlspecialchars((string)($compra['fecha'] ?? date('Y-m-d'))) ?>" required />
+                            <input class="form-control form-control-sm" name="fecha" id="fecha" type="date" value="<?= htmlspecialchars((string)($compra['fecha'] ?? date('Y-m-d'))) ?>" required />
                         </div>
-                        <div class="col-6">
+                        <div class="col-4">
+                            <label class="form-label small">Fecha recepción</label>
+                            <input class="form-control form-control-sm" name="fecha_recepcion" id="fechaRecepcion" type="date" value="<?= htmlspecialchars((string)($compra['fecha_recepcion'] ?? ($compra['fecha'] ?? date('Y-m-d')))) ?>" title="Fecha de recepción del pedido" />
+                        </div>
+                        <div class="col-4">
                             <label class="form-label small">Tipo</label>
                             <select class="form-select form-select-sm" name="tipo">
                                 <?php foreach ($tipos as $v => $l): ?>
@@ -169,23 +173,23 @@ $idcta1Sel = (int)($compra['idcta1'] ?? 0);
                         </div>
                         <div class="col-6">
                             <label class="form-label small">Neto gravado</label>
-                            <input class="form-control form-control-sm importe-input" name="imp_neto_gravado" value="<?= htmlspecialchars((string)($compra['imp_neto_gravado'] ?? '0')) ?>" />
+                            <input class="form-control form-control-sm importe-input" name="imp_neto_gravado" id="imp_neto_gravado" value="<?= htmlspecialchars((string)($compra['imp_neto_gravado'] ?? '0')) ?>" />
                         </div>
                         <div class="col-6">
                             <label class="form-label small">No gravado</label>
-                            <input class="form-control form-control-sm importe-input" name="imp_no_gravado" value="<?= htmlspecialchars((string)($compra['imp_no_gravado'] ?? '0')) ?>" />
+                            <input class="form-control form-control-sm importe-input" name="imp_no_gravado" id="imp_no_gravado" value="<?= htmlspecialchars((string)($compra['imp_no_gravado'] ?? '0')) ?>" />
                         </div>
                         <div class="col-6">
                             <label class="form-label small">Exento</label>
-                            <input class="form-control form-control-sm importe-input" name="imp_exento" value="<?= htmlspecialchars((string)($compra['imp_exento'] ?? '0')) ?>" />
+                            <input class="form-control form-control-sm importe-input" name="imp_exento" id="imp_exento" value="<?= htmlspecialchars((string)($compra['imp_exento'] ?? '0')) ?>" />
                         </div>
                         <div class="col-6">
                             <label class="form-label small">Otros tributos</label>
-                            <input class="form-control form-control-sm importe-input" name="otros_tributos" value="<?= htmlspecialchars((string)($compra['otros_tributos'] ?? '0')) ?>" />
+                            <input class="form-control form-control-sm importe-input" name="otros_tributos" id="otros_tributos" value="<?= htmlspecialchars((string)($compra['otros_tributos'] ?? '0')) ?>" />
                         </div>
                         <div class="col-6">
                             <label class="form-label small">IVA</label>
-                            <input class="form-control form-control-sm importe-input" name="imp_iva" value="<?= htmlspecialchars((string)($compra['imp_iva'] ?? '0')) ?>" />
+                            <input class="form-control form-control-sm importe-input" name="imp_iva" id="imp_iva" value="<?= htmlspecialchars((string)($compra['imp_iva'] ?? '0')) ?>" />
                         </div>
                         <div class="col-6">
                             <label class="form-label small">Ret. Ing. Brutos</label>
@@ -197,7 +201,30 @@ $idcta1Sel = (int)($compra['idcta1'] ?? 0);
                         </div>
                         <div class="col-6">
                             <label class="form-label small fw-bold">Total</label>
-                            <input class="form-control form-control-sm importe-input fw-bold" name="imp_total" value="<?= htmlspecialchars((string)($compra['imp_total'] ?? '0')) ?>" />
+                            <input class="form-control form-control-sm importe-input fw-bold" name="imp_total" id="imp_total" value="<?= htmlspecialchars((string)($compra['imp_total'] ?? '0')) ?>" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-white fw-semibold">Flete</div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-12 position-relative">
+                            <label class="form-label small">Transporte que entregó</label>
+                            <input class="form-control form-control-sm" id="fleteTransporteSearch" placeholder="Buscar en tabla transporte..." autocomplete="off" value="<?= htmlspecialchars((string)($compra['flete_transporte'] ?? '')) ?>" />
+                            <input type="hidden" name="flete_transporte_id" id="fleteTransporteId" value="<?= (int)($compra['flete_transporte_id'] ?? 0) ?>" />
+                            <input type="hidden" name="flete_transporte" id="fleteTransporteNombre" value="<?= htmlspecialchars((string)($compra['flete_transporte'] ?? '')) ?>" />
+                            <div id="fleteTransporteResults" class="list-group mt-1" style="display:none;position:absolute;z-index:1050;max-height:220px;overflow-y:auto;left:0;right:0"></div>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Monto flete</label>
+                            <input class="form-control form-control-sm" name="flete_monto" id="fleteMonto" inputmode="decimal" placeholder="0.00" value="<?= ((int)($compra['flete_cents'] ?? 0) > 0) ? htmlspecialchars(number_format((int)$compra['flete_cents'] / 100, 2, '.', '')) : '' ?>" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">% sobre gravado</label>
+                            <input class="form-control form-control-sm" id="fletePct" readonly tabindex="-1" value="<?= (isset($compra['flete_pct']) && $compra['flete_pct'] !== null && $compra['flete_pct'] !== '') ? htmlspecialchars((string)$compra['flete_pct']) : '' ?>" />
                         </div>
                     </div>
                 </div>
@@ -535,6 +562,88 @@ function recalcular() {
 }
 
 // ── Plazo de pago ──
+// Total del comprobante = neto + no gravado + exento + otros tributos + IVA.
+function parseImporte(v) {
+    if (v === null || v === undefined) return 0;
+    return parseFloat(String(v).replace(',', '.')) || 0;
+}
+function calcTotalCompra() {
+    var total = parseImporte(document.getElementById('imp_neto_gravado').value)
+        + parseImporte(document.getElementById('imp_no_gravado').value)
+        + parseImporte(document.getElementById('imp_exento').value)
+        + parseImporte(document.getElementById('otros_tributos').value)
+        + parseImporte(document.getElementById('imp_iva').value);
+    var el = document.getElementById('imp_total');
+    if (el) el.value = total.toFixed(2);
+    calcFletePct();
+    if (typeof previewPlazo === 'function') previewPlazo();
+}
+document.querySelectorAll('.importe-input').forEach(function(el) {
+    if (el.name !== 'imp_total') el.addEventListener('input', calcTotalCompra);
+});
+
+// % del flete sobre el neto gravado (solo informativo: el flete no suma al total).
+function calcFletePct() {
+    var monto = parseImporte(document.getElementById('fleteMonto').value);
+    var neto = parseImporte(document.getElementById('imp_neto_gravado').value);
+    var el = document.getElementById('fletePct');
+    if (el) el.value = (monto > 0 && neto > 0) ? (monto / neto * 100).toFixed(2) : '';
+}
+document.getElementById('fleteMonto').addEventListener('input', calcFletePct);
+document.addEventListener('DOMContentLoaded', calcTotalCompra);
+
+// Buscador de transporte (tabla transporte).
+(function() {
+    var input = document.getElementById('fleteTransporteSearch');
+    var results = document.getElementById('fleteTransporteResults');
+    if (!input || !results) return;
+    var esc = function(s) {
+        var d = document.createElement('div');
+        d.textContent = s || '';
+        return d.innerHTML;
+    };
+    var t = null;
+    input.addEventListener('input', function() {
+        document.getElementById('fleteTransporteId').value = '0';
+        document.getElementById('fleteTransporteNombre').value = this.value.trim();
+        clearTimeout(t);
+        var q = this.value.trim();
+        if (q.length < 2) { results.style.display = 'none'; return; }
+        t = setTimeout(function() {
+            fetch('/admin/compras/buscar-transportes?q=' + encodeURIComponent(q))
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    results.innerHTML = '';
+                    if (!data || !data.length) {
+                        results.innerHTML = '<span class="list-group-item list-group-item-action text-muted small">Sin resultados: queda el nombre escrito</span>';
+                    } else {
+                        data.forEach(function(tr) {
+                            var a = document.createElement('a');
+                            a.className = 'list-group-item list-group-item-action';
+                            a.href = '#';
+                            a.innerHTML = '<strong>' + esc(tr.nomtranspor) + '</strong>';
+                            a.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                input.value = tr.nomtranspor || '';
+                                document.getElementById('fleteTransporteId').value = tr.idtranspor || 0;
+                                document.getElementById('fleteTransporteNombre').value = tr.nomtranspor || '';
+                                results.style.display = 'none';
+                            });
+                            results.appendChild(a);
+                        });
+                    }
+                    results.style.display = 'block';
+                })
+                .catch(function() { results.style.display = 'none'; });
+        }, 250);
+    });
+    document.addEventListener('click', function(e) {
+        if (!input.contains(e.target) && !results.contains(e.target)) {
+            results.style.display = 'none';
+        }
+    });
+})();
+
 function plazoDiasArray() {
     return (document.getElementById('plazoDias').value || '')
         .split(',')

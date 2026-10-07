@@ -92,6 +92,10 @@ if (!$remito):
                     <dd class="col-sm-8"><?= htmlspecialchars((string)($remito['cliente_nombre'] ?: $remito['proveedor_nombre'] ?: '-')) ?></dd>
                     <dt class="col-sm-4">Fecha</dt>
                     <dd class="col-sm-8"><?= htmlspecialchars((string)($remito['fecha'] ?? '-')) ?></dd>
+                    <?php if (($remito['tipo'] ?? '') === 'entrada' && !empty($remito['fecha_ingreso'])): ?>
+                    <dt class="col-sm-4">Fecha de ingreso</dt>
+                    <dd class="col-sm-8"><?= htmlspecialchars((string)$remito['fecha_ingreso']) ?></dd>
+                    <?php endif; ?>
                     <?php if ($remito['presupuesto_id']): ?>
                     <dt class="col-sm-4">Presupuesto</dt>
                     <dd class="col-sm-8"><a href="/admin/presupuestos/<?= (int)$remito['presupuesto_id'] ?>">#<?= (int)$remito['presupuesto_id'] ?></a></dd>

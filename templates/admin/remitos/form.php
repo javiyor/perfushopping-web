@@ -120,6 +120,10 @@ $isEntrada = $tipo === 'entrada';
                 <div class="card-header bg-white fw-semibold">Fecha</div>
                 <div class="card-body">
                     <input class="form-control form-control-sm" name="fecha" type="date" value="<?= date('Y-m-d') ?>" />
+                    <?php if ($isEntrada): ?>
+                    <label class="form-label small mt-2">Fecha de ingreso del pedido</label>
+                    <input class="form-control form-control-sm" name="fecha_ingreso" type="date" value="<?= date('Y-m-d') ?>" title="Fecha de ingreso del pedido" />
+                    <?php endif; ?>
                 </div>
             </div>
 

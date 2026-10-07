@@ -138,6 +138,7 @@ final class RemitoController
             'proveedor_nombre' => trim((string)($_POST['proveedor_nombre'] ?? '')),
             'presupuesto_id' => $presupuestoId,
             'fecha' => (string)($_POST['fecha'] ?? date('Y-m-d')),
+            'fecha_ingreso' => trim((string)($_POST['fecha_ingreso'] ?? '')),
             'total_cents' => $total,
             'estado' => 'pendiente',
             'notas' => trim((string)($_POST['notas'] ?? '')),

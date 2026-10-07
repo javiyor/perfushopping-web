@@ -315,9 +315,18 @@ final class CompraController
         }
 
         $fecha = trim((string)($_POST['fecha'] ?? ''));
+        $fechaRecepcion = trim((string)($_POST['fecha_recepcion'] ?? ''));
+        $fleteMonto = (float)str_replace(',', '.', trim((string)($_POST['flete_monto'] ?? '0')));
+        $fleteCents = $fleteMonto > 0 ? (int)round($fleteMonto * 100) : 0;
+        $netoGravado = (float)($_POST['imp_neto_gravado'] ?? 0);
         $data = [
             'origen' => (string)($_POST['origen'] ?? 'manual'),
             'fecha' => $fecha !== '' ? $fecha : date('Y-m-d'),
+            'fecha_recepcion' => preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaRecepcion) ? $fechaRecepcion : null,
+            'flete_cents' => $fleteCents,
+            'flete_pct' => ($fleteCents > 0 && $netoGravado > 0) ? round(($fleteCents / 100) / $netoGravado * 100, 2) : null,
+            'flete_transporte_id' => (int)($_POST['flete_transporte_id'] ?? 0) ?: null,
+            'flete_transporte' => trim((string)($_POST['flete_transporte'] ?? '')),
             'tipo' => trim((string)($_POST['tipo'] ?? '')),
             'punto_venta' => trim((string)($_POST['punto_venta'] ?? '')),
             'numero_desde' => trim((string)($_POST['numero_desde'] ?? '')),
@@ -423,6 +432,19 @@ final class CompraController
             $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Factura de compra eliminada.'];
         }
         Response::redirect('/admin/compras');
+    }
+
+    public function searchTransportes(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requirePermiso('compras');
+
+        $q = trim((string)($_GET['q'] ?? ''));
+        if ($q === '') {
+            Response::json([]);
+            return;
+        }
+        Response::json((new CompraRepo())->searchTransportes($q));
     }
 
     public function searchProveedores(array $params): void

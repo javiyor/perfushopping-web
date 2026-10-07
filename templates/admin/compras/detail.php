@@ -33,6 +33,10 @@ $estado = (string)($compra['estado'] ?? 'pendiente');
                 <dl class="row small mb-0">
                     <dt class="col-sm-3">Fecha</dt>
                     <dd class="col-sm-9"><?= htmlspecialchars((string)($compra['fecha'] ?? '-')) ?></dd>
+                    <?php if (!empty($compra['fecha_recepcion'])): ?>
+                    <dt class="col-sm-3">Fecha recepción</dt>
+                    <dd class="col-sm-9"><?= htmlspecialchars((string)$compra['fecha_recepcion']) ?></dd>
+                    <?php endif; ?>
                     <dt class="col-sm-3">Proveedor</dt>
                     <dd class="col-sm-9 fw-bold">
                         <?php
@@ -52,6 +56,10 @@ $estado = (string)($compra['estado'] ?? 'pendiente');
                     <dd class="col-sm-9"><?= !empty($compra['cuenta_nombre']) ? htmlspecialchars((string)($compra['cuenta_grupo'] ?? '') . ' › ' . $compra['cuenta_nombre']) : '<span class="text-muted">Sin asignar</span>' ?></dd>
                     <dt class="col-sm-3">Depósito</dt>
                     <dd class="col-sm-9"><?= $compra['deposito_nombre'] ? htmlspecialchars((string)$compra['deposito_nombre']) : '<span class="text-muted">—</span>' ?></dd>
+                    <?php if ((int)($compra['flete_cents'] ?? 0) > 0 || trim((string)($compra['flete_transporte'] ?? '')) !== ''): ?>
+                    <dt class="col-sm-3">Flete</dt>
+                    <dd class="col-sm-9">$<?= $mon(((int)($compra['flete_cents'] ?? 0)) / 100) ?><?= (isset($compra['flete_pct']) && $compra['flete_pct'] !== null && $compra['flete_pct'] !== '') ? ' (' . htmlspecialchars((string)$compra['flete_pct']) . '% s/gravado)' : '' ?><?= trim((string)($compra['flete_transporte'] ?? '')) !== '' ? ' · ' . htmlspecialchars((string)$compra['flete_transporte']) : '' ?></dd>
+                    <?php endif; ?>
                     <dt class="col-sm-3">Creado por</dt>
                     <dd class="col-sm-9 text-muted"><?= htmlspecialchars((string)($compra['created_by_nombre'] ?? '-')) ?></dd>
                     <?php if (!empty($compra['observaciones'])): ?>
