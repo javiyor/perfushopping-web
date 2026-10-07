@@ -390,7 +390,20 @@ searchInput.addEventListener('input', function() {
     searchTimeout = setTimeout(() => {
         fetch('/admin/stock/ajuste/buscar-productos?q=' + encodeURIComponent(q))
             .then(r => r.json())
-            .then(data => {
+            .then(resp => {
+                const data = resp.products || resp; // compatibilidad
+                const autoLoad = resp.auto_load;
+                const autoLoadProduct = resp.auto_load_product;
+
+                // Auto-carga si hay coincidencia exacta de código de barras
+                if (autoLoad && autoLoadProduct) {
+                    addItemRow(autoLoadProduct);
+                    resultsDiv.innerHTML = '';
+                    resultsDiv.style.display = 'none';
+                    searchInput.value = '';
+                    return;
+                }
+
                 if (!data.length) {
                     resultsDiv.innerHTML = '<a class="list-group-item list-group-item-action text-muted">Sin resultados</a>';
                 } else {
