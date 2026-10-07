@@ -632,7 +632,6 @@ final class StockRepo
         $q = trim($q);
         if ($q === '') return [];
 
-        $hasCodbarra = in_array('codbarra', $this->productoColumns(), true);
         $like = '%' . $q . '%';
         $params = [
             ':likeProdu' => $like,
@@ -645,9 +644,6 @@ final class StockRepo
             ':exactVariant' => $q,
             ':exactNombre' => $q,
         ];
-        if ($hasCodbarra) {
-            $params[':exactCodbarra'] = $q;
-        }
         $where = ['p.produ LIKE :likeProdu', 'p.codprodu LIKE :likeCod', 'p.codprodup LIKE :likeProv'];
         $exactRank = ['p.codprodu = :exactCod', 'p.codprodup = :exactProv'];
         if (ctype_digit($q)) {
@@ -655,15 +651,9 @@ final class StockRepo
             array_unshift($where, 'p.idprodu = :exactId');
             array_unshift($exactRank, 'p.idprodu = :exactId');
         }
-        if ($hasCodbarra) {
-            $params[':likeCodbarra'] = $like;
-            $params[':exactCodbarra'] = $q;
-            $where[] = 'p.codbarra LIKE :likeCodbarra';
-            $exactRank[] = 'p.codbarra = :exactCodbarra';
-        }
 
         $st = Db::pdo()->prepare('
-            SELECT DISTINCT p.idprodu, p.codprodu, p.codbarra, p.produ, p.codprodup, p.stocact, p.precomp, p.precio,
+            SELECT DISTINCT p.idprodu, p.codprodu, p.produ, p.codprodup, p.stocact, p.precomp, p.precio,
                 (SELECT g2.idcodgusto
                  FROM gustos g2
                  WHERE g2.idprodu = p.idprodu AND g2.codscan = :exactVariant AND g2.discont = 0
