@@ -684,7 +684,12 @@ final class StockRepo
                 WHEN p.produ = :exactNombre THEN 2 ELSE 3 END,
                 p.produ ASC LIMIT ' . $limit
         );
-        $st->execute($params);
+        try {
+            $st->execute($params);
+        } catch (\Throwable $e) {
+            error_log('StockRepo::searchProducts main query error: ' . $e->getMessage() . ' | Query: ' . $st->queryString . ' | Params: ' . json_encode($params));
+            throw $e;
+        }
         $products = $st->fetchAll();
 
         // Buscar variante exacta por codscan (idéntico a FacturaRepo)
