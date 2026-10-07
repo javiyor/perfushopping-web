@@ -467,7 +467,16 @@ final class CompraController
 
         $q = trim((string)($_GET['q'] ?? ''));
         $limit = max(1, min(100, (int)($_GET['limit'] ?? 50)));
-        $prod = (new StockRepo())->searchProducts($q, $limit);
+        $repo = new StockRepo();
+
+        try {
+            $prod = $repo->searchProducts($q, $limit);
+        } catch (\Throwable $e) {
+            error_log('CompraController::searchProducts error: ' . $e->getMessage());
+            Response::json(['error' => 'Error al buscar productos: ' . $e->getMessage()], 500);
+            return;
+        }
+
         $out = [];
         foreach ($prod as $p) {
             $variants = (new StockRepo())->variantesPorProducto((int)$p['idprodu']);

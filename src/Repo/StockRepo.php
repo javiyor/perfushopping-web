@@ -685,7 +685,55 @@ final class StockRepo
                 p.produ ASC LIMIT ' . $limit
         );
         $st->execute($params);
-        return $st->fetchAll();
+        $products = $st->fetchAll();
+
+        // Buscar variante exacta por codscan (como en FacturaRepo)
+        if (ctype_digit($q) || preg_match('/^\d{8,13}$/', $q)) {
+            $st2 = Db::pdo()->prepare('
+                SELECT g.idcodgusto, g.idprodu, g.nomgusto, g.codscan,
+                       p.idprodu, p.codprodu, p.produ, p.precio, p.precio1, p.precomp, p.codprodup, p.enweb, p.stocact,
+                       i.codivaprodu, i.tiva
+                FROM gustos g
+                INNER JOIN producto p ON p.idprodu = g.idprodu
+                LEFT JOIN ivaprodu i ON i.codivaprodu = p.iva
+                WHERE g.codscan = :c
+                GROUP BY p.idprodu
+                LIMIT 1
+            ');
+            $st2 = Db::pdo()->prepare($st2);
+            $st2->execute([':c' => $q]);
+            $byCode = $st2->fetch();
+            if ($byCode) {
+                $matchedVariant = [
+                    'idcodgusto' => (int)$byCode['idcodgusto'],
+                    'nomgusto' => $byCode['nomgusto'],
+                    'codscan' => $q,
+                ];
+                $exists = false;
+                foreach ($products as $pr) {
+                    if ((int)$pr['idprodu'] === (int)$byCode['idprodu']) { $exists = true; break; }
+                }
+                if (!$exists) array_unshift($products, $byCode);
+            }
+        }
+
+        // Agregar variantes a cada producto
+        foreach ($products as $idx => $pr) {
+            $idprodu = (int)$pr['idprodu'];
+            $st3 = Db::pdo()->prepare('
+                SELECT idcodgusto, nomgusto, codscan, stockact
+                FROM gustos
+                WHERE idprodu = :id AND discont = 0
+                GROUP BY idcodgusto, nomgusto, codscan, stockact
+                ORDER BY nomgusto ASC
+            ');
+            $st3->execute([':id' => $idprodu]);
+            $products[$idx]['variants'] = $st3->fetchAll();
+
+            $products[$idx]['stock_total'] = (int)($pr['stocact'] ?? 0);
+        }
+
+        return $products;
     }
 
     public function variantesPorProducto(int $idprodu): array

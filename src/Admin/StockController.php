@@ -513,7 +513,14 @@ public function searchAjusteProductos(array $params): void
         }
 
         $repo = new StockRepo();
-        $products = $repo->searchProducts($q, 15);
+
+        try {
+            $products = $repo->searchProducts($q, 15);
+        } catch (\Throwable $e) {
+            error_log('StockController::searchAjusteProductos error: ' . $e->getMessage());
+            Response::json(['error' => 'Error al buscar productos: ' . $e->getMessage()], 500);
+            return;
+        }
 
         // Detectar coincidencia exacta de código de barras para auto-carga
         $autoLoad = false;
