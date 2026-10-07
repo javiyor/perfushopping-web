@@ -258,6 +258,7 @@ $router->post('/admin/productos/describe', [AdminProductControllerNew::class, 'd
 $router->post('/admin/productos/describe-commercial', [AdminProductControllerNew::class, 'describeCommercial']);
 $router->post('/admin/productos/ai-tags', [AdminProductControllerNew::class, 'aiTags']);
 $router->get('/admin/productos/etiquetas/(?P<id>\d+)', [AdminProductControllerNew::class, 'printLabels']);
+$router->post('/admin/productos/etiquetas/(?P<id>\d+)', [AdminProductControllerNew::class, 'printLabels']);
 
 // Admin - Marketing
 $router->get('/admin/marketing/videos', [AdminMarketingVideoController::class, 'index']);

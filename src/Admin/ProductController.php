@@ -600,12 +600,25 @@ final class ProductController
             Response::redirect('/admin/productos/' . $id);
         }
 
+        // Si es POST, usar selección del usuario
+        $selectedVariants = [];
+        $quantities = [];
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $selectedVariants = $_POST['variants'] ?? [];
+            $quantities = $_POST['qty'] ?? [];
+            $variants = array_filter($variants, function($v) use ($selectedVariants) {
+                return in_array((int)($v['idcodgusto'] ?? 0), $selectedVariants);
+            });
+        }
+
         echo View::render('admin/productos/labels.php', [
             'product' => $product,
             'variants' => $variants,
             'showPrice' => ($_GET['precio'] ?? '1') === '1',
             'showDesc' => ($_GET['desc'] ?? '1') === '1',
             'showVariant' => ($_GET['variedad'] ?? '1') === '1',
+            'quantities' => $quantities,
+            'selectedVariants' => $selectedVariants,
         ]);
     }
 
