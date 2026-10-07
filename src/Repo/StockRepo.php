@@ -689,6 +689,7 @@ final class StockRepo
 
         // Buscar variante exacta por codscan (como en FacturaRepo)
         if (ctype_digit($q) || preg_match('/^\d{8,13}$/', $q)) {
+            $qTrimmed = trim($q);
             $st2 = Db::pdo()->prepare('
                 SELECT g.idcodgusto, g.idprodu, g.nomgusto, g.codscan,
                        p.idprodu, p.codprodu, p.produ, p.precio, p.precio1, p.precomp, p.codprodup, p.enweb, p.stocact,
@@ -696,12 +697,12 @@ final class StockRepo
                 FROM gustos g
                 INNER JOIN producto p ON p.idprodu = g.idprodu
                 LEFT JOIN ivaprodu i ON i.codivaprodu = p.iva
-                WHERE g.codscan = :c
+                WHERE TRIM(g.codscan) = :c
                 GROUP BY p.idprodu
                 LIMIT 1
             ');
             $st2 = Db::pdo()->prepare($st2);
-            $st2->execute([':c' => $q]);
+            $st2->execute([':c' => $qTrimmed]);
             $byCode = $st2->fetch();
             if ($byCode) {
                 $matchedVariant = [
