@@ -687,34 +687,36 @@ final class StockRepo
         $st->execute($params);
         $products = $st->fetchAll();
 
-        // Buscar variante exacta por codscan (como en FacturaRepo)
+        // Buscar variante exacta por codscan (idéntico a FacturaRepo)
         if (ctype_digit($q) || preg_match('/^\d{8,13}$/', $q)) {
-            $qTrimmed = trim($q);
-            $st2 = Db::pdo()->prepare('
-                SELECT g.idcodgusto, g.idprodu, g.nomgusto, g.codscan,
-                       p.idprodu, p.codprodu, p.produ, p.precio, p.precio1, p.precomp, p.codprodup, p.enweb, p.stocact,
-                       i.codivaprodu, i.tiva
-                FROM gustos g
-                INNER JOIN producto p ON p.idprodu = g.idprodu
-                LEFT JOIN ivaprodu i ON i.codivaprodu = p.iva
-                WHERE TRIM(g.codscan) = :c
-                GROUP BY p.idprodu
-                LIMIT 1
-            ');
-            $st2 = Db::pdo()->prepare($st2);
-            $st2->execute([':c' => $qTrimmed]);
-            $byCode = $st2->fetch();
-            if ($byCode) {
-                $matchedVariant = [
-                    'idcodgusto' => (int)$byCode['idcodgusto'],
-                    'nomgusto' => $byCode['nomgusto'],
-                    'codscan' => $q,
-                ];
-                $exists = false;
-                foreach ($products as $pr) {
-                    if ((int)$pr['idprodu'] === (int)$byCode['idprodu']) { $exists = true; break; }
+            try {
+                $st2 = Db::pdo()->prepare('
+                    SELECT g.idcodgusto, g.idprodu, g.nomgusto, g.codscan,
+                           p.idprodu, p.codprodu, p.produ, p.precio, p.precio1, p.precomp, p.codprodup, p.enweb, p.stocact,
+                           i.codivaprodu, i.tiva
+                    FROM gustos g
+                    INNER JOIN producto p ON p.idprodu = g.idprodu
+                    LEFT JOIN ivaprodu i ON i.codivaprodu = p.iva
+                    WHERE g.codscan = :c
+                    GROUP BY p.idprodu
+                    LIMIT 1
+                ');
+                $st2->execute([':c' => $q]);
+                $byCode = $st2->fetch();
+                if ($byCode) {
+                    $matchedVariant = [
+                        'idcodgusto' => (int)$byCode['idcodgusto'],
+                        'nomgusto' => $byCode['nomgusto'],
+                        'codscan' => $q,
+                    ];
+                    $exists = false;
+                    foreach ($products as $pr) {
+                        if ((int)$pr['idprodu'] === (int)$byCode['idprodu']) { $exists = true; break; }
+                    }
+                    if (!$exists) array_unshift($products, $byCode);
                 }
-                if (!$exists) array_unshift($products, $byCode);
+            } catch (\Throwable $e) {
+                error_log('StockRepo searchProducts exact barcode error: ' . $e->getMessage());
             }
         }
 
