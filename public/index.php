@@ -255,6 +255,7 @@ $router->post('/admin/productos/main-image/clear', [AdminProductControllerNew::c
 $router->post('/admin/productos/variant-logistics', [AdminProductControllerNew::class, 'saveVariantLogistics']);
 $router->post('/admin/productos/variant-images', [AdminProductControllerNew::class, 'uploadVariantImages']);
 $router->post('/admin/productos/variant-images/delete', [AdminProductControllerNew::class, 'deleteVariantImage']);
+$router->post('/admin/productos/variant/barcode', [AdminProductControllerNew::class, 'saveBarcode']);
 $router->post('/admin/productos/describe', [AdminProductControllerNew::class, 'describe']);
 $router->post('/admin/productos/describe-commercial', [AdminProductControllerNew::class, 'describeCommercial']);
 $router->post('/admin/productos/ai-tags', [AdminProductControllerNew::class, 'aiTags']);
