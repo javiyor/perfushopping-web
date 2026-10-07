@@ -660,7 +660,7 @@ final class StockRepo
         }
 
         $st = Db::pdo()->prepare('
-            SELECT DISTINCT p.idprodu, p.codprodu, p.produ, p.codprodup, p.stocact, p.precomp, p.precio,
+            SELECT DISTINCT p.idprodu, p.codprodu, p.codbarra, p.produ, p.codprodup, p.stocact, p.precomp, p.precio,
                 (SELECT g2.idcodgusto
                  FROM gustos g2
                  WHERE g2.idprodu = p.idprodu AND g2.codscan = :exactVariant AND g2.discont = 0

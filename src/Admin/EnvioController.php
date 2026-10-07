@@ -48,15 +48,13 @@ final class EnvioController
         }
         $repo->marcarEnvioEntregado($id, (int)$adminUser['id']);
 
-        // Si era efectivo contra entrega, ahora impacta en caja: registrar movimiento
-        $forma = $factura['forma_pago'] ?? '';
+        // Solo si era efectivo contra entrega, impacta en caja
         $pagos = $repo->pagos($id);
         $efectivo = 0;
         foreach ($pagos as $p) if (($p['forma_pago'] ?? '') === 'efectivo') $efectivo += (int)($p['monto_cents'] ?? 0);
-        if ($efectivo <= 0) $efectivo = (int)($factura['total_cents'] ?? 0);
 
-        if ($forma === 'efectivo' || $efectivo > 0) {
-            // intentar agregar a caja chica si hay apertura, sino a caja general
+        // Solo registrar en caja si el pago fue realmente en efectivo (contra entrega)
+        if ($efectivo > 0) {
             $cajaRepo = new CajaRepo();
             $sucursalId = $auth->getSucursalId();
             $turno = $auth->getTurno();
