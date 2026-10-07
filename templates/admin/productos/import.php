@@ -269,7 +269,7 @@ $errors = (int)($stats['errors'] ?? 0);
                     <?php endif; ?>
                 </div>
                 <div class="d-flex gap-2">
-                    <a class="btn btn-outline-secondary btn-sm" href="/admin/productos/importar">Cancelar</a>
+                    <a class="btn btn-outline-secondary btn-sm" href="/admin/productos/importar?cancelar=1">Cancelar</a>
                     <?php if ($found > 0): ?>
                         <button class="btn btn-accent btn-sm" type="submit"><i class="bi bi-check-lg"></i> Confirmar importación</button>
                     <?php endif; ?>

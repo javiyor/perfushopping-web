@@ -24,9 +24,16 @@ final class ImportController
     {
         $adminUser = $this->auth->requirePermiso('productos');
 
+        // El preview debe persistir en sesión hasta confirmar o cancelar,
+        // porque el confirm lo lee en un request posterior.
+        if (isset($_GET['cancelar'])) {
+            unset($_SESSION['import_preview']);
+            Response::redirect('/admin/productos/importar');
+        }
+
         $preview = $_SESSION['import_preview'] ?? null;
         $stats = $_SESSION['import_stats'] ?? null;
-        unset($_SESSION['import_preview'], $_SESSION['import_stats']);
+        unset($_SESSION['import_stats']);
 
         $proveedores = [];
         try {
