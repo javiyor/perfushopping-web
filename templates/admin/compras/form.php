@@ -133,6 +133,11 @@ $idcta1Sel = (int)($compra['idcta1'] ?? 0);
                 <div class="card-header bg-white fw-semibold">Proveedor</div>
                 <div class="card-body">
                     <div class="row g-2">
+                        <div class="col-12 position-relative">
+                            <label class="form-label small">Buscar proveedor cargado</label>
+                            <input class="form-control form-control-sm" id="proveedorSearch" placeholder="Escribí razón social, código o CUIT y elegí de la lista" autocomplete="off" />
+                            <div id="proveedorResults" class="list-group mt-1" style="display:none;position:absolute;z-index:1050;max-height:260px;overflow-y:auto;left:0;right:0"></div>
+                        </div>
                         <div class="col-6">
                             <label class="form-label small">CUIT <span class="text-danger">*</span></label>
                             <input class="form-control form-control-sm" name="cuit_proveedor" id="cuitProveedor" value="<?= htmlspecialchars((string)($compra['cuit_proveedor'] ?? '')) ?>" placeholder="20-12345678-9" required />
@@ -281,6 +286,57 @@ $idcta1Sel = (int)($compra['idcta1'] ?? 0);
 <script>
 let rowCounter = 1;
 const COMPRA_PROD_SEARCH_LIMIT = 50;
+
+// Autocompletado de proveedor desde la tabla proveedo.
+(function() {
+    const input = document.getElementById('proveedorSearch');
+    const results = document.getElementById('proveedorResults');
+    if (!input || !results) return;
+    const esc = function(s) {
+        const d = document.createElement('div');
+        d.textContent = s || '';
+        return d.innerHTML;
+    };
+    let t = null;
+    input.addEventListener('input', function() {
+        clearTimeout(t);
+        const q = this.value.trim();
+        if (q.length < 2) { results.style.display = 'none'; return; }
+        t = setTimeout(function() {
+            fetch('/admin/compras/buscar-proveedores?q=' + encodeURIComponent(q))
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    results.innerHTML = '';
+                    if (!data || !data.length) {
+                        results.innerHTML = '<span class="list-group-item list-group-item-action text-muted small">Sin resultados: completá CUIT y razón manualmente</span>';
+                    } else {
+                        data.forEach(function(p) {
+                            const a = document.createElement('a');
+                            a.className = 'list-group-item list-group-item-action';
+                            a.href = '#';
+                            a.innerHTML = '<div><strong>' + esc(p.razon) + '</strong></div>'
+                                + '<div class="small text-muted">CUIT: ' + esc(p.cuit || '-') + (p.codprove ? ' · Cód: ' + esc(p.codprove) : '') + '</div>';
+                            a.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                document.getElementById('cuitProveedor').value = p.cuit || '';
+                                document.getElementById('razonProveedor').value = p.razon || '';
+                                input.value = p.razon || '';
+                                results.style.display = 'none';
+                            });
+                            results.appendChild(a);
+                        });
+                    }
+                    results.style.display = 'block';
+                })
+                .catch(function() { results.style.display = 'none'; });
+        }, 250);
+    });
+    document.addEventListener('click', function(e) {
+        if (!input.contains(e.target) && !results.contains(e.target)) {
+            results.style.display = 'none';
+        }
+    });
+})();
 
 document.addEventListener('DOMContentLoaded', function() {
     <?php if ($items): ?>

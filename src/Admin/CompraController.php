@@ -6,6 +6,7 @@ namespace Perfushopping\Web\Admin;
 use Perfushopping\Web\Infra\Db;
 use Perfushopping\Web\Repo\CompraRepo;
 use Perfushopping\Web\Repo\CtaCteProveedorRepo;
+use Perfushopping\Web\Repo\ProveedorRepo;
 use Perfushopping\Web\Repo\StockRepo;
 use Perfushopping\Web\Service\AdminAuthService;
 use Perfushopping\Web\Service\ArcaQrParser;
@@ -422,6 +423,19 @@ final class CompraController
             $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Factura de compra eliminada.'];
         }
         Response::redirect('/admin/compras');
+    }
+
+    public function searchProveedores(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requirePermiso('compras');
+
+        $q = trim((string)($_GET['q'] ?? ''));
+        if ($q === '') {
+            Response::json([]);
+            return;
+        }
+        Response::json((new ProveedorRepo())->findProveedores($q));
     }
 
     public function searchProducts(array $params): void
