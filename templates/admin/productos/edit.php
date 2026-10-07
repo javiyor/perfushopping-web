@@ -344,6 +344,13 @@ foreach ($proveedores as $prov) {
                     </div>
                     <div class="d-flex gap-2 align-items-center">
                         <span class="badge bg-info"><?= is_array($variant['images'] ?? null) ? count($variant['images']) : 0 ?>/6 img</span>
+                        <form method="post" action="/admin/productos/variant/update" class="d-flex gap-1" style="flex-wrap:wrap">
+                            <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                            <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
+                            <input type="hidden" name="idcodgusto" value="<?= $variantId ?>" />
+                            <input class="form-control form-control-sm" name="nomgusto" value="<?= htmlspecialchars((string)($variant['nomgusto'] ?? '')) ?>" placeholder="Nombre variedad" style="min-width:140px" required />
+                            <button class="btn btn-sm btn-outline-success py-0 px-2" type="submit" title="Guardar nombre"><i class="bi bi-check-lg"></i></button>
+                        </form>
                         <form method="post" action="/admin/productos/variant/delete" onsubmit="return confirm('Eliminar esta variedad?')">
                             <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
                             <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />

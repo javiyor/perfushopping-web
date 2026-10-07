@@ -332,6 +332,12 @@ final class AdminProductRepo
         $st->execute([':c' => $codscan, ':id' => $idcodgusto]);
     }
 
+    public function updateVariant(int $idcodgusto, string $nomgusto): void
+    {
+        $st = Db::pdo()->prepare('UPDATE gustos SET nomgusto = :n WHERE idcodgusto = :id LIMIT 1');
+        $st->execute([':n' => $nomgusto, ':id' => $idcodgusto]);
+    }
+
     public function updateMainImage(int $idprodu, string $filename): void
     {
         $st = Db::pdo()->prepare('UPDATE producto SET imagen = :img WHERE idprodu = :id LIMIT 1');

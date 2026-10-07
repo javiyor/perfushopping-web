@@ -414,7 +414,7 @@ final class ProductController
         Response::redirect('/admin/productos/' . $idprodu);
     }
 
-    public function saveVariantLogistics(array $params): void
+public function saveVariantLogistics(array $params): void
     {
         $this->auth->requirePermiso('productos');
         Csrf::check($_POST['_csrf'] ?? null);
@@ -430,11 +430,30 @@ final class ProductController
         $product = $this->repo->find($idprodu);
         if (!$product) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Producto no encontrado.'];
-            Response::redirect('/admin/productos');
+            Response::redirect('/admin/productos/' . $idprodu);
         }
 
         $this->repo->updateVariantLogistics($idcodgusto, $weightG, $heightCm, $widthCm, $depthCm, $productCategory);
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Datos logisticos actualizados.'];
+        Response::redirect('/admin/productos/' . $idprodu);
+    }
+
+    public function updateVariant(array $params): void
+    {
+        $this->auth->requirePermiso('productos');
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $idprodu = (int)($_POST['idprodu'] ?? 0);
+        $idcodgusto = (int)($_POST['idcodgusto'] ?? 0);
+        $nomgusto = trim((string)($_POST['nomgusto'] ?? ''));
+
+        if ($idprodu <= 0 || $idcodgusto <= 0 || $nomgusto === '') {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Datos inválidos.'];
+            Response::redirect('/admin/productos/' . max(0, $idprodu));
+        }
+
+        $this->repo->updateVariant($idcodgusto, $nomgusto);
+        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Variedad actualizada.'];
         Response::redirect('/admin/productos/' . $idprodu);
     }
 
