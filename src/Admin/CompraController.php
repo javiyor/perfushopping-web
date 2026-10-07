@@ -472,7 +472,7 @@ final class CompraController
         foreach ($prod as $p) {
             $variants = (new StockRepo())->variantesPorProducto((int)$p['idprodu']);
             $matched = null;
-            $matchedId = (int)($p['matched_variant_id'] ?? 0);
+            $matchedId = (int)($p['matched_variant_id'] ?? $p['barcode_variant_id'] ?? 0);
             if ($matchedId > 0) {
                 foreach ($variants as $v) {
                     if ((int)($v['idcodgusto'] ?? 0) === $matchedId) {

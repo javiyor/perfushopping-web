@@ -526,13 +526,20 @@ public function searchAjusteProductos(array $params): void
                     $autoLoadProduct = $p;
                     break;
                 }
-                // Coincidencia exacta en codscan de variante
+                // Coincidencia exacta en codscan de variante (matched_variant_id o barcode_variant_id)
+                $matchedVariantId = $p['matched_variant_id'] ?? $p['barcode_variant_id'] ?? 0;
+                if ($matchedVariantId > 0) {
+                    $autoLoad = true;
+                    $autoLoadProduct = $p;
+                    $p['matched_variant_id'] = $matchedVariantId;
+                    break;
+                }
+                // Coincidencia exacta en codscan de variante (buscar en variants)
                 if (isset($p['variants'])) {
                     foreach ($p['variants'] as $v) {
                         if (isset($v['codscan']) && $v['codscan'] === $q) {
                             $autoLoad = true;
                             $autoLoadProduct = $p;
-                            // Agregar matched_variant_id al producto
                             $p['matched_variant_id'] = $v['idcodgusto'];
                             break 2;
                         }
