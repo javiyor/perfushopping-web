@@ -32,6 +32,17 @@ $ivaOptions = $ivaOptions ?? [];
                         <div class="col-md-4">
                             <label class="form-label small">Costo <span class="text-muted">(sin IVA)</span></label>
                             <input class="form-control form-control-sm calc-trigger" name="precomp" placeholder="0.00" inputmode="decimal" />
+                            <div class="d-flex gap-2 align-items-center mt-1">
+                                <div class="form-check m-0" title="El costo ingresado tiene IVA incluido">
+                                    <input class="form-check-input" type="checkbox" id="ivaIncCosto" />
+                                    <label class="form-check-label small" for="ivaIncCosto">IVA incl.</label>
+                                </div>
+                                <div class="input-group input-group-sm" style="max-width:135px" title="Descuento % aplicado al costo">
+                                    <input class="form-control form-control-sm calc-trigger" name="descuento_pct" placeholder="0" inputmode="decimal" />
+                                    <span class="input-group-text">Dto%</span>
+                                </div>
+                            </div>
+                            <small class="text-muted" id="costoNetoResumen"></small>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label small">Margen minorista <span class="text-muted">(%)</span></label>
@@ -179,8 +190,24 @@ function ivaActualPct() {
     var ivaSel = document.querySelector('[name="iva"]');
     return parseFloat(ivaSel.options[ivaSel.selectedIndex].getAttribute('data-iva-pct')) || 0;
 }
+function costoNeto() {
+    var c = parseImporte(document.querySelector('[name="precomp"]').value);
+    var dtoEl = document.querySelector('[name="descuento_pct"]');
+    var dto = dtoEl ? parseImporte(dtoEl.value) : 0;
+    if (dto) c = c * (1 - dto / 100);
+    var ivaPct = ivaActualPct();
+    var ivaInc = document.getElementById('ivaIncCosto');
+    if (ivaInc && ivaInc.checked && ivaPct > 0) c = c / (1 + ivaPct / 100);
+    return c > 0 ? c : 0;
+}
+function costoNetoResumen() {
+    var el = document.getElementById('costoNetoResumen');
+    if (!el) return;
+    var c = costoNeto();
+    el.textContent = c > 0 ? 'Neto $' + c.toFixed(2) : '';
+}
 function autoCalcPrices() {
-    var costo = parseImporte(document.querySelector('[name="precomp"]').value);
+    var costo = costoNeto();
     var g1 = parseImporte(document.querySelector('[name="ganan1"]').value);
     var g2 = parseImporte(document.querySelector('[name="ganan2"]').value);
     var ivaPct = ivaActualPct();
@@ -190,10 +217,11 @@ function autoCalcPrices() {
     if (costo > 0 && g2 > 0) {
         document.querySelector('[name="precio1_gross"]').value = (costo * (1 + g2 / 100) * (1 + ivaPct / 100)).toFixed(2);
     }
+    costoNetoResumen();
 }
 function autoCalcMargins() {
-    var costo = parseImporte(document.querySelector('[name="precomp"]').value);
-    if (costo <= 0) return;
+    var costo = costoNeto();
+    if (costo <= 0) { costoNetoResumen(); return; }
     var ivaPct = ivaActualPct();
     var p1 = parseImporte(document.querySelector('[name="precio_gross"]').value);
     var p2 = parseImporte(document.querySelector('[name="precio1_gross"]').value);
@@ -203,7 +231,14 @@ function autoCalcMargins() {
     if (p2 > 0) {
         document.querySelector('[name="ganan2"]').value = (((p2 / (1 + ivaPct / 100)) / costo - 1) * 100).toFixed(2);
     }
+    costoNetoResumen();
 }
+document.getElementById('ivaIncCosto').addEventListener('change', autoCalcPrices);
+// Al guardar, el costo viaja neto (con descuento e IVA aplicados, como en Precios rápidos).
+document.querySelector('form[action="/admin/productos/crear"]').addEventListener('submit', function() {
+    var inp = document.querySelector('[name="precomp"]');
+    if (inp) inp.value = costoNeto().toFixed(2);
+});
 [document.querySelector('[name="precio_gross"]'), document.querySelector('[name="precio1_gross"]')].forEach(el => {
     if (!el) return;
     el.addEventListener('input', autoCalcMargins);
