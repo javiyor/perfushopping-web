@@ -336,93 +336,65 @@ foreach ($proveedores as $prov) {
             $vc = trim((string)($variant['product_category'] ?? '')) !== '' ? (string)$variant['product_category'] : $logisticsSeed['product_category'];
             $ean = \Perfushopping\Web\Support\Barcode::ean13((int)$variantId);
         ?>
-            <div class="border rounded p-2 mb-2">
-                <div class="d-flex justify-content-between align-items-start mb-1">
-                    <div>
-                        <h6 class="fw-bold mb-0"><?= htmlspecialchars((string)($variant['nomgusto'] ?? 'Sin nombre')) ?></h6>
-                        <small class="text-muted">ID: <?= $variantId ?> · Código: <span class="codscan-val"><?= htmlspecialchars((string)($variant['codscan'] ?? '-')) ?></span> · EAN: <?= $ean ?> · Stock: <?= htmlspecialchars((string)($variant['stockact'] ?? '0')) ?><?= ((int)($variant['discont'] ?? 0) === 1) ? ' · <span class="text-danger">Discontinuado</span>' : '' ?></small>
-                    </div>
-                    <div class="d-flex gap-2 align-items-center">
-                        <span class="badge bg-info"><?= is_array($variant['images'] ?? null) ? count($variant['images']) : 0 ?>/6 img</span>
-                        <form method="post" action="/admin/productos/variant/update" class="d-flex gap-1" style="flex-wrap:wrap">
-                            <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
-                            <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
-                            <input type="hidden" name="idcodgusto" value="<?= $variantId ?>" />
-                            <input class="form-control form-control-sm" name="nomgusto" value="<?= htmlspecialchars((string)($variant['nomgusto'] ?? '')) ?>" placeholder="Nombre variedad" style="min-width:140px" required />
-                            <button class="btn btn-sm btn-outline-success py-0 px-2" type="submit" title="Guardar nombre"><i class="bi bi-check-lg"></i></button>
-                        </form>
-                        <form method="post" action="/admin/productos/variant/delete" onsubmit="return confirm('Eliminar esta variedad?')">
-                            <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
-                            <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
-                            <input type="hidden" name="idcodgusto" value="<?= $variantId ?>" />
-                            <button class="btn btn-sm btn-outline-danger py-0 px-1" style="font-size:11px" type="submit"><i class="bi bi-x-lg"></i></button>
-                        </form>
-                    </div>
-                </div>
-
-                <?php if (!empty($variant['images']) && is_array($variant['images'])): ?>
-                    <div class="d-flex flex-wrap gap-1 mb-1">
-                        <?php foreach ($variant['images'] as $img): ?>
-                            <div class="text-center" style="width:80px">
-                                <img src="<?= htmlspecialchars(Format::uploadUrl((string)($img['rutaimg'] ?? ''))) ?>" alt="" style="width:70px;height:70px;object-fit:cover;border-radius:6px" />
-                                <form method="post" action="/admin/productos/variant-images/delete" class="mt-1">
-                                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
-                                    <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
-                                    <input type="hidden" name="idcodgusto" value="<?= $variantId ?>" />
-                                    <input type="hidden" name="idimagen" value="<?= (int)($img['idimagen'] ?? 0) ?>" />
-                                    <button class="btn btn-sm btn-outline-danger py-0 px-1" style="font-size:11px" type="submit">Quitar</button>
-                                </form>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php else: ?>
-                    <div class="small text-muted mb-2">Sin imágenes</div>
-                <?php endif; ?>
-
-                <div class="row g-1 mb-1 align-items-end">
-                    <div class="col-4">
-                        <label class="small text-muted mb-0">Código de barras (EAN-13)</label>
-                        <div class="input-group input-group-sm">
-                            <input class="form-control form-control-sm codscan-input" data-variant="<?= $variantId ?>" value="<?= htmlspecialchars((string)($variant['codscan'] ?? '')) ?>" placeholder="EAN-13" />
-                            <button class="btn btn-outline-secondary" type="button" onclick="generarEan(this, <?= $variantId ?>)"><i class="bi bi-upc-scan"></i></button>
-                            <button class="btn btn-outline-success" type="button" onclick="guardarCodscan(this, <?= $variantId ?>, <?= $selectedId ?>)"><i class="bi bi-check"></i></button>
-                        </div>
-                    </div>
-                    <form method="post" action="/admin/productos/variant-logistics" class="row g-1 col-8">
+            <div class="border rounded p-1 mb-1">
+                <div class="d-flex gap-2 align-items-center">
+                    <form method="post" action="/admin/productos/variant/update" class="d-flex gap-1 align-items-center flex-grow-1" style="min-width:0">
                         <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
                         <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
                         <input type="hidden" name="idcodgusto" value="<?= $variantId ?>" />
-                        <div class="col-2">
-                            <input class="form-control form-control-sm" name="weight_g" value="<?= htmlspecialchars($vw) ?>" placeholder="Peso g" />
-                        </div>
-                        <div class="col-2">
-                            <input class="form-control form-control-sm" name="height_cm" value="<?= htmlspecialchars($vh) ?>" placeholder="Alto cm" />
-                        </div>
-                        <div class="col-2">
-                            <input class="form-control form-control-sm" name="width_cm" value="<?= htmlspecialchars($vwi) ?>" placeholder="Ancho cm" />
-                        </div>
-                        <div class="col-2">
-                            <input class="form-control form-control-sm" name="depth_cm" value="<?= htmlspecialchars($vd) ?>" placeholder="Largo cm" />
-                        </div>
-                        <div class="col-2">
-                            <input class="form-control form-control-sm" name="product_category" value="<?= htmlspecialchars($vc) ?>" placeholder="Cat." />
-                        </div>
-                        <div class="col-2 d-grid">
-                            <button class="btn btn-outline-secondary btn-sm" type="submit"><i class="bi bi-save"></i></button>
-                        </div>
+                        <input class="form-control form-control-sm fw-bold" name="nomgusto" value="<?= htmlspecialchars((string)($variant['nomgusto'] ?? '')) ?>" placeholder="Nombre variedad" style="min-width:0" required />
+                        <button class="btn btn-sm btn-outline-success py-0 px-2 flex-shrink-0" type="submit" title="Guardar nombre"><i class="bi bi-check-lg"></i></button>
+                    </form>
+                    <small class="text-muted text-nowrap flex-shrink-0">ID: <?= $variantId ?> · <span class="codscan-val"><?= htmlspecialchars((string)($variant['codscan'] ?? '-')) ?></span> · EAN: <?= $ean ?> · Stock: <strong><?= htmlspecialchars((string)($variant['stockact'] ?? '0')) ?></strong><?= ((int)($variant['discont'] ?? 0) === 1) ? ' · <span class="text-danger">Discontinuado</span>' : '' ?></small>
+                    <span class="badge bg-info flex-shrink-0"><?= is_array($variant['images'] ?? null) ? count($variant['images']) : 0 ?>/6</span>
+                    <form method="post" action="/admin/productos/variant/delete" class="flex-shrink-0" onsubmit="return confirm('Eliminar esta variedad?')">
+                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                        <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
+                        <input type="hidden" name="idcodgusto" value="<?= $variantId ?>" />
+                        <button class="btn btn-sm btn-outline-danger py-0 px-1" style="font-size:11px" type="submit"><i class="bi bi-x-lg"></i></button>
                     </form>
                 </div>
 
-                <div class="row g-1">
-                    <div class="col-6">
-                        <form method="post" action="/admin/productos/variant-images" enctype="multipart/form-data" class="d-flex gap-1">
-                            <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
-                            <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
-                            <input type="hidden" name="idcodgusto" value="<?= $variantId ?>" />
-                            <input class="form-control form-control-sm" type="file" name="images[]" multiple accept=".jpg,.jpeg,.png,.webp" />
-                            <button class="btn btn-outline-secondary btn-sm flex-shrink-0" type="submit"><i class="bi bi-images"></i></button>
-                        </form>
+                <div class="d-flex gap-1 align-items-center mt-1 flex-wrap">
+                    <?php if (!empty($variant['images']) && is_array($variant['images'])): ?>
+                        <div class="d-flex gap-1 flex-shrink-0">
+                            <?php foreach ($variant['images'] as $img): ?>
+                                <div class="text-center">
+                                    <img src="<?= htmlspecialchars(Format::uploadUrl((string)($img['rutaimg'] ?? ''))) ?>" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:6px" />
+                                    <form method="post" action="/admin/productos/variant-images/delete">
+                                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                                        <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
+                                        <input type="hidden" name="idcodgusto" value="<?= $variantId ?>" />
+                                        <input type="hidden" name="idimagen" value="<?= (int)($img['idimagen'] ?? 0) ?>" />
+                                        <button class="btn btn-sm btn-outline-danger py-0 px-1" style="font-size:10px" type="submit" title="Quitar"><i class="bi bi-x-lg"></i></button>
+                                    </form>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+                    <div class="input-group input-group-sm" style="max-width:240px">
+                        <input class="form-control form-control-sm codscan-input" data-variant="<?= $variantId ?>" value="<?= htmlspecialchars((string)($variant['codscan'] ?? '')) ?>" placeholder="EAN-13" title="Código de barras (EAN-13)" />
+                        <button class="btn btn-outline-secondary" type="button" onclick="generarEan(this, <?= $variantId ?>)"><i class="bi bi-upc-scan"></i></button>
+                        <button class="btn btn-outline-success" type="button" onclick="guardarCodscan(this, <?= $variantId ?>, <?= $selectedId ?>)"><i class="bi bi-check"></i></button>
                     </div>
+                    <form method="post" action="/admin/productos/variant-logistics" class="d-flex gap-1 align-items-center">
+                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                        <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
+                        <input type="hidden" name="idcodgusto" value="<?= $variantId ?>" />
+                        <input class="form-control form-control-sm" name="weight_g" value="<?= htmlspecialchars($vw) ?>" placeholder="Peso g" style="width:70px" />
+                        <input class="form-control form-control-sm" name="height_cm" value="<?= htmlspecialchars($vh) ?>" placeholder="Alto" style="width:60px" />
+                        <input class="form-control form-control-sm" name="width_cm" value="<?= htmlspecialchars($vwi) ?>" placeholder="Ancho" style="width:60px" />
+                        <input class="form-control form-control-sm" name="depth_cm" value="<?= htmlspecialchars($vd) ?>" placeholder="Largo" style="width:60px" />
+                        <input class="form-control form-control-sm" name="product_category" value="<?= htmlspecialchars($vc) ?>" placeholder="Cat." style="width:70px" />
+                        <button class="btn btn-outline-secondary btn-sm" type="submit" title="Guardar logística"><i class="bi bi-save"></i></button>
+                    </form>
+                    <form method="post" action="/admin/productos/variant-images" enctype="multipart/form-data" class="d-flex gap-1 align-items-center">
+                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                        <input type="hidden" name="idprodu" value="<?= $selectedId ?>" />
+                        <input type="hidden" name="idcodgusto" value="<?= $variantId ?>" />
+                        <input class="form-control form-control-sm" type="file" name="images[]" multiple accept=".jpg,.jpeg,.png,.webp" style="max-width:170px" />
+                        <button class="btn btn-outline-secondary btn-sm flex-shrink-0" type="submit" title="Subir imágenes"><i class="bi bi-images"></i></button>
+                    </form>
                 </div>
             </div>
         <?php endforeach; ?>
