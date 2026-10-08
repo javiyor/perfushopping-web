@@ -195,6 +195,44 @@ final class FacturaController
         return null;
     }
 
+    /**
+     * Depósito de la sucursal de un comprobante (proxy sucursal_id ->
+     * admin_sucursales.iddepo). Devuelve 0 si no se puede determinar.
+     */
+    private function depositoDeSucursal(int $sucursalId): int
+    {
+        if ($sucursalId <= 0) {
+            return 0;
+        }
+        try {
+            $suc = (new \Perfushopping\Web\Repo\SucursalRepo())->findById($sucursalId);
+            return $suc ? (int)($suc['iddepo'] ?? 0) : 0;
+        } catch (\Throwable $e) {
+            return 0;
+        }
+    }
+
+    /**
+     * Depósito origen para la devolución de stock de una NC: el depósito de
+     * la sucursal de la factura asociada. 0 si no se puede determinar
+     * (en ese caso no se mueve stock).
+     */
+    private function depositoOrigenNc(int $asociadaId, FacturaRepo $repo): int
+    {
+        if ($asociadaId <= 0) {
+            return 0;
+        }
+        try {
+            $a = $repo->findById($asociadaId);
+        } catch (\Throwable $e) {
+            return 0;
+        }
+        if (!$a) {
+            return 0;
+        }
+        return $this->depositoDeSucursal((int)($a['sucursal_id'] ?? 0));
+    }
+
     public function store(array $params): void
     {
         $auth = new AdminAuthService();
@@ -395,20 +433,28 @@ final class FacturaController
             $puntosService->acreditarFactura($factura, $items);
         }
 
-        // Deduct stock from session deposit (un solo movimiento por factura)
+        // Stock (un solo movimiento por comprobante): la factura resta del
+        // depósito de sesión; la NC devuelve al depósito de la sucursal del
+        // comprobante asociado.
         $depoId = $auth->getDepositoId();
-        if ($depoId > 0) {
-            $stockRepo = new StockRepo();
-            $lote = [];
-            foreach ($items as $it) {
-                $idprodu = $it['idprodu'];
-                $idcodgusto = $it['idcodgusto'];
-                $qty = $it['qty'];
-                if ($idprodu) {
-                    $lote[] = ['idprodu' => $idprodu, 'idcodgusto' => $idcodgusto, 'cantidad' => $qty];
-                }
+        $stockRepo = new StockRepo();
+        $lote = [];
+        foreach ($items as $it) {
+            $idprodu = $it['idprodu'];
+            $idcodgusto = $it['idcodgusto'];
+            $qty = $it['qty'];
+            if ($idprodu) {
+                $lote[] = ['idprodu' => $idprodu, 'idcodgusto' => $idcodgusto, 'cantidad' => $qty];
             }
-            if ($lote) {
+        }
+        if ($lote) {
+            if ($tipo === 'NC') {
+                $depoOrigen = $this->depositoOrigenNc($comprobanteAsociadoId, $repo);
+                if ($depoOrigen > 0) {
+                    $stockRepo->registrarAjusteLote($lote, 0, $depoOrigen, 'NC ' . $codigo, (int)$adminUser['id'], 'devolucion_venta');
+                }
+            } elseif ($tipo !== 'ND' && $depoId > 0) {
+                // La ND no mueve mercadería: no toca stock.
                 $stockRepo->registrarAjusteLote($lote, $depoId, 0, 'Factura ' . $codigo, (int)$adminUser['id'], 'venta');
             }
         }
@@ -1012,8 +1058,11 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
         $this->registrarBancoMov($pagos, $editarId, $codigo, $fecha, (int)$adminUser['id'], $tipo);
 
         // Stock: aplicar solo el delta viejo -> nuevo (un movimiento por sentido).
+        // La factura ajusta contra el depósito de sesión; la NC contra el
+        // depósito de la sucursal del comprobante asociado.
         $depoId = $auth->getDepositoId();
-        if ($depoId > 0) {
+        $depoStock = $tipo === 'NC' ? $this->depositoOrigenNc($comprobanteAsociadoId, $repo) : ($tipo === 'ND' ? 0 : $depoId);
+        if ($depoStock > 0) {
             $stockRepo = new StockRepo();
             $loteVenta = [];
             $loteDevol = [];
@@ -1049,10 +1098,18 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
                 }
             }
             if (!empty($loteVenta)) {
-                $stockRepo->registrarAjusteLote($loteVenta, $depoId, 0, 'Edición Factura ' . $codigo, (int)$adminUser['id'], 'venta');
+                if ($tipo === 'NC') {
+                    $stockRepo->registrarAjusteLote($loteVenta, 0, $depoStock, 'Edición NC ' . $codigo, (int)$adminUser['id'], 'devolucion_venta');
+                } else {
+                    $stockRepo->registrarAjusteLote($loteVenta, $depoStock, 0, 'Edición Factura ' . $codigo, (int)$adminUser['id'], 'venta');
+                }
             }
             if (!empty($loteDevol)) {
-                $stockRepo->registrarAjusteLote($loteDevol, 0, $depoId, 'Edición Factura ' . $codigo, (int)$adminUser['id'], 'devolucion_venta');
+                if ($tipo === 'NC') {
+                    $stockRepo->registrarAjusteLote($loteDevol, $depoStock, 0, 'Edición NC ' . $codigo, (int)$adminUser['id'], 'devolucion_venta');
+                } else {
+                    $stockRepo->registrarAjusteLote($loteDevol, 0, $depoStock, 'Edición Factura ' . $codigo, (int)$adminUser['id'], 'devolucion_venta');
+                }
             }
         }
 
@@ -1176,22 +1233,30 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
 
         $repo->updateEstado($id, $estado);
 
-        // Restore stock if factura is anulated (un solo movimiento)
+        // Restore stock if factura is anulated (un solo movimiento). Anular una
+        // NC quita lo devuelto del depósito de origen. La ND no mueve stock.
         if ($estado === 'anulada' && $oldEstado !== 'anulada') {
+            $esNotaAnula = (string)($f['tipo_comprobante'] ?? '') === 'NC';
+            $esNdAnula = (string)($f['tipo_comprobante'] ?? '') === 'ND';
             $depoId = $auth->getDepositoId();
-            if ($depoId > 0) {
-                $stockRepo = new StockRepo();
-                $facturaItems = $repo->items($id);
-                $lote = [];
-                foreach ($facturaItems as $it) {
-                    $idprodu = (int)($it['idprodu'] ?? 0);
-                    $idcodgusto = (int)($it['idcodgusto'] ?? 0) ?: null;
-                    $qty = (int)($it['qty'] ?? 0);
-                    if ($idprodu) {
-                        $lote[] = ['idprodu' => $idprodu, 'idcodgusto' => $idcodgusto, 'cantidad' => $qty];
-                    }
+            $stockRepo = new StockRepo();
+            $facturaItems = $repo->items($id);
+            $lote = [];
+            foreach ($facturaItems as $it) {
+                $idprodu = (int)($it['idprodu'] ?? 0);
+                $idcodgusto = (int)($it['idcodgusto'] ?? 0) ?: null;
+                $qty = (int)($it['qty'] ?? 0);
+                if ($idprodu) {
+                    $lote[] = ['idprodu' => $idprodu, 'idcodgusto' => $idcodgusto, 'cantidad' => $qty];
                 }
-                if ($lote) {
+            }
+            if ($lote) {
+                if ($esNotaAnula) {
+                    $depoOrigen = $this->depositoOrigenNc((int)($f['comprobante_asociado_id'] ?? 0), $repo);
+                    if ($depoOrigen > 0) {
+                        $stockRepo->registrarAjusteLote($lote, $depoOrigen, 0, 'Anulación NC ' . ($f['codigo'] ?? ''), (int)$adminUser['id'], 'devolucion_venta');
+                    }
+                } elseif ($depoId > 0 && !$esNdAnula) {
                     $stockRepo->registrarAjusteLote($lote, 0, $depoId, 'Anulación Factura ' . ($f['codigo'] ?? ''), (int)$adminUser['id'], 'devolucion_venta');
                 }
             }
@@ -1234,7 +1299,28 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
         $id = (int)($_POST['id'] ?? 0);
         if ($id <= 0) Response::redirect('/admin/facturas');
 
-        (new FacturaRepo())->delete($id);
+        // Eliminar una NC revierte la devolución de stock (salida del depósito origen).
+        $repo = new FacturaRepo();
+        $f = $repo->findById($id);
+        if ($f && (string)($f['tipo_comprobante'] ?? '') === 'NC') {
+            $depoOrigen = $this->depositoOrigenNc((int)($f['comprobante_asociado_id'] ?? 0), $repo);
+            if ($depoOrigen > 0) {
+                $lote = [];
+                foreach ($repo->items($id) as $it) {
+                    $idprodu = (int)($it['idprodu'] ?? 0);
+                    $idcodgusto = (int)($it['idcodgusto'] ?? 0) ?: null;
+                    $qty = (int)($it['qty'] ?? 0);
+                    if ($idprodu && $qty > 0) {
+                        $lote[] = ['idprodu' => $idprodu, 'idcodgusto' => $idcodgusto, 'cantidad' => $qty];
+                    }
+                }
+                if ($lote) {
+                    (new StockRepo())->registrarAjusteLote($lote, $depoOrigen, 0, 'Eliminación NC ' . ($f['codigo'] ?? ''), (int)$adminUser['id'], 'devolucion_venta');
+                }
+            }
+        }
+
+        $repo->delete($id);
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Factura eliminada.'];
         Response::redirect('/admin/facturas');
     }
