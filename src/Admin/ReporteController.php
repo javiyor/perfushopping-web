@@ -16,7 +16,7 @@ final class ReporteController
         $auth = new AdminAuthService();
         $adminUser = $auth->requirePermiso('estadisticas');
 
-        $desde = (string)($_GET['desde'] ?? date('Y-m-01'));
+        $desde = (string)($_GET['desde'] ?? date('Y-m-d'));
         $hasta = (string)($_GET['hasta'] ?? date('Y-m-d'));
         $puntoVenta = (int)($_GET['punto_venta'] ?? 0);
 
@@ -46,12 +46,24 @@ final class ReporteController
         $auth = new AdminAuthService();
         $adminUser = $auth->requirePermiso('estadisticas');
 
-        $desde = (string)($_GET['desde'] ?? date('Y-m-01'));
+        $desde = (string)($_GET['desde'] ?? date('Y-m-d'));
         $hasta = (string)($_GET['hasta'] ?? date('Y-m-d'));
         // 0 = todos los puntos de venta
         $puntoVenta = (int)($_GET['punto_venta'] ?? 0);
 
         $repo = new ReporteRepo();
+
+        // Días naturales del período (inclusive) para promedios diarios.
+        $dias = 1;
+        try {
+            $d1 = new \DateTime($desde);
+            $d2 = new \DateTime($hasta);
+            if ($d2 >= $d1) {
+                $dias = max(1, (int)$d1->diff($d2)->days + 1);
+            }
+        } catch (\Throwable $e) {
+            $dias = 1;
+        }
 
         try {
             $step = 'resumen';
@@ -70,6 +82,10 @@ final class ReporteController
             $recibos = $repo->resumenRecibos($desde, $hasta, $puntoVenta);
             $step = 'porTipo';
             $porTipo = $repo->facturasPorTipo($desde, $hasta, $puntoVenta);
+            $step = 'autorizacion';
+            $autorizacion = $repo->resumenAutorizacion($desde, $hasta, $puntoVenta);
+            $step = 'porVendedor';
+            $porVendedor = $repo->ventasPorVendedor($desde, $hasta, $puntoVenta);
             $step = 'porSucursal';
             $porSucursal = $repo->ventasPorSucursal($desde, $hasta);
 
@@ -130,6 +146,9 @@ final class ReporteController
             'porEquipoTarjeta' => $porEquipoTarjeta,
             'recibos' => $recibos,
             'porTipo' => $porTipo,
+            'autorizacion' => $autorizacion ?? ['autorizadas' => [], 'no_autorizadas' => []],
+            'porVendedor' => $porVendedor ?? [],
+            'dias' => $dias,
             'porSucursal' => $porSucursal,
             'comparativas' => $comparativas,
             'mensuales' => $mensuales,

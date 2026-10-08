@@ -458,6 +458,18 @@ final class ReporteRepo
     }
 
     /**
+     * Condición de comprobante autorizado por ARCA (con CAE). Si la columna
+     * no existe, todo cuenta como autorizado (compatibilidad).
+     */
+    private function esAutorizadaExpr(string $fAlias = 'f'): string
+    {
+        if (!$this->facturasTieneColumna('cae')) {
+            return '(1 = 1)';
+        }
+        return "({$fAlias}.cae IS NOT NULL AND {$fAlias}.cae <> '' AND {$fAlias}.cae <> 'NULL')";
+    }
+
+    /**
      * Filtro de comprobantes autorizados por ARCA (con CAE). Estricto: sin
      * CAE el comprobante no suma en ningún total del reporte.
      */
@@ -466,7 +478,7 @@ final class ReporteRepo
         if (!$this->facturasTieneColumna('cae')) {
             return '';
         }
-        return " AND {$fAlias}.cae IS NOT NULL AND {$fAlias}.cae <> '' AND {$fAlias}.cae <> 'NULL'";
+        return ' AND ' . $this->esAutorizadaExpr($fAlias);
     }
 
     /**
@@ -643,5 +655,92 @@ final class ReporteRepo
         ");
         $st->execute($params);
         return $st->fetchAll();
+    }
+
+    /**
+     * Ventas totales discriminadas por autorización ARCA: autorizadas (con
+     * CAE) vs no autorizadas (emitidas sin CAE: pendientes o rechazadas).
+     * Importes con signo (NC resta), igual que el resto del reporte.
+     */
+    public function resumenAutorizacion(string $desde, string $hasta, int $puntoVenta = 0): array
+    {
+        $out = [
+            'autorizadas' => ['cantidad' => 0, 'total_cents' => 0, 'iva_cents' => 0],
+            'no_autorizadas' => ['cantidad' => 0, 'total_cents' => 0, 'iva_cents' => 0],
+        ];
+        try {
+            $params = [':desde' => $desde, ':hasta' => $hasta];
+            $pvWhere = '';
+            if ($puntoVenta > 0) {
+                $pvWhere = ' AND f.punto_venta = :pv';
+                $params[':pv'] = $puntoVenta;
+            }
+            $esAut = $this->esAutorizadaExpr();
+            $total = $this->montoSignado('f.total_cents');
+            $iva = $this->montoSignado('f.iva_cents');
+            $st = Db::pdo()->prepare("
+                SELECT
+                    COALESCE(SUM(CASE WHEN {$esAut} THEN 1 ELSE 0 END), 0) AS aut_cantidad,
+                    COALESCE(SUM(CASE WHEN {$esAut} THEN {$total} ELSE 0 END), 0) AS aut_total,
+                    COALESCE(SUM(CASE WHEN {$esAut} THEN {$iva} ELSE 0 END), 0) AS aut_iva,
+                    COALESCE(SUM(CASE WHEN NOT ({$esAut}) THEN 1 ELSE 0 END), 0) AS noaut_cantidad,
+                    COALESCE(SUM(CASE WHEN NOT ({$esAut}) THEN {$total} ELSE 0 END), 0) AS noaut_total,
+                    COALESCE(SUM(CASE WHEN NOT ({$esAut}) THEN {$iva} ELSE 0 END), 0) AS noaut_iva
+                FROM facturas f
+                WHERE f.estado = 'emitida'
+                  AND f.fecha BETWEEN :desde AND :hasta
+                  $pvWhere
+            ");
+            $st->execute($params);
+            $r = $st->fetch() ?: [];
+            $out['autorizadas'] = [
+                'cantidad' => (int)($r['aut_cantidad'] ?? 0),
+                'total_cents' => (int)($r['aut_total'] ?? 0),
+                'iva_cents' => (int)($r['aut_iva'] ?? 0),
+            ];
+            $out['no_autorizadas'] = [
+                'cantidad' => (int)($r['noaut_cantidad'] ?? 0),
+                'total_cents' => (int)($r['noaut_total'] ?? 0),
+                'iva_cents' => (int)($r['noaut_iva'] ?? 0),
+            ];
+        } catch (\Throwable $e) {
+            error_log('ReporteRepo::resumenAutorizacion error: ' . $e->getMessage());
+        }
+        return $out;
+    }
+
+    /**
+     * Ventas por vendedor (admin_users.nombre vía facturas.vendedor_id).
+     * Importes con signo (NC resta), solo comprobantes autorizados.
+     */
+    public function ventasPorVendedor(string $desde, string $hasta, int $puntoVenta = 0): array
+    {
+        try {
+            $params = [':desde' => $desde, ':hasta' => $hasta];
+            $pvWhere = '';
+            if ($puntoVenta > 0) {
+                $pvWhere = ' AND f.punto_venta = :pv';
+                $params[':pv'] = $puntoVenta;
+            }
+            $total = $this->montoSignado('f.total_cents');
+            $st = Db::pdo()->prepare("
+                SELECT
+                    COALESCE(NULLIF(TRIM(v.nombre), ''), 'Sin vendedor') AS vendedor,
+                    COUNT(*) AS cantidad,
+                    COALESCE(SUM({$total}), 0) AS total_cents
+                FROM facturas f
+                LEFT JOIN admin_users v ON v.id = f.vendedor_id
+                WHERE f.estado = 'emitida'{$this->soloAutorizadasWhere()}
+                  AND f.fecha BETWEEN :desde AND :hasta
+                  $pvWhere
+                GROUP BY vendedor
+                ORDER BY total_cents DESC
+            ");
+            $st->execute($params);
+            return $st->fetchAll();
+        } catch (\Throwable $e) {
+            error_log('ReporteRepo::ventasPorVendedor error: ' . $e->getMessage());
+            return [];
+        }
     }
 }

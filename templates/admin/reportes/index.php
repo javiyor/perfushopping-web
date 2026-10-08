@@ -1,7 +1,7 @@
 <?php
 use Perfushopping\Web\Support\Format;
 
-$desde = (string)($desde ?? date('Y-m-01'));
+$desde = (string)($desde ?? date('Y-m-d'));
 $hasta = (string)($hasta ?? date('Y-m-d'));
 $puntoVenta = (int)($puntoVenta ?? 0);
 $puntosVenta = $puntosVenta ?? [];
@@ -98,6 +98,27 @@ $puntosVenta = $puntosVenta ?? [];
         </div>
     </div>
 
+    <div class="row g-3 mb-4" id="kpiRow3">
+        <div class="col-6 col-md-4">
+            <div class="card-dashboard text-center">
+                <div class="h3 fw-bold mb-0 text-success" id="kpiAutorizadas">-</div>
+                <div class="small text-muted">Autorizadas ARCA (<span id="kpiAutorizadasCant">-</span> compr.)</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4">
+            <div class="card-dashboard text-center">
+                <div class="h3 fw-bold mb-0 text-danger" id="kpiNoAutorizadas">-</div>
+                <div class="small text-muted">No autorizadas (<span id="kpiNoAutorizadasCant">-</span> compr.)</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4">
+            <div class="card-dashboard text-center">
+                <div class="h3 fw-bold mb-0" id="kpiPromDiario">-</div>
+                <div class="small text-muted">Promedio diario (<span id="kpiPromDiarioDias">-</span> días)</div>
+            </div>
+        </div>
+    </div>
+
     <div class="row g-3 mb-4">
         <div class="col-12">
             <div class="card shadow-sm">
@@ -179,10 +200,33 @@ $puntosVenta = $puntosVenta ?? [];
                                 <th class="text-end">Ganancia neta</th>
                                 <th class="text-end">Margen neto</th>
                                 <th class="text-end">Ticket prom.</th>
+                                <th class="text-end">Prom. diario</th>
                                 <th class="text-end">Gastos</th>
                             </tr>
                         </thead>
                         <tbody id="sucursalBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mt-2">
+        <!-- Por vendedor -->
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white fw-semibold">Ventas por vendedor</div>
+                <div class="table-responsive">
+                    <table class="table table-admin mb-0">
+                        <thead>
+                            <tr>
+                                <th>Vendedor</th>
+                                <th class="text-end">Comprobantes</th>
+                                <th class="text-end">Total</th>
+                                <th class="text-end">Ticket prom.</th>
+                            </tr>
+                        </thead>
+                        <tbody id="vendedorBody"></tbody>
                     </table>
                 </div>
             </div>
@@ -323,6 +367,18 @@ function cargarReportes() {
             document.getElementById('kpiGanancia').textContent = fmtCents(ganancia);
             document.getElementById('kpiMargen').textContent = neto > 0 ? (ganancia / neto * 100).toFixed(1) + '%' : '—';
 
+            // Autorizadas vs no autorizadas + promedio diario
+            const aut = (d.autorizacion && d.autorizacion.autorizadas) || {};
+            const noaut = (d.autorizacion && d.autorizacion.no_autorizadas) || {};
+            document.getElementById('kpiAutorizadas').textContent = fmtCents(parseInt(aut.total_cents ?? 0));
+            document.getElementById('kpiAutorizadasCant').textContent = parseInt(aut.cantidad ?? 0);
+            document.getElementById('kpiNoAutorizadas').textContent = fmtCents(parseInt(noaut.total_cents ?? 0));
+            document.getElementById('kpiNoAutorizadasCant').textContent = parseInt(noaut.cantidad ?? 0);
+            const dias = Math.max(1, parseInt(d.dias ?? 1));
+            const totalRes = parseInt(res.total_cents ?? 0);
+            document.getElementById('kpiPromDiario').textContent = fmtCents(Math.round(totalRes / dias));
+            document.getElementById('kpiPromDiarioDias').textContent = dias;
+
             // Comparativas
             const compBody = document.getElementById('compBody');
             compBody.innerHTML = '';
@@ -436,8 +492,9 @@ function cargarReportes() {
             const sucBody = document.getElementById('sucursalBody');
             sucBody.innerHTML = '';
             const sucs = d.porSucursal || [];
+            const diasS = Math.max(1, parseInt(d.dias ?? 1));
             if (!sucs.length) {
-                sucBody.innerHTML = '<tr><td colspan="10" class="text-muted text-center">Sin datos</td></tr>';
+                sucBody.innerHTML = '<tr><td colspan="11" class="text-muted text-center">Sin datos</td></tr>';
             } else {
                 sucs.forEach(s => {
                     const total = parseInt(s.total_cents || 0);
@@ -449,6 +506,7 @@ function cargarReportes() {
                     const gastos = parseInt(s.gastos_cents || 0);
                     const margen = (s.margen_pct !== null && s.margen_pct !== undefined) ? parseFloat(s.margen_pct).toFixed(1) + '%' : '—';
                     const ticket = cant > 0 ? fmtCents(Math.round(total / cant)) : '—';
+                    const promDiario = fmtCents(Math.round(total / diasS));
                     sucBody.innerHTML += '<tr>'
                         + '<td>' + escHtml(s.sucursal) + '</td>'
                         + '<td class="text-end">' + cant + '</td>'
@@ -459,6 +517,7 @@ function cargarReportes() {
                         + '<td class="text-end text-success">' + fmtCents(gana) + '</td>'
                         + '<td class="text-end">' + margen + '</td>'
                         + '<td class="text-end">' + ticket + '</td>'
+                        + '<td class="text-end">' + promDiario + '</td>'
                         + '<td class="text-end text-danger">' + fmtCents(gastos) + '</td>'
                         + '</tr>';
                 });
@@ -542,6 +601,21 @@ function cargarReportes() {
                     tipoBody.innerHTML += '<tr><td>' + escHtml(t.tipo_comprobante) + '</td><td class="text-end">' + parseInt(t.cantidad || 0) + '</td><td class="text-end">' + fmtCents(parseInt(t.total_cents || 0)) + '</td></tr>';
                 });
             }
+
+            // Vendedores
+            const vendBody = document.getElementById('vendedorBody');
+            vendBody.innerHTML = '';
+            const vends = d.porVendedor || [];
+            if (!vends.length) {
+                vendBody.innerHTML = '<tr><td colspan="4" class="text-muted text-center">Sin datos</td></tr>';
+            } else {
+                vends.forEach(v => {
+                    const vTotal = parseInt(v.total_cents || 0);
+                    const vCant = parseInt(v.cantidad || 0);
+                    const vTicket = vCant > 0 ? fmtCents(Math.round(vTotal / vCant)) : '—';
+                    vendBody.innerHTML += '<tr><td>' + escHtml(v.vendedor) + '</td><td class="text-end">' + vCant + '</td><td class="text-end">' + fmtCents(vTotal) + '</td><td class="text-end">' + vTicket + '</td></tr>';
+                });
+            }
         })
         .catch(e => {
             console.error(e);
@@ -576,7 +650,16 @@ function exportarCSV() {
             csv += 'Resumen\n';
             csv += 'Facturas,' + (res.cantidad ?? 0) + '\n';
             csv += 'Total,' + (parseInt(res.total_cents ?? 0) / 100).toFixed(2) + '\n';
-            csv += 'IVA,' + (parseInt(res.iva_cents ?? 0) / 100).toFixed(2) + '\n\n';
+            csv += 'IVA,' + (parseInt(res.iva_cents ?? 0) / 100).toFixed(2) + '\n';
+            const autCsv = (d.autorizacion && d.autorizacion.autorizadas) || {};
+            const noautCsv = (d.autorizacion && d.autorizacion.no_autorizadas) || {};
+            const diasCsv = Math.max(1, parseInt(d.dias ?? 1));
+            csv += 'Autorizadas cant.,' + (autCsv.cantidad ?? 0) + '\n';
+            csv += 'Autorizadas total,' + (parseInt(autCsv.total_cents ?? 0) / 100).toFixed(2) + '\n';
+            csv += 'No autorizadas cant.,' + (noautCsv.cantidad ?? 0) + '\n';
+            csv += 'No autorizadas total,' + (parseInt(noautCsv.total_cents ?? 0) / 100).toFixed(2) + '\n';
+            csv += 'Dias periodo,' + diasCsv + '\n';
+            csv += 'Promedio diario,' + (parseInt(res.total_cents ?? 0) / diasCsv / 100).toFixed(2) + '\n\n';
 
             csv += 'Ventas Diarias\n';
             csv += 'Fecha,Cantidad,Total\n';
@@ -623,7 +706,7 @@ function exportarCSV() {
             });
 
             csv += '\nPor Sucursal\n';
-            csv += 'Sucursal,Comprobantes,Ventas totales,Neto sin IVA,Descuentos,Costo,Ganancia neta,Margen neto %,Ticket promedio,Gastos\n';
+            csv += 'Sucursal,Comprobantes,Ventas totales,Neto sin IVA,Descuentos,Costo,Ganancia neta,Margen neto %,Ticket promedio,Promedio diario,Gastos\n';
             (d.porSucursal || []).forEach(s => {
                 const total = parseInt(s.total_cents || 0);
                 const cant = parseInt(s.cantidad || 0);
@@ -632,6 +715,7 @@ function exportarCSV() {
                 const gana = parseInt(s.ganancia_cents || 0);
                 const margen = neto > 0 ? (gana / neto * 100).toFixed(1) : '0';
                 const ticket = cant > 0 ? (total / cant / 100).toFixed(2) : '0';
+                const promD = (total / diasCsv / 100).toFixed(2);
                 csv += '"' + String(s.sucursal || '').replace(/"/g, '""') + '",' + cant + ','
                     + (total / 100).toFixed(2) + ','
                     + (neto / 100).toFixed(2) + ','
@@ -640,7 +724,17 @@ function exportarCSV() {
                     + (gana / 100).toFixed(2) + ','
                     + margen + ','
                     + ticket + ','
+                    + promD + ','
                     + (parseInt(s.gastos_cents || 0) / 100).toFixed(2) + '\n';
+            });
+
+            csv += '\nPor Vendedor\n';
+            csv += 'Vendedor,Comprobantes,Total,Ticket promedio\n';
+            (d.porVendedor || []).forEach(v => {
+                const vTotal = parseInt(v.total_cents || 0);
+                const vCant = parseInt(v.cantidad || 0);
+                const vTicket = vCant > 0 ? (vTotal / vCant / 100).toFixed(2) : '0';
+                csv += '"' + String(v.vendedor || '').replace(/"/g, '""') + '",' + vCant + ',' + (vTotal / 100).toFixed(2) + ',' + vTicket + '\n';
             });
 
             const gan = d.ganancia || {};
