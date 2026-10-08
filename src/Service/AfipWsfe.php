@@ -63,6 +63,13 @@ final class AfipWsfe
         'ND' => 9,
     ];
 
+    /** Clase ARCA de la factura original que una NC/ND acredita/debita. */
+    private static array $claseCbteMap = [
+        'FACT-A' => 1,
+        'FACT-B' => 6,
+        'FACT-C' => 11,
+    ];
+
     private static array $condIvaReceptorMap = [
         'responsable_inscripto' => 1,
         'responsable_no_inscripto' => 2,
@@ -138,7 +145,22 @@ final class AfipWsfe
 
     public function solicitarCAE(array $factura, array $items): array
     {
-        $tipoCbte = self::tipoCbteDeFactura($factura);
+        $tipoComprobante = (string)($factura['tipo_comprobante'] ?? '');
+        $esNota = $tipoComprobante === 'NC' || $tipoComprobante === 'ND';
+        // Comprobante asociado (obligatorio para NC/ND): se usa para el tipo
+        // por clase y para CbtesAsoc/PeriodoAsoc.
+        $asociada = null;
+        if ($esNota) {
+            $asocId = (int)($factura['comprobante_asociado_id'] ?? 0);
+            if ($asocId > 0) {
+                try {
+                    $asociada = (new FacturaRepo())->findById($asocId) ?: null;
+                } catch (\Throwable $e) {
+                    $asociada = null;
+                }
+            }
+        }
+        $tipoCbte = self::tipoCbteDeFactura($factura, $asociada);
         $puntoVenta = $this->resolvePuntoVentaArca($factura);
         $ultimo = $this->getUltimoComprobanteAutorizado($puntoVenta, $tipoCbte);
         $cbteNro = $ultimo + 1;
@@ -274,6 +296,50 @@ final class AfipWsfe
         $condIvaReceptor = self::$condIvaReceptorMap[$condNorm]
             ?? (in_array($tipoCbte, [1, 2, 3], true) ? 1 : 5);
 
+        // NC/ND: ARCA exige exactamente una de CbtesAsoc o PeriodoAsoc
+        // (ambas o ninguna -> error 10197). Si la asociada tiene CAE se
+        // informa el comprobante; si no, el período de la propia nota.
+        $cbtesAsocXml = '';
+        $periodoAsocXml = '';
+        if ($esNota) {
+            $claseAsoc = $asociada ? (self::$claseCbteMap[(string)($asociada['tipo_comprobante'] ?? '')] ?? 0) : 0;
+            $pvAsoc = $asociada ? (int)($asociada['punto_venta'] ?? 0) : 0;
+            $nroAsoc = 0;
+            $caeAsoc = '';
+            if ($asociada) {
+                try {
+                    $arcaAsoc = (new ArcaRepo())->getComprobante((int)($asociada['id'] ?? 0));
+                } catch (\Throwable $e) {
+                    $arcaAsoc = null;
+                }
+                if (is_array($arcaAsoc)) {
+                    $nroAsoc = (int)($arcaAsoc['codigo_emision'] ?? 0);
+                    $caeAsoc = (string)($arcaAsoc['cae'] ?? '');
+                }
+                if ($nroAsoc <= 0) {
+                    $nroAsoc = (int)($asociada['codigo_emision_arca'] ?? 0);
+                }
+                if ($caeAsoc === '') {
+                    $caeAsoc = (string)($asociada['cae'] ?? '');
+                }
+                if ($nroAsoc <= 0 && preg_match('/^(\d{4,5})-(\d{8})$/', (string)($asociada['codigo'] ?? ''), $mAsoc)) {
+                    $pvAsoc = (int)$mAsoc[1];
+                    $nroAsoc = (int)$mAsoc[2];
+                }
+            }
+            $fchAsoc = $asociada ? str_replace('-', '', (string)($asociada['fecha'] ?? '')) : '';
+            if ($claseAsoc > 0 && $pvAsoc > 0 && $nroAsoc > 0 && preg_match('/^\d{8}$/', $fchAsoc) && self::esCaeValido($caeAsoc)) {
+                $cbtesAsocXml = '<CbtesAsoc><CbteAsoc>'
+                    . '<Tipo>' . $claseAsoc . '</Tipo>'
+                    . '<PtoVta>' . $pvAsoc . '</PtoVta>'
+                    . '<Nro>' . $nroAsoc . '</Nro>'
+                    . '<CbteFch>' . $fchAsoc . '</CbteFch>'
+                    . '</CbteAsoc></CbtesAsoc>';
+            } else {
+                $periodoAsocXml = '<PeriodoAsoc><FchDesde>' . $fecha . '</FchDesde><FchHasta>' . $fecha . '</FchHasta></PeriodoAsoc>';
+            }
+        }
+
         $detalle = '<FECAEDetRequest>';
         $detalle .= '<Concepto>1</Concepto>';
         $detalle .= '<DocTipo>' . $tipoDoc . '</DocTipo>';
@@ -291,6 +357,7 @@ final class AfipWsfe
         $detalle .= '<MonId>PES</MonId>';
         $detalle .= '<MonCotiz>1.000000</MonCotiz>';
         $detalle .= '<CondicionIVAReceptorId>' . $condIvaReceptor . '</CondicionIVAReceptorId>';
+        $detalle .= $cbtesAsocXml;
 
         $ivaXml = '';
         foreach ($grupos as $g) {
@@ -307,6 +374,7 @@ final class AfipWsfe
         if ($ivaXml !== '') {
             $detalle .= '<Iva>' . $ivaXml . '</Iva>';
         }
+        $detalle .= $periodoAsocXml;
 
         $detalle .= '</FECAEDetRequest>';
 
@@ -335,12 +403,21 @@ final class AfipWsfe
      * emisor RI, C (NCC/NDC) con emisor monotributo/exento, y B en el
      * resto (NCB/NDB). El mapa fijo NC=8/ND=9 (NCB/Recibo B) no sirve
      * para receptores RI: la clase B rechaza CondicionIvaReceptorId 1.
+     *
+     * Si se pasa la factura asociada, la clase manda sobre la condición
+     * del receptor (ARCA exige NC/ND de la misma clase que el original).
      */
-    public static function tipoCbteDeFactura(array $factura): int
+    public static function tipoCbteDeFactura(array $factura, ?array $asociada = null): int
     {
         $tipo = (string)($factura['tipo_comprobante'] ?? '');
         if ($tipo !== 'NC' && $tipo !== 'ND') {
             return self::$tipoCbteMap[$tipo] ?? 6;
+        }
+        if ($asociada !== null) {
+            $porClase = self::tipoCbtePorClaseAsociada($tipo, (string)($asociada['tipo_comprobante'] ?? ''));
+            if ($porClase !== null) {
+                return $porClase;
+            }
         }
         $condNorm = FacturaRepo::normalizeCondIva((string)($factura['cliente_condicion_iva'] ?? ''));
         $emisor = ArcaValidacionService::condicionEmisor();
@@ -351,6 +428,33 @@ final class AfipWsfe
             return $tipo === 'NC' ? 3 : 2;
         }
         return $tipo === 'NC' ? 8 : 7;
+    }
+
+    /**
+     * Tipo de NC/ND según la clase de la factura asociada:
+     * FACT-A -> NC 3 / ND 2, FACT-B -> NC 8 / ND 7, FACT-C -> NC 13 / ND 12.
+     * Devuelve null si la asociada no es una factura conocida.
+     */
+    public static function tipoCbtePorClaseAsociada(string $tipoNota, string $tipoAsociada): ?int
+    {
+        $clase = self::$claseCbteMap[$tipoAsociada] ?? 0;
+        if ($clase === 1) {
+            return $tipoNota === 'NC' ? 3 : 2;
+        }
+        if ($clase === 6) {
+            return $tipoNota === 'NC' ? 8 : 7;
+        }
+        if ($clase === 11) {
+            return $tipoNota === 'NC' ? 13 : 12;
+        }
+        return null;
+    }
+
+    /** ¿El texto es un CAE usable (no vacío ni el literal 'NULL')? */
+    private static function esCaeValido(?string $cae): bool
+    {
+        $cae = trim((string)$cae);
+        return $cae !== '' && strcasecmp($cae, 'NULL') !== 0;
     }
 
     public function getUrlQr(array $factura, int $codigoEmision, string $cae): string

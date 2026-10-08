@@ -170,6 +170,31 @@ final class FacturaController
         ];
     }
 
+    /**
+     * Valida el comprobante asociado de una NC/ND: obligatorio, debe ser una
+     * factura (A/B/C) existente y no anulada. Devuelve el mensaje de error o null.
+     */
+    private function errorComprobanteAsociado(string $tipo, int $asociadaId, FacturaRepo $repo): ?string
+    {
+        if ($tipo !== 'NC' && $tipo !== 'ND') {
+            return null;
+        }
+        if ($asociadaId <= 0) {
+            return 'La nota de crédito/débito requiere comprobante asociado.';
+        }
+        $a = $repo->findById($asociadaId);
+        if (!$a) {
+            return 'El comprobante asociado no existe.';
+        }
+        if (!in_array((string)($a['tipo_comprobante'] ?? ''), ['FACT-A', 'FACT-B', 'FACT-C'], true)) {
+            return 'El comprobante asociado debe ser una factura (A, B o C).';
+        }
+        if (($a['estado'] ?? '') === 'anulada') {
+            return 'El comprobante asociado está anulado.';
+        }
+        return null;
+    }
+
     public function store(array $params): void
     {
         $auth = new AdminAuthService();
@@ -188,13 +213,19 @@ final class FacturaController
         }
 
         $tipo = (string)($input['tipo_comprobante'] ?? 'FACT-B');
+        $repo = new FacturaRepo();
+        $comprobanteAsociadoId = (int)($input['comprobante_asociado_id'] ?? 0);
+        $errorAsociada = $this->errorComprobanteAsociado($tipo, $comprobanteAsociadoId, $repo);
+        if ($errorAsociada !== null) {
+            Response::json(['ok' => false, 'error' => $errorAsociada], 422);
+            return;
+        }
         $cliente = $input['cliente'] ?? [];
         $clienteNombre = trim((string)($cliente['nombre'] ?? ''));
         $clienteCuit = trim((string)($cliente['cuit'] ?? ''));
         $clienteId = (int)($cliente['id'] ?? 0) ?: null;
         $clienteCondIva = trim((string)($cliente['condicion_iva'] ?? 'consumidor_final'));
 
-        $repo = new FacturaRepo();
         // Si el cliente está identificado pero el nombre llegó vacío o como CF, usar su razón real.
         $clienteNombre = $this->resolverNombreCliente(
             $repo,
@@ -322,6 +353,7 @@ final class FacturaController
         $id = $repo->create([
             'codigo' => $codigo,
             'tipo_comprobante' => $tipo,
+            'comprobante_asociado_id' => $comprobanteAsociadoId > 0 ? $comprobanteAsociadoId : null,
             'remito_id' => $remitoId,
             'presupuesto_id' => $presupuestoId,
             'order_id' => $pedidoId,
@@ -768,6 +800,12 @@ final class FacturaController
         $oldPagos = $repo->pagos($editarId);
 
         $tipo = (string)($input['tipo_comprobante'] ?? $old['tipo_comprobante'] ?? 'FACT-B');
+        $comprobanteAsociadoId = (int)($input['comprobante_asociado_id'] ?? $old['comprobante_asociado_id'] ?? 0);
+        $errorAsociada = $this->errorComprobanteAsociado($tipo, $comprobanteAsociadoId, $repo);
+        if ($errorAsociada !== null) {
+            Response::json(['ok' => false, 'error' => $errorAsociada], 422);
+            return;
+        }
         $cliente = $input['cliente'] ?? [];
         $clienteCuit = trim((string)($cliente['cuit'] ?? $old['cliente_cuit'] ?? ''));
         $clienteId = (int)($cliente['id'] ?? 0) ?: null;
@@ -877,6 +915,7 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
 
         $repo->actualizar($editarId, [
             'tipo_comprobante' => $tipo,
+            'comprobante_asociado_id' => $comprobanteAsociadoId > 0 ? $comprobanteAsociadoId : null,
             'cliente_id' => $clienteId,
             'idclien' => $clienteErpId,
             'cliente_nombre' => $clienteNombre,

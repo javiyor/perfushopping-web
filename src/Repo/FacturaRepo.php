@@ -511,6 +511,7 @@ $st = $pdo->prepare('
     public function actualizar(int $id, array $data, array $items, array $pagos): void
     {
         $this->ensureEntregaColumns();
+        $hasAsociada = $this->ensureComprobanteAsociadoColumn();
         $pdo = Db::pdo();
         $pdo->beginTransaction();
         try {
@@ -548,6 +549,10 @@ $st = $pdo->prepare('
                 $params[':envio_estado'] = $data['envio_estado'] ?? null;
                 $params[':envio_direccion'] = $data['envio_direccion'] ?? null;
                 $params[':envio_observacion'] = $data['envio_observacion'] ?? null;
+            }
+            if ($hasAsociada) {
+                $cols .= ', comprobante_asociado_id = :comprobante_asociado_id';
+                $params[':comprobante_asociado_id'] = $data['comprobante_asociado_id'] ?? null;
             }
             $st = $pdo->prepare("UPDATE facturas SET {$cols} WHERE id = :i LIMIT 1");
             $params[':i'] = $id;
