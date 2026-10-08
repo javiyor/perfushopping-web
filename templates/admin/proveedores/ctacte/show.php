@@ -7,7 +7,9 @@ $proveedorNombre = (string)($proveedorNombre ?? '');
 $proveedorId = $proveedorId ?? null;
 $saldo = (int)($saldo ?? 0);
 $q = (string)($q ?? '');
+$filtro = (string)($filtro ?? 'pendientes');
 $mon = static fn ($v) => number_format((float)$v, 2, ',', '.');
+$filtroQs = $q !== '' ? '&q=' . urlencode($q) : '';
 ?>
 <style>
 .ctacte-compact .table { font-size: 0.76rem; }
@@ -49,7 +51,11 @@ $mon = static fn ($v) => number_format((float)$v, 2, ',', '.');
     <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
         <h5 class="mb-0">Comprobantes en cuenta corriente</h5>
         <p class="text-muted small mb-0">Comprobantes generados por facturas de compra con plazos de pago</p>
-        <button class="btn btn-sm btn-success" type="button" onclick="cargarPagoComprobantes()" title="Pagar los comprobantes seleccionados (el monto se puede ajustar en la orden de pago)"><i class="bi bi-cash-stack"></i> Cargar pago</button>
+        <div class="d-flex gap-2 align-items-center">
+            <a class="btn btn-sm <?= $filtro === 'pendientes' ? 'btn-accent' : 'btn-outline-secondary' ?>" href="/admin/proveedores/ctacte/<?= (int)$proveedorId ?>?filtro=pendientes<?= $filtroQs ?>">Pendientes</a>
+            <a class="btn btn-sm <?= $filtro === 'todos' ? 'btn-accent' : 'btn-outline-secondary' ?>" href="/admin/proveedores/ctacte/<?= (int)$proveedorId ?>?filtro=todos<?= $filtroQs ?>">Todos</a>
+            <button class="btn btn-sm btn-success" type="button" onclick="cargarPagoComprobantes()" title="Pagar los comprobantes seleccionados (el monto se puede ajustar en la orden de pago)"><i class="bi bi-cash-stack"></i> Cargar pago</button>
+        </div>
     </div>
     <div class="table-responsive">
         <table class="table table-sm table-hover mb-0">
@@ -63,11 +69,12 @@ $mon = static fn ($v) => number_format((float)$v, 2, ',', '.');
                     <th>Cuotas</th>
                     <th>Estado</th>
                     <th class="text-end">Pendiente</th>
+                    <th class="text-end">Saldo acum.</th>
                     <th style="width:110px"></th>
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($comprobantes as $c): ?>
+                <?php $acumPendiente = 0; foreach ($comprobantes as $c): $acumPendiente += (float)($c['pendiente'] ?? 0); ?>
                     <tr>
                         <td>
                             <?php if ($c['pendiente'] > 0): ?>
@@ -96,6 +103,7 @@ $mon = static fn ($v) => number_format((float)$v, 2, ',', '.');
                             <span class="badge bg-<?= $est[$c['estado']] ?? 'secondary' ?>"><?= htmlspecialchars((string)$c['estado']) ?></span>
                         </td>
                         <td class="text-end <?= $c['pendiente'] > 0 ? 'text-danger' : 'text-success' ?>">$<?= $mon($c['pendiente']) ?></td>
+                        <td class="text-end fw-bold">$<?= $mon($acumPendiente) ?></td>
                         <td class="text-end">
                             <?php if ($c['pendiente'] > 0): ?>
                                 <a class="btn btn-sm btn-outline-success" title="Cargar pago a cuenta (monto editable)"

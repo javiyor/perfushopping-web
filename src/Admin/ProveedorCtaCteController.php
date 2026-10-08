@@ -52,6 +52,10 @@ final class ProveedorCtaCteController
 
         $proveedorId = isset($params['id']) ? (int)$params['id'] : null;
         $q = trim((string)($_GET['q'] ?? ''));
+        $filtro = trim((string)($_GET['filtro'] ?? 'pendientes'));
+        if (!in_array($filtro, ['pendientes', 'todos'], true)) {
+            $filtro = 'pendientes';
+        }
 
         $repo = new CtaCteProveedorRepo();
         try {
@@ -63,6 +67,10 @@ final class ProveedorCtaCteController
         $movimientos = $repo->movimientos($proveedorId, $q);
         $saldo = $repo->saldoActual($proveedorId);
         $comprobantes = $proveedorId !== null ? $repo->comprobantesConPlazo($proveedorId) : [];
+        // Predeterminado: solo pendientes (oculta las pagadas/imputadas); ?filtro=todos las muestra.
+        if ($filtro === 'pendientes') {
+            $comprobantes = array_values(array_filter($comprobantes, static fn (array $c): bool => ($c['estado'] ?? '') !== 'Pagada'));
+        }
 
         $proveedorNombre = '';
         if ($movimientos) {
@@ -77,6 +85,7 @@ final class ProveedorCtaCteController
             'proveedorNombre' => $proveedorNombre,
             'saldo' => $saldo,
             'q' => $q,
+            'filtro' => $filtro,
             'csrf' => Csrf::token(),
             'pageTitle' => 'Cta Cte — ' . ($proveedorNombre ?: 'Proveedores'),
         ]);
