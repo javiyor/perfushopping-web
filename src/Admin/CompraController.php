@@ -345,6 +345,8 @@ final class CompraController
             'ret_ing_brutos' => (float)($_POST['ret_ing_brutos'] ?? 0),
             'ret_iva' => (float)($_POST['ret_iva'] ?? 0),
             'imp_total' => (float)($_POST['imp_total'] ?? 0),
+            'plazo_cuotas' => max(1, (int)($_POST['plazo_cuotas'] ?? 1)),
+            'plazo_dias' => trim((string)($_POST['plazo_dias'] ?? '')),
             'idcta1' => $idcta1,
             'iddepo' => (int)($_POST['iddepo'] ?? 0),
             'observaciones' => trim((string)($_POST['observaciones'] ?? '')),
