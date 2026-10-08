@@ -70,11 +70,18 @@ final class ImportController
         }
 
         $rows = $this->parseCsv($tmp);
-        $conIva = isset($_POST['precios_con_iva']);
+        $modo = (string)($_POST['modo_precio'] ?? (isset($_POST['precios_con_iva']) ? 'con_iva' : 'neto'));
+        if (!in_array($modo, ['neto', 'con_iva', 'costo'], true)) {
+            $modo = 'neto';
+        }
+        $conIva = $modo === 'con_iva';
+        $soloCosto = $modo === 'costo';
         if (!$rows) {
-            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => $conIva
-                ? 'No se pudieron leer filas del CSV. Verifica que tenga las columnas: codscan, precio_con_iva (opcional: costo_con_iva, stock). Si es un Excel (.xlsx), guardalo como CSV primero.'
-                : 'No se pudieron leer filas del CSV. Verifica que tenga las columnas: codprodup, codscan, precio_sin_iva, costo_sin_iva, stock. Si es un Excel (.xlsx), guardalo como CSV primero.'];
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => $soloCosto
+                ? 'No se pudieron leer filas del CSV. Verifica que tenga las columnas: codscan, costo_sin_iva (opcional: stock). Si es un Excel (.xlsx), guardalo como CSV primero.'
+                : ($conIva
+                    ? 'No se pudieron leer filas del CSV. Verifica que tenga las columnas: codscan, precio_con_iva (opcional: costo_con_iva, stock). Si es un Excel (.xlsx), guardalo como CSV primero.'
+                    : 'No se pudieron leer filas del CSV. Verifica que tenga las columnas: codprodup, codscan, precio_sin_iva, costo_sin_iva, stock. Si es un Excel (.xlsx), guardalo como CSV primero.')];
             Response::redirect('/admin/productos/importar');
         }
 
@@ -100,7 +107,27 @@ final class ImportController
             $codprodup = trim((string)($row['codprodup'] ?? ''));
             $codscan = trim((string)($row['codscan'] ?? ''));
             $stockNew = $this->parseInt((string)($row['stock'] ?? ''));
-            if ($conIva) {
+            if ($soloCosto) {
+                // Modo costo sin IVA: se busca por código de barra y los precios
+                // minorista/mayorista se calculan con los márgenes existentes.
+                $precioConIvaNew = null;
+                $costoConIvaNew = null;
+                $precioNew = null;
+                $costoNew = $this->parseFloat((string)($row['costo_sin_iva'] ?? $row['costo'] ?? ''));
+                $ganan1New = null;
+                $ganan2New = null;
+                $precio1New = null;
+                $match = null;
+                if ($codscan !== '') {
+                    $match = $this->repo->findByCodscan($codscan, $idprovee);
+                }
+                if ($match === null && $codprodup !== '') {
+                    $match = $this->repo->findByCodprodup($codprodup, $idprovee);
+                    if ($match) {
+                        $match['_match_type'] = 'codprodup';
+                    }
+                }
+            } elseif ($conIva) {
                 // Modo precios con IVA: se busca por código de barra de la variedad y
                 // los netos se calculan contra IVA y márgenes existentes dentro del bloque matched.
                 $precioConIvaNew = $this->parseFloat((string)($row['precio_con_iva'] ?? $row['precio_iva'] ?? ''));
@@ -196,6 +223,20 @@ final class ImportController
                     $item['precio_new'] = $precioNew;
                     $item['costo_new'] = $costoNew;
                     $item['precio1_new'] = $precio1New;
+                } elseif ($soloCosto) {
+                    // El CSV trae el costo: minorista y mayorista se calculan
+                    // con los márgenes ya cargados (ganan1/ganan2).
+                    if ($costoNew !== null) {
+                        if ($ganan1Old > 0) {
+                            $precioNew = round($costoNew * (1 + $ganan1Old / 100), 2);
+                        }
+                        if ($ganan2Old > 0) {
+                            $precio1New = round($costoNew * (1 + $ganan2Old / 100), 2);
+                        }
+                    }
+                    $item['precio_new'] = $precioNew;
+                    $item['costo_new'] = $costoNew;
+                    $item['precio1_new'] = $precio1New;
                 }
 
                 $item['precio_diff'] = $precioNew !== null ? round($precioNew - $precioOld, 2) : null;
@@ -226,6 +267,7 @@ final class ImportController
             'idprovee' => $idprovee,
             'proveedor' => $proveedorNombre,
             'precios_con_iva' => $conIva,
+            'modo_precio' => $modo,
         ];
 
         Response::redirect('/admin/productos/importar');

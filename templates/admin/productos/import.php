@@ -45,14 +45,21 @@ $errors = (int)($stats['errors'] ?? 0);
             <br>
             <strong>Márgenes:</strong> Si incluís <code>ganan1</code> y <code>ganan2</code> (porcentajes), se actualizan los márgenes del producto.
             <hr class="my-2">
-            <strong>Modo "Precios con IVA incluido" (checkbox):</strong>
+            <strong>Modo "Precios con IVA incluido":</strong>
             Columnas: <code>codscan</code>, <code>precio_con_iva</code>, <code>costo_con_iva</code> (opcional), <code>stock</code> (opcional).
             <br>
             <strong>Matching:</strong> Busca por <code>codscan</code> (código de barra de la variante).
             <br>
-            <strong>Cálculo automático:</strong> <code>precio_con_iva</code> → calcula <code>precio</code> (sin IVA), <code>precomp</code> (costo) usando margen <code>ganan1</code> existente, y <code>precio1</code> (mayorista con IVA) usando margen <code>ganan2</code> existente.
+            <strong>Cálculo automático:</strong> <code>precio_con_iva</code> → calcula <code>precio</code> (sin IVA), <code>precomp</code> (costo) usando margen <code>ganan1</code> existente, y <code>precio1</code> (mayorista) usando margen <code>ganan2</code> existente.
             <br>
             <strong>Precios:</strong> <code>precio_con_iva</code> debe ser monto <strong>con IVA</strong> (retail). Usá punto (<code>.</code>) como separador decimal.
+            <hr class="my-2">
+            <strong>Modo "Costo sin IVA":</strong>
+            Columnas: <code>codscan</code>, <code>costo_sin_iva</code>, <code>stock</code> (opcional).
+            <br>
+            <strong>Matching:</strong> Busca por <code>codscan</code> (código de barra de la variante).
+            <br>
+            <strong>Cálculo automático:</strong> <code>costo_sin_iva</code> → calcula <code>precio</code> (minorista) con margen <code>ganan1</code> existente y <code>precio1</code> (mayorista) con margen <code>ganan2</code> existente. Los márgenes no se modifican.
 
         <form method="post" action="/admin/productos/importar/preview" enctype="multipart/form-data">
             <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
@@ -70,10 +77,12 @@ $errors = (int)($stats['errors'] ?? 0);
                     <input class="form-control form-control-sm" type="file" name="csv_file" accept=".csv,.txt" required />
                 </div>
                 <div class="col-md-3">
-                    <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="checkbox" name="precios_con_iva" id="precios_con_iva" value="1" />
-                        <label class="form-check-label small" for="precios_con_iva">Precios con IVA incluido</label>
-                    </div>
+                    <label class="form-label small">Modo de precios</label>
+                    <select class="form-select form-select-sm" name="modo_precio">
+                        <option value="neto">Precios netos (sin IVA)</option>
+                        <option value="con_iva">Precios con IVA incluido</option>
+                        <option value="costo">Costo sin IVA (calcula precios)</option>
+                    </select>
                 </div>
                 <div class="col-md-3">
                     <button class="btn btn-accent btn-sm w-100" type="submit"><i class="bi bi-eye"></i> Previsualizar</button>
@@ -84,9 +93,9 @@ $errors = (int)($stats['errors'] ?? 0);
         <hr class="my-3" />
         <p class="small text-muted mb-0">
             <i class="bi bi-download"></i> Descargá una
-            <a href="#" onclick="return downloadSampleCsv()">plantilla de ejemplo</a>
-            o una
-            <a href="#" onclick="return downloadSampleCsvIva()">plantilla con IVA</a>.
+            <a href="#" onclick="return downloadSampleCsv()">plantilla de ejemplo</a>,
+            <a href="#" onclick="return downloadSampleCsvIva()">plantilla con IVA</a> o
+            <a href="#" onclick="return downloadSampleCsvCosto()">plantilla de costo</a>.
         </p>
     </div>
 </div>
@@ -97,8 +106,12 @@ $errors = (int)($stats['errors'] ?? 0);
         <span><i class="bi bi-table"></i> Vista previa<?php if ($previewProveedor !== ''): ?> · Proveedor: <strong><?= htmlspecialchars($previewProveedor) ?></strong><?php endif; ?></span>
         <div class="d-flex gap-2 align-items-center">
             <span class="badge bg-success"><?= $found ?> encontrados</span>
-            <?php if (!empty($preview['precios_con_iva'])): ?>
+            <?php
+            $modoPreview = (string)($preview['modo_precio'] ?? (!empty($preview['precios_con_iva']) ? 'con_iva' : 'neto'));
+            if ($modoPreview === 'con_iva'): ?>
                 <span class="badge bg-info text-dark">Precios con IVA</span>
+            <?php elseif ($modoPreview === 'costo'): ?>
+                <span class="badge bg-info text-dark">Costo sin IVA</span>
             <?php endif; ?>
             <?php if ($notFound > 0): ?>
                 <span class="badge bg-warning"><?= $notFound ?> sin match</span>
@@ -333,6 +346,23 @@ function downloadSampleCsvIva() {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'importar_productos_con_iva.csv';
+    a.click();
+    return false;
+}
+
+function downloadSampleCsvCosto() {
+    const bom = '\uFEFF';
+    const headers = 'codscan;costo_sin_iva;stock';
+    const rows = [
+        '7791234567890;10714.29;25',
+        '7790987654321;5000.00;50',
+        '7791112223334;18000.00;5',
+    ];
+    const csv = bom + headers + '\n' + rows.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'importar_productos_costo.csv';
     a.click();
     return false;
 }
