@@ -11,6 +11,7 @@ final class ReporteRepo
     public function puntosVentaDisponibles(): array
     {
         try {
+            $aut = $this->soloAutorizadasWhere();
             $st = Db::pdo()->query("
                 SELECT f.punto_venta,
                        COALESCE(s.nomsuc, spv_suc.nomsuc, CONCAT('PV ', f.punto_venta)) AS nombre,
@@ -19,7 +20,7 @@ final class ReporteRepo
                 LEFT JOIN admin_sucursales s ON s.id = f.sucursal_id
                 LEFT JOIN admin_sucursal_puntos_venta spv ON spv.punto_venta = f.punto_venta
                 LEFT JOIN admin_sucursales spv_suc ON spv_suc.id = spv.sucursal_id
-                WHERE f.estado = 'emitida'
+                WHERE f.estado = 'emitida'{$aut}
                 GROUP BY f.punto_venta
                 ORDER BY f.punto_venta ASC
             ");
@@ -38,14 +39,18 @@ final class ReporteRepo
             $pvWhere = ' AND f.punto_venta = :pv';
             $params[':pv'] = $puntoVenta;
         }
+        $aut = $this->soloAutorizadasWhere();
+        $total = $this->montoSignado('f.total_cents');
+        $iva = $this->montoSignado('f.iva_cents');
+        $subtotal = $this->montoSignado('f.subtotal_cents');
         $st = Db::pdo()->prepare("
             SELECT
                 COUNT(*) AS cantidad,
-                COALESCE(SUM(f.total_cents), 0) AS total_cents,
-                COALESCE(SUM(f.iva_cents), 0) AS iva_cents,
-                COALESCE(SUM(f.subtotal_cents), 0) AS subtotal_cents
+                COALESCE(SUM({$total}), 0) AS total_cents,
+                COALESCE(SUM({$iva}), 0) AS iva_cents,
+                COALESCE(SUM({$subtotal}), 0) AS subtotal_cents
             FROM facturas f
-            WHERE f.estado = 'emitida'
+            WHERE f.estado = 'emitida'{$aut}
               AND f.fecha BETWEEN :desde AND :hasta
               $pvWhere
         ");
@@ -61,10 +66,12 @@ final class ReporteRepo
             $pvWhere = ' AND f.punto_venta = :pv';
             $params[':pv'] = $puntoVenta;
         }
+        $aut = $this->soloAutorizadasWhere();
+        $total = $this->montoSignado('f.total_cents');
         $st = Db::pdo()->prepare("
-            SELECT f.fecha, COUNT(*) AS cantidad, COALESCE(SUM(f.total_cents), 0) AS total_cents
+            SELECT f.fecha, COUNT(*) AS cantidad, COALESCE(SUM({$total}), 0) AS total_cents
             FROM facturas f
-            WHERE f.estado = 'emitida'
+            WHERE f.estado = 'emitida'{$aut}
               AND f.fecha BETWEEN :desde AND :hasta
               $pvWhere
             GROUP BY f.fecha
@@ -83,16 +90,19 @@ final class ReporteRepo
             $pvWhere = ' AND f.punto_venta = :pv';
             $params[':pv'] = $puntoVenta;
         }
+        $aut = $this->soloAutorizadasWhere();
+        $qty = $this->montoSignado('fi.qty');
+        $total = $this->montoSignado('fi.total_cents');
         $st = Db::pdo()->prepare("
             SELECT
                 COALESCE(NULLIF(fi.producto, ''), '(sin nombre)') AS producto,
                 fi.variedad,
-                SUM(fi.qty) AS qty_total,
-                SUM(fi.total_cents) AS total_cents,
+                SUM({$qty}) AS qty_total,
+                SUM({$total}) AS total_cents,
                 COUNT(DISTINCT f.id) AS facturas
             FROM factura_items fi
             INNER JOIN facturas f ON f.id = fi.factura_id
-            WHERE f.estado = 'emitida'
+            WHERE f.estado = 'emitida'{$aut}
               AND f.fecha BETWEEN :desde AND :hasta
               $pvWhere
             GROUP BY fi.producto, fi.variedad
@@ -111,17 +121,20 @@ final class ReporteRepo
             $pvWhere = ' AND f.punto_venta = :pv';
             $params[':pv'] = $puntoVenta;
         }
+        $aut = $this->soloAutorizadasWhere();
+        $qty = $this->montoSignado('fi.qty');
+        $total = $this->montoSignado('fi.total_cents');
         $st = Db::pdo()->prepare("
             SELECT
                 COALESCE(NULLIF(d.nomdepar, ''), 'Sin dep.') AS departamento,
                 d.codactiv,
-                SUM(fi.qty) AS qty_total,
-                SUM(fi.total_cents) AS total_cents
+                SUM({$qty}) AS qty_total,
+                SUM({$total}) AS total_cents
             FROM factura_items fi
             INNER JOIN facturas f ON f.id = fi.factura_id
             LEFT JOIN producto p ON p.idprodu = fi.idprodu
             LEFT JOIN departa d ON d.codepar = p.codepar
-            WHERE f.estado = 'emitida'
+            WHERE f.estado = 'emitida'{$aut}
               AND f.fecha BETWEEN :desde AND :hasta
               $pvWhere
             GROUP BY d.codepar, d.codactiv
@@ -139,11 +152,13 @@ final class ReporteRepo
             $pvWhere = ' AND f.punto_venta = :pv';
             $params[':pv'] = $puntoVenta;
         }
+        $aut = $this->soloAutorizadasWhere();
+        $monto = $this->montoSignado('fp.monto_cents');
         $st = Db::pdo()->prepare("
-            SELECT fp.forma_pago, SUM(fp.monto_cents) AS total_cents, COUNT(DISTINCT fp.factura_id) AS cantidad
+            SELECT fp.forma_pago, SUM({$monto}) AS total_cents, COUNT(DISTINCT fp.factura_id) AS cantidad
             FROM factura_pagos fp
             INNER JOIN facturas f ON f.id = fp.factura_id
-            WHERE f.estado = 'emitida'
+            WHERE f.estado = 'emitida'{$aut}
               AND f.fecha BETWEEN :desde AND :hasta
               $pvWhere
             GROUP BY fp.forma_pago
@@ -192,11 +207,11 @@ final class ReporteRepo
             $st = Db::pdo()->prepare("
                 SELECT COALESCE(NULLIF(TRIM(e.empresa), ''), CONCAT('Equipo ', fp.equipo_id), 'Sin equipo') AS equipo,
                        COUNT(*) AS pagos,
-                       COALESCE(SUM(fp.monto_cents), 0) AS total_cents
+                       COALESCE(SUM({$this->montoSignado('fp.monto_cents')}), 0) AS total_cents
                 FROM factura_pagos fp
                 INNER JOIN facturas f ON f.id = fp.factura_id
                 LEFT JOIN equipotar e ON e.idequipo = fp.equipo_id
-                WHERE f.estado = 'emitida'
+                WHERE f.estado = 'emitida'{$this->soloAutorizadasWhere()}
                   AND f.fecha BETWEEN :desde AND :hasta
                   AND {$tipoExpr} = 'tarjeta'
                   {$pvWhere}
@@ -252,23 +267,26 @@ final class ReporteRepo
     {
         $byKey = [];
         try {
-            $descExpr = $this->facturasTieneColumna('descuento_cents') ? 'COALESCE(SUM(f.descuento_cents), 0)' : '0';
-            $puntosExpr = $this->facturasTieneColumna('puntos_cents') ? 'COALESCE(SUM(f.puntos_cents), 0)' : '0';
+            $descExpr = $this->facturasTieneColumna('descuento_cents') ? 'COALESCE(SUM(' . $this->montoSignado('f.descuento_cents') . '), 0)' : '0';
+            $puntosExpr = $this->facturasTieneColumna('puntos_cents') ? 'COALESCE(SUM(' . $this->montoSignado('f.puntos_cents') . '), 0)' : '0';
+            $total = $this->montoSignado('f.total_cents');
+            $subtotal = $this->montoSignado('f.subtotal_cents');
+            $iva = $this->montoSignado('f.iva_cents');
             $st = Db::pdo()->prepare("
                 SELECT
                     COALESCE(s.id, CONCAT('pv-', f.punto_venta)) AS sucursal_key,
                     COALESCE(s.nomsuc, spv_suc.nomsuc, CONCAT('PV ', f.punto_venta)) AS sucursal,
                     COUNT(*) AS cantidad,
-                    COALESCE(SUM(f.total_cents), 0) AS total_cents,
-                    COALESCE(SUM(f.subtotal_cents), 0) AS subtotal_cents,
-                    COALESCE(SUM(f.iva_cents), 0) AS iva_cents,
+                    COALESCE(SUM({$total}), 0) AS total_cents,
+                    COALESCE(SUM({$subtotal}), 0) AS subtotal_cents,
+                    COALESCE(SUM({$iva}), 0) AS iva_cents,
                     {$descExpr} AS descuento_cents,
                     {$puntosExpr} AS puntos_cents
                 FROM facturas f
                 LEFT JOIN admin_sucursales s ON s.id = f.sucursal_id
                 LEFT JOIN admin_sucursal_puntos_venta spv ON spv.punto_venta = f.punto_venta
                 LEFT JOIN admin_sucursales spv_suc ON spv_suc.id = spv.sucursal_id
-                WHERE f.estado = 'emitida'
+                WHERE f.estado = 'emitida'{$this->soloAutorizadasWhere()}
                   AND f.fecha BETWEEN :desde AND :hasta
                 GROUP BY sucursal_key
             ");
@@ -295,17 +313,18 @@ final class ReporteRepo
 
         try {
             $costo = $this->costoUnitExpr();
+            $costoNc = "CASE WHEN f.tipo_comprobante = 'NC' THEN -({$costo} * fi.qty) ELSE ({$costo} * fi.qty) END";
             $st2 = Db::pdo()->prepare("
                 SELECT
                     COALESCE(s.id, CONCAT('pv-', f.punto_venta)) AS sucursal_key,
-                    COALESCE(SUM({$costo} * fi.qty), 0) AS costo_cents
+                    COALESCE(SUM({$costoNc}), 0) AS costo_cents
                 FROM factura_items fi
                 INNER JOIN facturas f ON f.id = fi.factura_id
                 LEFT JOIN producto p ON p.idprodu = fi.idprodu
                 LEFT JOIN admin_sucursales s ON s.id = f.sucursal_id
                 LEFT JOIN admin_sucursal_puntos_venta spv ON spv.punto_venta = f.punto_venta
                 LEFT JOIN admin_sucursales spv_suc ON spv_suc.id = spv.sucursal_id
-                WHERE f.estado = 'emitida'
+                WHERE f.estado = 'emitida'{$this->soloAutorizadasWhere()}
                   AND f.fecha BETWEEN :desde AND :hasta
                 GROUP BY sucursal_key
             ");
@@ -384,9 +403,9 @@ final class ReporteRepo
             $st = Db::pdo()->prepare("
                 SELECT DATE_FORMAT(f.fecha, '%Y-%m') AS mes,
                        COUNT(*) AS cantidad,
-                       COALESCE(SUM(f.total_cents), 0) AS total_cents
+                       COALESCE(SUM({$this->montoSignado('f.total_cents')}), 0) AS total_cents
                 FROM facturas f
-                WHERE f.estado = 'emitida'
+                WHERE f.estado = 'emitida'{$this->soloAutorizadasWhere()}
                   AND f.fecha BETWEEN :desde AND :hasta
                   $pvWhere
                 GROUP BY mes
@@ -439,6 +458,27 @@ final class ReporteRepo
     }
 
     /**
+     * Filtro de comprobantes autorizados por ARCA (con CAE). Estricto: sin
+     * CAE el comprobante no suma en ningún total del reporte.
+     */
+    private function soloAutorizadasWhere(string $fAlias = 'f'): string
+    {
+        if (!$this->facturasTieneColumna('cae')) {
+            return '';
+        }
+        return " AND {$fAlias}.cae IS NOT NULL AND {$fAlias}.cae <> '' AND {$fAlias}.cae <> 'NULL'";
+    }
+
+    /**
+     * Importe con signo para sumas del reporte: las Notas de Crédito
+     * restan; facturas y Notas de Débito suman.
+     */
+    private function montoSignado(string $montoExpr, string $fAlias = 'f'): string
+    {
+        return "CASE WHEN {$fAlias}.tipo_comprobante = 'NC' THEN -({$montoExpr}) ELSE ({$montoExpr}) END";
+    }
+
+    /**
      * Ganancia neta: neto vendido sin IVA menos descuentos y costo.
      * Costo = snapshot costo_cents al facturar, o precomp actual si no hay.
      */
@@ -453,14 +493,16 @@ final class ReporteRepo
         $row = ['neto_cents' => 0, 'costo_cents' => 0];
         try {
             $costo = $this->costoUnitExpr();
+            $netoItem = $this->montoSignado('fi.total_cents - fi.iva_cents');
+            $costoItem = "CASE WHEN f.tipo_comprobante = 'NC' THEN -({$costo} * fi.qty) ELSE ({$costo} * fi.qty) END";
             $st = Db::pdo()->prepare("
                 SELECT
-                    COALESCE(SUM(fi.total_cents - fi.iva_cents), 0) AS neto_cents,
-                    COALESCE(SUM({$costo} * fi.qty), 0) AS costo_cents
+                    COALESCE(SUM({$netoItem}), 0) AS neto_cents,
+                    COALESCE(SUM({$costoItem}), 0) AS costo_cents
                 FROM factura_items fi
                 INNER JOIN facturas f ON f.id = fi.factura_id
                 LEFT JOIN producto p ON p.idprodu = fi.idprodu
-                WHERE f.estado = 'emitida'
+                WHERE f.estado = 'emitida'{$this->soloAutorizadasWhere()}
                   AND f.fecha BETWEEN :desde AND :hasta
                   $pvWhere
             ");
@@ -474,16 +516,16 @@ final class ReporteRepo
         try {
             $descCols = [];
             if ($this->facturasTieneColumna('descuento_cents')) {
-                $descCols[] = 'COALESCE(SUM(f.descuento_cents), 0)';
+                $descCols[] = 'COALESCE(SUM(' . $this->montoSignado('f.descuento_cents') . '), 0)';
             }
             if ($this->facturasTieneColumna('puntos_cents')) {
-                $descCols[] = 'COALESCE(SUM(f.puntos_cents), 0)';
+                $descCols[] = 'COALESCE(SUM(' . $this->montoSignado('f.puntos_cents') . '), 0)';
             }
             if ($descCols) {
                 $std = Db::pdo()->prepare('
                     SELECT ' . implode(' + ', $descCols) . ' AS descuento_cents
                     FROM facturas f
-                    WHERE f.estado = \'emitida\'
+                    WHERE f.estado = \'emitida\'' . $this->soloAutorizadasWhere() . '
                       AND f.fecha BETWEEN :desde AND :hasta
                       ' . ($puntoVenta > 0 ? ' AND f.punto_venta = :pv' : '') . '
                 ');
@@ -516,18 +558,20 @@ final class ReporteRepo
         }
         try {
             $costo = $this->costoUnitExpr();
+            $netoItem = $this->montoSignado('fi.total_cents - fi.iva_cents');
+            $costoItem = "CASE WHEN f.tipo_comprobante = 'NC' THEN -({$costo} * fi.qty) ELSE ({$costo} * fi.qty) END";
             $st = Db::pdo()->prepare("
                 SELECT
                     COALESCE(NULLIF(fi.producto, ''), '(sin nombre)') AS producto,
                     fi.variedad,
-                    SUM(fi.qty) AS qty_total,
-                    SUM(fi.total_cents - fi.iva_cents) AS neto_cents,
-                    SUM({$costo} * fi.qty) AS costo_cents,
-                    SUM(fi.total_cents - fi.iva_cents) - SUM({$costo} * fi.qty) AS ganancia_cents
+                    SUM({$this->montoSignado('fi.qty')}) AS qty_total,
+                    SUM({$netoItem}) AS neto_cents,
+                    SUM({$costoItem}) AS costo_cents,
+                    SUM({$netoItem}) - SUM({$costoItem}) AS ganancia_cents
                 FROM factura_items fi
                 INNER JOIN facturas f ON f.id = fi.factura_id
                 LEFT JOIN producto p ON p.idprodu = fi.idprodu
-                WHERE f.estado = 'emitida'
+                WHERE f.estado = 'emitida'{$this->soloAutorizadasWhere()}
                   AND f.fecha BETWEEN :desde AND :hasta
                   $pvWhere
                 GROUP BY fi.producto, fi.variedad
@@ -553,18 +597,20 @@ final class ReporteRepo
         }
         try {
             $costo = $this->costoUnitExpr();
+            $netoItem = $this->montoSignado('fi.total_cents - fi.iva_cents');
+            $costoItem = "CASE WHEN f.tipo_comprobante = 'NC' THEN -({$costo} * fi.qty) ELSE ({$costo} * fi.qty) END";
             $st = Db::pdo()->prepare("
                 SELECT
                     COALESCE(NULLIF(d.nomdepar, ''), 'Sin dep.') AS departamento,
-                    SUM(fi.qty) AS qty_total,
-                    SUM(fi.total_cents - fi.iva_cents) AS neto_cents,
-                    SUM({$costo} * fi.qty) AS costo_cents,
-                    SUM(fi.total_cents - fi.iva_cents) - SUM({$costo} * fi.qty) AS ganancia_cents
+                    SUM({$this->montoSignado('fi.qty')}) AS qty_total,
+                    SUM({$netoItem}) AS neto_cents,
+                    SUM({$costoItem}) AS costo_cents,
+                    SUM({$netoItem}) - SUM({$costoItem}) AS ganancia_cents
                 FROM factura_items fi
                 INNER JOIN facturas f ON f.id = fi.factura_id
                 LEFT JOIN producto p ON p.idprodu = fi.idprodu
                 LEFT JOIN departa d ON d.codepar = p.codepar
-                WHERE f.estado = 'emitida'
+                WHERE f.estado = 'emitida'{$this->soloAutorizadasWhere()}
                   AND f.fecha BETWEEN :desde AND :hasta
                   $pvWhere
                 GROUP BY d.codepar
@@ -587,9 +633,9 @@ final class ReporteRepo
             $params[':pv'] = $puntoVenta;
         }
         $st = Db::pdo()->prepare("
-            SELECT f.tipo_comprobante, COUNT(*) AS cantidad, COALESCE(SUM(f.total_cents), 0) AS total_cents
+            SELECT f.tipo_comprobante, COUNT(*) AS cantidad, COALESCE(SUM({$this->montoSignado('f.total_cents')}), 0) AS total_cents
             FROM facturas f
-            WHERE f.estado = 'emitida'
+            WHERE f.estado = 'emitida'{$this->soloAutorizadasWhere()}
               AND f.fecha BETWEEN :desde AND :hasta
               $pvWhere
             GROUP BY f.tipo_comprobante
