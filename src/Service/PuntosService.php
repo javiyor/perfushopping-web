@@ -131,6 +131,94 @@ final class PuntosService
     }
 
     /**
+     * Descuenta en una NC los puntos que generó la factura asociada: todos si
+     * la NC cubre el total, proporcionales (floor) si es parcial. El ajuste
+     * se registra contra la NC (idempotente por unique factura_id+tipo) para
+     * no ocupar el slot de 'ajuste' de la factura original. Devuelve el
+     * nuevo saldo o null si no había nada que descontar.
+     */
+    public function descontarPorNota(array $nc, array $origen): ?int
+    {
+        $ncId = (int)($nc['id'] ?? 0);
+        $origenId = (int)($origen['id'] ?? 0);
+        if ($ncId <= 0 || $origenId <= 0 || $ncId === $origenId) {
+            return null;
+        }
+        $st = Db::pdo()->prepare("SELECT idclien, puntos FROM puntos_movimientos WHERE factura_id = :f AND tipo = 'acumulacion' LIMIT 1");
+        $st->execute([':f' => $origenId]);
+        $acc = $st->fetch();
+        if (!$acc) {
+            return null;
+        }
+        $acum = (int)($acc['puntos'] ?? 0);
+        if ($acum <= 0) {
+            return null;
+        }
+        $origenTotal = (int)($origen['total_cents'] ?? 0);
+        $ncTotal = (int)($nc['total_cents'] ?? 0);
+        if ($origenTotal <= 0 || $ncTotal <= 0) {
+            return null;
+        }
+        // Ya descontado por otras NC contra el mismo origen (excluye anuladas y esta NC).
+        $st = Db::pdo()->prepare("
+            SELECT COALESCE(SUM(-puntos), 0)
+            FROM puntos_movimientos
+            WHERE tipo = 'ajuste' AND puntos < 0 AND factura_id IN (
+                SELECT id FROM facturas
+                WHERE comprobante_asociado_id = :o AND tipo_comprobante = 'NC' AND estado <> 'anulada' AND id <> :nc
+            )");
+        $st->execute([':o' => $origenId, ':nc' => $ncId]);
+        $yaDesc = (int)$st->fetchColumn();
+        $desc = (int)floor($acum * min($ncTotal, $origenTotal) / $origenTotal) - $yaDesc;
+        if ($desc <= 0) {
+            return null;
+        }
+        if ($desc > $acum - $yaDesc) {
+            $desc = $acum - $yaDesc;
+        }
+        if ($desc <= 0) {
+            return null;
+        }
+        return $this->repo->registrar(
+            'ajuste',
+            (int)$acc['idclien'],
+            -$desc,
+            $ncId,
+            null,
+            'Descuento de puntos por NC ' . ($nc['codigo'] ?? $ncId) . ' (factura ' . ($origen['codigo'] ?? $origenId) . ')',
+            (int)($nc['created_by'] ?? 0) ?: null
+        );
+    }
+
+    /**
+     * Revierte el descuento de puntos de una NC (anulación/eliminación):
+     * borra el ajuste y devuelve los puntos al saldo. Se hace con DELETE
+     * porque el slot (factura_id, 'ajuste') no admite una segunda fila.
+     */
+    public function revertirDescuentoNota(int $ncId): void
+    {
+        if ($ncId <= 0) {
+            return;
+        }
+        $pdo = Db::pdo();
+        $st = $pdo->prepare("SELECT id, idclien, puntos FROM puntos_movimientos WHERE factura_id = :f AND tipo = 'ajuste' AND puntos < 0 AND descripcion LIKE 'Descuento de puntos por NC%' LIMIT 1");
+        $st->execute([':f' => $ncId]);
+        $row = $st->fetch();
+        if (!$row) {
+            return;
+        }
+        $pts = (int)($row['puntos'] ?? 0);
+        $cli = (int)($row['idclien'] ?? 0);
+        if ($pts >= 0 || $cli <= 0) {
+            return;
+        }
+        $pdo->prepare('DELETE FROM puntos_movimientos WHERE id = :i LIMIT 1')
+            ->execute([':i' => (int)$row['id']]);
+        $pdo->prepare('UPDATE puntos_cuentas SET saldo_puntos = saldo_puntos - :p, updated_at = NOW() WHERE idclien = :c LIMIT 1')
+            ->execute([':p' => $pts, ':c' => $cli]);
+    }
+
+    /**
      * Accrue points on a web order marked as paid. Idempotent (unique key on order_id+tipo).
      */
     public function acreditarOrder(array $order): ?int

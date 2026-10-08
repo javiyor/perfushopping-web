@@ -432,6 +432,13 @@ final class FacturaController
         if ($factura) {
             $puntosService->acreditarFactura($factura, $items);
         }
+        // La NC descuenta los puntos que generó la factura asociada.
+        if ($tipo === 'NC' && $comprobanteAsociadoId > 0 && isset($factura) && $factura) {
+            $origenNc = $repo->findById($comprobanteAsociadoId);
+            if ($origenNc) {
+                $puntosService->descontarPorNota($factura, $origenNc);
+            }
+        }
 
         // Stock (un solo movimiento por comprobante): la factura resta del
         // depósito de sesión; la NC devuelve al depósito de la sucursal del
@@ -1035,6 +1042,15 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
         if ($facturaNow) {
             $puntosService->acreditarFactura($facturaNow, $items);
         }
+        // La NC descuenta los puntos de la factura asociada (recalcula el ajuste).
+        if ($tipo === 'NC') {
+            $puntosService->revertirDescuentoNota($editarId);
+            $ncNow = $repo->findById($editarId);
+            $origenNow = $comprobanteAsociadoId > 0 ? $repo->findById($comprobanteAsociadoId) : null;
+            if ($ncNow && $origenNow) {
+                $puntosService->descontarPorNota($ncNow, $origenNow);
+            }
+        }
 
         // Cuenta corriente: rearmar el débito con los nuevos importes.
         $ctaCte = new \Perfushopping\Web\Repo\CtaCteRepo();
@@ -1282,6 +1298,11 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
         // Reverse loyalty points if factura is anulated (accrual removed + redeemed points returned).
         if ($estado === 'anulada' && $oldEstado !== 'anulada') {
             $puntosService = new \Perfushopping\Web\Service\PuntosService();
+            if ((string)($f['tipo_comprobante'] ?? '') === 'NC') {
+                // Primero se revierte el descuento de la NC para liberar el
+                // slot (factura_id, 'ajuste') antes de devolver el canje.
+                $puntosService->revertirDescuentoNota($id);
+            }
             $puntosService->revertirFactura($id);
             $puntosService->revertirUsoFactura($id);
         }
@@ -1318,6 +1339,8 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
                     (new StockRepo())->registrarAjusteLote($lote, $depoOrigen, 0, 'Eliminación NC ' . ($f['codigo'] ?? ''), (int)$adminUser['id'], 'devolucion_venta');
                 }
             }
+            // Eliminar una NC también devuelve los puntos descontados.
+            (new \Perfushopping\Web\Service\PuntosService())->revertirDescuentoNota($id);
         }
 
         $repo->delete($id);
