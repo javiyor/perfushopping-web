@@ -43,12 +43,13 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
         .header .razon { font-size:<?= $formato === 'a4' ? '18px' : '14px' ?>; font-weight:bold; }
         .header .data { font-size:<?= $formato === '58mm' ? '9px' : '11px' ?>; }
         hr { border:none; border-top:1px dashed #000; margin:6px 0; }
-        table { width:100%; border-collapse:collapse; font-size:<?= $formato === '58mm' ? '9px' : ($isTicket ? '11px' : '12px') ?>; }
-        th, td { padding:<?= $isTicket ? '2px 4px' : '6px 8px' ?>; text-align:left; <?= $isTicket ? 'word-break:break-word; overflow-wrap:anywhere;' : '' ?> }
+        table { width:100%; border-collapse:collapse; table-layout:fixed; font-size:<?= $formato === '58mm' ? '9px' : ($isTicket ? '11px' : '12px') ?>; }
+        th, td { padding:<?= $isTicket ? '2px 3px' : '6px 8px' ?>; text-align:left; <?= $isTicket ? 'word-break:break-word; overflow-wrap:anywhere; overflow:hidden;' : '' ?> }
+        .text-right { text-align:right; <?= $isTicket ? 'word-break:break-word; overflow-wrap:anywhere; overflow:hidden;' : '' ?> }
         <?php if ($isTicket): ?>
         .ticket-item { margin:0 0 5px; font-size:<?= $formato === '58mm' ? '9px' : '11px' ?>; }
         .ticket-item-name { font-weight:bold; word-break:break-word; overflow-wrap:anywhere; }
-        .ticket-item-line { display:flex; justify-content:space-between; gap:6px; }
+        .ticket-item-line { display:flex; justify-content:space-between; gap:4px; min-width:0; }
         <?php endif; ?>
         th { border-bottom:1px solid #000; <?= $formato === 'a4' ? 'background:#f5f5f5;' : '' ?> }
         .text-right { text-align:right; }
@@ -66,7 +67,7 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
         <?php endif; ?>
         @media print {
             html, body { margin:0; padding:0; }
-            body { width:<?= $formato === '58mm' ? '52mm' : ($isTicket ? '72mm' : '100%') ?>; margin:0 auto; }
+            body { width:<?= $formato === '58mm' ? '48mm' : ($isTicket ? '72mm' : '100%') ?>; margin:0 auto; }
             .no-print { display:none; }
             <?php if ($isTicket): ?>
             .cut-space { display:block; height:10mm; }

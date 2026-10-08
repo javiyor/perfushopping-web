@@ -25,19 +25,23 @@ $proximaApertura = (int)($proximaApertura ?? 0);
     <title>Resumen cierre de caja #<?= $cajaId ?></title>
     <style>
         @page { size: auto; margin: 0mm 0mm 0mm 0mm; }
-        body { font-family: 'Courier New', monospace; font-size: 10px; margin: 0; padding: 0; background: white; }
-        .ticket { width: 696px; margin: 0 auto; }
+        body { font-family: 'Courier New', monospace; font-size: 9px; margin: 0; padding: 0; background: white; width: 100%; max-width: 58mm; }
+        .ticket { width: 100%; max-width: 58mm; margin: 0 auto; }
         .header { text-align: center; border-bottom: 2px solid #333; padding: 5px 0; margin-bottom: 5px; }
-        .header h1 { font-size: 14px; margin: 0; font-weight: bold; }
-        .header p { font-size: 10px; margin: 2px 0 0 0; }
+        .header h1 { font-size: 13px; margin: 0; font-weight: bold; }
+        .header p { font-size: 9px; margin: 2px 0 0 0; }
         .section { border-bottom: 1px solid #ccc; padding: 3px 0; margin: 3px 0; overflow: hidden; }
-        .section .label { font-weight: bold; float: left; width: 50%; }
-        .section .value { float: right; width: 50%; text-align: right; }
-        .total { border-top: 2px solid #333; padding: 5px 0; margin: 5px 0; font-size: 12px; font-weight: bold; overflow: hidden; }
-        .total .label { float: left; width: 50%; }
-        .total .value { float: right; width: 50%; text-align: right; }
+        .section .label { font-weight: bold; float: left; width: 50%; word-wrap: break-word; }
+        .section .value { float: right; width: 50%; text-align: right; word-wrap: break-word; }
+        .total { border-top: 2px solid #333; padding: 5px 0; margin: 5px 0; font-size: 11px; font-weight: bold; overflow: hidden; }
+        .total .label { float: left; width: 50%; word-wrap: break-word; }
+        .total .value { float: right; width: 50%; text-align: right; word-wrap: break-word; }
         .footer { text-align: center; font-size: 8px; margin-top: 8px; border-top: 1px solid #333; padding: 4px 0; }
-        @media print { .noprint { display: none; } }
+        @media print { 
+            .noprint { display: none; }
+            body { margin: 0; padding: 0; width: 100%; max-width: 58mm; }
+            .ticket { width: 100%; max-width: 58mm; }
+        }
     </style>
 </head>
 <body>
