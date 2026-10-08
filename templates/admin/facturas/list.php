@@ -141,6 +141,9 @@ $tipoBadges = ['FACT-A' => 'primary', 'FACT-B' => 'success', 'FACT-C' => 'second
                             <td style="white-space:nowrap">
                                 <a class="btn btn-sm btn-outline-secondary py-0 px-1" title="Ver" href="/admin/facturas/<?= (int)($f['id'] ?? 0) ?>"><i class="bi bi-eye"></i></a>
                                 <a class="btn btn-sm btn-outline-secondary py-0 px-1 print-link" title="Imprimir" target="_blank" data-print-id="<?= (int)($f['id'] ?? 0) ?>" href="/admin/facturas/imprimir/<?= (int)($f['id'] ?? 0) ?>"><i class="bi bi-printer"></i></a>
+                                <?php if (in_array($f['tipo_comprobante'] ?? '', ['FACT-A', 'FACT-B', 'FACT-C'], true) && ($f['estado'] ?? '') !== 'anulada'): ?>
+                                <a class="btn btn-sm btn-outline-warning py-0 px-1" title="Generar nota de crédito" href="/admin/facturas/nueva?nc_de=<?= (int)($f['id'] ?? 0) ?>"><i class="bi bi-file-earmark-minus"></i></a>
+                                <?php endif; ?>
                                 <?php
                                 $waTel = preg_replace('/\D/', '', (string)($f['cliente_tele'] ?? ''));
                                 if ($waTel !== ''):

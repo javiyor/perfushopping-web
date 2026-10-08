@@ -13,6 +13,9 @@ $editarId = (int)($editarId ?? 0);
 $editarFactura = is_array($editarFactura ?? null) ? $editarFactura : null;
 $editarItems = is_array($editarItems ?? null) ? $editarItems : [];
 $editarPagos = is_array($editarPagos ?? null) ? $editarPagos : [];
+$editarAsociada = is_array($editarAsociada ?? null) ? $editarAsociada : null;
+$ncDeId = (int)($ncDeId ?? 0);
+$ncDe = is_array($ncDe ?? null) ? $ncDe : null;
 $pedidoId = (int)($pedidoId ?? 0);
 $pedidoCodigo = (string)($pedidoCodigo ?? '');
 $pedidoItems = is_array($pedidoItems ?? null) ? $pedidoItems : [];
@@ -136,6 +139,12 @@ $pedidoDescPct = $pedidoDescPct ?? 0;
         <option value="NC">Nota de Crédito</option>
         <option value="ND">Nota de Débito</option>
     </select>
+    <div id="asociadaWrap" style="display:none;position:relative">
+        <input type="hidden" id="comprobanteAsociadoId" value="0" />
+        <input class="form-control form-control-sm" id="asociadaSearch" placeholder="Buscar factura asociada..." autocomplete="off" style="width:270px" />
+        <div id="asociadaSuggestions" style="position:absolute;z-index:1050;width:100%"></div>
+        <div id="asociadaSel" class="mt-1" style="display:none"></div>
+    </div>
 
     <?php $vendedores = $vendedores ?? []; if ($vendedores): ?>
     <div class="pos-cliente">
@@ -879,7 +888,10 @@ function selectCliente(c) {
     } else if (emisorIva === 'monotributo' || emisorIva === 'exento') {
         tipoAutomatico = 'FACT-C';
     }
-    document.getElementById('tipoComprobante').value = tipoAutomatico;
+    const tipoSelNc = document.getElementById('tipoComprobante');
+    if (tipoSelNc.value !== 'NC' && tipoSelNc.value !== 'ND') {
+        tipoSelNc.value = tipoAutomatico;
+    }
     renderCart();
 
     loadPuntosSaldo(c.idclien || 0);
@@ -1137,6 +1149,108 @@ if (presInput) {
     });
 }
 
+// ── Comprobante asociado (NC/ND, obligatorio) ──
+function toggleAsociada() {
+    const tipo = document.getElementById('tipoComprobante').value;
+    const wrap = document.getElementById('asociadaWrap');
+    const show = (tipo === 'NC' || tipo === 'ND');
+    wrap.style.display = show ? '' : 'none';
+    if (!show) {
+        document.getElementById('comprobanteAsociadoId').value = '0';
+        document.getElementById('asociadaSearch').value = '';
+        document.getElementById('asociadaSel').style.display = 'none';
+    }
+}
+document.getElementById('tipoComprobante').addEventListener('change', toggleAsociada);
+
+function mostrarAsociada(id, codigo, tipo, cliente, totalCents, fecha) {
+    const hid = document.getElementById('comprobanteAsociadoId');
+    const box = document.getElementById('asociadaSel');
+    hid.value = String(id || 0);
+    if (id > 0) {
+        const total = (parseInt(totalCents || 0) / 100).toLocaleString('es-AR', { minimumFractionDigits: 2 });
+        box.innerHTML = '<span class="badge bg-warning text-dark">Asociada: ' + esc(tipo || '') + ' ' + esc(codigo || '') + ' — ' + esc(cliente || '') + ' ($' + total + ')' + (fecha ? ' ' + esc(fecha) : '') + '</span> '
+            + '<button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="limpiarAsociada()" title="Quitar">×</button>';
+        box.style.display = '';
+    } else {
+        box.style.display = 'none';
+    }
+}
+function limpiarAsociada() {
+    document.getElementById('comprobanteAsociadoId').value = '0';
+    document.getElementById('asociadaSearch').value = '';
+    document.getElementById('asociadaSel').style.display = 'none';
+}
+const asocInput = document.getElementById('asociadaSearch');
+const asocSuggestions = document.getElementById('asociadaSuggestions');
+if (asocInput) {
+    let asocTimer;
+    asocInput.addEventListener('input', function() {
+        clearTimeout(asocTimer);
+        const val = this.value.trim();
+        if (val.length < 2) { asocSuggestions.innerHTML = ''; return; }
+        asocTimer = setTimeout(() => {
+            fetch('/admin/facturas/buscar-comprobantes?q=' + encodeURIComponent(val))
+                .then(r => r.json())
+                .then(data => {
+                    asocSuggestions.innerHTML = '';
+                    if (!data || data.length === 0) {
+                        asocSuggestions.innerHTML = '<div class="suggestion-item text-muted">Sin resultados</div>';
+                        return;
+                    }
+                    data.forEach(c => {
+                        const div = document.createElement('div');
+                        div.className = 'suggestion-item';
+                        const total = (parseInt(c.total_cents || 0) / 100).toLocaleString('es-AR', { minimumFractionDigits: 2 });
+                        div.innerHTML = '<strong>' + esc(c.tipo_comprobante || '') + ' ' + esc(c.codigo || '') + '</strong> <span class="text-muted">' + esc(c.cliente_nombre || '') + ' ($' + total + ')</span>';
+                        div.style.cssText = 'padding:6px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid #eee;background:#fff;';
+                        div.addEventListener('mousedown', function(e) {
+                            e.preventDefault();
+                            mostrarAsociada(c.id, c.codigo, c.tipo_comprobante, c.cliente_nombre, c.total_cents, c.fecha);
+                            asocInput.value = '';
+                            asocSuggestions.innerHTML = '';
+                        });
+                        asocSuggestions.appendChild(div);
+                    });
+                });
+        }, 300);
+    });
+    asocInput.addEventListener('blur', function() {
+        setTimeout(() => asocSuggestions.innerHTML = '', 300);
+    });
+}
+
+// ── Precarga para "Generar NC" (?nc_de=) ──
+function ncDePrefill() {
+    const o = NC_DE || {};
+    const tc = document.getElementById('tipoComprobante');
+    if (tc) { tc.value = 'NC'; toggleAsociada(); }
+    mostrarAsociada(o.id || 0, o.codigo || '', o.tipo || '', (o.cliente && o.cliente.nombre) || '', 0, '');
+    const cli = o.cliente || {};
+    if (cli.id || cli.idclien || cli.nombre) {
+        selectCliente({
+            id: cli.id || 0,
+            idclien: cli.idclien || 0,
+            name: cli.nombre || '',
+            cuit: cli.cuit || '',
+            condicion_iva: cli.condicion_iva || 'consumidor_final',
+            direc: cli.direc || '',
+            city: '',
+        });
+    }
+    (o.items || []).forEach(it => addToCart({
+        idprodu: it.idprodu || 0,
+        idcodgusto: it.idcodgusto || 0,
+        producto: it.producto || '',
+        variedad: it.variedad || '',
+        qty: it.qty || 1,
+        unit_price_cents: it.unit_price_cents || 0,
+        iva_rate: (it.iva_rate === undefined || it.iva_rate === null) ? 21 : it.iva_rate,
+        dto: it.dto || 0,
+    }));
+    renderCart();
+}
+
 // ── Pedido web search ──
 const pedInput = document.getElementById('pedidoSearch');
 const pedSuggestions = document.getElementById('pedidoSuggestions');
@@ -1187,6 +1301,8 @@ const EDITAR_ID = <?= (int)$editarId ?>;
 const EDITAR_FACTURA = <?= json_encode($editarFactura, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?: 'null' ?>;
 const EDITAR_ITEMS = <?= json_encode($editarItems, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]' ?>;
 const EDITAR_PAGOS = <?= json_encode($editarPagos, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]' ?>;
+const EDITAR_ASOCIADA = <?= json_encode($editarAsociada ?? null, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?: 'null' ?>;
+const NC_DE = <?= json_encode($ncDe ?? null, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?: 'null' ?>;
 const BTN_LABEL = EDITAR_ID > 0 ? '<i class="bi bi-pencil"></i> GUARDAR CAMBIOS' : '<i class="bi bi-receipt"></i> FACTURAR';
 
 function pedidoDisplayedTotalCents() {
@@ -1196,7 +1312,9 @@ function pedidoDisplayedTotalCents() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    toggleAsociada();
     if (EDITAR_ID > 0) { editarPrefill(); return; }
+    if (NC_DE && NC_DE.id > 0) { ncDePrefill(); return; }
     const pidEl = document.getElementById('pedidoId');
     if (!pidEl || parseInt(pidEl.value) <= 0) return;
     (PEDIDO_ITEMS || []).forEach(it => addToCart({
@@ -1281,6 +1399,11 @@ function editarPrefill() {
     // selectCliente puede cambiar el tipo según la condición: prevalece el original
     const tc = document.getElementById('tipoComprobante');
     if (tc && f.tipo_comprobante) tc.value = f.tipo_comprobante;
+    toggleAsociada();
+    // Comprobante asociado (NC/ND)
+    if (typeof EDITAR_ASOCIADA !== 'undefined' && EDITAR_ASOCIADA && EDITAR_ASOCIADA.id > 0) {
+        mostrarAsociada(EDITAR_ASOCIADA.id, EDITAR_ASOCIADA.codigo, EDITAR_ASOCIADA.tipo, EDITAR_ASOCIADA.cliente_nombre, EDITAR_ASOCIADA.total_cents, EDITAR_ASOCIADA.fecha);
+    }
     const vEl = document.getElementById('vendedorId');
     if (vEl) {
         vEl.value = String(parseInt(f.vendedor_id || 0)) || '0';
@@ -1547,7 +1670,23 @@ function submitFactura() {
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Facturando...';
 
+    const vendedorSel = document.getElementById('vendedorId');
+    if (vendedorSel && (parseInt(vendedorSel.value) || 0) <= 0) {
+        alert('Seleccioná el vendedor para facturar.');
+        if (vendedorSel) vendedorSel.focus();
+        btn.disabled = false;
+        btn.innerHTML = BTN_LABEL;
+        return;
+    }
+
     const tipo = document.getElementById('tipoComprobante').value;
+    const asociadaId = parseInt((document.getElementById('comprobanteAsociadoId') || {}).value) || 0;
+    if ((tipo === 'NC' || tipo === 'ND') && asociadaId <= 0) {
+        alert('Seleccioná el comprobante asociado (factura A, B o C).');
+        btn.disabled = false;
+        btn.innerHTML = BTN_LABEL;
+        return;
+    }
     const clienteId = parseInt(document.getElementById('clienteId').value) || 0;
     const remitoId = parseInt(document.getElementById('remitoId').value) || 0;
     const clienteErpId = parseInt(document.getElementById('clienteErpId').value) || 0;
@@ -1633,6 +1772,7 @@ function submitFactura() {
         _csrf: document.getElementById('csrfToken').value,
         editar_id: EDITAR_ID,
         tipo_comprobante: tipo,
+        comprobante_asociado_id: asociadaId > 0 ? asociadaId : null,
         forma_pago: pagos[0].forma_pago,
         entrega: {
             tipo: entregaTipo,

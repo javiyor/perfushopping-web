@@ -166,6 +166,11 @@ $discriminaIva = in_array($factura['tipo_comprobante'] ?? '', ['FACT-A']);
                             <i class="bi bi-pencil"></i> Editar
                         </a>
                     <?php endif; ?>
+                    <?php if (in_array($factura['tipo_comprobante'] ?? '', ['FACT-A', 'FACT-B', 'FACT-C'], true) && ($factura['estado'] ?? '') !== 'anulada'): ?>
+                        <a class="btn btn-outline-warning btn-sm" href="/admin/facturas/nueva?nc_de=<?= (int)($factura['id'] ?? 0) ?>">
+                            <i class="bi bi-file-earmark-minus"></i> Generar NC
+                        </a>
+                    <?php endif; ?>
                     <?php if (($factura['entrega_tipo'] ?? 'local') === 'envio' && in_array($factura['envio_estado'] ?? '', ['pendiente','en_transito'], true)): ?>
                         <form method="post" action="/admin/envios/entregar" style="display:inline" onsubmit="return confirm('¿Confirmar entrega y cobro?')">
                             <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />

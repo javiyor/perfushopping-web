@@ -104,6 +104,44 @@ final class FacturaController
             }
         }
 
+        // Precarga para "Generar NC": tipo NC + asociada + cliente + items del original.
+        $ncDeId = (int)($_GET['nc_de'] ?? 0);
+        $ncDe = null;
+        if ($ncDeId > 0) {
+            $origen = $repo->findById($ncDeId);
+            if ($origen && in_array((string)($origen['tipo_comprobante'] ?? ''), ['FACT-A', 'FACT-B', 'FACT-C'], true) && ($origen['estado'] ?? '') !== 'anulada') {
+                $ncItems = [];
+                foreach ($repo->items($ncDeId) as $it) {
+                    $ncItems[] = [
+                        'idprodu' => (int)($it['idprodu'] ?? 0),
+                        'idcodgusto' => (int)($it['idcodgusto'] ?? 0),
+                        'producto' => (string)($it['producto'] ?? ''),
+                        'variedad' => (string)($it['variedad'] ?? ''),
+                        'qty' => max(1, (int)($it['qty'] ?? 1)),
+                        'unit_price_cents' => (int)($it['unit_price_cents'] ?? 0),
+                        'iva_rate' => (float)($it['iva_rate'] ?? 21),
+                        'dto' => (float)($it['descuento_pct'] ?? 0),
+                    ];
+                }
+                $ncDe = [
+                    'id' => $ncDeId,
+                    'codigo' => (string)($origen['codigo'] ?? ''),
+                    'tipo' => (string)($origen['tipo_comprobante'] ?? ''),
+                    'cliente' => [
+                        'id' => (int)($origen['cliente_id'] ?? 0),
+                        'idclien' => (int)($origen['idclien'] ?? 0),
+                        'nombre' => (string)($origen['cliente_nombre'] ?? ''),
+                        'cuit' => (string)($origen['cliente_cuit'] ?? ''),
+                        'condicion_iva' => (string)($origen['cliente_condicion_iva'] ?? 'consumidor_final'),
+                        'direc' => (string)($origen['cliente_direc'] ?? ''),
+                    ],
+                    'items' => $ncItems,
+                ];
+            } else {
+                $ncDeId = 0;
+            }
+        }
+
         echo View::adminPage('admin/facturas/pos.php', $this->posCommon($auth) + [
             'remitoId' => $remitoId,
             'remitoItems' => $remitoItems,
@@ -116,6 +154,8 @@ final class FacturaController
             'pedidoEnvio' => $pedidoEnvio,
             'pedidoPago' => $pedidoPago,
             'pedidoDescPct' => $pedidoDescPct,
+            'ncDeId' => $ncDeId,
+            'ncDe' => $ncDe,
             'pageTitle' => 'Nueva factura',
         ]);
     }
@@ -391,7 +431,7 @@ final class FacturaController
         $id = $repo->create([
             'codigo' => $codigo,
             'tipo_comprobante' => $tipo,
-            'comprobante_asociado_id' => $comprobanteAsociadoId > 0 ? $comprobanteAsociadoId : null,
+            'comprobante_asociado_id' => ($tipo === 'NC' || $tipo === 'ND') && $comprobanteAsociadoId > 0 ? $comprobanteAsociadoId : null,
             'remito_id' => $remitoId,
             'presupuesto_id' => $presupuestoId,
             'order_id' => $pedidoId,
@@ -823,8 +863,29 @@ final class FacturaController
             'editarFactura' => $factura,
             'editarItems' => $repo->items($id),
             'editarPagos' => $repo->pagos($id),
+            'editarAsociada' => $this->resumenAsociada($repo, (int)($factura['comprobante_asociado_id'] ?? 0)),
             'pageTitle' => 'Editar factura ' . ($factura['codigo'] ?? ''),
         ]);
+    }
+
+    /** Resumen para mostrar la asociada en el POS (o null). */
+    private function resumenAsociada(FacturaRepo $repo, int $asociadaId): ?array
+    {
+        if ($asociadaId <= 0) {
+            return null;
+        }
+        $a = $repo->findById($asociadaId);
+        if (!$a) {
+            return null;
+        }
+        return [
+            'id' => $asociadaId,
+            'codigo' => (string)($a['codigo'] ?? ''),
+            'tipo' => (string)($a['tipo_comprobante'] ?? ''),
+            'cliente_nombre' => (string)($a['cliente_nombre'] ?? ''),
+            'total_cents' => (int)($a['total_cents'] ?? 0),
+            'fecha' => (string)($a['fecha'] ?? ''),
+        ];
     }
 
     public function actualizar(array $params): void
@@ -968,7 +1029,7 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
 
         $repo->actualizar($editarId, [
             'tipo_comprobante' => $tipo,
-            'comprobante_asociado_id' => $comprobanteAsociadoId > 0 ? $comprobanteAsociadoId : null,
+            'comprobante_asociado_id' => ($tipo === 'NC' || $tipo === 'ND') && $comprobanteAsociadoId > 0 ? $comprobanteAsociadoId : null,
             'cliente_id' => $clienteId,
             'idclien' => $clienteErpId,
             'cliente_nombre' => $clienteNombre,
