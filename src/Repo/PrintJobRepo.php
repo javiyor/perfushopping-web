@@ -34,8 +34,28 @@ final class PrintJobRepo
             ");
             $cols = Db::pdo()->query('SHOW COLUMNS FROM impresoras')->fetchAll();
             $fields = array_column($cols, 'Field');
-            if (!in_array('formato', $fields, true)) {
-                Db::pdo()->exec("ALTER TABLE impresoras ADD COLUMN formato VARCHAR(10) NOT NULL DEFAULT '80mm'");
+            $need = [
+                'nombre' => 'ADD COLUMN nombre VARCHAR(80) NOT NULL',
+                'punto_venta' => 'ADD COLUMN punto_venta INT NOT NULL DEFAULT 0',
+                'sucursal_id' => 'ADD COLUMN sucursal_id INT UNSIGNED DEFAULT NULL',
+                'token' => 'ADD COLUMN token VARCHAR(64) NOT NULL',
+                'activo' => 'ADD COLUMN activo TINYINT(1) NOT NULL DEFAULT 1',
+                'formato' => "ADD COLUMN formato VARCHAR(10) NOT NULL DEFAULT '80mm'",
+                'created_at' => 'ADD COLUMN created_at DATETIME DEFAULT NULL',
+                'updated_at' => 'ADD COLUMN updated_at DATETIME DEFAULT NULL',
+            ];
+            foreach ($need as $col => $ddl) {
+                if (!in_array($col, $fields, true)) {
+                    try {
+                        Db::pdo()->exec('ALTER TABLE impresoras ' . $ddl);
+                    } catch (\Throwable $e) {
+                        error_log('PrintJobRepo::ensureTables impresoras ' . $col . ': ' . $e->getMessage());
+                    }
+                }
+            }
+            try {
+                Db::pdo()->exec('ALTER TABLE impresoras ADD UNIQUE KEY uq_token (token)');
+            } catch (\Throwable $e) {
             }
             Db::pdo()->exec("
                 CREATE TABLE IF NOT EXISTS print_jobs (

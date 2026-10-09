@@ -70,7 +70,7 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
             html, body { margin:0; padding:0; }
             body { width:<?= $formato === '58mm' ? '48mm' : ($isTicket ? '72mm' : '100%') ?>; margin:0 auto; }
             <?php if ($isTicket): ?>
-            body { padding:0 2mm; }
+            body { margin:0; padding:0 5mm 0 2mm; }
             .cut-space { display:block; height:10mm; }
             <?php endif; ?>
             .no-print { display:none; }
