@@ -493,6 +493,7 @@ final class ReporteRepo
     /**
      * Ganancia neta: neto vendido sin IVA menos descuentos y costo.
      * Costo = snapshot costo_cents al facturar, o precomp actual si no hay.
+     * Base = total vendido (autorizadas y no autorizadas), igual que el KPI total.
      */
     public function ganancia(string $desde, string $hasta, int $puntoVenta = 0): array
     {
@@ -514,7 +515,7 @@ final class ReporteRepo
                 FROM factura_items fi
                 INNER JOIN facturas f ON f.id = fi.factura_id
                 LEFT JOIN producto p ON p.idprodu = fi.idprodu
-                WHERE f.estado = 'emitida'{$this->soloAutorizadasWhere()}
+                WHERE f.estado = 'emitida'
                   AND f.fecha BETWEEN :desde AND :hasta
                   $pvWhere
             ");
@@ -537,7 +538,7 @@ final class ReporteRepo
                 $std = Db::pdo()->prepare('
                     SELECT ' . implode(' + ', $descCols) . ' AS descuento_cents
                     FROM facturas f
-                    WHERE f.estado = \'emitida\'' . $this->soloAutorizadasWhere() . '
+                    WHERE f.estado = \'emitida\'
                       AND f.fecha BETWEEN :desde AND :hasta
                       ' . ($puntoVenta > 0 ? ' AND f.punto_venta = :pv' : '') . '
                 ');

@@ -33,9 +33,10 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
         .cut-space { display:none; }
         <?php endif; ?>
         body {
-            font-family:Arial,Helvetica,sans-serif;
+            font-family:<?= $isTicket ? "Verdana, Tahoma, Geneva, sans-serif" : 'Arial,Helvetica,sans-serif' ?>;
             font-size:<?= $bodyFontSize ?>; line-height:<?= $isTicket ? '1.5' : '1.4' ?>; color:#000;
             width:<?= $bodyWidth ?>; margin:0 auto;
+            <?php if ($isTicket): ?>-webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;<?php endif; ?>
         }
         h1 { font-size:<?= $formato === '58mm' ? '13px' : '16px' ?>; text-align:center; margin:0 0 4px; }
         .header { text-align:center; margin-bottom:10px; }
@@ -68,15 +69,21 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
         @media print {
             html, body { margin:0; padding:0; }
             body { width:<?= $formato === '58mm' ? '48mm' : ($isTicket ? '72mm' : '100%') ?>; margin:0 auto; }
-            .no-print { display:none; }
             <?php if ($isTicket): ?>
+            body { padding-left:3mm; }
             .cut-space { display:block; height:10mm; }
             <?php endif; ?>
+            .no-print { display:none; }
         }
     </style>
 </head>
 <body>
-    <?php if ($autoPrint): ?><script>window.onload=function(){setTimeout(function(){window.print()},500)}</script><?php endif; ?>
+    <?php if ($autoPrint): ?>
+    <script>
+    window.onload = function() { setTimeout(function() { window.print(); }, 500); };
+    window.addEventListener('afterprint', function() { window.location.href = '/admin/facturas'; });
+    </script>
+    <?php endif; ?>
     <div class="header">
         <?php $logo = $empresa['logo'] ?? ''; ?>
         <img class="logo" src="<?= $logo ? htmlspecialchars($logo) : '/assets/brand/logo-header.png' ?>" alt="<?= htmlspecialchars($empresa['nomemp'] ?? 'Perfushopping') ?>" onerror="this.style.display='none'" />
