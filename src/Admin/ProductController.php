@@ -679,6 +679,10 @@ public function saveVariantLogistics(array $params): void
         $selectedVariants = array_map('intval', (array)($_POST['variants'] ?? []));
         $quantities = (array)($_POST['qty'] ?? []);
         $dpi = ((int)($_POST['dpi'] ?? 203)) === 300 ? 300 : 203;
+        $rot = (int)($_POST['rot'] ?? 0);
+        if (!in_array($rot, [0, 1, 2, 3], true)) {
+            $rot = 0;
+        }
 
         $variants = array_values(array_filter($this->repo->variants($id), function ($v) use ($selectedVariants) {
             return in_array((int)($v['idcodgusto'] ?? 0), $selectedVariants, true);
@@ -688,7 +692,7 @@ public function saveVariantLogistics(array $params): void
             Response::redirect('/admin/productos/etiquetas/' . $id);
         }
 
-        $epl = $this->buildEpl($product, $variants, $quantities, $dpi);
+        $epl = $this->buildEpl($product, $variants, $quantities, $dpi, $rot);
         header('Content-Type: text/plain; charset=us-ascii');
         header('Content-Disposition: attachment; filename="etiquetas-' . $id . '.epl"');
         header('Content-Length: ' . strlen($epl));
@@ -696,7 +700,7 @@ public function saveVariantLogistics(array $params): void
         exit;
     }
 
-    private function buildEpl(array $product, array $variants, array $quantities, int $dpi): string
+    private function buildEpl(array $product, array $variants, array $quantities, int $dpi, int $rot = 0): string
     {
         $dpm = $dpi / 25.4;
         $labelW = (int)round(38 * $dpm);
@@ -747,19 +751,19 @@ public function saveVariantLogistics(array $params): void
                     if ($line === '') {
                         continue;
                     }
-                    $out .= 'A' . $x . ',' . $y . ',0,' . $fontSmall . ',1,1,N,"' . $line . "\"\n";
+                    $out .= 'A' . $x . ',' . $y . ',' . $rot . ',' . $fontSmall . ',1,1,N,"' . $line . "\"\n";
                     $y += $lhSmall + 1;
                 }
-                $out .= 'A' . $x . ',' . $y . ',0,' . $fontSmall . ',1,1,N,"' . $lb['sub'] . "\"\n";
+                $out .= 'A' . $x . ',' . $y . ',' . $rot . ',' . $fontSmall . ',1,1,N,"' . $lb['sub'] . "\"\n";
                 $y += $lhSmall + 3;
-                $out .= 'A' . $x . ',' . $y . ',0,' . $fontBig . ',1,1,N,"' . $price . "\"\n";
-                $out .= 'A' . $x . ',' . $y . ',' . (int)round($labelW * 0.52) . ',' . $fontSmall . ',1,1,N,"' . $priceWs . "\"\n";
+                $out .= 'A' . $x . ',' . $y . ',' . $rot . ',' . $fontBig . ',1,1,N,"' . $price . "\"\n";
+                $out .= 'A' . $x . ',' . $y . ',' . $rot . ',' . $fontSmall . ',1,1,N,"' . $priceWs . "\"\n";
                 $y += $lhBig + 4;
                 $barH = max((int)round(8 * $dpm), $labelH - $y - $lhSmall - 4);
                 if (strlen($lb['ean']) === 13 && ctype_digit($lb['ean'])) {
-                    $out .= 'B' . $x . ',' . $y . ',0,' . $barH . ',7,' . $narrow . ',5,N,"' . substr($lb['ean'], 0, 12) . "\"\n";
+                    $out .= 'B' . $x . ',' . $y . ',' . $rot . ',' . $barH . ',7,' . $narrow . ',5,N,"' . substr($lb['ean'], 0, 12) . "\"\n";
                 } else {
-                    $out .= 'B' . $x . ',' . $y . ',0,' . $barH . ',5,' . $narrow . ',3,N,"' . $lb['ean'] . "\"\n";
+                    $out .= 'B' . $x . ',' . $y . ',' . $rot . ',' . $barH . ',5,' . $narrow . ',3,N,"' . $lb['ean'] . "\"\n";
                 }
             }
             $out .= "P1\n";

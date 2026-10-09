@@ -94,11 +94,19 @@ body { font-family:Arial,Helvetica,sans-serif; width:80mm; }
             </label>
         </div>
         <?php endforeach; ?>
-        <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
-            <label style="font-size:13px;margin-right:8px">DPI:
+        <div style="display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap">
+            <label style="font-size:13px">DPI:
                 <select name="dpi" style="width:70px">
                     <option value="203">203</option>
                     <option value="300">300</option>
+                </select>
+            </label>
+            <label style="font-size:13px">Rotación:
+                <select name="rot" style="width:90px">
+                    <option value="0">0°</option>
+                    <option value="1">90°</option>
+                    <option value="2">180°</option>
+                    <option value="3">270°</option>
                 </select>
             </label>
             <button type="submit" class="btn btn-accent btn-print"><i class="bi bi-print"></i> Generar e imprimir etiquetas</button>
