@@ -2,68 +2,87 @@
 $puntoVenta = (int)($puntoVenta ?? 0);
 $impresora = $impresora ?? null;
 ?>
-<div class="d-flex justify-content-between align-items-start mb-3">
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
     <div>
-        <h4 class="fw-bold mb-1">Spooler de tickets — PV <?= $puntoVenta ?></h4>
-        <p class="text-muted small">Dejá esta página abierta en la PC del punto de venta: imprime sola cada factura que entra en cola</p>
+        <h4 class="fw-bold mb-1">Spooler de tickets</h4>
+        <p class="text-muted small mb-0">
+            PV <span class="badge bg-primary align-middle"> <?= $puntoVenta ?> </span>
+            &middot; Dejá esta pestaña abierta en la PC del mostrador: imprime sola cada factura en cola.
+        </p>
     </div>
     <div class="d-flex gap-2">
-        <button class="btn btn-success btn-sm" id="btnSpoolerToggle" type="button"><i class="bi bi-pause-fill"></i> Pausar</button>
-        <a class="btn btn-outline-secondary btn-sm" href="/admin/impresion/impresoras">Impresoras</a>
+        <button class="btn btn-outline-secondary btn-sm" id="btnSpoolerToggle" type="button"><i class="bi bi-pause-fill"></i> Pausar</button>
+        <a class="btn btn-outline-secondary btn-sm" href="/admin/impresion/impresoras"><i class="bi bi-printer"></i> Impresoras</a>
     </div>
 </div>
 
-<?php if (!$impresora): ?>
-<div class="alert alert-warning">
-    <i class="bi bi-exclamation-triangle"></i>
-    No hay impresora activa asignada al punto de venta <?= $puntoVenta ?>.
-    <a href="/admin/impresion/impresoras">Asigná una acá</a>: las facturas igual quedan en cola.
-</div>
-<?php else: ?>
-<div class="alert alert-success py-2 small">
-    <i class="bi bi-printer"></i>
-    Impresora asignada: <strong><?= htmlspecialchars((string)($impresora['nombre'] ?? '')) ?></strong> (<?= htmlspecialchars((string)(($impresora['formato'] ?? '') ?: '80mm')) ?>)
-</div>
-<?php endif; ?>
+<div id="spoolerBanner"></div>
 
-<div class="alert alert-info small">
-    Para impresión <strong>sin diálogo</strong>, abrí Chrome con el parámetro <code>--kiosk-printing</code>
+<div class="row g-2 mb-3">
+    <div class="col-6 col-md-3">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-body py-2 px-3">
+                <div class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.04em">Estado</div>
+                <div class="fw-bold" id="spoolerStatus">Iniciando…</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-body py-2 px-3">
+                <div class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.04em">Pendientes</div>
+                <div class="fw-bold" id="spoolerPending">0</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-body py-2 px-3">
+                <div class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.04em">Última revisión</div>
+                <div class="fw-bold" id="spoolerLast">—</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-body py-2 px-3">
+                <div class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.04em">Último impreso</div>
+                <div class="fw-bold" id="spoolerLastPrinted">—</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="alert alert-info small py-2">
+    <i class="bi bi-info-circle"></i>
+    Para imprimir <strong>sin diálogo</strong>, abrí Chrome con el parámetro <code>--kiosk-printing</code>
     (acceso directo a esta página). Si no, el navegador pide confirmar cada ticket.
 </div>
 
-<div class="card shadow-sm mb-3">
-    <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
-        <span>Estado</span>
-        <span class="small text-muted" id="spoolerStatus">Iniciando…</span>
-    </div>
-    <div class="card-body small">
-        Última revisión: <strong id="spoolerLast">—</strong> ·
-        Pendientes: <strong id="spoolerPending">0</strong> ·
-        Último impreso: <strong id="spoolerLastPrinted">—</strong>
-    </div>
-</div>
-
 <div class="card shadow-sm">
-    <div class="card-header bg-white fw-semibold">Cola pendiente</div>
+    <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-list-ol"></i> Cola de espera</span>
+        <span class="small text-muted">se imprime de a una</span>
+    </div>
     <div class="table-responsive">
-        <table class="table table-sm mb-0">
-            <thead>
+        <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
                 <tr>
-                    <th>#</th>
+                    <th style="width:70px">Nº</th>
                     <th>Factura</th>
                     <th>Cliente</th>
-                    <th>Encolado</th>
-                    <th style="width:100px"></th>
+                    <th style="width:150px">Encolado</th>
+                    <th style="width:110px" class="text-end">Acciones</th>
                 </tr>
             </thead>
             <tbody id="spoolerQueue">
-                <tr><td colspan="4" class="text-muted text-center small">Sin pendientes</td></tr>
+                <tr><td colspan="5" class="text-center text-muted small py-4">Sin pendientes</td></tr>
             </tbody>
         </table>
     </div>
 </div>
 
-<div id="spoolerFrames" style="display:none"></div>
+<div id="spoolerFrames" style="position:absolute;left:-10000px;top:0;width:1px;height:1px;overflow:hidden;opacity:0"></div>
 
 <script>
 (function() {
@@ -73,19 +92,42 @@ $impresora = $impresora ?? null;
     var running = true;
     var busy = false;
     var queue = [];
+    var currentFrame = null;
 
     var btn = document.getElementById('btnSpoolerToggle');
     btn.addEventListener('click', function() {
         running = !running;
-        btn.className = running ? 'btn btn-success btn-sm' : 'btn btn-outline-secondary btn-sm';
+        btn.className = running ? 'btn btn-outline-secondary btn-sm' : 'btn btn-accent btn-sm';
         btn.innerHTML = running ? '<i class="bi bi-pause-fill"></i> Pausar' : '<i class="bi bi-play-fill"></i> Reanudar';
         setStatus(running ? 'En espera' : 'Pausado');
         if (running) poll();
     });
 
+    // Banner de impresora asignada / faltante
+    (function() {
+        var el = document.getElementById('spoolerBanner');
+        if (!el) return;
+        <?php if (!$impresora): ?>
+        el.innerHTML = '<div class="alert alert-warning py-2"><i class="bi bi-exclamation-triangle"></i> '
+            + 'No hay impresora activa para el PV <?= $puntoVenta ?>. '
+            + '<a href="/admin/impresion/impresoras">Asigná una acá</a>. Las facturas igual quedan en cola.</div>';
+        <?php else: ?>
+        el.innerHTML = '<div class="alert alert-success py-2"><i class="bi bi-printer"></i> '
+            + 'Imprimiendo con <strong><?= htmlspecialchars((string)($impresora['nombre'] ?? '')) ?></strong> '
+            + '(<?= htmlspecialchars((string)(($impresora['formato'] ?? '') ?: '80mm')) ?>).</div>';
+        <?php endif; ?>
+    })();
+
     function setStatus(t) {
         document.getElementById('spoolerStatus').textContent = t;
     }
+
+    // El ticket (iframe) avisa con postMessage cuando terminó de imprimir.
+    window.addEventListener('message', function(ev) {
+        if (!ev.data || ev.data.type !== 'ticket_impreso') return;
+        var cur = currentFrame;
+        if (cur && cur.resolve) cur.resolve('impreso');
+    });
 
     function escSpooler(s) {
         var d = document.createElement('div');
@@ -113,31 +155,31 @@ $impresora = $impresora ?? null;
     function printJob(job) {
         busy = true;
         setStatus('Imprimiendo ' + (job.factura_codigo || ('#' + job.factura_id)) + '…');
-        var done = false;
+        var frame = document.createElement('iframe');
+        frame.style.width = FORMATO === '58mm' ? '58mm' : '80mm';
+        frame.style.border = '0';
+        frame.src = '/admin/facturas/imprimir/' + job.factura_id + '?formato=' + FORMATO + '&auto=1';
+        document.getElementById('spoolerFrames').appendChild(frame);
+
+        var settled = false;
         var finish = function(estado, mensaje) {
-            if (done) return;
-            done = true;
+            if (settled) return;
+            settled = true;
+            clearTimeout(safety);
+            try { frame.remove(); } catch (e) {}
+            currentFrame = null;
             ack(job.id, estado, mensaje).then(function() {
-                document.getElementById('spoolerLastPrinted').textContent = (job.factura_codigo || ('#' + job.factura_id)) + ' (' + new Date().toLocaleTimeString('es-AR') + ')';
+                if (estado === 'impreso') {
+                    document.getElementById('spoolerLastPrinted').textContent = (job.factura_codigo || ('#' + job.factura_id)) + ' (' + new Date().toLocaleTimeString('es-AR') + ')';
+                }
                 busy = false;
                 poll();
             });
         };
-        try {
-            var frame = document.createElement('iframe');
-            frame.style.width = FORMATO === '58mm' ? '58mm' : '80mm';
-            frame.style.border = '0';
-            var to = setTimeout(function() { finish('error', 'timeout de impresión'); }, 45000);
-            frame.onload = function() {
-                setTimeout(function() { clearTimeout(to); finish('impreso', null); }, 2000);
-            };
-            frame.onerror = function() { clearTimeout(to); finish('error', 'no se pudo cargar el ticket'); };
-            frame.src = '/admin/facturas/imprimir/' + job.factura_id + '?formato=' + FORMATO + '&auto=1';
-            document.getElementById('spoolerFrames').appendChild(frame);
-            setTimeout(function() { try { frame.remove(); } catch (e) {} }, 60000);
-        } catch (e) {
-            finish('error', String(e && e.message || e));
-        }
+        currentFrame = { resolve: function() { finish('impreso', null); } };
+        // Si el navegador no emite postMessage (sin --kiosk-printing puede pasar),
+        // damos por impreso a los 15s para no trabar la cola.
+        var safety = setTimeout(function() { finish('impreso', null); }, 15000);
     }
 
     function renderQueue(jobs) {

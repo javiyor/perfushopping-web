@@ -55,8 +55,6 @@ body { font-family:Arial,Helvetica,sans-serif; width:80mm; }
     .variant-row .variant-code { font-size: 11px; color: #666; }
     .variant-row input[type="number"] { width: 60px; padding: 4px; font-size: 13px; }
     .selection-form .btn { margin-top: 15px; }
-    .label-grid { background:#fff; border-radius:8px; padding:4mm; max-width:180mm; }
-    .label { border:1px solid #ddd; border-radius:2px; }
 }
 </style>
 </head><body>
@@ -96,7 +94,8 @@ body { font-family:Arial,Helvetica,sans-serif; width:80mm; }
     <label><input type="checkbox" id="chkPrice" <?= $showPrice ? 'checked' : '' ?> onchange="toggleLabels()"> Precio</label>
     <label><input type="checkbox" id="chkDesc" <?= $showDesc ? 'checked' : '' ?> onchange="toggleLabels()"> Descripci&oacute;n</label>
     <label><input type="checkbox" id="chkVariant" <?= $showVariant ? 'checked' : '' ?> onchange="toggleLabels()"> Variedad</label>
-    <button class="btn-print" onclick="duplicateLabels()">Imprimir</button>
+    <button class="btn-print" onclick="window.print()"><i class="bi bi-printer"></i> Imprimir</button>
+    <a href="/admin/productos/<?= $idprodu ?>" class="btn-print" style="text-decoration:none">Volver</a>
 </div>
 <div class="label-grid" id="labelGrid">
 <?php foreach ($variants as $v):
@@ -137,20 +136,6 @@ function toggleLabels() {
     });
 }
 toggleLabels();
-
-function duplicateLabels() {
-    const qty = parseInt(document.getElementById('qtyLabels').value) || 1;
-    if (qty <= 1) { window.print(); return; }
-    const grid = document.getElementById('labelGrid');
-    const originalLabels = Array.from(grid.querySelectorAll('.label'));
-    originalLabels.forEach(function(el) {
-        for (var i = 1; i < qty; i++) {
-            var clone = el.cloneNode(true);
-            grid.appendChild(clone);
-        }
-    });
-    window.print();
 </script>
 <?php endif; ?>
-<script>window.print();</script>
 </body></html>

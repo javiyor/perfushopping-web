@@ -81,7 +81,10 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
     <?php if ($autoPrint): ?>
     <script>
     window.onload = function() { setTimeout(function() { window.print(); }, 500); };
-    window.addEventListener('afterprint', function() { window.location.href = '/admin/facturas'; });
+    window.addEventListener('afterprint', function() {
+        try { window.parent.postMessage({ type: 'ticket_impreso' }, '*'); } catch (e) {}
+        if (window.self === window.top) { window.location.href = '/admin/facturas'; }
+    });
     </script>
     <?php endif; ?>
     <div class="header">
