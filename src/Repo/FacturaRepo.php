@@ -675,7 +675,7 @@ $st = $pdo->prepare('
         }
 
         $sql = '
-            SELECT p.idprodu, p.codprodu, p.produ, p.precio, p.precio1, p.precomp, p.codprodup, p.enweb, p.stocact,
+            SELECT p.idprodu, p.codprodu, p.produ, p.precio, p.precio1, p.precomp, p.codprodup, p.enweb, p.stocact, p.fecompra,
                    i.codivaprodu, i.tiva
             FROM producto p
             LEFT JOIN ivaprodu i ON i.codivaprodu = p.iva
@@ -691,7 +691,7 @@ $st = $pdo->prepare('
         $matchedVariant = null;
         if (ctype_digit($q) || preg_match('/^\d{8,13}$/', $q)) {
             $st2 = $pdo->prepare('
-                SELECT p.idprodu, p.codprodu, p.produ, p.precio, p.precio1, p.precomp, p.codprodup, p.enweb, p.stocact,
+                SELECT p.idprodu, p.codprodu, p.produ, p.precio, p.precio1, p.precomp, p.codprodup, p.enweb, p.stocact, p.fecompra,
                        i.codivaprodu, i.tiva,
                        g.idcodgusto, g.nomgusto AS matched_nomgusto
                 FROM gustos g

@@ -565,8 +565,18 @@ document.addEventListener('click', function(e) {
     if (!e.target.closest('.pos-search-box')) prodResults.style.display = 'none';
 });
 
-function searchProd(q) {
-    fetch('/admin/facturas/buscar-productos?q=' + encodeURIComponent(q))
+// Semáforo de fecha de compra: >90 días rojo, >60 amarillo, dentro verde.
+function fecompraBadge(fecha) {
+    if (!fecha) return '<span class="text-muted">F.Comp: —</span>';
+    const d = new Date(String(fecha).substring(0, 10) + 'T00:00:00');
+    if (isNaN(d.getTime())) return '<span class="text-muted">F.Comp: —</span>';
+    const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+    const cls = days > 90 ? 'text-danger fw-bold' : (days > 60 ? 'text-warning fw-bold' : 'text-success');
+    const txt = String(fecha).substring(0, 10).split('-').reverse().join('/');
+    return '<span class="' + cls + '">F.Comp: ' + esc(txt) + '</span>';
+}
+
+function searchProd(q) {    fetch('/admin/facturas/buscar-productos?q=' + encodeURIComponent(q))
         .then(r => r.json())
         .then(data => {
             prodResults.innerHTML = '';
@@ -612,6 +622,7 @@ function searchProd(q) {
                         <div style="font-size:11px;color:#6c757d;margin-top:2px">
                             <span class="text-success fw-semibold">Dep: ${stockDep}</span>
                             <span class="ms-2 text-muted">Total: ${stockTot}</span>
+                            <span class="ms-2">${fecompraBadge(p.fecompra)}</span>
                         </div>
                     </div>
                     <div class="prod-price">$${fmtPrice(displayPrice)}</div>
@@ -644,7 +655,7 @@ function searchProd(q) {
 
 function showVariantPicker(p, priceCents, precio1Cents, ivaRate) {
     let html = '<div class="pos-result-item" style="flex-direction:column;align-items:stretch;cursor:default">';
-    html += '<div class="fw-bold mb-2">' + esc(p.produ) + ' — elegí variedad:</div>';
+    html += '<div class="fw-bold mb-2">' + esc(p.produ) + ' — elegí variedad: ' + fecompraBadge(p.fecompra) + '</div>';
     html += '<input type="text" id="variantFilter" placeholder="Filtrar por nombre o id (ej: saro, 123)" class="form-control form-control-sm mb-2" oninput="filterVariantPicker(this.value)" />';
     html += '<div id="variantList" style="max-height:300px;overflow-y:auto;">';
     p.variants.forEach(v => {
