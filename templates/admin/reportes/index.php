@@ -367,16 +367,20 @@ function cargarReportes() {
             document.getElementById('kpiGanancia').textContent = fmtCents(ganancia);
             document.getElementById('kpiMargen').textContent = neto > 0 ? (ganancia / neto * 100).toFixed(1) + '%' : '—';
 
-            // Autorizadas vs no autorizadas + promedio diario
+            // Autorizadas vs no autorizadas + promedio diario.
+            // Total vendido, ticket promedio y promedio diario suman ambos grupos.
             const aut = (d.autorizacion && d.autorizacion.autorizadas) || {};
             const noaut = (d.autorizacion && d.autorizacion.no_autorizadas) || {};
+            const totAll = parseInt(aut.total_cents ?? 0) + parseInt(noaut.total_cents ?? 0);
+            const cantAll = parseInt(aut.cantidad ?? 0) + parseInt(noaut.cantidad ?? 0);
+            const dias = Math.max(1, parseInt(d.dias ?? 1));
+            document.getElementById('kpiTotal').textContent = fmtCents(totAll);
+            document.getElementById('kpiTicket').textContent = cantAll > 0 ? fmtCents(Math.round(totAll / cantAll)) : '—';
             document.getElementById('kpiAutorizadas').textContent = fmtCents(parseInt(aut.total_cents ?? 0));
             document.getElementById('kpiAutorizadasCant').textContent = parseInt(aut.cantidad ?? 0);
             document.getElementById('kpiNoAutorizadas').textContent = fmtCents(parseInt(noaut.total_cents ?? 0));
             document.getElementById('kpiNoAutorizadasCant').textContent = parseInt(noaut.cantidad ?? 0);
-            const dias = Math.max(1, parseInt(d.dias ?? 1));
-            const totalRes = parseInt(res.total_cents ?? 0);
-            document.getElementById('kpiPromDiario').textContent = fmtCents(Math.round(totalRes / dias));
+            document.getElementById('kpiPromDiario').textContent = fmtCents(Math.round(totAll / dias));
             document.getElementById('kpiPromDiarioDias').textContent = dias;
 
             // Comparativas
@@ -649,17 +653,20 @@ function exportarCSV() {
             const res = d.resumen || {};
             csv += 'Resumen\n';
             csv += 'Facturas,' + (res.cantidad ?? 0) + '\n';
-            csv += 'Total,' + (parseInt(res.total_cents ?? 0) / 100).toFixed(2) + '\n';
-            csv += 'IVA,' + (parseInt(res.iva_cents ?? 0) / 100).toFixed(2) + '\n';
             const autCsv = (d.autorizacion && d.autorizacion.autorizadas) || {};
             const noautCsv = (d.autorizacion && d.autorizacion.no_autorizadas) || {};
+            const totCsv = parseInt(autCsv.total_cents ?? 0) + parseInt(noautCsv.total_cents ?? 0);
+            const cantCsv = parseInt(autCsv.cantidad ?? 0) + parseInt(noautCsv.cantidad ?? 0);
             const diasCsv = Math.max(1, parseInt(d.dias ?? 1));
+            csv += 'Total,' + (totCsv / 100).toFixed(2) + '\n';
+            csv += 'Ticket promedio,' + (cantCsv > 0 ? (totCsv / cantCsv / 100).toFixed(2) : '0') + '\n';
+            csv += 'IVA,' + (parseInt(res.iva_cents ?? 0) / 100).toFixed(2) + '\n';
             csv += 'Autorizadas cant.,' + (autCsv.cantidad ?? 0) + '\n';
             csv += 'Autorizadas total,' + (parseInt(autCsv.total_cents ?? 0) / 100).toFixed(2) + '\n';
             csv += 'No autorizadas cant.,' + (noautCsv.cantidad ?? 0) + '\n';
             csv += 'No autorizadas total,' + (parseInt(noautCsv.total_cents ?? 0) / 100).toFixed(2) + '\n';
             csv += 'Dias periodo,' + diasCsv + '\n';
-            csv += 'Promedio diario,' + (parseInt(res.total_cents ?? 0) / diasCsv / 100).toFixed(2) + '\n\n';
+            csv += 'Promedio diario,' + (totCsv / diasCsv / 100).toFixed(2) + '\n\n';
 
             csv += 'Ventas Diarias\n';
             csv += 'Fecha,Cantidad,Total\n';
@@ -743,7 +750,7 @@ function exportarCSV() {
             csv += 'Costo,' + (parseInt(gan.costo_cents ?? 0) / 100).toFixed(2) + '\n';
             csv += 'Descuentos,' + (parseInt(gan.descuento_cents ?? 0) / 100).toFixed(2) + '\n';
             csv += 'Ganancia,' + (parseInt(gan.ganancia_cents ?? 0) / 100).toFixed(2) + '\n';
-            csv += 'Ticket promedio,' + (parseInt(d.ticket ?? 0) / 100).toFixed(2) + '\n';
+            csv += 'Ticket promedio,' + (cantCsv > 0 ? (totCsv / cantCsv / 100).toFixed(2) : '0') + '\n';
 
             csv += '\nTop por Ganancia\n';
             csv += 'Producto,Variedad,Cantidad,Neto,Costo,Ganancia\n';
