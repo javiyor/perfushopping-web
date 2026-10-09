@@ -40,8 +40,10 @@ final class PrintConfigController
             'list' => $repo->impresorasTodas(),
             'sucursales' => $sucursales,
             'csrf' => Csrf::token(),
+            'flash' => $_SESSION['admin_flash'] ?? null,
             'pageTitle' => 'Impresoras de tickets',
         ]);
+        unset($_SESSION['admin_flash']);
     }
 
     public function impresoraSave(array $params): void
@@ -90,6 +92,28 @@ final class PrintConfigController
         if ($id > 0) {
             (new PrintJobRepo())->eliminarImpresora($id);
             $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Impresora eliminada.'];
+        }
+        Response::redirect('/admin/impresion/impresoras');
+    }
+
+    /** Marca/desmarca una impresora como predeterminada para etiquetas de productos. */
+    public function impresoraEtiquetasSet(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $auth->requirePermiso('caja_movimientos');
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $id = (int)($_POST['id'] ?? 0);
+        $quitar = !empty($_POST['quitar']);
+        if ($id > 0) {
+            $repo = new PrintJobRepo();
+            if ($quitar) {
+                $repo->desmarcarImpresoraEtiquetas($id);
+                $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Impresora de etiquetas desmarcada.'];
+            } else {
+                $repo->marcarImpresoraEtiquetas($id);
+                $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Impresora predeterminada para etiquetas actualizada.'];
+            }
         }
         Response::redirect('/admin/impresion/impresoras');
     }

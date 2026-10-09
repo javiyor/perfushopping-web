@@ -261,6 +261,7 @@ $router->post('/admin/productos/describe-commercial', [AdminProductControllerNew
 $router->post('/admin/productos/ai-tags', [AdminProductControllerNew::class, 'aiTags']);
 $router->get('/admin/productos/etiquetas/(?P<id>\d+)', [AdminProductControllerNew::class, 'printLabels']);
 $router->post('/admin/productos/etiquetas/(?P<id>\d+)', [AdminProductControllerNew::class, 'printLabels']);
+$router->post('/admin/productos/etiquetas/epl/(?P<id>\d+)', [AdminProductControllerNew::class, 'etiquetasEpl']);
 
 // Admin - Marketing
 $router->get('/admin/marketing/videos', [AdminMarketingVideoController::class, 'index']);
@@ -474,6 +475,7 @@ $router->get('/admin/impresion/impresoras', [AdminPrintConfigController::class, 
 $router->post('/admin/impresion/impresora/guardar', [AdminPrintConfigController::class, 'impresoraSave']);
 $router->post('/admin/impresion/impresora/toggle', [AdminPrintConfigController::class, 'impresoraToggle']);
 $router->post('/admin/impresion/impresora/eliminar', [AdminPrintConfigController::class, 'impresoraDelete']);
+$router->post('/admin/impresion/impresora/etiquetas', [AdminPrintConfigController::class, 'impresoraEtiquetasSet']);
 $router->get('/admin/impresion/spooler', [AdminPrintConfigController::class, 'spooler']);
 $router->get('/admin/impresion/cola', [AdminPrintConfigController::class, 'colaData']);
 $router->post('/admin/impresion/cola/ack', [AdminPrintConfigController::class, 'colaAck']);

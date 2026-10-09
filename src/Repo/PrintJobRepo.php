@@ -41,6 +41,7 @@ final class PrintJobRepo
                 'token' => 'ADD COLUMN token VARCHAR(64) NOT NULL',
                 'activo' => 'ADD COLUMN activo TINYINT(1) NOT NULL DEFAULT 1',
                 'formato' => "ADD COLUMN formato VARCHAR(10) NOT NULL DEFAULT '80mm'",
+                'etiquetas_default' => 'ADD COLUMN etiquetas_default TINYINT(1) NOT NULL DEFAULT 0',
                 'created_at' => 'ADD COLUMN created_at DATETIME DEFAULT NULL',
                 'updated_at' => 'ADD COLUMN updated_at DATETIME DEFAULT NULL',
             ];
@@ -121,6 +122,34 @@ final class PrintJobRepo
         $st = Db::pdo()->prepare('SELECT * FROM impresoras WHERE token = :t AND activo = 1 LIMIT 1');
         $st->execute([':t' => $token]);
         return $st->fetch() ?: null;
+    }
+
+    /** Impresora marcada como predeterminada para etiquetas de productos. */
+    public function impresoraEtiquetas(): ?array
+    {
+        self::ensureTables();
+        try {
+            $st = Db::pdo()->query('SELECT * FROM impresoras WHERE etiquetas_default = 1 ORDER BY id ASC LIMIT 1');
+            return $st->fetch() ?: null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /** Marca una impresora como la de etiquetas (solo puede haber una). */
+    public function marcarImpresoraEtiquetas(int $id): void
+    {
+        self::ensureTables();
+        Db::pdo()->exec('UPDATE impresoras SET etiquetas_default = 0');
+        Db::pdo()->prepare('UPDATE impresoras SET etiquetas_default = 1, updated_at = NOW() WHERE id = :id LIMIT 1')
+            ->execute([':id' => $id]);
+    }
+
+    public function desmarcarImpresoraEtiquetas(int $id): void
+    {
+        self::ensureTables();
+        Db::pdo()->prepare('UPDATE impresoras SET etiquetas_default = 0, updated_at = NOW() WHERE id = :id LIMIT 1')
+            ->execute([':id' => $id]);
     }
 
     public function guardarImpresora(?int $id, string $nombre, int $puntoVenta, ?int $sucursalId, int $activo, string $formato = '80mm'): int

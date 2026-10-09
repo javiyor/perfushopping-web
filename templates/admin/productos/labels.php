@@ -15,6 +15,7 @@ $priceGross = number_format((float)($product['precio'] ?? 0) * (1 + ((float)($pr
 $priceGrossWs = number_format((float)($product['precio1'] ?? 0) * (1 + ((float)($product['tiva'] ?? 0) / 100)), 0, ',', '.');
 $idprodu = (int)($product['idprodu'] ?? 0);
 $isPost = count($selectedVariants) > 0;
+$impresoraEtiquetas = $impresoraEtiquetas ?? null;
 ?>
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Etiquetas - <?= htmlspecialchars(mb_substr($productName, 0, 30)) ?></title>
@@ -62,6 +63,14 @@ body { font-family:Arial,Helvetica,sans-serif; width:80mm; }
 <!-- Formulario de selección -->
 <div class="selection-form">
     <h4>Seleccionar variedades e indicar cantidades</h4>
+    <?php if ($impresoraEtiquetas): ?>
+    <div class="alert alert-info py-2 small" style="margin-bottom:12px">
+        <i class="bi bi-printer"></i>
+        Impresora de etiquetas: <strong><?= htmlspecialchars((string)($impresoraEtiquetas['nombre'] ?? '')) ?></strong>
+        (<?= htmlspecialchars((string)(($impresoraEtiquetas['formato'] ?? '') ?: '80mm')) ?>)
+        · <a href="/admin/impresion/impresoras">Cambiar</a>
+    </div>
+    <?php endif; ?>
     <form method="post" action="/admin/productos/etiquetas/<?= $idprodu ?>">
         <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
         <?php foreach ($variants as $v): 
@@ -85,7 +94,16 @@ body { font-family:Arial,Helvetica,sans-serif; width:80mm; }
             </label>
         </div>
         <?php endforeach; ?>
-        <button type="submit" class="btn btn-accent btn-print"><i class="bi bi-print"></i> Generar e imprimir etiquetas</button>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
+            <label style="font-size:13px;margin-right:8px">DPI:
+                <select name="dpi" style="width:70px">
+                    <option value="203">203</option>
+                    <option value="300">300</option>
+                </select>
+            </label>
+            <button type="submit" class="btn btn-accent btn-print"><i class="bi bi-print"></i> Generar e imprimir etiquetas</button>
+            <button type="submit" formaction="/admin/productos/etiquetas/epl/<?= $idprodu ?>" class="btn btn-outline-secondary btn-print"><i class="bi bi-file-earmark-arrow-down"></i> Descargar EPL (Honeywell PC42t)</button>
+        </div>
     </form>
 </div>
 <?php else: ?>

@@ -1,7 +1,13 @@
 <?php
 $list = $list ?? [];
 $sucursales = $sucursales ?? [];
+$flash = $flash ?? null;
 ?>
+<?php if ($flash): ?>
+<div class="alert alert-<?= ($flash['type'] ?? '') === 'ok' ? 'success' : 'danger' ?> py-2">
+    <?= htmlspecialchars((string)($flash['text'] ?? '')) ?>
+</div>
+<?php endif; ?>
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
         <h4 class="fw-bold mb-1">Impresoras de tickets</h4>
@@ -24,12 +30,13 @@ $sucursales = $sucursales ?? [];
                     <th>Formato</th>
                     <th>Token (agente local)</th>
                     <th>Activa</th>
+                    <th title="Predeterminada para etiquetas de productos">Etiquetas</th>
                     <th style="width:130px"></th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (!$list): ?>
-                <tr><td colspan="7" class="text-center text-muted py-4">No hay impresoras. Agregá una por cada punto de venta.</td></tr>
+                <tr><td colspan="8" class="text-center text-muted py-4">No hay impresoras. Agregá una por cada punto de venta.</td></tr>
                 <?php else: ?>
                     <?php foreach ($list as $imp): ?>
                     <tr>
@@ -43,6 +50,22 @@ $sucursales = $sucursales ?? [];
                                 <span class="badge bg-success">Sí</span>
                             <?php else: ?>
                                 <span class="badge bg-secondary">No</span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if (!empty($imp['etiquetas_default'])): ?>
+                                <form method="post" action="/admin/impresion/impresora/etiquetas" class="d-inline">
+                                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                                    <input type="hidden" name="id" value="<?= (int)$imp['id'] ?>" />
+                                    <input type="hidden" name="quitar" value="1" />
+                                    <button type="submit" class="btn btn-sm badge text-bg-warning border-0" title="Quitar como impresora de etiquetas"><i class="bi bi-star-fill"></i> Predet.</button>
+                                </form>
+                            <?php else: ?>
+                                <form method="post" action="/admin/impresion/impresora/etiquetas" class="d-inline">
+                                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                                    <input type="hidden" name="id" value="<?= (int)$imp['id'] ?>" />
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary" title="Marcar como impresora de etiquetas de productos"><i class="bi bi-star"></i></button>
+                                </form>
                             <?php endif; ?>
                         </td>
                         <td>

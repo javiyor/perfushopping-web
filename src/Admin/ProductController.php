@@ -13,6 +13,7 @@ use Perfushopping\Web\Repo\Marketing\VideoRepo;
 use Perfushopping\Web\Service\AdminAuthService;
 use Perfushopping\Web\Service\AiProductDescriptionService;
 use Perfushopping\Web\Service\AiTaggingService;
+use Perfushopping\Web\Support\Barcode;
 use Perfushopping\Web\Support\Csrf;
 use Perfushopping\Web\Support\Format;
 use Perfushopping\Web\Support\Response;
@@ -640,6 +641,13 @@ public function saveVariantLogistics(array $params): void
             });
         }
 
+        $impresoraEtiquetas = null;
+        try {
+            $impresoraEtiquetas = (new \Perfushopping\Web\Repo\PrintJobRepo())->impresoraEtiquetas();
+        } catch (\Throwable $e) {
+            $impresoraEtiquetas = null;
+        }
+
         echo View::render('admin/productos/labels.php', [
             'product' => $product,
             'variants' => $variants,
@@ -648,7 +656,122 @@ public function saveVariantLogistics(array $params): void
             'showVariant' => ($_GET['variedad'] ?? '1') === '1',
             'quantities' => $quantities,
             'selectedVariants' => $selectedVariants,
+            'impresoraEtiquetas' => $impresoraEtiquetas,
         ]);
+    }
+
+    /**
+     * Descarga las etiquetas como archivo EPL (Eltron/Honeywell) para
+     * impresoras térmicas tipo PC42t que no rasterizan HTML del navegador.
+     * Stock: 80mm, 2 columnas de 38x25mm con 1mm de separación.
+     */
+    public function etiquetasEpl(array $params): void
+    {
+        $this->auth->requirePermiso('productos');
+        $id = (int)($params['id'] ?? 0);
+
+        $product = $this->repo->find($id);
+        if (!$product) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Producto no encontrado.'];
+            Response::redirect('/admin/productos');
+        }
+
+        $selectedVariants = array_map('intval', (array)($_POST['variants'] ?? []));
+        $quantities = (array)($_POST['qty'] ?? []);
+        $dpi = ((int)($_POST['dpi'] ?? 203)) === 300 ? 300 : 203;
+
+        $variants = array_values(array_filter($this->repo->variants($id), function ($v) use ($selectedVariants) {
+            return in_array((int)($v['idcodgusto'] ?? 0), $selectedVariants, true);
+        }));
+        if (!$variants) {
+            $_SESSION['admin_flash'] = ['type' => 'warning', 'text' => 'Seleccioná al menos una variedad.'];
+            Response::redirect('/admin/productos/etiquetas/' . $id);
+        }
+
+        $epl = $this->buildEpl($product, $variants, $quantities, $dpi);
+        header('Content-Type: text/plain; charset=us-ascii');
+        header('Content-Disposition: attachment; filename="etiquetas-' . $id . '.epl"');
+        header('Content-Length: ' . strlen($epl));
+        echo $epl;
+        exit;
+    }
+
+    private function buildEpl(array $product, array $variants, array $quantities, int $dpi): string
+    {
+        $dpm = $dpi / 25.4;
+        $labelW = (int)round(38 * $dpm);
+        $labelH = (int)round(25 * $dpm);
+        $gap = (int)round(1 * $dpm);
+        $pageW = (int)round(80 * $dpm);
+        $pitch = $labelH + $gap;
+        $marginX = (int)round(1.5 * $dpm);
+        $marginY = (int)round(1 * $dpm);
+
+        $fontSmall = $dpi === 300 ? 3 : 2;
+        $fontBig = $dpi === 300 ? 4 : 3;
+        $lhSmall = $dpi === 300 ? 15 : 12;
+        $lhBig = $dpi === 300 ? 20 : 15;
+        $narrow = $dpi === 300 ? 3 : 2;
+
+        $tiva = (float)($product['tiva'] ?? 0);
+        $price = '$' . number_format((float)($product['precio'] ?? 0) * (1 + $tiva / 100), 0, ',', '.');
+        $priceWs = 'May $' . number_format((float)($product['precio1'] ?? 0) * (1 + $tiva / 100), 0, ',', '.');
+        $idprodu = (int)($product['idprodu'] ?? 0);
+        $nameLines = str_split($this->eplText((string)($product['produ'] ?? '')), $dpi === 300 ? 26 : 36);
+
+        $labels = [];
+        foreach ($variants as $v) {
+            $vid = (int)($v['idcodgusto'] ?? 0);
+            $qty = max(1, (int)($quantities[$vid] ?? 1));
+            $codscan = trim((string)($v['codscan'] ?? ''));
+            $ean = ($codscan !== '' && strlen($codscan) === 13 && ctype_digit($codscan))
+                ? $codscan
+                : Barcode::ean13($vid);
+            $nomgusto = trim((string)($v['nomgusto'] ?? ''));
+            $sub = '#' . $idprodu . ($nomgusto !== '' ? ' / ' . $this->eplText($nomgusto) : '');
+            for ($i = 0; $i < $qty; $i++) {
+                $labels[] = ['ean' => $ean, 'nameLines' => $nameLines, 'sub' => $sub];
+            }
+        }
+        if (!$labels) {
+            return "N\n";
+        }
+
+        $out = "N\nq{$pageW}\nQ{$pitch},0008\n";
+        foreach (array_chunk($labels, 2) as $row) {
+            $out .= "N\n";
+            foreach ($row as $col => $lb) {
+                $x = $marginX + $col * ($labelW + $gap);
+                $y = $marginY;
+                foreach ($lb['nameLines'] as $line) {
+                    if ($line === '') {
+                        continue;
+                    }
+                    $out .= 'A' . $x . ',' . $y . ',0,' . $fontSmall . ',1,1,N,"' . $line . "\"\n";
+                    $y += $lhSmall + 1;
+                }
+                $out .= 'A' . $x . ',' . $y . ',0,' . $fontSmall . ',1,1,N,"' . $lb['sub'] . "\"\n";
+                $y += $lhSmall + 3;
+                $out .= 'A' . $x . ',' . $y . ',0,' . $fontBig . ',1,1,N,"' . $price . "\"\n";
+                $out .= 'A' . $x . ',' . $y . ',' . (int)round($labelW * 0.52) . ',' . $fontSmall . ',1,1,N,"' . $priceWs . "\"\n";
+                $y += $lhBig + 4;
+                $barH = max((int)round(8 * $dpm), $labelH - $y - $lhSmall - 4);
+                if (strlen($lb['ean']) === 13 && ctype_digit($lb['ean'])) {
+                    $out .= 'B' . $x . ',' . $y . ',0,' . $barH . ',7,' . $narrow . ',5,N,"' . substr($lb['ean'], 0, 12) . "\"\n";
+                } else {
+                    $out .= 'B' . $x . ',' . $y . ',0,' . $barH . ',5,' . $narrow . ',3,N,"' . $lb['ean'] . "\"\n";
+                }
+            }
+            $out .= "P1\n";
+        }
+        return $out;
+    }
+
+    private function eplText(string $s): string
+    {
+        $s = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $s) ?: '';
+        $s = str_replace(['"', "\n", "\r"], ["'", ' ', ''], $s);
+        return (string)preg_replace('/[^ -~]/', '', $s);
     }
 
     public function createVariant(array $params): void
