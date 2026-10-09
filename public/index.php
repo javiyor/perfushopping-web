@@ -503,6 +503,7 @@ $router->post('/admin/caja/cierre/guardar', [AdminCajaController::class, 'cierre
 $router->get('/admin/caja/cierre/imprimir', [AdminCajaController::class, 'cierrePrint']);
 $router->get('/admin/caja/general', [AdminCajaController::class, 'general']);
 $router->post('/admin/caja/general/guardar', [AdminCajaController::class, 'storeGeneralMovimiento']);
+$router->post('/admin/caja/general/transferir', [AdminCajaController::class, 'storeTransferencia']);
 $router->post('/admin/caja/general/controlar', [AdminCajaController::class, 'controlarMovimiento']);
 $router->post('/admin/caja/cierre/controlar', [AdminCajaController::class, 'controlarCierre']);
 $router->get('/admin/caja/apertura/ajuste', [AdminCajaController::class, 'solicitarAjusteForm']);

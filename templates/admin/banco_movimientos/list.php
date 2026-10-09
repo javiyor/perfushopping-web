@@ -88,7 +88,7 @@
 <?php endif; ?>
 
 <?php
-$origenLabels = ['factura' => 'Factura', 'gasto' => 'Gasto', 'deposito' => 'Depósito'];
+$origenLabels = ['factura' => 'Factura', 'gasto' => 'Gasto', 'deposito' => 'Depósito', 'retiro' => 'Retiro'];
 ?>
 <div class="card shadow-sm">
     <div class="card-header bg-white fw-semibold">Detalle de movimientos (máx. 500)</div>

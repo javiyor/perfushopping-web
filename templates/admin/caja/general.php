@@ -84,15 +84,16 @@ $q = (string)($q ?? '');
                     <th class="text-end">Ingr. efectivo</th>
                     <th class="text-end">Ingr. tarjeta</th>
                     <th class="text-end">Ingr. transferencia</th>
-                    <th class="text-end">Total</th>
-                    <th class="text-end">Pasaje a Caja Gral</th>
-                    <th>Control</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php if (!$cierres): ?>
-                    <tr><td colspan="9" class="text-muted text-center">Sin cierres de caja en el período</td></tr>
+                        <th class="text-end">Total</th>
+                        <th class="text-end">Pasaje a Caja Gral</th>
+                        <th class="text-end">Dif.</th>
+                        <th>Control</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (!$cierres): ?>
+                        <tr><td colspan="10" class="text-muted text-center">Sin cierres de caja en el período</td></tr>
                 <?php else: ?>
                     <?php foreach ($cierres as $c): ?>
                         <?php $rs = $c['resumen'] ?? ['efectivo' => 0, 'tarjeta' => 0, 'transferencia' => 0, 'total' => 0]; ?>
@@ -105,6 +106,7 @@ $q = (string)($q ?? '');
                             <td class="text-end text-success"><?= Format::moneyFromCents((int)$rs['transferencia']) ?></td>
                             <td class="text-end fw-bold"><?= Format::moneyFromCents((int)$rs['total']) ?></td>
                             <td class="text-end <?= (int)($c['monto_retirado_cents'] ?? 0) > 0 ? 'fw-bold text-warning' : 'text-muted' ?>"><?= Format::moneyFromCents((int)($c['monto_retirado_cents'] ?? 0)) ?></td>
+                            <td class="text-end"><?= (!empty($c['con_diferencia']) || (int)($c['diferencia_cents'] ?? 0) !== 0) ? '<span class="badge bg-warning text-dark">con dif ' . Format::moneyFromCents((int)($c['diferencia_cents'] ?? 0)) . '</span>' : '<span class="text-muted">—</span>' ?></td>
                             <td>
                                 <?php if (!empty($c['controlado_por'])): ?>
                                     <span class="badge bg-success"><i class="bi bi-check-lg"></i> OK</span>
@@ -200,6 +202,49 @@ $q = (string)($q ?? '');
             </div>
         </div>
 
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-white fw-semibold">Transferencia banco ↔ caja</div>
+            <div class="card-body">
+                <form method="post" action="/admin/caja/general/transferir">
+                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Dirección</label>
+                        <select class="form-select" name="direccion" required>
+                            <option value="caja_a_banco">Caja general → Banco</option>
+                            <option value="banco_a_caja">Banco → Caja general</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Cuenta bancaria</label>
+                        <select class="form-select" name="banco_cuenta_id" required>
+                            <option value="">— Seleccionar —</option>
+                            <?php foreach (($bancos ?? []) as $b): ?>
+                                <option value="<?= (int)($b['id'] ?? 0) ?>"><?= htmlspecialchars((string)(($b['banco'] ?? '') . ' ' . ($b['numero_cuenta'] ?? ''))) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Concepto</label>
+                        <input class="form-control" name="concepto" placeholder="Ej: Depósito de caja general..." />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Monto</label>
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            <input class="form-control" name="monto_cents" type="number" required min="0.01" step="0.01" />
+                        </div>
+                        <div class="form-text">En pesos (ej: 200 = $200,00). Valida fondos en ambos sentidos.</div>
+                    </div>
+
+                    <button class="btn btn-accent" type="submit"><i class="bi bi-arrow-left-right"></i> Transferir</button>
+                </form>
+            </div>
+        </div>
+
         <div class="card shadow-sm">
             <div class="card-header bg-white fw-semibold">Filtros</div>
             <div class="card-body">
@@ -255,7 +300,7 @@ $q = (string)($q ?? '');
                             <tr><td colspan="7" class="text-muted text-center">Sin movimientos</td></tr>
                         <?php else: ?>
                             <?php foreach ($movimientos as $m): ?>
-                                <?php $origenLabels = ['cierre_caja'=>'Cierre caja','directo'=>'Directo','gasto'=>'Gasto','deposito_banco'=>'Depósito banco','envio'=>'Envío']; ?>
+                                <?php $origenLabels = ['cierre_caja'=>'Cierre caja','directo'=>'Directo','gasto'=>'Gasto','deposito_banco'=>'Depósito banco','retiro_banco'=>'Retiro banco','envio'=>'Envío']; ?>
                                 <tr>
                                     <td class="small"><?= date('d/m/Y H:i', strtotime($m['created_at'] ?? '')) ?></td>
                                     <td><span class="badge bg-<?= $m['tipo'] === 'ingreso' ? 'success' : 'danger' ?>"><?= htmlspecialchars($m['tipo']) ?></span></td>

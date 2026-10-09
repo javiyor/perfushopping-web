@@ -322,6 +322,13 @@ $sucursalId = $auth->getSucursalId();
         // Gastos pagados con caja general discriminados por forma de pago
         $gastosPorForma = (new \Perfushopping\Web\Repo\GastoRepo())->totalesCajaGeneralPorForma($desde ?: null, $hasta ?: null);
 
+        $bancos = [];
+        try {
+            $bancos = (new \Perfushopping\Web\Repo\BancoCuentaRepo())->findAll();
+        } catch (\Throwable $e) {
+            $bancos = [];
+        }
+
         echo View::adminPage('admin/caja/general.php', [
             'adminUser' => $adminUser,
             'movimientos' => $movimientos,
@@ -329,6 +336,7 @@ $sucursalId = $auth->getSucursalId();
             'totalesControl' => $totalesControl,
             'cierres' => $cierres,
             'gastosPorForma' => $gastosPorForma,
+            'bancos' => $bancos,
             'saldo' => $saldo,
             'tipo' => $tipo,
             'desde' => $desde,
@@ -358,6 +366,50 @@ $sucursalId = $auth->getSucursalId();
         $repo->agregarMovimientoGeneral($tipo, 'directo', null, $concepto, $monto, (int)$adminUser['id']);
 
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Movimiento registrado en Caja General.'];
+        Response::redirect('/admin/caja/general');
+    }
+
+    public function storeTransferencia(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requireRol('superadmin');
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $direccion = (string)($_POST['direccion'] ?? '');
+        $bancoCuentaId = (int)($_POST['banco_cuenta_id'] ?? 0);
+        $monto = self::pesosACents($_POST['monto_cents'] ?? 0);
+        $concepto = trim((string)($_POST['concepto'] ?? ''));
+        if ($concepto === '') {
+            $concepto = $direccion === 'banco_a_caja' ? 'Retiro de banco a caja general' : 'Depósito de caja general a banco';
+        }
+
+        if (!in_array($direccion, ['caja_a_banco', 'banco_a_caja'], true) || $bancoCuentaId <= 0 || $monto <= 0) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Completá dirección, banco y monto.'];
+            Response::redirect('/admin/caja/general');
+        }
+
+        $cajaRepo = new CajaRepo();
+        $bancoRepo = new \Perfushopping\Web\Repo\BancoMovimientoRepo();
+        $fecha = date('Y-m-d');
+        $uid = (int)$adminUser['id'];
+
+        if ($direccion === 'caja_a_banco') {
+            if ($monto > $cajaRepo->saldoGeneral()) {
+                $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Fondos insuficientes en Caja General: $' . number_format($cajaRepo->saldoGeneral() / 100, 2, ',', '.') . '.'];
+                Response::redirect('/admin/caja/general');
+            }
+            $cajaRepo->agregarMovimientoGeneral('egreso', 'deposito_banco', null, $concepto, $monto, $uid);
+            $bancoRepo->create($bancoCuentaId, 'credito', 'deposito', null, $concepto, $monto, $fecha, $uid);
+        } else {
+            if ($monto > $bancoRepo->saldo($bancoCuentaId)) {
+                $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Fondos insuficientes en la cuenta bancaria: $' . number_format($bancoRepo->saldo($bancoCuentaId) / 100, 2, ',', '.') . '.'];
+                Response::redirect('/admin/caja/general');
+            }
+            $bancoRepo->create($bancoCuentaId, 'debito', 'retiro', null, $concepto, $monto, $fecha, $uid);
+            $cajaRepo->agregarMovimientoGeneral('ingreso', 'retiro_banco', null, $concepto, $monto, $uid);
+        }
+
+        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Transferencia registrada (caja ↔ banco).'];
         Response::redirect('/admin/caja/general');
     }
 
@@ -569,7 +621,7 @@ $sucursalId = $auth->getSucursalId();
             Response::redirect('/admin/caja/cierre');
         }
 
-        $repo->cerrar($apId, $montoCierre, (int)$adminUser['id'], $montoRetirado, $proximaApertura);
+        $repo->cerrar($apId, $montoCierre, (int)$adminUser['id'], $montoRetirado, $proximaApertura, $montoCierre - $efectivoDisponible);
 
         // El conteo de billetes del cierre queda guardado como arqueo (conteo único).
         $detalleCierre = trim((string)($_POST['detalle_efectivo'] ?? ''));
@@ -609,6 +661,11 @@ $sucursalId = $auth->getSucursalId();
         unset($_SESSION['admin_caja_id']);
 
         $msg = 'Caja cerrada. Monto final: $' . number_format($montoCierre / 100, 2, ',', '.');
+        $diferencia = $montoCierre - $efectivoDisponible;
+        if ($diferencia !== 0) {
+            $msg .= ' | Diferencia: ' . ($diferencia < 0 ? '−' : '+') . '$' . number_format(abs($diferencia) / 100, 2, ',', '.')
+                . ' (' . ($diferencia < 0 ? 'faltante' : 'sobrante') . ', marcada con dif).';
+        }
         if ($montoRetirado > 0) {
             $msg .= ' | Pasaje a Caja General (efectivo): $' . number_format($montoRetirado / 100, 2, ',', '.');
         }
@@ -814,6 +871,8 @@ $sucursalId = $auth->getSucursalId();
             'montoCierre' => (int)($apertura['monto_cierre_cents'] ?? 0),
             'montoRetirado' => (int)($apertura['monto_retirado_cents'] ?? 0),
             'proximaApertura' => (int)($apertura['monto_proxima_apertura_cents'] ?? 0),
+            'diferencia' => (int)($apertura['diferencia_cents'] ?? 0),
+            'conDiferencia' => !empty($apertura['con_diferencia']),
         ]);
     }
 

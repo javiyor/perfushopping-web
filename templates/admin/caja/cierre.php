@@ -73,11 +73,13 @@ $esperadoEfectivo = (int)($esperadoEfectivo ?? 0);
 
                     <div class="mb-3">
                         <label class="form-label small fw-semibold">Monto final de cierre</label>
+                        <input type="hidden" id="esperadoEfectivo" value="<?= (float)($esperadoEfectivo / 100) ?>" />
                         <div class="input-group">
                             <span class="input-group-text">$</span>
                             <input class="form-control" name="monto_cierre_cents" id="montoCierre" type="number" value="<?= (int)round($esperadoEfectivo / 100) ?>" min="0" step="0.01" />
                         </div>
                         <div class="form-text">Efectivo físico contado al cierre, en pesos. Se completa solo con el detalle.</div>
+                        <div id="difAlerta" class="mt-1" style="display:none"></div>
                     </div>
 
                     <div class="mb-3">
@@ -110,7 +112,7 @@ $esperadoEfectivo = (int)($esperadoEfectivo ?? 0);
                         El conteo de arriba queda guardado como arqueo del cierre. Al cerrar se finaliza el registro y no se podrán agregar más movimientos.
                     </div>
 
-                    <button class="btn btn-warning w-100" type="submit" onclick="return confirm('¿Confirmar el cierre de caja? Verificá los montos antes de continuar.')"><i class="bi bi-stop-fill"></i> Cerrar caja</button>
+                    <button class="btn btn-warning w-100" type="submit" onclick="return confirmarCierre()"><i class="bi bi-stop-fill"></i> Cerrar caja</button>
 
 <script>
 const DENOMINACIONES_SUGERIDAS = [20000, 10000, 5000, 2000, 1000, 500, 200, 100];
@@ -218,8 +220,44 @@ function calcQueda() {
     if (proximaEl && document.activeElement !== proximaEl) {
         proximaEl.value = (Math.max(0, queda) / 100).toFixed(2);
     }
+    mostrarDiferencia(cierre);
 }
 calcQueda();
+
+function diferenciaCierre() {
+    const cierre = Math.round((parseFloat(document.getElementById('montoCierre').value) || 0) * 100);
+    const esperadoEl = document.getElementById('esperadoEfectivo');
+    const esperado = Math.round((parseFloat(esperadoEl ? esperadoEl.value : 0) || 0) * 100);
+    return cierre - esperado;
+}
+function mostrarDiferencia(cierre) {
+    const box = document.getElementById('difAlerta');
+    if (!box) return;
+    const esperadoEl = document.getElementById('esperadoEfectivo');
+    const esperado = Math.round((parseFloat(esperadoEl ? esperadoEl.value : 0) || 0) * 100);
+    const dif = (typeof cierre === 'number' ? cierre : Math.round((parseFloat(document.getElementById('montoCierre').value) || 0) * 100)) - esperado;
+    if (dif === 0) {
+        box.style.display = 'none';
+        box.innerHTML = '';
+        return;
+    }
+    const monto = '$' + (Math.abs(dif) / 100).toLocaleString('es-AR', {minimumFractionDigits: 2});
+    const sobra = dif > 0;
+    box.style.display = '';
+    box.innerHTML = '<div class="alert ' + (sobra ? 'alert-success' : 'alert-danger') + ' small py-2 mb-0">'
+        + '<i class="bi bi-exclamation-triangle"></i> Diferencia: <strong>' + (sobra ? '+' : '−') + monto
+        + ' (' + (sobra ? 'sobrante' : 'faltante') + ')</strong>. Se puede cerrar igual y la caja queda marcada <strong>con dif</strong>.</div>';
+}
+function fmtDiferencia(dif) {
+    return (dif < 0 ? '−' : '+') + '$' + (Math.abs(dif) / 100).toLocaleString('es-AR', {minimumFractionDigits: 2 });
+}
+function confirmarCierre() {
+    const dif = diferenciaCierre();
+    if (dif === 0) {
+        return confirm('¿Confirmar el cierre de caja? Verificá los montos antes de continuar.');
+    }
+    return confirm('ATENCIÓN: hay diferencia de ' + fmtDiferencia(dif) + ' (' + (dif < 0 ? 'faltante' : 'sobrante') + ') vs el esperado. ¿Cerrar igual y marcar la caja con dif?');
+}
 
 // Evita que el auto-update recargue la página mientras se cuentan billetes.
 window.__conteoEnProceso = function() {

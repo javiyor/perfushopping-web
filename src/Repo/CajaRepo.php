@@ -40,18 +40,24 @@ final class CajaRepo
         return (int)Db::pdo()->lastInsertId();
     }
 
-    public function cerrar(int $id, int $montoCierreCents, int $cerradaPor, int $montoRetiradoCents = 0, int $proximaAperturaCents = 0): void
+    public function cerrar(int $id, int $montoCierreCents, int $cerradaPor, int $montoRetiradoCents = 0, int $proximaAperturaCents = 0, int $diferenciaCents = 0): void
     {
         $this->ensureCajaColumnas();
         $retSql = '';
+        $difSql = '';
         $params = [':mon' => $montoCierreCents, ':cp' => $cerradaPor, ':i' => $id];
         if ($this->aperturasTieneMontoRetirado()) {
             $retSql = ', monto_retirado_cents = :ret';
             $params[':ret'] = $montoRetiradoCents;
         }
+        if ($this->aperturasTieneDiferencia()) {
+            $difSql = ', diferencia_cents = :dif, con_diferencia = :condif';
+            $params[':dif'] = $diferenciaCents;
+            $params[':condif'] = $diferenciaCents !== 0 ? 1 : 0;
+        }
         try {
             $st = Db::pdo()->prepare("
-                UPDATE caja_aperturas SET estado = 'cerrada', monto_cierre_cents = :mon{$retSql}, monto_proxima_apertura_cents = :prox, cerrada_por = :cp, updated_at = NOW()
+                UPDATE caja_aperturas SET estado = 'cerrada', monto_cierre_cents = :mon{$retSql}{$difSql}, monto_proxima_apertura_cents = :prox, cerrada_por = :cp, updated_at = NOW()
                 WHERE id = :i LIMIT 1
             ");
             $params[':prox'] = $proximaAperturaCents;
@@ -59,7 +65,7 @@ final class CajaRepo
         } catch (\Throwable $e) {
             unset($params[':prox']);
             $st = Db::pdo()->prepare("
-                UPDATE caja_aperturas SET estado = 'cerrada', monto_cierre_cents = :mon{$retSql}, cerrada_por = :cp, updated_at = NOW()
+                UPDATE caja_aperturas SET estado = 'cerrada', monto_cierre_cents = :mon{$retSql}{$difSql}, cerrada_por = :cp, updated_at = NOW()
                 WHERE id = :i LIMIT 1
             ");
             $st->execute($params);
@@ -331,6 +337,20 @@ final class CajaRepo
             }
         }
         return in_array('monto_retirado_cents', self::$aperturasColumns, true);
+    }
+
+    private function aperturasTieneDiferencia(): bool
+    {
+        if (self::$aperturasColumns === null) {
+            try {
+                $st = Db::pdo()->query('SHOW COLUMNS FROM caja_aperturas');
+                self::$aperturasColumns = array_column($st->fetchAll(), 'Field');
+            } catch (\Throwable $e) {
+                self::$aperturasColumns = [];
+            }
+        }
+        return in_array('diferencia_cents', self::$aperturasColumns, true)
+            && in_array('con_diferencia', self::$aperturasColumns, true);
     }
 
     public function arqueos(int $cajaId): array
@@ -870,6 +890,12 @@ final class CajaRepo
             }
             if (!in_array('monto_retirado_cents', $fields, true)) {
                 Db::pdo()->exec('ALTER TABLE caja_aperturas ADD COLUMN monto_retirado_cents INT NOT NULL DEFAULT 0 AFTER monto_cierre_cents');
+            }
+            if (!in_array('diferencia_cents', $fields, true)) {
+                Db::pdo()->exec('ALTER TABLE caja_aperturas ADD COLUMN diferencia_cents INT NOT NULL DEFAULT 0 AFTER monto_cierre_cents');
+            }
+            if (!in_array('con_diferencia', $fields, true)) {
+                Db::pdo()->exec('ALTER TABLE caja_aperturas ADD COLUMN con_diferencia TINYINT(1) NOT NULL DEFAULT 0 AFTER diferencia_cents');
             }
         } catch (\Throwable $e) {
             error_log('CajaRepo::ensureCajaColumnas aperturas error: ' . $e->getMessage());

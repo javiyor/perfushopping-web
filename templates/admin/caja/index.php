@@ -84,10 +84,11 @@ if (!$cajasCerradas && $historial) {
                 <tr>
                     <th>Fecha</th>
                     <th>Turno</th>
-                    <th class="text-end">Apertura</th>
-                    <th class="text-end">Cierre</th>
-                    <th class="text-end">Retirado</th>
-                    <th>Estado</th>
+                        <th class="text-end">Apertura</th>
+                        <th class="text-end">Cierre</th>
+                        <th class="text-end">Retirado</th>
+                        <th class="text-end">Dif.</th>
+                        <th>Estado</th>
                     <th style="width:50px"></th>
                 </tr>
             </thead>
@@ -99,6 +100,7 @@ if (!$cajasCerradas && $historial) {
                         <td class="text-end small"><?= Format::moneyFromCents((int)($h['monto_inicial_cents'] ?? 0)) ?></td>
                         <td class="text-end small"><?= Format::moneyFromCents((int)($h['monto_cierre_cents'] ?? 0)) ?></td>
                         <td class="text-end small"><?= Format::moneyFromCents((int)($h['monto_retirado_cents'] ?? 0)) ?></td>
+                        <td class="text-end small"><?= (!empty($h['con_diferencia']) || (int)($h['diferencia_cents'] ?? 0) !== 0) ? '<span class="badge bg-warning text-dark">con dif ' . Format::moneyFromCents((int)($h['diferencia_cents'] ?? 0)) . '</span>' : '<span class="text-muted">—</span>' ?></td>
                         <td><span class="badge bg-secondary"><?= htmlspecialchars($h['estado'] ?? '') ?></span></td>
                         <td>
                             <a class="btn btn-sm btn-outline-primary py-0 px-1" title="Imprimir resumen de cierre" href="/admin/caja/cierre/imprimir?id=<?= (int)$h['id'] ?>" target="_blank"><i class="bi bi-printer"></i></a>

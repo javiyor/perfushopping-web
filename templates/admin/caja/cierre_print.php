@@ -87,6 +87,14 @@ $proximaApertura = (int)($proximaApertura ?? 0);
         <span class="value">$<?= Format::moneyRoundedFromCents($montoCierre) ?></span>
     </div>
 
+    <?php $difPrint = (int)($diferencia ?? 0); ?>
+    <?php if (!empty($conDiferencia) || $difPrint !== 0): ?>
+    <div class="section">
+        <span class="label">Diferencia (con dif)</span>
+        <span class="value">$<?= Format::moneyRoundedFromCents($difPrint) ?></span>
+    </div>
+    <?php endif; ?>
+
     <div class="section">
         <span class="label">Pje. a Caja Gral.</span>
         <span class="value">$<?= Format::moneyRoundedFromCents($montoRetirado) ?></span>
