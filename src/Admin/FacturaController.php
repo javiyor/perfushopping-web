@@ -534,8 +534,8 @@ final class FacturaController
             );
         }
 
-        // Auto-send to ARCA if enabled
-        $arca = $this->autoEnviarArca($id, $repo);
+        // Auto-send a ARCA: siempre si está habilitado; con tarjeta/MP aunque esté apagado.
+        $arca = $this->autoEnviarArca($id, $repo, $this->pagosRequierenArca($pagos));
         if (isset($arca['codigo'])) {
             $codigo = $arca['codigo'];
         }
@@ -749,6 +749,25 @@ final class FacturaController
         }));
     }
 
+    /** Tarjeta o MercadoPago: al facturar siempre intentan autorizar en ARCA. */
+    private function pagosRequierenArca(array $pagos): bool
+    {
+        foreach ($pagos as $pg) {
+            $fp = (string)($pg['forma_pago'] ?? '');
+            if ($fp === 'mercadopago') {
+                return true;
+            }
+            try {
+                if (\Perfushopping\Web\Repo\FormaPagoRepo::tipoDe($fp) === 'tarjeta') {
+                    return true;
+                }
+            } catch (\Throwable $e) {
+                // ignora: sin tabla de formas de pago no se puede clasificar
+            }
+        }
+        return false;
+    }
+
     /** Registra movimientos bancarios por cobros de transferencia/tarjeta. En NC invierte el sentido (débito). */
     private function registrarBancoMov(array $pagos, int $id, string $codigo, string $fecha, int $adminId, string $tipoComprobante = ''): void
     {
@@ -783,14 +802,15 @@ final class FacturaController
     }
 
     /**
-     * Envía la factura a ARCA (si está habilitado). Devuelve cae/codigo o error.
+     * Envía la factura a ARCA (si está habilitado, o si $forzar es true:
+     * tarjeta/MercadoPago siempre intentan autorizar). Devuelve cae/codigo o error.
      * @return array{cae?:string,codigo?:string,error?:string}
      */
-    private function autoEnviarArca(int $id, FacturaRepo $repo): array
+    private function autoEnviarArca(int $id, FacturaRepo $repo, bool $forzar = false): array
     {
         $out = [];
         $arcaRepo = new ArcaRepo();
-        if (!$arcaRepo->isHabilitado()) {
+        if (!$arcaRepo->isHabilitado() && !$forzar) {
             return $out;
         }
         $wsfe = new \Perfushopping\Web\Service\AfipWsfe();
@@ -1214,8 +1234,8 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
             }
         }
 
-        // Auto-send to ARCA if enabled
-        $arca = $this->autoEnviarArca($editarId, $repo);
+        // Auto-send a ARCA: siempre si está habilitado; con tarjeta/MP aunque esté apagado.
+        $arca = $this->autoEnviarArca($editarId, $repo, $this->pagosRequierenArca($pagos));
         if (isset($arca['codigo'])) {
             $codigo = $arca['codigo'];
         }
