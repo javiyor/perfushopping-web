@@ -36,11 +36,11 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
             font-family:<?= $isTicket ? "Verdana, Tahoma, Geneva, sans-serif" : 'Arial,Helvetica,sans-serif' ?>;
             font-size:<?= $bodyFontSize ?>; line-height:<?= $isTicket ? '1.5' : '1.4' ?>; color:#000;
             width:<?= $bodyWidth ?>; margin:0 auto;
-            <?php if ($isTicket): ?>-webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;<?php endif; ?>
+            <?php if ($isTicket): ?>-webkit-text-stroke:0.15px currentColor;<?php endif; ?>
         }
         h1 { font-size:<?= $formato === '58mm' ? '13px' : '16px' ?>; text-align:center; margin:0 0 4px; }
         .header { text-align:center; margin-bottom:10px; }
-        .header .logo { max-width:<?= $isTicket ? '100px' : '150px' ?>; margin-bottom:4px; }
+        .header .logo { <?= $isTicket ? 'width:80px; height:auto; image-rendering:-webkit-optimize-contrast;' : 'max-width:150px;' ?> margin-bottom:4px; }
         .header .razon { font-size:<?= $formato === 'a4' ? '18px' : '14px' ?>; font-weight:bold; }
         .header .data { font-size:<?= $formato === '58mm' ? '9px' : '11px' ?>; }
         hr { border:none; border-top:1px dashed #000; margin:6px 0; }
@@ -58,7 +58,7 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
         .totals { margin-top:6px; }
         .totals .row { display:flex; justify-content:space-between; padding:2px 0; }
         .totals .total { font-size:<?= $formato === '58mm' ? '13px' : '16px' ?>; font-weight:bold; border-top:2px solid #000; padding-top:4px; margin-top:4px; }
-        .footer { text-align:center; margin-top:12px; font-size:10px; color:#666; }
+        .footer { text-align:center; margin-top:12px; font-size:<?= $isTicket ? '11px' : '10px' ?>; color:<?= $isTicket ? '#000' : '#666' ?>; <?php if ($isTicket): ?>font-weight:600;<?php endif; ?> }
         .a4-layout { display:none; }
         <?php if ($formato === 'a4'): ?>
         body { width:210mm; }
@@ -70,7 +70,7 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
             html, body { margin:0; padding:0; }
             body { width:<?= $formato === '58mm' ? '48mm' : ($isTicket ? '72mm' : '100%') ?>; margin:0 auto; }
             <?php if ($isTicket): ?>
-            body { padding-left:3mm; }
+            body { padding:0 2mm; }
             .cut-space { display:block; height:10mm; }
             <?php endif; ?>
             .no-print { display:none; }
