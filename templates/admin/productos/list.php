@@ -27,6 +27,25 @@ $preserve['sort'] = $sort;
 $preserve['order'] = $order;
 $pageUrl = fn(array $extra) => '/admin/productos?' . http_build_query(array_merge($preserve, $extra));
 $sortLink = fn(string $col) => '/admin/productos?' . http_build_query(array_merge($preserve, ['sort' => $col, 'order' => ($sort === $col && $order === 'asc') ? 'desc' : 'asc']));
+$fecompraClass = static function (string $fcompra): string {
+    if (in_array($fcompra, ['', '0000-00-00', '0000-00-00 00:00:00'], true)) {
+        return 'text-muted';
+    }
+    try {
+        $d = new DateTime(substr($fcompra, 0, 10));
+        $today = new DateTime('today');
+        $days = (int)$today->diff($d)->format('%r%a');
+    } catch (\Throwable $e) {
+        return 'text-muted';
+    }
+    if ($days < -90) {
+        return 'text-danger fw-bold';
+    }
+    if ($days < -60) {
+        return 'text-warning fw-bold';
+    }
+    return 'text-success';
+};
 ?>
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
@@ -181,7 +200,7 @@ $sortLink = fn(string $col) => '/admin/productos?' . http_build_query(array_merg
                             <td class="small"><?= htmlspecialchars((string)($item['nomsub'] ?? '-')) ?></td>
                             <td class="small"><?= htmlspecialchars((string)($item['nomrub'] ?? '-')) ?></td>
                             <td class="text-end js-precio-cell"><?= htmlspecialchars(Format::moneyRoundedFromCents((int)round($itemGross * 100))) ?></td>
-                            <td class="small td-fecompra"><?php $fcompra = (string)($item['fecompra'] ?? ''); ?><?= htmlspecialchars(in_array($fcompra, ['', '0000-00-00'], true) ? '—' : $fcompra) ?></td>
+                            <td class="small td-fecompra"><?php $fcompra = (string)($item['fecompra'] ?? ''); ?><span class="<?= $fecompraClass($fcompra) ?>"><?= htmlspecialchars(in_array($fcompra, ['', '0000-00-00'], true) ? '—' : $fcompra) ?></span></td>
                             <td class="text-center"><?= (int)($item['variants_count'] ?? 0) ?></td>
                             <td class="text-center">
                                 <span class="badge <?= ((int)($item['enweb'] ?? 0) === 1) ? 'bg-success' : 'bg-secondary' ?>" style="font-size:10px"><?= ((int)($item['enweb'] ?? 0) === 1) ? 'ON' : 'OFF' ?></span>
@@ -252,6 +271,8 @@ $sortLink = fn(string $col) => '/admin/productos?' . http_build_query(array_merg
                                     <span class="desc-status small text-success" style="display:none">Guardado</span>
                                     <div class="d-flex justify-content-between mt-1 small">
                                         <span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)round($itemGross * 100))) ?></span>
+                                        <?php $cardFcompra = (string)($item['fecompra'] ?? ''); ?>
+                                        <span class="<?= $fecompraClass($cardFcompra) ?>">F.Comp: <?= htmlspecialchars(in_array($cardFcompra, ['', '0000-00-00'], true) ? '—' : $cardFcompra) ?></span>
                                         <span><?= (int)($item['variants_count'] ?? 0) ?> var.</span>
                                     </div>
                                 </div>
@@ -341,6 +362,16 @@ document.addEventListener('DOMContentLoaded', function () {
     function fmt(n) {
         var parts = (Math.round(n * 100) / 100).toFixed(2).split('.');
         return parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + (parts[1] || '00');
+    }
+
+    function fecompraListClass(fecha) {
+        if (!fecha || fecha === '0000-00-00') return 'text-muted';
+        var d = new Date(String(fecha).substring(0, 10) + 'T00:00:00');
+        if (isNaN(d.getTime())) return 'text-muted';
+        var days = Math.floor((Date.now() - d.getTime()) / 86400000);
+        if (days > 90) return 'text-danger fw-bold';
+        if (days > 60) return 'text-warning fw-bold';
+        return 'text-success';
     }
 
     function costoNeto() {
@@ -454,7 +485,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (cell) cell.textContent = '$' + new Intl.NumberFormat('es-AR', {maximumFractionDigits: 0}).format(Math.round(res.precio_gross));
                 if (res.fecompra) {
                     var fcell = tr.querySelector('.td-fecompra');
-                    if (fcell) fcell.textContent = res.fecompra;
+                    if (fcell) {
+                        fcell.innerHTML = '<span class="' + fecompraListClass(res.fecompra) + '">' + res.fecompra + '</span>';
+                    }
                 }
                 status.textContent = '✓ Guardado';
                 status.className = 'small fw-semibold q-status text-success';

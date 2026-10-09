@@ -605,6 +605,7 @@ function searchProd(q) {    fetch('/admin/facturas/buscar-productos?q=' + encode
                         unit_price_cents: priceCents,
                         precio1_cents: precio1Cents,
                         iva_rate: ivaRate,
+                        fecompra: p.fecompra || '',
                     });
                     prodResults.style.display = 'none';
                     prodInput.value = '';
@@ -641,6 +642,7 @@ function searchProd(q) {    fetch('/admin/facturas/buscar-productos?q=' + encode
                             unit_price_cents: priceCents,
                             precio1_cents: precio1Cents,
                             iva_rate: ivaRate,
+                            fecompra: p.fecompra || '',
                         });
                         prodResults.style.display = 'none';
                         prodInput.value = '';
@@ -686,6 +688,7 @@ function showVariantPicker(p, priceCents, precio1Cents, ivaRate) {
                 unit_price_cents: priceCents,
                 precio1_cents: precio1Cents,
                 iva_rate: ivaRate,
+                fecompra: p.fecompra || '',
             });
             prodResults.style.display = 'none';
             prodInput.value = '';
@@ -717,6 +720,7 @@ function addToCart(item) {
     const existing = cart.find(c => (c.idprodu + '-' + c.idcodgusto + '-' + lineDto(c.dto)) === key);
     if (existing) {
         existing.qty += item.qty || 1;
+        if (!existing.fecompra && item.fecompra) existing.fecompra = item.fecompra;
     } else {
         cart.push({
             idprodu: item.idprodu,
@@ -728,6 +732,7 @@ function addToCart(item) {
             precio1_cents: item.precio1_cents || 0,
             dto: dto,
             iva_rate: item.iva_rate || 21,
+            fecompra: item.fecompra || '',
         });
     }
     renderCart();
@@ -755,6 +760,7 @@ function renderCart() {
                 <div class="ci-name">
                     <div class="ci-prod">${esc(item.producto)}</div>
                     <div class="ci-var">${item.variedad ? esc(item.variedad) : '—'}</div>
+                    ${item.fecompra ? '<div style="font-size:10px">' + fecompraBadge(item.fecompra) + '</div>' : ''}
                 </div>
                 <div class="ci-qty"><input type="number" value="${item.qty}" min="1" onchange="updateQty(${idx}, this.value)" /></div>
                 <div class="ci-dto"><input type="number" value="${dto}" min="0" max="100" step="1" title="Descuento %" onchange="updateDto(${idx}, this.value)" /></div>
