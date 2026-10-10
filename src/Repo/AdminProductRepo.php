@@ -500,7 +500,7 @@ final class AdminProductRepo
         ";
     }
 
-    /** @return array{where: array<int,string>, params: array<string,mixed>, depSub: string} */
+    /** @return array{0: array<int,string>, 1: array<string,mixed>, 2: string} */
     private function etiquetasFiltros(string $q, int $codsub, int $codrub, string $fecDesde, string $fecHasta, ?int $iddepo, bool $conStock): array
     {
         $params = [];
@@ -532,7 +532,7 @@ final class AdminProductRepo
         if ($conStock) {
             $where[] = 'dep.stock > 0';
         }
-        return ['where' => $where, 'params' => $params, 'depSub' => $this->etiquetasStockSubquery($iddepo)];
+        return [$where, $params, $this->etiquetasStockSubquery($iddepo)];
     }
 
     /** @return array{items: array<int, array<string,mixed>>, total: int, page: int, perPage: int} */
