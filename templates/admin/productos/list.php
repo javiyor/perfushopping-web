@@ -56,6 +56,7 @@ $fecompraClass = static function (string $fcompra): string {
         <a class="btn btn-accent btn-sm" href="/admin/productos/nuevo"><i class="bi bi-plus-lg"></i> Nuevo</a>
         <a class="btn btn-outline-secondary btn-sm" href="/admin/productos/importar"><i class="bi bi-upload"></i> Importar</a>
         <a class="btn btn-outline-secondary btn-sm" href="/admin/productos/actualizar-precios"><i class="bi bi-percent"></i> Precios</a>
+        <a class="btn btn-outline-secondary btn-sm" href="/admin/productos/etiquetas-a4"><i class="bi bi-tags"></i> Etiquetas A4</a>
     </div>
 </div>
 

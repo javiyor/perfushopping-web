@@ -6,6 +6,7 @@ namespace Perfushopping\Web\Admin;
 use Perfushopping\Web\Repo\AdminProductRepo;
 use Perfushopping\Web\Repo\DepartamentoRepo;
 use Perfushopping\Web\Repo\ProveedorRepo;
+use Perfushopping\Web\Repo\StockRepo;
 use Perfushopping\Web\Repo\Marketing\FaqRepo;
 use Perfushopping\Web\Repo\Marketing\ProductContentRepo;
 use Perfushopping\Web\Repo\Marketing\TaxonomyRepo;
@@ -776,6 +777,90 @@ public function saveVariantLogistics(array $params): void
         $s = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $s) ?: '';
         $s = str_replace(['"', "\n", "\r"], ["'", ' ', ''], $s);
         return (string)preg_replace('/[^ -~]/', '', $s);
+    }
+
+    public function etiquetasA4(array $params): void
+    {
+        $adminUser = $this->auth->requirePermiso('productos');
+
+        $q = trim((string)($_GET['q'] ?? ''));
+        $codsub = (int)($_GET['codsub'] ?? 0);
+        $codrub = (int)($_GET['codrub'] ?? 0);
+        $fecDesde = trim((string)($_GET['fecdesde'] ?? ''));
+        $fecHasta = trim((string)($_GET['fechasta'] ?? ''));
+        $iddepo = (int)($_GET['iddepo'] ?? 0);
+        $conStock = ($_GET['stock'] ?? '1') === '1';
+        $page = max(1, (int)($_GET['page'] ?? 1));
+        $perPage = 50;
+
+        $result = $this->repo->etiquetasList($q, $codsub, $codrub, $fecDesde, $fecHasta, $iddepo ?: null, $conStock, $perPage, $page);
+
+        $depositos = array_values(array_filter(
+            (new StockRepo())->depositos(),
+            static fn ($d) => (int)($d['marca'] ?? 0) === 2
+        ));
+
+        echo View::adminPage('admin/productos/etiquetas-a4.php', [
+            'adminUser' => $adminUser,
+            'rows' => $result['items'],
+            'total' => $result['total'],
+            'page' => $result['page'],
+            'perPage' => $result['perPage'],
+            'q' => $q,
+            'codsub' => $codsub,
+            'codrub' => $codrub,
+            'fecDesde' => $fecDesde,
+            'fecHasta' => $fecHasta,
+            'iddepo' => $iddepo,
+            'conStock' => $conStock,
+            'brands' => $this->repo->brandOptions(),
+            'categories' => $this->repo->categoryOptions(),
+            'depositos' => $depositos,
+            'csrf' => Csrf::token(),
+            'pageTitle' => 'Etiquetas de precio A4',
+        ]);
+    }
+
+    public function etiquetasA4Imprimir(array $params): void
+    {
+        $this->auth->requirePermiso('productos');
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $sel = array_map('intval', (array)($_POST['sel'] ?? []));
+        $qty = (array)($_POST['qty'] ?? []);
+        if (!$sel) {
+            $_SESSION['admin_flash'] = ['type' => 'warning', 'text' => 'Tildá al menos una variedad para imprimir.'];
+            Response::redirect('/admin/productos/etiquetas-a4');
+        }
+
+        $rows = $this->repo->etiquetasPorIds($sel);
+        $labels = [];
+        foreach ($rows as $row) {
+            $idg = (int)($row['idcodgusto'] ?? 0);
+            if (!in_array($idg, $sel, true)) {
+                continue;
+            }
+            $n = max(1, min(999, (int)($qty[$idg] ?? 1)));
+            $codscan = preg_replace('/\D/', '', (string)($row['codscan'] ?? ''));
+            $precio = (float)($row['precio'] ?? 0) * (1 + (float)($row['tiva'] ?? 0) / 100);
+            for ($i = 0; $i < $n; $i++) {
+                $labels[] = [
+                    'idprodu' => (int)($row['idprodu'] ?? 0),
+                    'produ' => (string)($row['produ'] ?? ''),
+                    'nomgusto' => (string)($row['nomgusto'] ?? ''),
+                    'codscan' => $codscan,
+                    'precio' => $precio,
+                ];
+            }
+        }
+        if (!$labels) {
+            $_SESSION['admin_flash'] = ['type' => 'warning', 'text' => 'No hay etiquetas para imprimir.'];
+            Response::redirect('/admin/productos/etiquetas-a4');
+        }
+
+        echo View::render('admin/productos/etiquetas-a4-print.php', [
+            'labels' => $labels,
+        ]);
     }
 
     public function createVariant(array $params): void

@@ -467,4 +467,130 @@ final class AdminProductRepo
         $st->execute(array_map('intval', $ids));
         return $st->rowCount();
     }
+
+    // ── Etiquetas de precio A4 ──
+
+    /** Stock por variante en depósitos operativos (marca=2), una fila por variedad. */
+    private function etiquetasStockSubquery(?int $iddepo): string
+    {
+        $depFiltro = '';
+        if ($iddepo) {
+            $depFiltro = ' AND t.iddepo = ' . (int)$iddepo;
+        }
+        return "
+            LEFT JOIN (
+                SELECT t.idcodgusto, SUM(t.neto) AS stock
+                FROM (
+                    SELECT sd.idcodgusto, sc.iddepoh AS iddepo, SUM(sd.canti) AS neto
+                    FROM stockdet sd
+                    INNER JOIN stockcab sc ON sc.idcabstock = sd.idstockcab
+                    WHERE sc.iddepoh IS NOT NULL AND sd.idcodgusto > 0
+                    GROUP BY sd.idcodgusto, sc.iddepoh
+                    UNION ALL
+                    SELECT sd.idcodgusto, sc.iddepod AS iddepo, -SUM(sd.canti) AS neto
+                    FROM stockdet sd
+                    INNER JOIN stockcab sc ON sc.idcabstock = sd.idstockcab
+                    WHERE sc.iddepod IS NOT NULL AND sd.idcodgusto > 0
+                    GROUP BY sd.idcodgusto, sc.iddepod
+                ) t
+                INNER JOIN deposito d ON d.iddepo = t.iddepo AND d.marca = 2
+                WHERE t.neto > 0 {$depFiltro}
+                GROUP BY t.idcodgusto
+            ) dep ON dep.idcodgusto = g.idcodgusto
+        ";
+    }
+
+    /** @return array{where: array<int,string>, params: array<string,mixed>, depSub: string} */
+    private function etiquetasFiltros(string $q, int $codsub, int $codrub, string $fecDesde, string $fecHasta, ?int $iddepo, bool $conStock): array
+    {
+        $params = [];
+        $where = [];
+        $q = trim($q);
+        if ($q !== '') {
+            $where[] = '(p.produ LIKE :like1 OR p.codprodu LIKE :like2 OR g.nomgusto LIKE :like3 OR g.codscan LIKE :like4)';
+            $params[':like1'] = '%' . $q . '%';
+            $params[':like2'] = $q . '%';
+            $params[':like3'] = '%' . $q . '%';
+            $params[':like4'] = '%' . $q . '%';
+        }
+        if ($codsub > 0) {
+            $where[] = 'p.codsub = :codsub';
+            $params[':codsub'] = $codsub;
+        }
+        if ($codrub > 0) {
+            $where[] = 'p.codrub = :codrub';
+            $params[':codrub'] = $codrub;
+        }
+        if ($fecDesde !== '') {
+            $where[] = 'p.fecompra >= :fecdesde';
+            $params[':fecdesde'] = $fecDesde;
+        }
+        if ($fecHasta !== '') {
+            $where[] = 'p.fecompra < DATE_ADD(:fechasta, INTERVAL 1 DAY)';
+            $params[':fechasta'] = $fecHasta;
+        }
+        if ($conStock) {
+            $where[] = 'dep.stock > 0';
+        }
+        return ['where' => $where, 'params' => $params, 'depSub' => $this->etiquetasStockSubquery($iddepo)];
+    }
+
+    /** @return array{items: array<int, array<string,mixed>>, total: int, page: int, perPage: int} */
+    public function etiquetasList(string $q, int $codsub, int $codrub, string $fecDesde, string $fecHasta, ?int $iddepo, bool $conStock, int $perPage, int $page): array
+    {
+        $perPage = max(10, min(200, $perPage));
+        $page = max(1, $page);
+        $offset = ($page - 1) * $perPage;
+
+        [$where, $params, $depSub] = $this->etiquetasFiltros($q, $codsub, $codrub, $fecDesde, $fecHasta, $iddepo, $conStock);
+
+        $from = '
+            FROM producto p
+            INNER JOIN gustos g ON g.idprodu = p.idprodu AND g.discont = 0
+            LEFT JOIN rubros r ON r.codrub = p.codrub
+            LEFT JOIN subrubro s ON s.codsub = p.codsub
+            LEFT JOIN ivaprodu i ON i.codivaprodu = p.iva
+            ' . $depSub . '
+        ';
+        $whereClause = $where ? 'WHERE ' . implode(' AND ', $where) : '';
+
+        $stCount = Db::pdo()->prepare('SELECT COUNT(*) ' . $from . $whereClause);
+        $stCount->execute($params);
+        $total = (int)$stCount->fetchColumn();
+
+        $st = Db::pdo()->prepare('
+            SELECT p.idprodu, p.produ, p.precio, p.fecompra, i.tiva, r.nomrub, s.nomsub,
+                   g.idcodgusto, g.nomgusto, g.codscan,
+                   COALESCE(dep.stock, 0) AS stock_deposito
+            ' . $from . $whereClause . '
+            ORDER BY p.produ ASC, g.nomgusto ASC
+            LIMIT ' . $perPage . ' OFFSET ' . $offset
+        );
+        $st->execute($params);
+        return ['items' => $st->fetchAll(), 'total' => $total, 'page' => $page, 'perPage' => $perPage];
+    }
+
+    /** @param int[] $ids ids de variedad (idcodgusto)
+     *  @return array<int, array<string,mixed>> */
+    public function etiquetasPorIds(array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+        if (!$ids) {
+            return [];
+        }
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $st = Db::pdo()->prepare('
+            SELECT p.idprodu, p.produ, p.precio, i.tiva, r.nomrub, s.nomsub,
+                   g.idcodgusto, g.nomgusto, g.codscan
+            FROM gustos g
+            INNER JOIN producto p ON p.idprodu = g.idprodu
+            LEFT JOIN rubros r ON r.codrub = p.codrub
+            LEFT JOIN subrubro s ON s.codsub = p.codsub
+            LEFT JOIN ivaprodu i ON i.codivaprodu = p.iva
+            WHERE g.idcodgusto IN (' . $ph . ')
+            ORDER BY p.produ ASC, g.nomgusto ASC
+        ');
+        $st->execute($ids);
+        return $st->fetchAll();
+    }
 }

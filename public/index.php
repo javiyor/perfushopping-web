@@ -262,6 +262,8 @@ $router->post('/admin/productos/ai-tags', [AdminProductControllerNew::class, 'ai
 $router->get('/admin/productos/etiquetas/(?P<id>\d+)', [AdminProductControllerNew::class, 'printLabels']);
 $router->post('/admin/productos/etiquetas/(?P<id>\d+)', [AdminProductControllerNew::class, 'printLabels']);
 $router->post('/admin/productos/etiquetas/epl/(?P<id>\d+)', [AdminProductControllerNew::class, 'etiquetasEpl']);
+$router->get('/admin/productos/etiquetas-a4', [AdminProductControllerNew::class, 'etiquetasA4']);
+$router->post('/admin/productos/etiquetas-a4/imprimir', [AdminProductControllerNew::class, 'etiquetasA4Imprimir']);
 
 // Admin - Marketing
 $router->get('/admin/marketing/videos', [AdminMarketingVideoController::class, 'index']);
