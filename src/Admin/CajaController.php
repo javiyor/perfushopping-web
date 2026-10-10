@@ -121,6 +121,7 @@ $sucursalId = $auth->getSucursalId();
         }
 
         $historial = $repo->historial($sucursalId, 10);
+        $turnosPendientes = $repo->turnosCorreccionPendientes($sucursalId);
         $ventasPorPuntoVenta = $repo->ventasPorPuntoVenta($fecha);
         $saldoGeneral = $repo->saldoGeneral();
 
@@ -148,6 +149,7 @@ $sucursalId = $auth->getSucursalId();
             'arqueos' => $arqueos,
             'historial' => $historial,
             'cajasCerradas' => $cajasCerradas,
+            'turnosPendientes' => $turnosPendientes,
             'csrf' => Csrf::token(),
             'pageTitle' => 'Caja',
         ]);
@@ -612,12 +614,13 @@ $sucursalId = $auth->getSucursalId();
         $efectivoDisponible = (int)$apertura['monto_inicial_cents'] + $ventasEfectivo
             + (int)$totalesMov['total_ingresos'] - (int)$totalesMov['total_egresos'];
 
-        if ($montoRetirado > $efectivoDisponible) {
-            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'El pasaje a Caja General (solo efectivo) no puede superar el efectivo disponible: $' . number_format($efectivoDisponible / 100, 2, ',', '.') . '.'];
+        // Lo que se puede distribuir es el efectivo FÍSICO contado, no el del sistema.
+        if ($montoRetirado > $montoCierre) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'El pasaje a Caja General (solo efectivo) no puede superar el efectivo contado: $' . number_format($montoCierre / 100, 2, ',', '.') . '.'];
             Response::redirect('/admin/caja/cierre');
         }
-        if ($montoRetirado + $proximaApertura > $efectivoDisponible) {
-            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Pasaje + saldo para próxima apertura no pueden superar el efectivo disponible: $' . number_format($efectivoDisponible / 100, 2, ',', '.') . '.'];
+        if ($montoRetirado + $proximaApertura > $montoCierre) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Pasaje + saldo para próxima apertura no pueden superar el efectivo contado: $' . number_format($montoCierre / 100, 2, ',', '.') . '.'];
             Response::redirect('/admin/caja/cierre');
         }
 

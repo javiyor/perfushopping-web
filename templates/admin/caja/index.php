@@ -20,6 +20,7 @@ $saldoGeneral = (int)($saldoGeneral ?? 0);
 $ajustePendiente = $ajustePendiente ?? null;
 $esAdmin = (bool)($esAdmin ?? false);
 $ajustesPendientesCount = (int)($ajustesPendientesCount ?? 0);
+$turnosPendientes = $turnosPendientes ?? [];
 $cajasCerradas = (isset($cajasCerradas) && is_array($cajasCerradas)) ? $cajasCerradas : [];
 if (!$cajasCerradas && $historial) {
     $cajasCerradas = array_values(array_filter($historial, static fn($h) => (($h['estado'] ?? '') === 'cerrada')));
@@ -96,7 +97,7 @@ if (!$cajasCerradas && $historial) {
                 <?php foreach ($cajasCerradas as $h): ?>
                     <tr>
                         <td class="small"><?= htmlspecialchars((string)($h['fecha'] ?? '')) ?></td>
-                        <td class="small"><?= htmlspecialchars($h['turno'] ?? '') ?></td>
+                        <td class="small"><?= htmlspecialchars($h['turno'] ?? '') ?><?php if (isset($turnosPendientes[(int)$h['id']])): ?> <span class="badge bg-warning text-dark" title="Corrección de turno pendiente de aprobación">→ <?= htmlspecialchars($turnosPendientes[(int)$h['id']]) ?> (pend.)</span><?php endif; ?></td>
                         <td class="text-end small"><?= Format::moneyFromCents((int)($h['monto_inicial_cents'] ?? 0)) ?></td>
                         <td class="text-end small"><?= Format::moneyFromCents((int)($h['monto_cierre_cents'] ?? 0)) ?></td>
                         <td class="text-end small"><?= Format::moneyFromCents((int)($h['monto_retirado_cents'] ?? 0)) ?></td>
@@ -289,7 +290,7 @@ $saldoEsperado = $montoInicial + $ventasEfectivo + (int)$totalesMov['total_ingre
                         <?php foreach ($historial as $h): ?>
                             <tr>
                                 <td class="small"><?= htmlspecialchars((string)($h['fecha'] ?? '')) ?></td>
-                                <td class="small"><?= htmlspecialchars($h['turno'] ?? '') ?></td>
+                        <td class="small"><?= htmlspecialchars($h['turno'] ?? '') ?><?php if (isset($turnosPendientes[(int)$h['id']])): ?> <span class="badge bg-warning text-dark" title="Corrección de turno pendiente de aprobación">→ <?= htmlspecialchars($turnosPendientes[(int)$h['id']]) ?> (pend.)</span><?php endif; ?></td>
                                 <td class="text-end small"><?= Format::moneyFromCents((int)($h['monto_inicial_cents'] ?? 0)) ?></td>
                                 <td class="text-end small"><?= Format::moneyFromCents((int)($h['monto_cierre_cents'] ?? 0)) ?></td>
                                 <td class="text-end small"><?= Format::moneyFromCents((int)($h['monto_retirado_cents'] ?? 0)) ?></td>

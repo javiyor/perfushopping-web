@@ -86,9 +86,9 @@ $esperadoEfectivo = (int)($esperadoEfectivo ?? 0);
                         <label class="form-label small fw-semibold">Pasaje a Caja General (solo efectivo)</label>
                         <div class="input-group">
                             <span class="input-group-text">$</span>
-                            <input class="form-control" name="monto_retirado_cents" id="montoRetirado" type="number" value="0" min="0" max="<?= (int)round($esperadoEfectivo / 100) ?>" step="0.01" />
+                            <input class="form-control" name="monto_retirado_cents" id="montoRetirado" type="number" value="0" min="0" step="0.01" />
                         </div>
-                        <div class="form-text">Solo efectivo. Máximo disponible: <?= Format::moneyFromCents($esperadoEfectivo) ?>.</div>
+                        <div class="form-text">Solo efectivo. Máximo disponible: el efectivo <strong>contado</strong> en el cierre.</div>
                     </div>
 
                     <div class="mb-3">
@@ -252,6 +252,17 @@ function fmtDiferencia(dif) {
     return (dif < 0 ? '−' : '+') + '$' + (Math.abs(dif) / 100).toLocaleString('es-AR', {minimumFractionDigits: 2 });
 }
 function confirmarCierre() {
+    const cierre = Math.round((parseFloat(document.getElementById('montoCierre').value) || 0) * 100);
+    const retiro = Math.round((parseFloat(document.getElementById('montoRetirado').value) || 0) * 100);
+    const proxima = Math.round((parseFloat(document.getElementById('montoProxima').value) || 0) * 100);
+    if (retiro > cierre) {
+        alert('El pasaje a Caja General no puede superar el efectivo contado ($' + (cierre / 100).toLocaleString('es-AR') + ').');
+        return false;
+    }
+    if (retiro + proxima > cierre) {
+        alert('Pasaje + saldo para próxima apertura no pueden superar el efectivo contado ($' + (cierre / 100).toLocaleString('es-AR') + ').');
+        return false;
+    }
     const dif = diferenciaCierre();
     if (dif === 0) {
         return confirm('¿Confirmar el cierre de caja? Verificá los montos antes de continuar.');
