@@ -33,6 +33,15 @@ $campos = $campos ?? [];
                     <?php endforeach; ?>
 
                     <div class="mb-3">
+                        <label class="form-label small fw-semibold">Turno</label>
+                        <select class="form-select" name="turno" style="max-width:220px">
+                            <option value="manana" <?= ($caja['turno'] ?? '') === 'manana' ? 'selected' : '' ?>>Mañana</option>
+                            <option value="tarde" <?= ($caja['turno'] ?? '') === 'tarde' ? 'selected' : '' ?>>Tarde</option>
+                        </select>
+                        <div class="form-text">Actual: <?= ($caja['turno'] ?? '') === 'tarde' ? 'Tarde' : 'Mañana' ?></div>
+                    </div>
+
+                    <div class="mb-3">
                         <label class="form-label small fw-semibold">Descripción del error</label>
                         <textarea class="form-control" name="motivo" rows="3" required minlength="10" placeholder="Ej: el cierre se cargó con 10000 de más, el conteo real fue..."></textarea>
                         <div class="form-text">Explicá qué salió mal para que el administrador pueda revisarlo.</div>

@@ -8,7 +8,16 @@ $camposAjuste = [
     'monto_cierre_cents' => 'Cierre',
     'monto_retirado_cents' => 'Pasaje',
     'monto_proxima_apertura_cents' => 'Saldo próx.',
+    'turno' => 'Turno',
 ];
+
+$fmtValor = static function (array $row, string $col): string {
+    if (($row['campo'] ?? '') === 'turno') {
+        $t = (string)($row[$col === 'valor_anterior_cents' ? 'valor_anterior_text' : 'valor_nuevo_text'] ?? '');
+        return $t === 'tarde' ? 'Tarde' : ($t === 'manana' ? 'Mañana' : '—');
+    }
+    return Format::moneyFromCents((int)($row[$col] ?? 0));
+};
 ?>
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
@@ -44,8 +53,8 @@ $camposAjuste = [
                             <td class="small"><?= htmlspecialchars((string)($p['sucursal_nombre'] ?? '')) ?> · <?= htmlspecialchars((string)($p['fecha'] ?? '')) ?> · <?= htmlspecialchars((string)($p['turno'] ?? '')) ?></td>
                             <td><span class="badge bg-info"><?= htmlspecialchars($camposAjuste[$p['campo'] ?? ''] ?? ($p['campo'] ?? '')) ?></span></td>
                             <td class="small"><?= htmlspecialchars((string)($p['solicitado_por_nombre'] ?? '')) ?></td>
-                            <td class="text-end small"><?= Format::moneyFromCents((int)($p['valor_anterior_cents'] ?? 0)) ?></td>
-                            <td class="text-end small fw-bold"><?= Format::moneyFromCents((int)($p['valor_nuevo_cents'] ?? 0)) ?></td>
+                            <td class="text-end small"><?= htmlspecialchars($fmtValor($p, 'valor_anterior_cents')) ?></td>
+                            <td class="text-end small fw-bold"><?= htmlspecialchars($fmtValor($p, 'valor_nuevo_cents')) ?></td>
                             <td class="small"><?= htmlspecialchars((string)($p['motivo'] ?? '')) ?></td>
                             <td>
                                 <div class="d-flex gap-1">
@@ -95,8 +104,8 @@ $camposAjuste = [
                             <td class="small"><?= htmlspecialchars(mb_substr((string)($h['created_at'] ?? ''), 0, 16)) ?></td>
                             <td><span class="badge bg-<?= ($h['estado'] ?? '') === 'aprobado' ? 'success' : (($h['estado'] ?? '') === 'rechazado' ? 'danger' : 'warning') ?>"><?= htmlspecialchars($h['estado'] ?? '') ?></span></td>
                             <td><span class="badge bg-info"><?= htmlspecialchars($camposAjuste[$h['campo'] ?? ''] ?? ($h['campo'] ?? '')) ?></span></td>
-                            <td class="text-end small"><?= Format::moneyFromCents((int)($h['valor_anterior_cents'] ?? 0)) ?></td>
-                            <td class="text-end small"><?= Format::moneyFromCents((int)($h['valor_nuevo_cents'] ?? 0)) ?></td>
+                            <td class="text-end small"><?= htmlspecialchars($fmtValor($h, 'valor_anterior_cents')) ?></td>
+                            <td class="text-end small"><?= htmlspecialchars($fmtValor($h, 'valor_nuevo_cents')) ?></td>
                             <td class="small text-muted"><?= htmlspecialchars(mb_substr((string)($h['motivo'] ?? ''), 0, 60)) ?></td>
                             <td class="small text-muted"><?= htmlspecialchars((string)($h['resuelto_por_nombre'] ?? '—')) ?></td>
                         </tr>

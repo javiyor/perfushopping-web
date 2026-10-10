@@ -1182,6 +1182,8 @@ final class CajaRepo
                     campo VARCHAR(50) NOT NULL DEFAULT 'monto_inicial_cents',
                     valor_anterior_cents INT NOT NULL DEFAULT 0,
                     valor_nuevo_cents INT NOT NULL DEFAULT 0,
+                    valor_anterior_text VARCHAR(50) DEFAULT NULL,
+                    valor_nuevo_text VARCHAR(50) DEFAULT NULL,
                     motivo TEXT NOT NULL,
                     estado ENUM('pendiente','aprobado','rechazado') NOT NULL DEFAULT 'pendiente',
                     solicitado_por INT UNSIGNED DEFAULT NULL,
@@ -1196,6 +1198,18 @@ final class CajaRepo
             ");
         } catch (\Throwable $e) {
             error_log('CajaRepo::ensureAjustesTable error: ' . $e->getMessage());
+        }
+        try {
+            $cols = Db::pdo()->query('SHOW COLUMNS FROM caja_apertura_ajustes')->fetchAll();
+            $fields = array_column($cols, 'Field');
+            if (!in_array('valor_anterior_text', $fields, true)) {
+                Db::pdo()->exec("ALTER TABLE caja_apertura_ajustes ADD COLUMN valor_anterior_text VARCHAR(50) DEFAULT NULL AFTER valor_nuevo_cents");
+            }
+            if (!in_array('valor_nuevo_text', $fields, true)) {
+                Db::pdo()->exec("ALTER TABLE caja_apertura_ajustes ADD COLUMN valor_nuevo_text VARCHAR(50) DEFAULT NULL AFTER valor_anterior_text");
+            }
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::ensureAjustesTable columnas error: ' . $e->getMessage());
         }
     }
 
@@ -1268,6 +1282,27 @@ final class CajaRepo
         return (int)Db::pdo()->lastInsertId();
     }
 
+    /** ¿Hay otra apertura (distinta de $cajaId) para sucursal+fecha+turno? */
+    private function existeOtraAperturaTurno(int $cajaId, string $turno): bool
+    {
+        $ap = $this->findById($cajaId);
+        if (!$ap) {
+            return false;
+        }
+        $st = Db::pdo()->prepare('
+            SELECT id FROM caja_aperturas
+            WHERE sucursal_id = :suc AND fecha = :fec AND turno = :tur AND id <> :id
+            LIMIT 1
+        ');
+        $st->execute([
+            ':suc' => (int)($ap['sucursal_id'] ?? 0),
+            ':fec' => (string)($ap['fecha'] ?? ''),
+            ':tur' => $turno,
+            ':id' => $cajaId,
+        ]);
+        return (bool)$st->fetch();
+    }
+
     public function ajustePendienteDeCajaPorCampo(int $cajaId, string $campo): ?array
     {
         $this->ensureAjustesTable();
@@ -1280,6 +1315,41 @@ final class CajaRepo
         ");
         $st->execute([':caja' => $cajaId, ':campo' => $campo]);
         return $st->fetch() ?: null;
+    }
+
+    /** Solicita cambiar el turno de una caja cerrada (manana/tarde). */
+    public function solicitarAjusteTurno(int $cajaId, string $nuevoTurno, string $motivo, int $solicitadoPor): int
+    {
+        $this->ensureAjustesTable();
+        if (!in_array($nuevoTurno, ['manana', 'tarde'], true)) {
+            throw new \RuntimeException('Turno inválido.');
+        }
+        $apertura = $this->findById($cajaId);
+        if (!$apertura) {
+            throw new \RuntimeException('Cierre no encontrado.');
+        }
+        if (($apertura['estado'] ?? '') !== 'cerrada') {
+            throw new \RuntimeException('Solo se puede corregir un cierre ya realizado.');
+        }
+        $actual = (string)($apertura['turno'] ?? '');
+        if ($actual === $nuevoTurno) {
+            throw new \RuntimeException('El turno ya es ese.');
+        }
+        if ($this->existeOtraAperturaTurno($cajaId, $nuevoTurno)) {
+            throw new \RuntimeException('Ya existe una caja de esta sucursal/fecha para ese turno.');
+        }
+        $st = Db::pdo()->prepare('
+            INSERT INTO caja_apertura_ajustes (caja_id, campo, valor_anterior_cents, valor_nuevo_cents, valor_anterior_text, valor_nuevo_text, motivo, estado, solicitado_por, created_at)
+            VALUES (:caja, \'turno\', 0, 0, :ant, :nuevo, :motivo, \'pendiente\', :sol, NOW())
+        ');
+        $st->execute([
+            ':caja' => $cajaId,
+            ':ant' => $actual,
+            ':nuevo' => $nuevoTurno,
+            ':motivo' => $motivo,
+            ':sol' => $solicitadoPor ?: null,
+        ]);
+        return (int)Db::pdo()->lastInsertId();
     }
 
     public function movimientoGeneralPorOrigen(string $origen, int $origenId): ?array
@@ -1370,25 +1440,40 @@ final class CajaRepo
                 if (!$caja) {
                     throw new \RuntimeException('Caja no encontrada.');
                 }
-                if ($campo === 'monto_inicial_cents' && ($caja['estado'] ?? '') !== 'abierta') {
-                    throw new \RuntimeException('La caja ya se cerró; la corrección de apertura ya no aplica.');
-                }
-                if (!in_array($campo, ['monto_inicial_cents', 'monto_cierre_cents', 'monto_retirado_cents', 'monto_proxima_apertura_cents'], true)) {
-                    throw new \RuntimeException('Campo inválido.');
-                }
-                $pdo->prepare("UPDATE caja_aperturas SET {$campo} = :mon, updated_at = NOW() WHERE id = :caja LIMIT 1")
-                    ->execute([':mon' => $nuevo, ':caja' => $cajaId]);
+                if ($campo === 'turno') {
+                    $nuevoTurno = (string)($aj['valor_nuevo_text'] ?? '');
+                    if (!in_array($nuevoTurno, ['manana', 'tarde'], true)) {
+                        throw new \RuntimeException('Turno inválido.');
+                    }
+                    if (($caja['turno'] ?? '') === $nuevoTurno) {
+                        throw new \RuntimeException('El turno ya es ese.');
+                    }
+                    if ($this->existeOtraAperturaTurno($cajaId, $nuevoTurno)) {
+                        throw new \RuntimeException('Ya existe una caja de esta sucursal/fecha para ese turno.');
+                    }
+                    $pdo->prepare("UPDATE caja_aperturas SET turno = :tur, updated_at = NOW() WHERE id = :caja LIMIT 1")
+                        ->execute([':tur' => $nuevoTurno, ':caja' => $cajaId]);
+                } else {
+                    if ($campo === 'monto_inicial_cents' && ($caja['estado'] ?? '') !== 'abierta') {
+                        throw new \RuntimeException('La caja ya se cerró; la corrección de apertura ya no aplica.');
+                    }
+                    if (!in_array($campo, ['monto_inicial_cents', 'monto_cierre_cents', 'monto_retirado_cents', 'monto_proxima_apertura_cents'], true)) {
+                        throw new \RuntimeException('Campo inválido.');
+                    }
+                    $pdo->prepare("UPDATE caja_aperturas SET {$campo} = :mon, updated_at = NOW() WHERE id = :caja LIMIT 1")
+                        ->execute([':mon' => $nuevo, ':caja' => $cajaId]);
 
-                // Sincronizar el pasaje a Caja General si se corrigió el retiro.
-                if ($campo === 'monto_retirado_cents') {
-                    $mov = $this->movimientoGeneralPorOrigen('cierre_caja', $cajaId);
-                    if ($mov && $nuevo > 0) {
-                        $this->actualizarMontoGeneral((int)$mov['id'], $nuevo);
-                    } elseif ($mov && $nuevo <= 0) {
-                        $this->eliminarMovimientoGeneral((int)$mov['id']);
-                    } elseif (!$mov && $nuevo > 0) {
-                        $this->agregarMovimientoGeneral('ingreso', 'cierre_caja', $cajaId,
-                            'Retiro cierre caja (corrección)', $nuevo, $resueltoPor);
+                    // Sincronizar el pasaje a Caja General si se corrigió el retiro.
+                    if ($campo === 'monto_retirado_cents') {
+                        $mov = $this->movimientoGeneralPorOrigen('cierre_caja', $cajaId);
+                        if ($mov && $nuevo > 0) {
+                            $this->actualizarMontoGeneral((int)$mov['id'], $nuevo);
+                        } elseif ($mov && $nuevo <= 0) {
+                            $this->eliminarMovimientoGeneral((int)$mov['id']);
+                        } elseif (!$mov && $nuevo > 0) {
+                            $this->agregarMovimientoGeneral('ingreso', 'cierre_caja', $cajaId,
+                                'Retiro cierre caja (corrección)', $nuevo, $resueltoPor);
+                        }
                     }
                 }
             }

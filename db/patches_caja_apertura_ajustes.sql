@@ -6,6 +6,8 @@ CREATE TABLE IF NOT EXISTS caja_apertura_ajustes (
     campo VARCHAR(50) NOT NULL DEFAULT 'monto_inicial_cents',
     valor_anterior_cents INT NOT NULL DEFAULT 0,
     valor_nuevo_cents INT NOT NULL DEFAULT 0,
+    valor_anterior_text VARCHAR(50) DEFAULT NULL,
+    valor_nuevo_text VARCHAR(50) DEFAULT NULL,
     motivo TEXT NOT NULL,
     estado ENUM('pendiente','aprobado','rechazado') NOT NULL DEFAULT 'pendiente',
     solicitado_por INT UNSIGNED DEFAULT NULL,

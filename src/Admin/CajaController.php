@@ -807,6 +807,21 @@ $sucursalId = $auth->getSucursalId();
             }
         }
 
+        // Corrección del turno (manana/tarde).
+        $nuevoTurno = (string)($_POST['turno'] ?? '');
+        if (in_array($nuevoTurno, ['manana', 'tarde'], true)
+            && $nuevoTurno !== (string)($caja['turno'] ?? '')
+            && !$repo->ajustePendienteDeCajaPorCampo($cajaId, 'turno')
+        ) {
+            try {
+                $repo->solicitarAjusteTurno($cajaId, $nuevoTurno, $motivo, (int)$adminUser['id']);
+                $creadas++;
+            } catch (\Throwable $e) {
+                $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => $e->getMessage()];
+                Response::redirect('/admin/caja');
+            }
+        }
+
         if ($creadas > 0) {
             $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Corrección enviada. Queda pendiente hasta que un administrador la apruebe.'];
         } else {
