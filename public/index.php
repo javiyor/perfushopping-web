@@ -566,7 +566,7 @@ $router->post('/admin/mensajes/liberar', [AdminSocialInboxController::class, 're
 $router->post('/admin/mensajes/cerrar', [AdminSocialInboxController::class, 'close']);
 $router->post('/admin/mensajes/reabrir', [AdminSocialInboxController::class, 'reopen']);
 $router->post('/admin/mensajes/nota', [AdminSocialInboxController::class, 'note']);
-
+$router->post('/admin/mensajes/responder', [AdminSocialInboxController::class, 'responder']);
  // Admin - Gastos varios
 $router->get('/admin/gastos', [AdminGastoController::class, 'index']);
 $router->post('/admin/gastos/guardar', [AdminGastoController::class, 'store']);

@@ -55,6 +55,10 @@ final class MetaWebhookController
             $repo->ingestInbound($m);
         }
 
+        foreach (self::normalizeStatuses($payload) as $s) {
+            $repo->applyStatus($s['message_id'], $s['status'], $s['at'], $s['error_code']);
+        }
+
         Response::json(['ok' => true], 200);
     }
 
@@ -106,6 +110,73 @@ final class MetaWebhookController
         }
 
         return $messages;
+    }
+
+    /**
+     * Normaliza los eventos de estado de WhatsApp (value.statuses).
+     * @param array<string,mixed> $payload
+     * @return array<int,array{message_id:string,status:string,at:?string,error_code:?string,recipient:string}>
+     */
+    public static function normalizeStatuses(array $payload): array
+    {
+        $out = [];
+        $entries = $payload['entry'] ?? [];
+        if (!is_array($entries)) {
+            return $out;
+        }
+        foreach ($entries as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+            $changes = $entry['changes'] ?? null;
+            if (!is_array($changes)) {
+                continue;
+            }
+            foreach ($changes as $change) {
+                if (!is_array($change)) {
+                    continue;
+                }
+                $value = $change['value'] ?? null;
+                if (!is_array($value)) {
+                    continue;
+                }
+                $statuses = $value['statuses'] ?? null;
+                if (!is_array($statuses)) {
+                    continue;
+                }
+                foreach ($statuses as $st) {
+                    if (!is_array($st)) {
+                        continue;
+                    }
+                    $messageId = trim((string)($st['id'] ?? ''));
+                    $status = trim((string)($st['status'] ?? ''));
+                    if ($messageId === '' || !in_array($status, ['sent', 'delivered', 'read', 'failed'], true)) {
+                        continue;
+                    }
+                    $at = null;
+                    $ts = (string)($st['timestamp'] ?? '');
+                    if ($ts !== '' && ctype_digit($ts)) {
+                        $at = gmdate('Y-m-d H:i:s', (int)$ts);
+                    }
+                    $errorCode = null;
+                    $errors = $st['errors'] ?? null;
+                    if (is_array($errors) && isset($errors[0]) && is_array($errors[0])) {
+                        $errorCode = trim((string)($errors[0]['code'] ?? ''));
+                        if ($errorCode === '') {
+                            $errorCode = null;
+                        }
+                    }
+                    $out[] = [
+                        'message_id' => $messageId,
+                        'status' => $status,
+                        'at' => $at,
+                        'error_code' => $errorCode,
+                        'recipient' => trim((string)($st['recipient_id'] ?? '')),
+                    ];
+                }
+            }
+        }
+        return $out;
     }
 
     /** @param array<int,mixed> $changes */

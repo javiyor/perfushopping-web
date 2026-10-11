@@ -17,6 +17,9 @@ $channelBadge = [
     'instagram' => 'danger',
     'facebook' => 'primary',
 ];
+
+$sendStatusBadge = ['sent' => 'secondary', 'delivered' => 'primary', 'read' => 'success', 'failed' => 'danger'];
+$sendStatusLabel = ['sent' => 'Enviado', 'delivered' => 'Entregado', 'read' => 'Leído', 'failed' => 'Fallido'];
 ?>
 
 <div class="d-flex justify-content-between align-items-start mb-3">
@@ -141,12 +144,37 @@ $channelBadge = [
                                     <div class="text-muted small">[<?= htmlspecialchars((string)($m['message_type'] ?? 'mensaje')) ?>]</div>
                                 <?php endif; ?>
                                 <div class="small text-muted mt-1"><?= htmlspecialchars((string)($m['provider_created_at'] ?? $m['created_at'] ?? '')) ?></div>
+                                <?php if (($m['direction'] ?? 'in') === 'out' && ($m['send_status'] ?? '') !== ''): ?>
+                                    <div class="small mt-1">
+                                        <span class="badge bg-<?= $sendStatusBadge[$m['send_status']] ?? 'secondary' ?>"><?= htmlspecialchars($sendStatusLabel[$m['send_status']] ?? (string)$m['send_status']) ?></span>
+                                        <?php if (($m['send_status'] ?? '') === 'failed' && ($m['error_code'] ?? '') !== ''): ?>
+                                            <span class="text-danger"><?= htmlspecialchars((string)$m['error_code']) ?></span>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endif; ?>
                             </div>
                         </div>
                     <?php endforeach; ?>
                 <?php endif; ?>
             </div>
         </div>
+
+        <?php if ($selected && ($selected['status'] ?? '') !== 'cerrado' && ($selected['channel'] ?? '') === 'whatsapp'): ?>
+        <div class="card shadow-sm mt-3">
+            <div class="card-header bg-white fw-semibold">Responder por WhatsApp</div>
+            <div class="card-body">
+                <form method="post" action="/admin/mensajes/responder">
+                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars((string)$csrf) ?>" />
+                    <input type="hidden" name="conversation_id" value="<?= (int)$selected['id'] ?>" />
+                    <input type="hidden" name="tab" value="<?= htmlspecialchars((string)$tab) ?>" />
+                    <textarea class="form-control form-control-sm" name="text" rows="2" maxlength="4096" placeholder="Escribí la respuesta..." required></textarea>
+                    <button class="btn btn-accent btn-sm mt-2" type="submit"><i class="bi bi-send"></i> Enviar</button>
+                </form>
+            </div>
+        </div>
+        <?php elseif ($selected && ($selected['status'] ?? '') !== 'cerrado'): ?>
+        <div class="alert alert-info mt-3 small mb-0">El envío por este canal llega en el Paso 2 (Instagram/Messenger).</div>
+        <?php endif; ?>
 
         <?php if ($selected): ?>
         <div class="card shadow-sm mt-3">

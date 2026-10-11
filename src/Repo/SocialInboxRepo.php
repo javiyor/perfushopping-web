@@ -86,7 +86,21 @@ final class SocialInboxRepo
             UNIQUE KEY uq_social_webhook_events_key (event_key)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
+        $this->ensureColumn('social_messages', 'send_status', "VARCHAR(20) DEFAULT NULL");
+        $this->ensureColumn('social_messages', 'error_code', "VARCHAR(64) DEFAULT NULL");
+        $this->ensureColumn('social_messages', 'sent_at', "DATETIME DEFAULT NULL");
+
         self::$tablesReady = true;
+    }
+
+    private function ensureColumn(string $table, string $column, string $definition): void
+    {
+        $like = Db::pdo()->prepare('SHOW COLUMNS FROM `' . $table . '` LIKE :c');
+        $like->execute([':c' => $column]);
+        if ($like->fetch() !== false) {
+            return;
+        }
+        Db::pdo()->exec('ALTER TABLE `' . $table . '` ADD COLUMN `' . $column . '` ' . $definition);
     }
 
     public function storeWebhookEvent(string $eventKey, string $payload): bool
@@ -286,6 +300,63 @@ final class SocialInboxRepo
         $this->ensureTables();
         $st = Db::pdo()->prepare('UPDATE social_conversations SET unread_count = 0, updated_at = NOW() WHERE id = :id LIMIT 1');
         $st->execute([':id' => $conversationId]);
+    }
+
+    /** Actualiza el estado de envío de un mensaje saliente por su wamid. */
+    public function applyStatus(string $messageId, string $status, ?string $at = null, ?string $errorCode = null): bool
+    {
+        $this->ensureTables();
+        if ($messageId === '') {
+            return false;
+        }
+        if (!in_array($status, ['sent', 'delivered', 'read', 'failed'], true)) {
+            return false;
+        }
+        $st = Db::pdo()->prepare('UPDATE social_messages
+            SET send_status = :s,
+                error_code = :e,
+                sent_at = COALESCE(sent_at, :at)
+            WHERE meta_message_id = :mid LIMIT 1');
+        $st->execute([
+            ':s' => $status,
+            ':e' => $errorCode !== null && $errorCode !== '' ? $errorCode : null,
+            ':at' => $at,
+            ':mid' => $messageId,
+        ]);
+        return $st->rowCount() > 0;
+    }
+
+    /** Guarda un mensaje saliente (respuesta del vendedor). */
+    public function insertOutbound(int $conversationId, string $body, ?string $wamid, string $sendStatus, ?string $errorCode = null): int
+    {
+        $this->ensureTables();
+        $ins = Db::pdo()->prepare("INSERT INTO social_messages
+            (conversation_id, direction, message_type, meta_message_id, body, send_status, error_code, sent_at, created_at)
+            VALUES (:c, 'out', 'text', :mid, :b, :s, :e, :sent, NOW())");
+        $sent = $sendStatus === 'sent' ? date('Y-m-d H:i:s') : null;
+        $ins->execute([
+            ':c' => $conversationId,
+            ':mid' => $wamid !== null && $wamid !== '' ? $wamid : null,
+            ':b' => $body !== '' ? $body : null,
+            ':s' => $sendStatus,
+            ':e' => $errorCode !== null && $errorCode !== '' ? $errorCode : null,
+            ':sent' => $sent,
+        ]);
+        return (int)Db::pdo()->lastInsertId();
+    }
+
+    /** Refresca la conversación luego de una respuesta exitosa. */
+    public function touchAfterOutbound(int $conversationId, string $preview): void
+    {
+        $this->ensureTables();
+        $st = Db::pdo()->prepare('UPDATE social_conversations
+            SET unread_count = 0,
+                last_message_at = NOW(),
+                last_message_preview = :p,
+                first_response_at = COALESCE(first_response_at, NOW()),
+                updated_at = NOW()
+            WHERE id = :id LIMIT 1');
+        $st->execute([':p' => $preview !== '' ? $preview : null, ':id' => $conversationId]);
     }
 
     public function takeConversation(int $conversationId, int $adminId): bool

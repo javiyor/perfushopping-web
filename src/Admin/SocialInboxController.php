@@ -5,6 +5,7 @@ namespace Perfushopping\Web\Admin;
 
 use Perfushopping\Web\Repo\SocialInboxRepo;
 use Perfushopping\Web\Service\AdminAuthService;
+use Perfushopping\Web\Service\Meta\WhatsAppChannel;
 use Perfushopping\Web\Support\Csrf;
 use Perfushopping\Web\Support\Response;
 use Perfushopping\Web\Support\View;
@@ -120,5 +121,57 @@ final class SocialInboxController
             $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Nota guardada.'];
         }
         Response::redirect('/admin/mensajes?c=' . $conversationId . '&tab=' . urlencode((string)($_POST['tab'] ?? 'unassigned')));
+    }
+
+    public function responder(array $params): void
+    {
+        (new AdminAuthService())->requirePermiso('clientes');
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $conversationId = (int)($_POST['conversation_id'] ?? 0);
+        $tab = (string)($_POST['tab'] ?? 'mine');
+        $text = trim((string)($_POST['text'] ?? ''));
+        $back = '/admin/mensajes?tab=' . urlencode($tab) . '&c=' . $conversationId;
+
+        $repo = new SocialInboxRepo();
+        $conv = $conversationId > 0 ? $repo->getConversation($conversationId) : null;
+        if (!$conv) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Conversación inválida.'];
+            Response::redirect('/admin/mensajes');
+        }
+        if (($conv['status'] ?? '') === 'cerrado') {
+            $_SESSION['admin_flash'] = ['type' => 'warning', 'text' => 'La conversación está cerrada.'];
+            Response::redirect($back);
+        }
+        if ($text === '') {
+            $_SESSION['admin_flash'] = ['type' => 'warning', 'text' => 'Escribí un mensaje para enviar.'];
+            Response::redirect($back);
+        }
+        if (($conv['channel'] ?? '') !== 'whatsapp') {
+            $_SESSION['admin_flash'] = ['type' => 'info', 'text' => 'El envío por este canal llega en el Paso 2 (Instagram/Messenger).'];
+            Response::redirect($back);
+        }
+
+        $phone = preg_replace('/\D/', '', (string)($conv['phone'] ?? '')) ?? '';
+        if ($phone === '') {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'El contacto no tiene un teléfono válido.'];
+            Response::redirect($back);
+        }
+        if (!WhatsAppChannel::isConfigured()) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'WhatsApp no está configurado (WA_ACCESS_TOKEN / WA_PHONE_NUMBER_ID en el .env).'];
+            Response::redirect($back);
+        }
+
+        $text = mb_substr($text, 0, 4096);
+        $res = (new WhatsAppChannel())->sendText($phone, $text);
+        if ($res['ok']) {
+            $repo->insertOutbound($conversationId, $text, $res['wamid'], 'sent', null);
+            $repo->touchAfterOutbound($conversationId, mb_substr($text, 0, 255));
+            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Mensaje enviado por WhatsApp.'];
+        } else {
+            $repo->insertOutbound($conversationId, $text, null, 'failed', $res['error']);
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se pudo enviar: ' . (string)$res['error']];
+        }
+        Response::redirect($back);
     }
 }
