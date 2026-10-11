@@ -56,7 +56,16 @@ final class PortadaController
         $codrub = (int)($_POST['codrub'] ?? 0);
         $codsub = (int)($_POST['codsub'] ?? 0);
 
-        (new PortadaRepo())->saveConfig($modo, $codrub ?: null, $codsub ?: null);
+        $banner = [
+            'text' => trim((string)($_POST['banner_text'] ?? '')),
+            'bold' => isset($_POST['banner_bold']) ? 1 : 0,
+            'italic' => isset($_POST['banner_italic']) ? 1 : 0,
+            'size' => trim((string)($_POST['banner_size'] ?? 'grande')),
+            'color' => trim((string)($_POST['banner_color'] ?? '')),
+            'bg' => isset($_POST['banner_bg_transp']) ? null : trim((string)($_POST['banner_bg'] ?? '')),
+        ];
+
+        (new PortadaRepo())->saveConfig($modo, $codrub ?: null, $codsub ?: null, $banner);
 
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Portada actualizada.'];
         Response::redirect('/admin/portada');

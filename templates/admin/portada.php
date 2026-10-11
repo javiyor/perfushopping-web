@@ -8,6 +8,16 @@ $searchResults = $searchResults ?? [];
 $modo = (string)($config['modo'] ?? 'auto');
 $codrub = (int)($config['codrub'] ?? 0);
 $codsub = (int)($config['codsub'] ?? 0);
+$bannerText = trim((string)($config['banner_text'] ?? ''));
+$bannerBold = !empty($config['banner_bold']);
+$bannerItalic = !empty($config['banner_italic']);
+$bannerSize = in_array($config['banner_size'] ?? '', ['chico', 'normal', 'grande'], true) ? (string)$config['banner_size'] : 'grande';
+$bannerColor = preg_match('/^#[0-9a-fA-F]{6}$/', (string)($config['banner_color'] ?? '')) ? (string)$config['banner_color'] : '#C9A227';
+$bannerBgRaw = (string)($config['banner_bg'] ?? '');
+$bannerBg = preg_match('/^#[0-9a-fA-F]{6}$/', $bannerBgRaw) ? $bannerBgRaw : '';
+$bannerBgTransp = $bannerBg === '';
+$presetTexto = ['#C9A227' => 'Dorado', '#FFFFFF' => 'Blanco', '#1a1a1a' => 'Negro', '#C0392B' => 'Rojo', '#E84393' => 'Rosa', '#2E86C1' => 'Celeste'];
+$presetFondo = ['#1a1a1a' => 'Negro', '#C9A227' => 'Dorado', '#C0392B' => 'Rojo', '#7B241C' => 'Bordó', '#E84393' => 'Rosa', '#FFFFFF' => 'Blanco'];
 ?>
 <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
@@ -60,6 +70,57 @@ $codsub = (int)($config['codsub'] ?? 0);
                         <option value="<?= (int)$m['codsub'] ?>" <?= $codsub === (int)$m['codsub'] ? 'selected' : '' ?>><?= htmlspecialchars(trim((string)$m['nomsub'])) ?></option>
                         <?php endforeach; ?>
                     </select>
+                </div>
+            </div>
+
+            <div class="mt-3 p-3 border rounded" id="fieldBanner" style="<?= $modo === 'manual' ? '' : 'display:none' ?>">
+                <label class="form-label fw-semibold small">Texto destacado (fechas especiales) <span class="text-muted fw-normal">— se muestra en la portada pública en lugar de "Destacados"</span></label>
+                <input class="form-control form-control-sm mb-2" name="banner_text" id="bannerText" maxlength="120" value="<?= htmlspecialchars($bannerText) ?>" placeholder="Ej: Para mamá" oninput="updateBannerPreview()" />
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-3">
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" name="banner_bold" id="bannerBold" value="1" <?= $bannerBold ? 'checked' : '' ?> onchange="updateBannerPreview()" />
+                            <label class="form-check-label small fw-bold" for="bannerBold">Negrita</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" name="banner_italic" id="bannerItalic" value="1" <?= $bannerItalic ? 'checked' : '' ?> onchange="updateBannerPreview()" />
+                            <label class="form-check-label small fst-italic" for="bannerItalic">Cursiva</label>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small mb-1">Tamaño</label>
+                        <select class="form-select form-select-sm" name="banner_size" id="bannerSize" onchange="updateBannerPreview()">
+                            <?php foreach (['chico' => 'Chico', 'normal' => 'Normal', 'grande' => 'Grande'] as $v => $l): ?>
+                            <option value="<?= $v ?>" <?= $bannerSize === $v ? 'selected' : '' ?>><?= $l ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small mb-1">Color del texto</label>
+                        <div class="d-flex align-items-center gap-1 flex-wrap">
+                            <?php foreach ($presetTexto as $hex => $nom): ?>
+                            <button type="button" title="<?= $nom ?>" onclick="setBannerColor('<?= $hex ?>')" style="width:22px;height:22px;border-radius:50%;border:2px solid #ccc;background:<?= $hex ?>;padding:0"></button>
+                            <?php endforeach; ?>
+                            <input type="color" name="banner_color" id="bannerColor" value="<?= htmlspecialchars($bannerColor) ?>" title="Personalizado" style="width:30px;height:24px;padding:0;border:none" oninput="updateBannerPreview()" />
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small mb-1">Fondo</label>
+                        <div class="d-flex align-items-center gap-1 flex-wrap">
+                            <?php foreach ($presetFondo as $hex => $nom): ?>
+                            <button type="button" title="<?= $nom ?>" onclick="setBannerBg('<?= $hex ?>')" style="width:22px;height:22px;border-radius:50%;border:2px solid #ccc;background:<?= $hex ?>;padding:0"></button>
+                            <?php endforeach; ?>
+                            <input type="color" name="banner_bg" id="bannerBg" value="<?= $bannerBg !== '' ? htmlspecialchars($bannerBg) : '#1a1a1a' ?>" title="Personalizado" style="width:30px;height:24px;padding:0;border:none" oninput="document.getElementById('bannerBgTransp').checked=false;updateBannerPreview()" />
+                        </div>
+                        <div class="form-check mt-1">
+                            <input class="form-check-input" type="checkbox" name="banner_bg_transp" id="bannerBgTransp" value="1" <?= $bannerBgTransp ? 'checked' : '' ?> onchange="updateBannerPreview()" />
+                            <label class="form-check-label small" for="bannerBgTransp">Sin fondo</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <div class="small text-muted mb-1">Vista previa:</div>
+                    <div class="p-2 rounded text-center" style="background:#222" id="bannerPreviewWrap"><span id="bannerPreview"></span></div>
                 </div>
             </div>
 
@@ -168,7 +229,42 @@ function togglePortadaFields() {
     const modo = document.querySelector('input[name="modo"]:checked')?.value || 'auto';
     document.getElementById('fieldRubro').style.display = (modo === 'rubro') ? '' : 'none';
     document.getElementById('fieldMarca').style.display = (modo === 'marca') ? '' : 'none';
+    document.getElementById('fieldBanner').style.display = (modo === 'manual') ? '' : 'none';
 }
+function setBannerColor(hex) {
+    document.getElementById('bannerColor').value = hex;
+    updateBannerPreview();
+}
+function setBannerBg(hex) {
+    document.getElementById('bannerBg').value = hex;
+    document.getElementById('bannerBgTransp').checked = false;
+    updateBannerPreview();
+}
+function updateBannerPreview() {
+    const txt = document.getElementById('bannerText').value.trim() || 'Texto destacado';
+    const prev = document.getElementById('bannerPreview');
+    prev.textContent = txt;
+    prev.style.fontWeight = document.getElementById('bannerBold').checked ? 'bold' : 'normal';
+    prev.style.fontStyle = document.getElementById('bannerItalic').checked ? 'italic' : 'normal';
+    const sizes = {chico: '1.1rem', normal: '1.4rem', grande: '1.8rem'};
+    prev.style.fontSize = sizes[document.getElementById('bannerSize').value] || '1.8rem';
+    prev.style.color = document.getElementById('bannerColor').value;
+    const wrap = document.getElementById('bannerPreviewWrap');
+    if (document.getElementById('bannerBgTransp').checked) {
+        wrap.style.background = '#222';
+        prev.style.background = 'transparent';
+        prev.style.padding = '0';
+        prev.style.borderRadius = '0';
+    } else {
+        wrap.style.background = '#222';
+        prev.style.background = document.getElementById('bannerBg').value;
+        prev.style.padding = '4px 18px';
+        prev.style.borderRadius = '8px';
+    }
+    prev.style.fontFamily = "Georgia, 'Times New Roman', serif";
+    prev.style.letterSpacing = '0.7px';
+}
+document.addEventListener('DOMContentLoaded', updateBannerPreview);
 function toggleAll(chk) {
     document.querySelectorAll('.chkProd').forEach(c => c.checked = chk.checked);
 }

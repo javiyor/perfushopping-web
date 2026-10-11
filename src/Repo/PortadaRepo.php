@@ -36,8 +36,24 @@ final class PortadaRepo
             if ((int)$st->fetchColumn() === 0) {
                 Db::pdo()->exec("INSERT IGNORE INTO portada_config (id, modo) VALUES (1, 'auto')");
             }
+            $this->ensureColumn('portada_config', 'banner_text', 'VARCHAR(120) DEFAULT NULL');
+            $this->ensureColumn('portada_config', 'banner_bold', 'TINYINT(1) NOT NULL DEFAULT 0');
+            $this->ensureColumn('portada_config', 'banner_italic', 'TINYINT(1) NOT NULL DEFAULT 0');
+            $this->ensureColumn('portada_config', 'banner_size', "VARCHAR(10) NOT NULL DEFAULT 'grande'");
+            $this->ensureColumn('portada_config', 'banner_color', "VARCHAR(7) NOT NULL DEFAULT '#C9A227'");
+            $this->ensureColumn('portada_config', 'banner_bg', 'VARCHAR(7) DEFAULT NULL');
         } catch (\Throwable $e) {
         }
+    }
+
+    private function ensureColumn(string $table, string $column, string $definition): void
+    {
+        $like = Db::pdo()->prepare('SHOW COLUMNS FROM `' . $table . '` LIKE :c');
+        $like->execute([':c' => $column]);
+        if ($like->fetch() !== false) {
+            return;
+        }
+        Db::pdo()->exec('ALTER TABLE `' . $table . '` ADD COLUMN `' . $column . '` ' . $definition);
     }
 
     /** @return array<string,mixed> */
@@ -52,10 +68,13 @@ final class PortadaRepo
             }
         } catch (\Throwable $e) {
         }
-        return ['id' => 1, 'modo' => 'auto', 'codrub' => null, 'codsub' => null];
+        return ['id' => 1, 'modo' => 'auto', 'codrub' => null, 'codsub' => null,
+            'banner_text' => null, 'banner_bold' => 0, 'banner_italic' => 0,
+            'banner_size' => 'grande', 'banner_color' => '#C9A227', 'banner_bg' => null];
     }
 
-    public function saveConfig(string $modo, ?int $codrub, ?int $codsub): void
+    /** @param array<string,mixed> $banner */
+    public function saveConfig(string $modo, ?int $codrub, ?int $codsub, array $banner = []): void
     {
         $this->ensureTables();
         if (!in_array($modo, self::MODOS, true)) {
@@ -69,16 +88,30 @@ final class PortadaRepo
         if ($modo === 'marca' && $codsub === null) {
             $modo = 'auto';
         }
+        $bannerText = mb_substr(trim((string)($banner['text'] ?? '')), 0, 120);
+        $bannerSize = in_array($banner['size'] ?? '', ['chico', 'normal', 'grande'], true) ? (string)$banner['size'] : 'grande';
+        $bannerColor = preg_match('/^#[0-9a-fA-F]{6}$/', (string)($banner['color'] ?? '')) ? (string)$banner['color'] : '#C9A227';
+        $bannerBg = ($banner['bg'] ?? null) === null || $banner['bg'] === ''
+            ? null
+            : (preg_match('/^#[0-9a-fA-F]{6}$/', (string)$banner['bg']) ? (string)$banner['bg'] : null);
         $pdo = Db::pdo();
         $st = $pdo->prepare("
-            INSERT INTO portada_config (id, modo, codrub, codsub)
-            VALUES (1, :modo, :codrub, :codsub)
-            ON DUPLICATE KEY UPDATE modo=VALUES(modo), codrub=VALUES(codrub), codsub=VALUES(codsub)
+            INSERT INTO portada_config (id, modo, codrub, codsub, banner_text, banner_bold, banner_italic, banner_size, banner_color, banner_bg)
+            VALUES (1, :modo, :codrub, :codsub, :btext, :bbold, :bitalic, :bsize, :bcolor, :bbg)
+            ON DUPLICATE KEY UPDATE modo=VALUES(modo), codrub=VALUES(codrub), codsub=VALUES(codsub),
+                banner_text=VALUES(banner_text), banner_bold=VALUES(banner_bold), banner_italic=VALUES(banner_italic),
+                banner_size=VALUES(banner_size), banner_color=VALUES(banner_color), banner_bg=VALUES(banner_bg)
         ");
         $st->execute([
             ':modo' => $modo,
             ':codrub' => $codrub,
             ':codsub' => $codsub,
+            ':btext' => $bannerText !== '' ? $bannerText : null,
+            ':bbold' => !empty($banner['bold']) ? 1 : 0,
+            ':bitalic' => !empty($banner['italic']) ? 1 : 0,
+            ':bsize' => $bannerSize,
+            ':bcolor' => $bannerColor,
+            ':bbg' => $bannerBg,
         ]);
     }
 

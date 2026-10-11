@@ -57,8 +57,25 @@ foreach ([1, 2, 3] as $bi) {
     <?php
     $portadaTitles = ['auto'=>'Novedades','rubro'=>'Selección por rubro','marca'=>'Selección por marca','ultimos'=>'Últimos ingresos','manual'=>'Destacados'];
     $portadaLabel = $portadaTitles[(string)($portadaInfo['modo'] ?? 'auto')] ?? 'Novedades';
+    $bannerText = trim((string)($portadaInfo['banner_text'] ?? ''));
+    $showBanner = (($portadaInfo['modo'] ?? '') === 'manual') && $bannerText !== '';
+    if ($showBanner):
+        $bSizes = ['chico' => '1.1rem', 'normal' => '1.4rem', 'grande' => '1.9rem'];
+        $bSize = $bSizes[(string)($portadaInfo['banner_size'] ?? '')] ?? '1.9rem';
+        $bColor = preg_match('/^#[0-9a-fA-F]{6}$/', (string)($portadaInfo['banner_color'] ?? '')) ? (string)$portadaInfo['banner_color'] : '#C9A227';
+        $bBg = preg_match('/^#[0-9a-fA-F]{6}$/', (string)($portadaInfo['banner_bg'] ?? '')) ? (string)$portadaInfo['banner_bg'] : '';
+        $bStyle = 'margin:10px 0 0;text-align:center;letter-spacing:0.7px;font-family:Georgia,\'Times New Roman\',serif;'
+            . 'font-size:' . $bSize . ';color:' . $bColor . ';'
+            . 'font-weight:' . (!empty($portadaInfo['banner_bold']) ? 'bold' : 'normal') . ';'
+            . 'font-style:' . (!empty($portadaInfo['banner_italic']) ? 'italic' : 'normal') . ';';
+        if ($bBg !== '') {
+            $bStyle .= 'background:' . $bBg . ';padding:6px 18px;border-radius:10px;display:inline-block;';
+        }
     ?>
+    <div style="text-align:center"><div style="<?= $bStyle ?>"><?= htmlspecialchars($bannerText) ?></div></div>
+    <?php else: ?>
     <h3 style="margin:10px 0 0;color:var(--gold);font-family:Georgia, 'Times New Roman', serif;letter-spacing:0.7px"><?= htmlspecialchars($portadaLabel) ?></h3>
+    <?php endif; ?>
   <?php else: ?>
     <h3 style="margin:0;color:var(--gold);font-family:Georgia, 'Times New Roman', serif;letter-spacing:0.7px">Catalogo</h3>
     <div style="margin-top:10px;color:rgba(246,244,239,0.72);line-height:1.55">
