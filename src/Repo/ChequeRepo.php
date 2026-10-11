@@ -7,7 +7,14 @@ use Perfushopping\Web\Infra\Db;
 
 final class ChequeRepo
 {
-    public function search(string $tipo = '', string $estado = '', string $q = '', int $limit = 100): array
+    private const SORT_MAP = [
+        'id' => 'c.id',
+        'titular' => 'c.titular',
+        'emision' => 'c.fecha_emision',
+        'vencimiento' => 'c.fecha_vencimiento',
+    ];
+
+    public function search(string $tipo = '', string $estado = '', string $q = '', int $limit = 100, string $sort = 'vencimiento', string $order = 'asc'): array
     {
         $limit = max(1, min(500, $limit));
         $params = [];
@@ -28,6 +35,9 @@ final class ChequeRepo
             $params[':like3'] = '%' . $q . '%';
         }
 
+        $sortCol = self::SORT_MAP[$sort] ?? 'c.fecha_vencimiento';
+        $sortDir = strtolower($order) === 'desc' ? 'DESC' : 'ASC';
+
         $sql = '
             SELECT c.*, a.nombre AS created_by_nombre, b.banco AS cuenta_banco
             FROM cheques c
@@ -37,7 +47,7 @@ final class ChequeRepo
         if ($where) {
             $sql .= ' WHERE ' . implode(' AND ', $where);
         }
-        $sql .= ' ORDER BY c.id DESC LIMIT ' . $limit;
+        $sql .= ' ORDER BY ' . $sortCol . ' IS NULL, ' . $sortCol . ' ' . $sortDir . ', c.id ASC LIMIT ' . $limit;
 
         $st = Db::pdo()->prepare($sql);
         $st->execute($params);

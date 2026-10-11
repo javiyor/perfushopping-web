@@ -22,7 +22,15 @@ final class ChequeController
         $tipo = trim((string)($_GET['tipo'] ?? ''));
         $estado = trim((string)($_GET['estado'] ?? ''));
         $q = trim((string)($_GET['q'] ?? ''));
-        $list = (new ChequeRepo())->search($tipo, $estado, $q);
+        $sort = trim((string)($_GET['sort'] ?? 'vencimiento'));
+        $order = strtolower(trim((string)($_GET['order'] ?? 'asc')));
+        if (!in_array($sort, ['id', 'titular', 'emision', 'vencimiento'], true)) {
+            $sort = 'vencimiento';
+        }
+        if (!in_array($order, ['asc', 'desc'], true)) {
+            $order = 'asc';
+        }
+        $list = (new ChequeRepo())->search($tipo, $estado, $q, 500, $sort, $order);
 
         echo View::adminPage('admin/cheques/list.php', [
             'adminUser' => $adminUser,
@@ -30,6 +38,8 @@ final class ChequeController
             'tipo' => $tipo,
             'estado' => $estado,
             'q' => $q,
+            'sort' => $sort,
+            'order' => $order,
             'csrf' => Csrf::token(),
             'pageTitle' => 'Cheques',
         ]);
