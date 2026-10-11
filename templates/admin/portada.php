@@ -16,6 +16,11 @@ $bannerColor = preg_match('/^#[0-9a-fA-F]{6}$/', (string)($config['banner_color'
 $bannerBgRaw = (string)($config['banner_bg'] ?? '');
 $bannerBg = preg_match('/^#[0-9a-fA-F]{6}$/', $bannerBgRaw) ? $bannerBgRaw : '';
 $bannerBgTransp = $bannerBg === '';
+$bannerSub = trim((string)($config['banner_sub'] ?? ''));
+$bannerSubBold = !empty($config['banner_sub_bold']);
+$bannerSubItalic = !empty($config['banner_sub_italic']);
+$bannerSubSize = in_array($config['banner_sub_size'] ?? '', ['chico', 'normal', 'grande'], true) ? (string)$config['banner_sub_size'] : 'normal';
+$bannerSubColor = preg_match('/^#[0-9a-fA-F]{6}$/', (string)($config['banner_sub_color'] ?? '')) ? (string)$config['banner_sub_color'] : '#FFFFFF';
 $presetTexto = ['#C9A227' => 'Dorado', '#FFFFFF' => 'Blanco', '#1a1a1a' => 'Negro', '#C0392B' => 'Rojo', '#E84393' => 'Rosa', '#2E86C1' => 'Celeste'];
 $presetFondo = ['#1a1a1a' => 'Negro', '#C9A227' => 'Dorado', '#C0392B' => 'Rojo', '#7B241C' => 'Bordó', '#E84393' => 'Rosa', '#FFFFFF' => 'Blanco'];
 ?>
@@ -76,6 +81,36 @@ $presetFondo = ['#1a1a1a' => 'Negro', '#C9A227' => 'Dorado', '#C0392B' => 'Rojo'
             <div class="mt-3 p-3 border rounded" id="fieldBanner" style="<?= $modo === 'manual' ? '' : 'display:none' ?>">
                 <label class="form-label fw-semibold small">Texto destacado (fechas especiales) <span class="text-muted fw-normal">— se muestra en la portada pública en lugar de "Destacados"</span></label>
                 <input class="form-control form-control-sm mb-2" name="banner_text" id="bannerText" maxlength="120" value="<?= htmlspecialchars($bannerText) ?>" placeholder="Ej: Para mamá" oninput="updateBannerPreview()" />
+                <input class="form-control form-control-sm mb-2" name="banner_sub" id="bannerSub" maxlength="160" value="<?= htmlspecialchars($bannerSub) ?>" placeholder="Subtítulo (opcional). Ej: Todo para regalarle" oninput="updateBannerPreview()" />
+                <div class="row g-2 align-items-end mb-2">
+                    <div class="col-md-4">
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" name="banner_sub_bold" id="bannerSubBold" value="1" <?= $bannerSubBold ? 'checked' : '' ?> onchange="updateBannerPreview()" />
+                            <label class="form-check-label small fw-bold" for="bannerSubBold">Negrita</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" name="banner_sub_italic" id="bannerSubItalic" value="1" <?= $bannerSubItalic ? 'checked' : '' ?> onchange="updateBannerPreview()" />
+                            <label class="form-check-label small fst-italic" for="bannerSubItalic">Cursiva</label>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small mb-1">Tamaño subtítulo</label>
+                        <select class="form-select form-select-sm" name="banner_sub_size" id="bannerSubSize" onchange="updateBannerPreview()">
+                            <?php foreach (['chico' => 'Chico', 'normal' => 'Normal', 'grande' => 'Grande'] as $v => $l): ?>
+                            <option value="<?= $v ?>" <?= $bannerSubSize === $v ? 'selected' : '' ?>><?= $l ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small mb-1">Color subtítulo</label>
+                        <div class="d-flex align-items-center gap-1 flex-wrap">
+                            <?php foreach ($presetTexto as $hex => $nom): ?>
+                            <button type="button" title="<?= $nom ?>" onclick="setBannerSubColor('<?= $hex ?>')" style="width:22px;height:22px;border-radius:50%;border:2px solid #ccc;background:<?= $hex ?>;padding:0"></button>
+                            <?php endforeach; ?>
+                            <input type="color" name="banner_sub_color" id="bannerSubColor" value="<?= htmlspecialchars($bannerSubColor) ?>" title="Personalizado" style="width:30px;height:24px;padding:0;border:none" oninput="updateBannerPreview()" />
+                        </div>
+                    </div>
+                </div>
                 <div class="row g-2 align-items-end">
                     <div class="col-md-3">
                         <div class="form-check form-check-inline">
@@ -120,7 +155,7 @@ $presetFondo = ['#1a1a1a' => 'Negro', '#C9A227' => 'Dorado', '#C0392B' => 'Rojo'
                 </div>
                 <div class="mt-2">
                     <div class="small text-muted mb-1">Vista previa:</div>
-                    <div class="p-2 rounded text-center" style="background:#222" id="bannerPreviewWrap"><span id="bannerPreview"></span></div>
+                    <div class="p-2 rounded text-center" style="background:#222" id="bannerPreviewWrap"><div id="bannerPreview"></div><div id="bannerPreviewSub"></div></div>
                 </div>
             </div>
 
@@ -240,29 +275,42 @@ function setBannerBg(hex) {
     document.getElementById('bannerBgTransp').checked = false;
     updateBannerPreview();
 }
+function setBannerSubColor(hex) {
+    document.getElementById('bannerSubColor').value = hex;
+    updateBannerPreview();
+}
 function updateBannerPreview() {
     const txt = document.getElementById('bannerText').value.trim() || 'Texto destacado';
+    const sub = document.getElementById('bannerSub').value.trim();
     const prev = document.getElementById('bannerPreview');
+    const prevSub = document.getElementById('bannerPreviewSub');
     prev.textContent = txt;
     prev.style.fontWeight = document.getElementById('bannerBold').checked ? 'bold' : 'normal';
     prev.style.fontStyle = document.getElementById('bannerItalic').checked ? 'italic' : 'normal';
     const sizes = {chico: '1.1rem', normal: '1.4rem', grande: '1.8rem'};
     prev.style.fontSize = sizes[document.getElementById('bannerSize').value] || '1.8rem';
     prev.style.color = document.getElementById('bannerColor').value;
+    prevSub.textContent = sub;
+    prevSub.style.display = sub !== '' ? '' : 'none';
+    prevSub.style.fontWeight = document.getElementById('bannerSubBold').checked ? 'bold' : 'normal';
+    prevSub.style.fontStyle = document.getElementById('bannerSubItalic').checked ? 'italic' : 'normal';
+    prevSub.style.fontSize = sizes[document.getElementById('bannerSubSize').value] || '1.4rem';
+    prevSub.style.color = document.getElementById('bannerSubColor').value;
+    prevSub.style.marginTop = '2px';
     const wrap = document.getElementById('bannerPreviewWrap');
     if (document.getElementById('bannerBgTransp').checked) {
         wrap.style.background = '#222';
-        prev.style.background = 'transparent';
-        prev.style.padding = '0';
-        prev.style.borderRadius = '0';
+        wrap.style.padding = '8px';
+        wrap.style.borderRadius = '4px';
     } else {
-        wrap.style.background = '#222';
-        prev.style.background = document.getElementById('bannerBg').value;
-        prev.style.padding = '4px 18px';
-        prev.style.borderRadius = '8px';
+        wrap.style.background = document.getElementById('bannerBg').value;
+        wrap.style.padding = '6px 18px';
+        wrap.style.borderRadius = '10px';
     }
-    prev.style.fontFamily = "Georgia, 'Times New Roman', serif";
-    prev.style.letterSpacing = '0.7px';
+    [prev, prevSub].forEach(el => {
+        el.style.fontFamily = "Georgia, 'Times New Roman', serif";
+        el.style.letterSpacing = '0.7px';
+    });
 }
 document.addEventListener('DOMContentLoaded', updateBannerPreview);
 function toggleAll(chk) {

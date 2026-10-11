@@ -42,6 +42,11 @@ final class PortadaRepo
             $this->ensureColumn('portada_config', 'banner_size', "VARCHAR(10) NOT NULL DEFAULT 'grande'");
             $this->ensureColumn('portada_config', 'banner_color', "VARCHAR(7) NOT NULL DEFAULT '#C9A227'");
             $this->ensureColumn('portada_config', 'banner_bg', 'VARCHAR(7) DEFAULT NULL');
+            $this->ensureColumn('portada_config', 'banner_sub', 'VARCHAR(160) DEFAULT NULL');
+            $this->ensureColumn('portada_config', 'banner_sub_bold', 'TINYINT(1) NOT NULL DEFAULT 0');
+            $this->ensureColumn('portada_config', 'banner_sub_italic', 'TINYINT(1) NOT NULL DEFAULT 0');
+            $this->ensureColumn('portada_config', 'banner_sub_size', "VARCHAR(10) NOT NULL DEFAULT 'normal'");
+            $this->ensureColumn('portada_config', 'banner_sub_color', "VARCHAR(7) NOT NULL DEFAULT '#FFFFFF'");
         } catch (\Throwable $e) {
         }
     }
@@ -70,7 +75,9 @@ final class PortadaRepo
         }
         return ['id' => 1, 'modo' => 'auto', 'codrub' => null, 'codsub' => null,
             'banner_text' => null, 'banner_bold' => 0, 'banner_italic' => 0,
-            'banner_size' => 'grande', 'banner_color' => '#C9A227', 'banner_bg' => null];
+            'banner_size' => 'grande', 'banner_color' => '#C9A227', 'banner_bg' => null,
+            'banner_sub' => null, 'banner_sub_bold' => 0, 'banner_sub_italic' => 0,
+            'banner_sub_size' => 'normal', 'banner_sub_color' => '#FFFFFF'];
     }
 
     /** @param array<string,mixed> $banner */
@@ -94,13 +101,20 @@ final class PortadaRepo
         $bannerBg = ($banner['bg'] ?? null) === null || $banner['bg'] === ''
             ? null
             : (preg_match('/^#[0-9a-fA-F]{6}$/', (string)$banner['bg']) ? (string)$banner['bg'] : null);
+        $bannerSub = mb_substr(trim((string)($banner['sub'] ?? '')), 0, 160);
+        $bannerSubSize = in_array($banner['sub_size'] ?? '', ['chico', 'normal', 'grande'], true) ? (string)$banner['sub_size'] : 'normal';
+        $bannerSubColor = preg_match('/^#[0-9a-fA-F]{6}$/', (string)($banner['sub_color'] ?? '')) ? (string)$banner['sub_color'] : '#FFFFFF';
         $pdo = Db::pdo();
         $st = $pdo->prepare("
-            INSERT INTO portada_config (id, modo, codrub, codsub, banner_text, banner_bold, banner_italic, banner_size, banner_color, banner_bg)
-            VALUES (1, :modo, :codrub, :codsub, :btext, :bbold, :bitalic, :bsize, :bcolor, :bbg)
+            INSERT INTO portada_config (id, modo, codrub, codsub, banner_text, banner_bold, banner_italic, banner_size, banner_color, banner_bg,
+                banner_sub, banner_sub_bold, banner_sub_italic, banner_sub_size, banner_sub_color)
+            VALUES (1, :modo, :codrub, :codsub, :btext, :bbold, :bitalic, :bsize, :bcolor, :bbg,
+                :bsub, :bsubbold, :bsubitalic, :bsubsize, :bsubcolor)
             ON DUPLICATE KEY UPDATE modo=VALUES(modo), codrub=VALUES(codrub), codsub=VALUES(codsub),
                 banner_text=VALUES(banner_text), banner_bold=VALUES(banner_bold), banner_italic=VALUES(banner_italic),
-                banner_size=VALUES(banner_size), banner_color=VALUES(banner_color), banner_bg=VALUES(banner_bg)
+                banner_size=VALUES(banner_size), banner_color=VALUES(banner_color), banner_bg=VALUES(banner_bg),
+                banner_sub=VALUES(banner_sub), banner_sub_bold=VALUES(banner_sub_bold), banner_sub_italic=VALUES(banner_sub_italic),
+                banner_sub_size=VALUES(banner_sub_size), banner_sub_color=VALUES(banner_sub_color)
         ");
         $st->execute([
             ':modo' => $modo,
@@ -112,6 +126,11 @@ final class PortadaRepo
             ':bsize' => $bannerSize,
             ':bcolor' => $bannerColor,
             ':bbg' => $bannerBg,
+            ':bsub' => $bannerSub !== '' ? $bannerSub : null,
+            ':bsubbold' => !empty($banner['sub_bold']) ? 1 : 0,
+            ':bsubitalic' => !empty($banner['sub_italic']) ? 1 : 0,
+            ':bsubsize' => $bannerSubSize,
+            ':bsubcolor' => $bannerSubColor,
         ]);
     }
 

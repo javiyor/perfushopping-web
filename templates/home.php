@@ -71,8 +71,18 @@ foreach ([1, 2, 3] as $bi) {
         if ($bBg !== '') {
             $bStyle .= 'background:' . $bBg . ';padding:6px 18px;border-radius:10px;display:inline-block;';
         }
+        $bannerSub = trim((string)($portadaInfo['banner_sub'] ?? ''));
+        $bSubSize = $bSizes[(string)($portadaInfo['banner_sub_size'] ?? '')] ?? '1.4rem';
+        $bSubColor = preg_match('/^#[0-9a-fA-F]{6}$/', (string)($portadaInfo['banner_sub_color'] ?? '')) ? (string)$portadaInfo['banner_sub_color'] : '#FFFFFF';
+        $bSubStyle = 'font-family:Georgia,\'Times New Roman\',serif;letter-spacing:0.7px;margin-top:2px;'
+            . 'font-size:' . $bSubSize . ';color:' . $bSubColor . ';'
+            . 'font-weight:' . (!empty($portadaInfo['banner_sub_bold']) ? 'bold' : 'normal') . ';'
+            . 'font-style:' . (!empty($portadaInfo['banner_sub_italic']) ? 'italic' : 'normal') . ';';
     ?>
-    <div style="text-align:center"><div style="<?= $bStyle ?>"><?= htmlspecialchars($bannerText) ?></div></div>
+    <div style="text-align:center"><div style="<?= $bStyle ?>">
+        <div><?= htmlspecialchars($bannerText) ?></div>
+        <?php if ($bannerSub !== ''): ?><div style="<?= $bSubStyle ?>"><?= htmlspecialchars($bannerSub) ?></div><?php endif; ?>
+    </div></div>
     <?php else: ?>
     <h3 style="margin:10px 0 0;color:var(--gold);font-family:Georgia, 'Times New Roman', serif;letter-spacing:0.7px"><?= htmlspecialchars($portadaLabel) ?></h3>
     <?php endif; ?>

@@ -63,6 +63,11 @@ final class PortadaController
             'size' => trim((string)($_POST['banner_size'] ?? 'grande')),
             'color' => trim((string)($_POST['banner_color'] ?? '')),
             'bg' => isset($_POST['banner_bg_transp']) ? null : trim((string)($_POST['banner_bg'] ?? '')),
+            'sub' => trim((string)($_POST['banner_sub'] ?? '')),
+            'sub_bold' => isset($_POST['banner_sub_bold']) ? 1 : 0,
+            'sub_italic' => isset($_POST['banner_sub_italic']) ? 1 : 0,
+            'sub_size' => trim((string)($_POST['banner_sub_size'] ?? 'normal')),
+            'sub_color' => trim((string)($_POST['banner_sub_color'] ?? '')),
         ];
 
         (new PortadaRepo())->saveConfig($modo, $codrub ?: null, $codsub ?: null, $banner);
