@@ -101,6 +101,13 @@ if ($cheque['tipo'] === 'tercero') {
                             </div>
                         </form>
                     <?php endforeach; ?>
+                    <?php if (($cheque['tipo'] ?? '') === 'tercero' && ($cheque['estado'] ?? '') === 'anulado'): ?>
+                        <form method="post" action="/admin/cheques/eliminar" onsubmit="return confirm('¿Eliminar definitivamente el cheque #<?= (int)$cheque['id'] ?>?');">
+                            <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                            <input type="hidden" name="id" value="<?= (int)$cheque['id'] ?>" />
+                            <button class="btn btn-danger btn-sm w-100" type="submit"><i class="bi bi-trash"></i> Eliminar cheque</button>
+                        </form>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>

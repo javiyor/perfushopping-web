@@ -216,4 +216,27 @@ final class ChequeController
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Estado del cheque actualizado a: ' . $estado];
         Response::redirect('/admin/cheques/' . $id);
     }
+
+    public function eliminar(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $auth->requirePermiso('cheques');
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $id = (int)($_POST['id'] ?? 0);
+        $repo = new ChequeRepo();
+        $cheque = $repo->findById($id);
+        if (!$cheque) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Cheque no encontrado.'];
+            Response::redirect('/admin/cheques');
+        }
+        if (($cheque['tipo'] ?? '') !== 'tercero' || ($cheque['estado'] ?? '') !== 'anulado') {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Sólo se pueden eliminar cheques de terceros anulados.'];
+            Response::redirect('/admin/cheques/' . $id);
+        }
+
+        $repo->delete($id);
+        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Cheque #' . $id . ' eliminado.'];
+        Response::redirect('/admin/cheques');
+    }
 }

@@ -544,6 +544,7 @@ $router->post('/admin/cheques/emitir/guardar', [AdminChequeController::class, 'e
 $router->get('/admin/cheques/buscar-proveedores', [AdminChequeController::class, 'searchProveedores']);
 $router->get('/admin/cheques/(?P<id>\d+)', [AdminChequeController::class, 'show']);
 $router->post('/admin/cheques/estado', [AdminChequeController::class, 'estado']);
+$router->post('/admin/cheques/eliminar', [AdminChequeController::class, 'eliminar']);
 
 // Admin - Sucursales
 $router->get('/admin/sucursales', [AdminSucursalController::class, 'index']);
