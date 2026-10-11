@@ -21,6 +21,29 @@ final class MetaRepo
         return $st->fetchAll();
     }
 
+    /** Marcas con al menos un producto visible con stock en depósitos operativos.
+     *  @return array<int, array<string,mixed>> */
+    public function marcasConStock(): array
+    {
+        $st = Db::pdo()->query("
+            SELECT DISTINCT s.codsub, s.nomsub
+            FROM subrubro s
+            INNER JOIN producto p ON p.codsub = s.codsub AND p.enweb = 1
+            INNER JOIN gustos g ON g.idprodu = p.idprodu AND g.discont = 0
+            INNER JOIN (
+                SELECT st.idcodgusto
+                FROM stock st
+                INNER JOIN deposito d ON d.iddepo = st.iddepo AND d.marca = 2
+                GROUP BY st.idcodgusto
+                HAVING SUM(st.stock) > 0
+            ) cst ON cst.idcodgusto = g.idcodgusto
+            WHERE s.nomsub IS NOT NULL AND s.nomsub <> ''
+            ORDER BY s.nomsub ASC
+        ");
+        $rows = $st ? $st->fetchAll() : [];
+        return is_array($rows) ? $rows : [];
+    }
+
     /** @return array<int, array<string,mixed>> */
     public function provincias(): array
     {

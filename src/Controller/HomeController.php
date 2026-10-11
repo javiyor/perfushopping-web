@@ -44,7 +44,7 @@ final class HomeController
         echo View::page('home.php', [
             'products' => $products,
             'rubros' => $meta->rubros(),
-            'marcas' => $meta->marcas(),
+            'marcas' => $meta->marcasConStock(),
             'user' => $user,
             'isWholesale' => $auth->isWholesaleApproved($user),
             'portadaInfo' => $portadaInfo,
