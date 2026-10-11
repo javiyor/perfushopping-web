@@ -25,12 +25,22 @@ foreach ([1, 2, 3] as $bi) {
 
 <?php if (!empty($blocks)): ?>
   <?php
+  $trustBlock = null;
   foreach ($blocks as $block) {
+      if (($block['block_type'] ?? '') === 'trust_badges' && $trustBlock === null) {
+          $trustBlock = $block;
+          continue;
+      }
       $blockFile = __DIR__ . '/home/blocks/' . preg_replace('/[^a-z0-9_]/', '', (string)$block['block_type']) . '.php';
       if (is_file($blockFile)) {
           include $blockFile;
       }
   }
+  $trustSettings = is_array($trustBlock) && is_array($trustBlock['settings'] ?? null) ? $trustBlock['settings'] : [];
+  $googleScore = trim((string)($trustSettings['google_score'] ?? '4.8'));
+  if ($googleScore === '') $googleScore = '4.8';
+  $googleReviews = trim((string)($trustSettings['google_reviews'] ?? ''));
+  $googleUrl = trim((string)($trustSettings['google_url'] ?? ''));
   ?>
 <?php else: ?>
 <div class="hero">
@@ -44,6 +54,12 @@ foreach ([1, 2, 3] as $bi) {
       <span class="<?= $i === 0 ? 'pill' : 'pill secondary' ?>"><?= htmlspecialchars($benef) ?></span>
     <?php endforeach; ?>
   </div>
+</div>
+<?php endif; ?>
+
+<?php if (($googleUrl ?? '') !== '' && $googleUrl !== '#'): ?>
+<div style="text-align:right;margin:8px 2px 0">
+  <a href="<?= htmlspecialchars($googleUrl) ?>" target="_blank" rel="noopener" style="font-size:11px;color:rgba(246,244,239,0.8);text-decoration:none;border:1px solid rgba(216,178,90,0.4);border-radius:20px;padding:2px 10px;display:inline-block">★ <?= htmlspecialchars($googleScore) ?> en Google<?= $googleReviews !== '' ? ' · ' . htmlspecialchars($googleReviews) . ' opiniones' : '' ?></a>
 </div>
 <?php endif; ?>
 
@@ -137,6 +153,16 @@ foreach ([1, 2, 3] as $bi) {
       </a>
     <?php endforeach; ?>
   </div>
+<?php endif; ?>
+
+<?php if (!empty($trustBlock ?? null)): ?>
+  <?php
+  $block = $trustBlock;
+  $blockFile = __DIR__ . '/home/blocks/trust_badges.php';
+  if (is_file($blockFile)) {
+      include $blockFile;
+  }
+  ?>
 <?php endif; ?>
 
 <div class="page" style="margin-top:26px;padding-top:18px;border-top:1px solid rgba(216,178,90,0.25)">
