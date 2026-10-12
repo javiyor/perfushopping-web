@@ -156,4 +156,185 @@ final class PromoWebRepo
             return [];
         }
     }
+
+    // ── Banners de texto (sin producto, opcionalmente enlazados a una marca) ──
+
+    private function ensureBanners(): void
+    {
+        $this->ensure();
+        try {
+            Db::pdo()->exec("CREATE TABLE IF NOT EXISTS promo_banners (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                titulo VARCHAR(120) NOT NULL,
+                texto VARCHAR(255) DEFAULT NULL,
+                codsub INT UNSIGNED DEFAULT NULL,
+                link VARCHAR(255) DEFAULT NULL,
+                color VARCHAR(7) NOT NULL DEFAULT '#FFFFFF',
+                bg VARCHAR(7) DEFAULT NULL,
+                activo TINYINT(1) NOT NULL DEFAULT 1,
+                orden INT UNSIGNED NOT NULL DEFAULT 0,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                KEY idx_promo_banners_activo_orden (activo, orden, id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        } catch (\Throwable $e) {
+        }
+    }
+
+    /** @return array<int, array<string,mixed>> */
+    public function listBannersAdmin(): array
+    {
+        $this->ensureBanners();
+        try {
+            $st = Db::pdo()->query("
+                SELECT b.*, s.nomsub
+                FROM promo_banners b
+                LEFT JOIN subrubro s ON s.codsub = b.codsub
+                ORDER BY b.orden ASC, b.id ASC
+            ");
+            return $st->fetchAll();
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    /** Banners activos para la portada, con nombre de marca y link resuelto. */
+    public function listActiveBanners(): array
+    {
+        $this->ensureBanners();
+        try {
+            $st = Db::pdo()->query("
+                SELECT b.*, s.nomsub
+                FROM promo_banners b
+                LEFT JOIN subrubro s ON s.codsub = b.codsub
+                WHERE b.activo = 1
+                ORDER BY b.orden ASC, b.id ASC
+            ");
+            $rows = $st->fetchAll();
+            foreach ($rows as &$r) {
+                $r['href'] = $this->bannerHref($r);
+            }
+            unset($r);
+            return $rows;
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    /** @param array<string,mixed> $b */
+    public function bannerHref(array $b): string
+    {
+        $codsub = (int)($b['codsub'] ?? 0);
+        if ($codsub > 0) {
+            return '/?codsub=' . $codsub;
+        }
+        $link = trim((string)($b['link'] ?? ''));
+        if ($link === '') {
+            return '';
+        }
+        if (str_starts_with($link, '/')) {
+            return $link;
+        }
+        if (preg_match('#^https?://#i', $link)) {
+            return $link;
+        }
+        return '';
+    }
+
+    /**
+     * Alta o edición de banner. $data: titulo, texto, codsub, link, color, bg.
+     * @param array<string,mixed> $data
+     */
+    public function saveBanner(array $data): bool
+    {
+        $this->ensureBanners();
+        $id = (int)($data['id'] ?? 0);
+        $titulo = mb_substr(trim((string)($data['titulo'] ?? '')), 0, 120);
+        if ($titulo === '') {
+            return false;
+        }
+        $texto = mb_substr(trim((string)($data['texto'] ?? '')), 0, 255);
+        $codsub = (int)($data['codsub'] ?? 0);
+        if ($codsub > 0) {
+            try {
+                $chk = Db::pdo()->prepare("SELECT codsub FROM subrubro WHERE codsub=:c LIMIT 1");
+                $chk->execute([':c' => $codsub]);
+                if (!$chk->fetch()) {
+                    $codsub = 0;
+                }
+            } catch (\Throwable $e) {
+                $codsub = 0;
+            }
+        }
+        $link = trim((string)($data['link'] ?? ''));
+        if ($link !== '' && !str_starts_with($link, '/') && !preg_match('#^https?://#i', $link)) {
+            $link = '';
+        }
+        $color = preg_match('/^#[0-9a-fA-F]{6}$/', (string)($data['color'] ?? '')) ? (string)$data['color'] : '#FFFFFF';
+        $bgRaw = trim((string)($data['bg'] ?? ''));
+        $bg = preg_match('/^#[0-9a-fA-F]{6}$/', $bgRaw) ? $bgRaw : null;
+        try {
+            $pdo = Db::pdo();
+            if ($id > 0) {
+                $st = $pdo->prepare("UPDATE promo_banners
+                    SET titulo=:t, texto=:x, codsub=:c, link=:l, color=:col, bg=:bg
+                    WHERE id=:id LIMIT 1");
+                $st->execute([
+                    ':t' => $titulo, ':x' => $texto !== '' ? $texto : null,
+                    ':c' => $codsub > 0 ? $codsub : null, ':l' => $link !== '' ? $link : null,
+                    ':col' => $color, ':bg' => $bg, ':id' => $id,
+                ]);
+                return $st->rowCount() > 0;
+            }
+            $max = (int)$pdo->query("SELECT COALESCE(MAX(orden),0)+1 FROM promo_banners")->fetchColumn();
+            $st = $pdo->prepare("INSERT INTO promo_banners (titulo, texto, codsub, link, color, bg, activo, orden)
+                VALUES (:t, :x, :c, :l, :col, :bg, 1, :o)");
+            $st->execute([
+                ':t' => $titulo, ':x' => $texto !== '' ? $texto : null,
+                ':c' => $codsub > 0 ? $codsub : null, ':l' => $link !== '' ? $link : null,
+                ':col' => $color, ':bg' => $bg, ':o' => max(1, $max),
+            ]);
+            return true;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    public function removeBanner(int $id): void
+    {
+        $this->ensureBanners();
+        try {
+            $st = Db::pdo()->prepare("DELETE FROM promo_banners WHERE id=:id LIMIT 1");
+            $st->execute([':id' => $id]);
+        } catch (\Throwable $e) {
+        }
+    }
+
+    public function toggleBanner(int $id): void
+    {
+        $this->ensureBanners();
+        try {
+            $st = Db::pdo()->prepare("UPDATE promo_banners SET activo=1-activo WHERE id=:id LIMIT 1");
+            $st->execute([':id' => $id]);
+        } catch (\Throwable $e) {
+        }
+    }
+
+    /** @param array<int,int> $map id => orden */
+    public function saveBannerOrder(array $map): void
+    {
+        $this->ensureBanners();
+        try {
+            $pdo = Db::pdo();
+            $st = $pdo->prepare("UPDATE promo_banners SET orden=:o WHERE id=:id LIMIT 1");
+            foreach ($map as $id => $orden) {
+                $id = (int)$id;
+                if ($id <= 0) {
+                    continue;
+                }
+                $st->execute([':o' => max(0, (int)$orden), ':id' => $id]);
+            }
+        } catch (\Throwable $e) {
+        }
+    }
 }

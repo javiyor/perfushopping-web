@@ -25,6 +25,8 @@ final class PromoWebController
         echo View::adminPage('admin/promos/list.php', [
             'adminUser' => $adminUser,
             'promos' => (new PromoWebRepo())->listAdmin(),
+            'banners' => (new PromoWebRepo())->listBannersAdmin(),
+            'brands' => (new AdminProductRepo())->brandOptions(),
             'q' => $q,
             'searchResults' => $searchResults,
             'csrf' => Csrf::token(),
@@ -119,6 +121,69 @@ final class PromoWebController
         }
         if ($map) {
             (new PromoWebRepo())->saveOrder($map);
+            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Orden actualizado.'];
+        }
+        Response::redirect('/admin/promos');
+    }
+
+    public function saveBanner(array $params): void
+    {
+        (new AdminAuthService())->requirePermiso('productos');
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $ok = (new PromoWebRepo())->saveBanner([
+            'id' => (int)($_POST['id'] ?? 0),
+            'titulo' => trim((string)($_POST['titulo'] ?? '')),
+            'texto' => trim((string)($_POST['texto'] ?? '')),
+            'codsub' => (int)($_POST['codsub'] ?? 0),
+            'link' => trim((string)($_POST['link'] ?? '')),
+            'color' => trim((string)($_POST['color'] ?? '')),
+            'bg' => trim((string)($_POST['bg'] ?? '')),
+        ]);
+        $_SESSION['admin_flash'] = $ok
+            ? ['type' => 'ok', 'text' => 'Banner guardado.']
+            : ['type' => 'danger', 'text' => 'No se pudo guardar (revisá el título).'];
+        Response::redirect('/admin/promos');
+    }
+
+    public function removeBanner(array $params): void
+    {
+        (new AdminAuthService())->requirePermiso('productos');
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $id = (int)($_POST['id'] ?? 0);
+        if ($id > 0) {
+            (new PromoWebRepo())->removeBanner($id);
+            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Banner quitado.'];
+        }
+        Response::redirect('/admin/promos');
+    }
+
+    public function toggleBanner(array $params): void
+    {
+        (new AdminAuthService())->requirePermiso('productos');
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $id = (int)($_POST['id'] ?? 0);
+        if ($id > 0) {
+            (new PromoWebRepo())->toggleBanner($id);
+            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Estado actualizado.'];
+        }
+        Response::redirect('/admin/promos');
+    }
+
+    public function reorderBanners(array $params): void
+    {
+        (new AdminAuthService())->requirePermiso('productos');
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $orden = (array)($_POST['orden'] ?? []);
+        $map = [];
+        foreach ($orden as $id => $pos) {
+            $map[(int)$id] = (int)$pos;
+        }
+        if ($map) {
+            (new PromoWebRepo())->saveBannerOrder($map);
             $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Orden actualizado.'];
         }
         Response::redirect('/admin/promos');

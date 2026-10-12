@@ -1,5 +1,7 @@
 <?php
 $promos = $promos ?? [];
+$banners = $banners ?? [];
+$brands = $brands ?? [];
 $q = (string)($q ?? '');
 $searchResults = $searchResults ?? [];
 $csrf = (string)($csrf ?? '');
@@ -61,16 +63,132 @@ $csrf = (string)($csrf ?? '');
 </div>
 
 <script>
-function promoPost(action, idprodu) {
+function promoPost(action, id, field) {
     const f = document.createElement('form');
     f.method = 'post';
     f.action = action;
     const csrf = document.createElement('input');
     csrf.type = 'hidden'; csrf.name = '_csrf'; csrf.value = <?= json_encode($csrf) ?>;
     const inp = document.createElement('input');
-    inp.type = 'hidden'; inp.name = 'idprodu'; inp.value = idprodu;
+    inp.type = 'hidden'; inp.name = field || 'idprodu'; inp.value = id;
     f.appendChild(csrf); f.appendChild(inp);
     document.body.appendChild(f); f.submit();
+}
+</script>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white fw-semibold">Banners de texto (sin producto) — van al carousel y enlazan a la marca (<?= count($banners) ?>)</div>
+    <div class="card-body p-0">
+        <?php if ($banners): ?>
+            <form method="post" action="/admin/promos/banner/orden">
+                <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>" />
+                <div class="table-responsive">
+                    <table class="table table-sm table-admin mb-0">
+                        <thead><tr><th style="width:70px">Orden</th><th>Banner</th><th>Destino</th><th>Estado</th><th style="width:90px"></th></tr></thead>
+                        <tbody>
+                            <?php foreach ($banners as $b): ?>
+                            <tr class="<?= empty($b['activo']) ? 'table-secondary' : '' ?>">
+                                <td><input type="number" class="form-control form-control-sm" name="orden[<?= (int)$b['id'] ?>]" value="<?= (int)($b['orden'] ?? 0) ?>" min="0" max="9999" style="width:65px" /></td>
+                                <td>
+                                    <div class="fw-semibold small"><?= htmlspecialchars((string)($b['titulo'] ?? '')) ?></div>
+                                    <div class="text-muted" style="font-size:11px"><?= htmlspecialchars(mb_substr((string)($b['texto'] ?? ''), 0, 80)) ?></div>
+                                </td>
+                                <td class="small"><?= (int)($b['codsub'] ?? 0) > 0 ? 'Marca: ' . htmlspecialchars((string)($b['nomsub'] ?? '')) : htmlspecialchars((string)($b['link'] ?? '—')) ?></td>
+                                <td>
+                                    <button class="btn btn-sm <?= !empty($b['activo']) ? 'btn-success' : 'btn-outline-secondary' ?>" type="button" onclick="promoPost('/admin/promos/banner/activo', <?= (int)$b['id'] ?>, 'id')"><?= !empty($b['activo']) ? 'Activo' : 'Pausado' ?></button>
+                                </td>
+                                <td class="text-nowrap">
+                                    <button class="btn btn-sm btn-outline-primary" type="button" title="Editar"
+                                        data-id="<?= (int)$b['id'] ?>"
+                                        data-titulo="<?= htmlspecialchars((string)($b['titulo'] ?? ''), ENT_QUOTES) ?>"
+                                        data-texto="<?= htmlspecialchars((string)($b['texto'] ?? ''), ENT_QUOTES) ?>"
+                                        data-codsub="<?= (int)($b['codsub'] ?? 0) ?>"
+                                        data-link="<?= htmlspecialchars((string)($b['link'] ?? ''), ENT_QUOTES) ?>"
+                                        data-color="<?= htmlspecialchars((string)($b['color'] ?? '#FFFFFF'), ENT_QUOTES) ?>"
+                                        data-bg="<?= htmlspecialchars((string)($b['bg'] ?? ''), ENT_QUOTES) ?>"
+                                        onclick="editarBanner(this)"><i class="bi bi-pencil"></i></button>
+                                    <button class="btn btn-sm btn-outline-danger" type="button" onclick="if(confirm('Quitar banner?')) promoPost('/admin/promos/banner/quitar', <?= (int)$b['id'] ?>, 'id')"><i class="bi bi-x-lg"></i></button>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="p-2">
+                    <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-arrow-down-up"></i> Guardar orden</button>
+                </div>
+            </form>
+        <?php else: ?>
+            <div class="p-3 text-muted small">Sin banners. Creá el primero abajo. Ej: "3 Protenat + 1 gratis".</div>
+        <?php endif; ?>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white fw-semibold" id="bannerFormTitle">Nuevo banner de texto</div>
+    <div class="card-body">
+        <form method="post" action="/admin/promos/banner/guardar" class="row g-2">
+            <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>" />
+            <input type="hidden" name="id" id="bannerId" value="0" />
+            <div class="col-md-4">
+                <label class="form-label small">Título *</label>
+                <input class="form-control form-control-sm" name="titulo" id="bannerTitulo" maxlength="120" required placeholder="Ej: 3 Protenat + 1 gratis" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small">Texto / condición</label>
+                <input class="form-control form-control-sm" name="texto" id="bannerTexto" maxlength="255" placeholder="Ej: Comprando 3 productos Protenat el 4° va gratis" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small">Marca (el botón lleva a la marca)</label>
+                <select class="form-select form-select-sm" name="codsub" id="bannerMarca">
+                    <option value="0">— Sin marca —</option>
+                    <?php foreach ($brands as $brand): ?>
+                    <option value="<?= (int)($brand['codsub'] ?? 0) ?>"><?= htmlspecialchars((string)($brand['nomsub'] ?? '')) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small">Link (si no hay marca)</label>
+                <input class="form-control form-control-sm" name="link" id="bannerLink" maxlength="255" placeholder="/ruta o https://..." />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">Color texto</label>
+                <input type="color" class="form-control form-control-sm" name="color" id="bannerColor" value="#FFFFFF" style="height:32px;padding:2px" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">Fondo (vacío = tema)</label>
+                <input class="form-control form-control-sm" name="bg" id="bannerBg" maxlength="7" placeholder="#C0392B" />
+            </div>
+            <div class="col-md-4 d-flex align-items-end gap-2">
+                <button class="btn btn-accent btn-sm" type="submit"><i class="bi bi-check-lg"></i> Guardar banner</button>
+                <button class="btn btn-outline-secondary btn-sm" type="button" onclick="limpiarBanner()">Limpiar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function editarBanner(btn) {
+    document.getElementById('bannerId').value = btn.dataset.id || '0';
+    document.getElementById('bannerTitulo').value = btn.dataset.titulo || '';
+    document.getElementById('bannerTexto').value = btn.dataset.texto || '';
+    document.getElementById('bannerMarca').value = btn.dataset.codsub || '0';
+    document.getElementById('bannerLink').value = btn.dataset.link || '';
+    document.getElementById('bannerColor').value = /^#[0-9a-fA-F]{6}$/.test(btn.dataset.color || '') ? btn.dataset.color : '#FFFFFF';
+    document.getElementById('bannerBg').value = btn.dataset.bg || '';
+    document.getElementById('bannerFormTitle').textContent = 'Editar banner #' + (btn.dataset.id || '');
+    document.getElementById('bannerTitulo').focus();
+    window.scrollTo({top: document.getElementById('bannerFormTitle').offsetTop - 80, behavior: 'smooth'});
+}
+function limpiarBanner() {
+    document.getElementById('bannerId').value = '0';
+    document.getElementById('bannerTitulo').value = '';
+    document.getElementById('bannerTexto').value = '';
+    document.getElementById('bannerMarca').value = '0';
+    document.getElementById('bannerLink').value = '';
+    document.getElementById('bannerColor').value = '#FFFFFF';
+    document.getElementById('bannerBg').value = '';
+    document.getElementById('bannerFormTitle').textContent = 'Nuevo banner de texto';
 }
 </script>
 

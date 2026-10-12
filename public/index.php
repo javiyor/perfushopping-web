@@ -663,6 +663,10 @@ $router->post('/admin/promos/agregar', [AdminPromoWebController::class, 'add']);
 $router->post('/admin/promos/quitar', [AdminPromoWebController::class, 'remove']);
 $router->post('/admin/promos/activo', [AdminPromoWebController::class, 'toggle']);
 $router->post('/admin/promos/orden', [AdminPromoWebController::class, 'reorder']);
+$router->post('/admin/promos/banner/guardar', [AdminPromoWebController::class, 'saveBanner']);
+$router->post('/admin/promos/banner/quitar', [AdminPromoWebController::class, 'removeBanner']);
+$router->post('/admin/promos/banner/activo', [AdminPromoWebController::class, 'toggleBanner']);
+$router->post('/admin/promos/banner/orden', [AdminPromoWebController::class, 'reorderBanners']);
 
 // Admin - Facturas de compra
 $router->get('/admin/compras', [AdminCompraController::class, 'index']);

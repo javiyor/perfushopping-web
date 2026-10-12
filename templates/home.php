@@ -134,7 +134,12 @@ foreach ($promos as $pr) {
     ];
 }
 ?>
-<?php if ($promosByProduct): ?>
+<?php
+$promos = $promos ?? [];
+$promoBanners = $promoBanners ?? [];
+$showPromos = $promosByProduct || $promoBanners;
+?>
+<?php if ($showPromos): ?>
 <style>
 .promo-banda { margin-top:18px; }
 .promo-banda-head { display:flex;justify-content:space-between;align-items:center;margin-bottom:8px; }
@@ -149,6 +154,10 @@ foreach ($promos as $pr) {
 .promo-off { display:inline-block;background:#c0392b;color:#fff;font-weight:800;font-size:13px;border-radius:8px;padding:1px 8px;margin:3px 0; }
 .promo-new { font-size:1.4rem;font-weight:800;color:#7CFC9A;line-height:1.2; }
 .promo-add { margin-top:8px;width:100%;padding:8px;border:none;border-radius:10px;background:linear-gradient(135deg,#d8b25a,#f3d48a);color:#17140f;font-weight:800;cursor:pointer; }
+.promo-banner-card { display:flex;flex-direction:column;justify-content:center; }
+.promo-banner-title { font-size:1.15rem;font-weight:800;line-height:1.25;font-family:Georgia,'Times New Roman',serif; }
+.promo-banner-text { font-size:12px;margin-top:6px;opacity:0.92;line-height:1.4; }
+.promo-banner-btn { margin-top:10px;display:inline-block;padding:8px 14px;border-radius:10px;background:rgba(255,255,255,0.92);color:#17140f;font-weight:800;font-size:13px;text-decoration:none; }
 </style>
 <div class="promo-banda">
   <div class="promo-banda-head">
@@ -159,6 +168,18 @@ foreach ($promos as $pr) {
     </div>
   </div>
   <div class="promo-track" id="promoTrack">
+    <?php foreach ($promoBanners as $bn):
+        $bnColor = preg_match('/^#[0-9a-fA-F]{6}$/', (string)($bn['color'] ?? '')) ? (string)$bn['color'] : '#FFFFFF';
+        $bnBg = preg_match('/^#[0-9a-fA-F]{6}$/', (string)($bn['bg'] ?? '')) ? (string)$bn['bg'] : '';
+        $bnHref = (string)($bn['href'] ?? '');
+        $bnMarca = trim((string)($bn['nomsub'] ?? ''));
+    ?>
+    <div class="promo-card promo-banner-card" style="color:<?= $bnColor ?>;<?= $bnBg !== '' ? 'background:' . $bnBg . ';border-color:transparent;' : '' ?>">
+      <div class="promo-banner-title"><?= htmlspecialchars((string)($bn['titulo'] ?? '')) ?></div>
+      <?php if (trim((string)($bn['texto'] ?? '')) !== ''): ?><div class="promo-banner-text"><?= htmlspecialchars((string)$bn['texto']) ?></div><?php endif; ?>
+      <?php if ($bnHref !== ''): ?><div><a class="promo-banner-btn" href="<?= htmlspecialchars($bnHref) ?>"><?= $bnMarca !== '' ? 'Ver ' . htmlspecialchars($bnMarca) : 'Ver más' ?></a></div><?php endif; ?>
+    </div>
+    <?php endforeach; ?>
     <?php foreach ($promosByProduct as $pr): ?>
     <div class="promo-card">
       <a href="/p/<?= $pr['idprodu'] ?>" style="text-decoration:none;color:inherit">
