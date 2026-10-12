@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Perfushopping\Web\Controller;
 
 use Perfushopping\Web\Repo\ProductRepo;
+use Perfushopping\Web\Repo\CartSnapshotRepo;
 use Perfushopping\Web\Service\AuthService;
 use Perfushopping\Web\Service\CartService;
 use Perfushopping\Web\Service\PricingService;
@@ -13,6 +14,20 @@ use Perfushopping\Web\Support\View;
 
 final class CartController
 {
+    private function snapshot(): void
+    {
+        try {
+            $auth = new AuthService();
+            $user = $auth->user();
+            (new CartSnapshotRepo())->capture(
+                (new CartService())->items(),
+                $user ? (int)$user['id'] : null,
+                $user ? (string)($user['email'] ?? '') : null,
+                (bool)$auth->isWholesaleApproved($user)
+            );
+        } catch (\Throwable $e) {
+        }
+    }
     public function view(array $params): void
     {
         $cart = new CartService();
@@ -77,6 +92,7 @@ final class CartController
             Response::redirect('/cart');
         }
         (new CartService())->add($id, $qty);
+        $this->snapshot();
         $_SESSION['flash'] = ['type' => 'ok', 'text' => 'Agregado al carrito.'];
         Response::redirect('/cart');
     }
@@ -88,6 +104,7 @@ final class CartController
         $qty = (int)($_POST['qty'] ?? 0);
         if ($id > 0) {
             (new CartService())->update($id, $qty);
+            $this->snapshot();
         }
         Response::redirect('/cart');
     }
@@ -98,6 +115,7 @@ final class CartController
         $id = (int)($_POST['idcodgusto'] ?? 0);
         if ($id > 0) {
             (new CartService())->remove($id);
+            $this->snapshot();
         }
         Response::redirect('/cart');
     }
@@ -106,6 +124,7 @@ final class CartController
     {
         Csrf::check($_POST['_csrf'] ?? null);
         (new CartService())->clear();
+        $this->snapshot();
         Response::redirect('/cart');
     }
 
@@ -150,6 +169,7 @@ final class CartController
             $cart->add((int)$chosen['idcodgusto'], 1);
             $added++;
         }
+        $this->snapshot();
         $_SESSION['flash'] = ['type' => 'ok', 'text' => $added > 0 ? 'Rutina agregada al carrito.' : 'No se pudo agregar la rutina.'];
         Response::redirect('/cart');
     }

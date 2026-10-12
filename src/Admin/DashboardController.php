@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Perfushopping\Web\Admin;
 
 use Perfushopping\Web\Infra\Db;
+use Perfushopping\Web\Repo\CartSnapshotRepo;
 use Perfushopping\Web\Repo\OrderRepo;
 use Perfushopping\Web\Repo\WebStatsRepo;
 use Perfushopping\Web\Service\AdminAuthService;
@@ -34,12 +35,18 @@ final class DashboardController
 
         $webStats = new WebStatsRepo();
         $abandonedCarts = [];
+        $unconvertedCarts = [];
+        $openCarts = [];
         $topProducts = [];
         try {
             $abandonedCarts = (new OrderRepo())->findAbandonedCarts();
+            $unconvertedCarts = (new OrderRepo())->findUnconverted();
+            $openCarts = (new CartSnapshotRepo())->listAbandoned(2, 50);
             $topProducts = $webStats->topProductos(5, 30);
         } catch (\Throwable $e) {
             $abandonedCarts = [];
+            $unconvertedCarts = [];
+            $openCarts = [];
             $topProducts = [];
         }
 
@@ -62,6 +69,9 @@ final class DashboardController
 
             $st = $pdo->query("SELECT COUNT(*) FROM orders WHERE status='pending_transfer'");
             $stats['pending_transfer'] = (int)$st->fetchColumn();
+
+            $stats['unconverted'] = count($unconvertedCarts);
+            $stats['carts_open'] = count($openCarts);
 
             $st = $pdo->query("SELECT COUNT(*) FROM web_users WHERE disabled_at IS NULL AND DATE(created_at) = CURDATE()");
             $stats['users_today'] = (int)$st->fetchColumn();
@@ -98,6 +108,8 @@ final class DashboardController
             'pendingOrders' => $pendingOrders,
             'paidOrders' => $paidOrders,
             'abandonedCarts' => $abandonedCarts,
+            'unconvertedCarts' => $unconvertedCarts,
+            'openCarts' => $openCarts,
             'topProducts' => $topProducts,
             'csrf' => Csrf::token(),
             'flash' => $_SESSION['admin_flash'] ?? null,

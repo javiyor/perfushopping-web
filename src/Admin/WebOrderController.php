@@ -132,6 +132,9 @@ final class WebOrderController
         Csrf::check($_POST['_csrf'] ?? null);
 
         $carts = (new OrderRepo())->findAbandonedCarts();
+        foreach ((new OrderRepo())->findUnconverted() as $unc) {
+            $carts[] = $unc;
+        }
         if (!$carts) {
             $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'No hay carritos abandonados para recuperar.'];
             Response::redirect('/admin/orders');

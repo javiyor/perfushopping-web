@@ -3,6 +3,8 @@ $stats = $stats ?? [];
 $pendingOrders = $pendingOrders ?? [];
 $paidOrders = $paidOrders ?? [];
 $abandonedCarts = $abandonedCarts ?? [];
+$unconvertedCarts = $unconvertedCarts ?? [];
+$openCarts = $openCarts ?? [];
 $topProducts = $topProducts ?? [];
 $adminRol = $adminUser['rol'] ?? '';
 $isSuper = $adminRol === 'superadmin';
@@ -74,6 +76,18 @@ $can = $can ?? function () { return false; };
         <div class="card-dashboard text-center">
             <div class="h3 fw-bold mb-0 text-danger"><?= (int)($stats['abandoned'] ?? 0) ?></div>
             <div class="small text-muted">Carritos abandonados</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card-dashboard text-center">
+            <div class="h3 fw-bold mb-0 text-danger"><?= (int)($stats['unconverted'] ?? 0) ?></div>
+            <div class="small text-muted">No concretadas 30d</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card-dashboard text-center">
+            <div class="h3 fw-bold mb-0 text-warning"><?= (int)($stats['carts_open'] ?? 0) ?></div>
+            <div class="small text-muted">Sin checkout 2h+</div>
         </div>
     </div>
 </div>
@@ -255,6 +269,83 @@ $can = $can ?? function () { return false; };
                                         <a href="https://wa.me/<?= rawurlencode(preg_replace('/\D/', '', $abPhone)) ?>" target="_blank" rel="noopener"><i class="bi bi-whatsapp"></i> <?= htmlspecialchars($abPhone) ?></a>
                                     <?php endif; ?>
                                 </div>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mt-1">
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+                <span>Pedidos cancelados (30 días)</span>
+                <span class="badge bg-danger"><?= count($unconvertedCarts) ?></span>
+            </div>
+            <div class="card-body p-0">
+                <?php if (!$unconvertedCarts): ?>
+                    <div class="p-3 text-muted small">No hay pedidos cancelados recientes.</div>
+                <?php else: ?>
+                    <ul class="list-group list-group-flush">
+                        <?php foreach ($unconvertedCarts as $o): ?>
+                            <li class="list-group-item py-2">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <a href="/admin/orders?q=<?= urlencode((string)($o['order_code'] ?? '')) ?>" class="fw-semibold text-decoration-none"><?= htmlspecialchars((string)($o['order_code'] ?? '#' . $o['id'])) ?></a>
+                                    <span class="badge bg-warning rounded-pill"><?= \Perfushopping\Web\Support\Format::moneyRoundedFromCents((int)($o['total_cents'] ?? 0)) ?></span>
+                                </div>
+                                <div class="small text-muted"><?= htmlspecialchars((string)($o['ship_name'] ?? '')) ?> · <?= htmlspecialchars(substr((string)($o['created_at'] ?? ''), 0, 16)) ?></div>
+                                <div class="small">
+                                    <?php $unEmail = trim((string)($o['email'] ?? '')); ?>
+                                    <?php $unPhone = trim((string)($o['phone'] ?? '')); ?>
+                                    <?php if ($unEmail !== ''): ?>
+                                        <a class="me-2" href="mailto:<?= htmlspecialchars($unEmail) ?>"><i class="bi bi-envelope"></i> <?= htmlspecialchars(mb_substr($unEmail, 0, 30)) ?></a>
+                                    <?php endif; ?>
+                                    <?php if ($unPhone !== ''): ?>
+                                        <a href="https://wa.me/<?= rawurlencode(preg_replace('/\D/', '', $unPhone)) ?>" target="_blank" rel="noopener"><i class="bi bi-whatsapp"></i> <?= htmlspecialchars($unPhone) ?></a>
+                                    <?php endif; ?>
+                                </div>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+                <span>Carritos web sin checkout (2h+)</span>
+                <span class="badge bg-warning"><?= count($openCarts) ?></span>
+            </div>
+            <div class="card-body p-0">
+                <?php if (!$openCarts): ?>
+                    <div class="p-3 text-muted small">No hay carritos sin checkout recientes.</div>
+                <?php else: ?>
+                    <ul class="list-group list-group-flush">
+                        <?php foreach ($openCarts as $s):
+                            $sLines = json_decode((string)($s['items_json'] ?? '[]'), true);
+                            if (!is_array($sLines)) $sLines = [];
+                            $sNames = [];
+                            foreach ($sLines as $sl) {
+                                if (count($sNames) >= 2) break;
+                                $nm = trim((string)(is_array($sl) ? ($sl['produ'] ?? '') : ''));
+                                if ($nm !== '') $sNames[] = $nm;
+                            }
+                            $sAgeH = max(0, (time() - (int)strtotime((string)($s['updated_at'] ?? 'now'))) / 3600);
+                            $sAge = $sAgeH >= 24 ? ((int)floor($sAgeH / 24) . 'd') : ((int)floor($sAgeH) . 'h');
+                            $sEmail = trim((string)($s['email'] ?? ''));
+                        ?>
+                            <li class="list-group-item py-2">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="fw-semibold"><?= (int)($s['items_count'] ?? 0) ?> ítems</span>
+                                    <span class="badge bg-warning rounded-pill"><?= \Perfushopping\Web\Support\Format::moneyRoundedFromCents((int)($s['total_cents'] ?? 0)) ?></span>
+                                </div>
+                                <div class="small text-muted text-truncate"><?= htmlspecialchars(implode(' · ', $sNames)) ?></div>
+                                <div class="small text-muted"><?= $sEmail !== '' ? htmlspecialchars(mb_substr($sEmail, 0, 30)) : 'Invitado' ?> · hace <?= htmlspecialchars($sAge) ?></div>
                             </li>
                         <?php endforeach; ?>
                     </ul>

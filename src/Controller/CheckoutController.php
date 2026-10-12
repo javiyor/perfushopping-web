@@ -5,6 +5,7 @@ namespace Perfushopping\Web\Controller;
 
 use Perfushopping\Web\Repo\MetaRepo;
 use Perfushopping\Web\Repo\OrderRepo;
+use Perfushopping\Web\Repo\CartSnapshotRepo;
 use Perfushopping\Web\Repo\ProductRepo;
 use Perfushopping\Web\Repo\PromoRepo;
 use Perfushopping\Web\Repo\UserRepo;
@@ -457,6 +458,10 @@ final class CheckoutController
 
         // Clear cart
         $cart->clear();
+        try {
+            (new CartSnapshotRepo())->markConverted();
+        } catch (\Throwable $e) {
+        }
         unset($_SESSION['checkout_form']);
 
         if ($isWholesale || $paymentMethod === 'transfer') {

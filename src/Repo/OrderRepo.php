@@ -249,4 +249,21 @@ final class OrderRepo
         $st->execute();
         return $st->rowCount();
     }
+
+    /** Pedidos cancelados recientes (no concretados).
+     *  @return array<int, array<string,mixed>> */
+    public function findUnconverted(int $days = 30, int $limit = 100): array
+    {
+        $limit = max(1, min(500, $limit));
+        $st = Db::pdo()->prepare("
+            SELECT o.*, u.name AS user_name
+            FROM orders o
+            LEFT JOIN web_users u ON u.id = o.user_id
+            WHERE o.status = 'cancelled'
+              AND o.created_at > DATE_SUB(NOW(), INTERVAL :d DAY)
+            ORDER BY o.created_at DESC LIMIT " . $limit . "
+        ");
+        $st->execute([':d' => max(1, $days)]);
+        return $st->fetchAll();
+    }
 }
