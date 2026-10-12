@@ -81,6 +81,7 @@ use Perfushopping\Web\Admin\NotaPedidoController as AdminNotaPedidoController;
 use Perfushopping\Web\Admin\CompraController as AdminCompraController;
 use Perfushopping\Web\Admin\PuntosController as AdminPuntosController;
 use Perfushopping\Web\Admin\PortadaController as AdminPortadaController;
+use Perfushopping\Web\Admin\PromoWebController as AdminPromoWebController;
 use Perfushopping\Web\Admin\EnvioController as AdminEnvioController;
 use Perfushopping\Web\Admin\SocialInboxController as AdminSocialInboxController;
 use Perfushopping\Web\Admin\GastoController as AdminGastoController;
@@ -657,6 +658,11 @@ $router->post('/admin/portada/manual/quitar', [AdminPortadaController::class, 'r
 $router->post('/admin/portada/manual/vaciar', [AdminPortadaController::class, 'clearManual']);
 $router->post('/admin/portada/manual/orden', [AdminPortadaController::class, 'reorderManual']);
 $router->get('/admin/portada/buscar', [AdminPortadaController::class, 'searchJson']);
+$router->get('/admin/promos', [AdminPromoWebController::class, 'index']);
+$router->post('/admin/promos/agregar', [AdminPromoWebController::class, 'add']);
+$router->post('/admin/promos/quitar', [AdminPromoWebController::class, 'remove']);
+$router->post('/admin/promos/activo', [AdminPromoWebController::class, 'toggle']);
+$router->post('/admin/promos/orden', [AdminPromoWebController::class, 'reorder']);
 
 // Admin - Facturas de compra
 $router->get('/admin/compras', [AdminCompraController::class, 'index']);

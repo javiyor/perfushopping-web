@@ -225,6 +225,7 @@
 
             <?php if ($can('productos')): ?><div class="nav-section">Productos</div><?php endif; ?>
             <?php if ($can('productos')): ?><a href="/admin/portada" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Productos destacados en la portada web"><i class="bi bi-easel"></i>Portada</a><?php endif; ?>
+            <?php if ($can('productos')): ?><a href="/admin/promos" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Precios promocionales y carousel de ofertas"><i class="bi bi-percent"></i>Promociones</a><?php endif; ?>
             <?php if ($can('productos')): ?><a href="/admin/productos" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Catálogo de productos y variantes"><i class="bi bi-box-seam"></i>Productos</a><?php endif; ?>
             <?php if ($can('productos')): ?><a href="/admin/productos/importar" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Importar productos y precios desde Excel/CSV"><i class="bi bi-upload"></i>Importar</a><?php endif; ?>
             <?php if ($can('productos')): ?><a href="/admin/departamentos" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Departamentos / categorías internas"><i class="bi bi-tags"></i>Departamentos</a><?php endif; ?>

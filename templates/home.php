@@ -1,4 +1,5 @@
 <?php
+use Perfushopping\Web\Support\Csrf;
 use Perfushopping\Web\Support\Format;
 use Perfushopping\Web\Service\AuthService;
 
@@ -112,6 +113,92 @@ foreach ([1, 2, 3] as $bi) {
   <?php endif; ?>
 </div>
 
+<?php
+$promos = $promos ?? [];
+$promosByProduct = [];
+foreach ($promos as $pr) {
+    $idp = (int)($pr['idprodu'] ?? 0);
+    if ($idp <= 0 || isset($promosByProduct[$idp])) continue;
+    $prTiva = (float)($pr['tiva'] ?? 0);
+    $prNormalNet = (float)($isWholesale ? ($pr['precio1'] ?? 0) : ($pr['precio'] ?? 0));
+    $prPromoNet = (float)($pr['promo_precio'] ?? 0);
+    if ($prNormalNet <= 0 || $prPromoNet <= 0 || $prPromoNet >= $prNormalNet) continue;
+    $promosByProduct[$idp] = [
+        'idprodu' => $idp,
+        'produ' => (string)($pr['produ'] ?? ''),
+        'imagen' => (string)($pr['imagen'] ?? ''),
+        'normal' => $prNormalNet * (1 + $prTiva / 100),
+        'promo' => $prPromoNet * (1 + $prTiva / 100),
+        'off' => (int)round((1 - $prPromoNet / $prNormalNet) * 100),
+        'variant' => (int)($pr['first_variant_id'] ?? 0),
+    ];
+}
+?>
+<?php if ($promosByProduct): ?>
+<style>
+.promo-banda { margin-top:18px; }
+.promo-banda-head { display:flex;justify-content:space-between;align-items:center;margin-bottom:8px; }
+.promo-banda-head h3 { margin:0;color:#ff6b6b;font-family:Georgia,'Times New Roman',serif;letter-spacing:0.7px; }
+.promo-nav { display:flex;gap:6px; }
+.promo-nav button { width:32px;height:32px;border-radius:50%;border:1px solid rgba(216,178,90,0.5);background:transparent;color:#f6f4ef;font-size:18px;line-height:1;cursor:pointer; }
+.promo-track { display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding:4px 2px 10px; }
+.promo-card { flex:0 0 200px;scroll-snap-align:start;background:rgba(255,255,255,0.05);border:1px solid rgba(216,178,90,0.35);border-radius:14px;padding:10px;text-align:center; }
+.promo-card img { width:100%;height:130px;object-fit:contain;border-radius:8px;background:#fff; }
+.promo-card-title { font-size:13px;margin:6px 0;min-height:32px;color:#f6f4ef; }
+.promo-old { font-size:12px;color:rgba(246,244,239,0.55); }
+.promo-off { display:inline-block;background:#c0392b;color:#fff;font-weight:800;font-size:13px;border-radius:8px;padding:1px 8px;margin:3px 0; }
+.promo-new { font-size:1.4rem;font-weight:800;color:#7CFC9A;line-height:1.2; }
+.promo-add { margin-top:8px;width:100%;padding:8px;border:none;border-radius:10px;background:linear-gradient(135deg,#d8b25a,#f3d48a);color:#17140f;font-weight:800;cursor:pointer; }
+</style>
+<div class="promo-banda">
+  <div class="promo-banda-head">
+    <h3>🔥 Promociones</h3>
+    <div class="promo-nav">
+      <button type="button" onclick="promoScroll(-1)" aria-label="Anterior">‹</button>
+      <button type="button" onclick="promoScroll(1)" aria-label="Siguiente">›</button>
+    </div>
+  </div>
+  <div class="promo-track" id="promoTrack">
+    <?php foreach ($promosByProduct as $pr): ?>
+    <div class="promo-card">
+      <a href="/p/<?= $pr['idprodu'] ?>" style="text-decoration:none;color:inherit">
+        <?php if ($pr['imagen'] !== ''): ?><img src="<?= htmlspecialchars(Format::uploadUrl($pr['imagen'])) ?>" alt="" loading="lazy" /><?php endif; ?>
+        <div class="promo-card-title"><?= htmlspecialchars(mb_substr($pr['produ'], 0, 45)) ?></div>
+      </a>
+      <div class="promo-old"><s>$<?= htmlspecialchars(Format::moneyRoundedFromCents((int)round($pr['normal'] * 100))) ?></s></div>
+      <div><span class="promo-off">-<?= $pr['off'] ?>% HOY</span></div>
+      <div class="promo-new">$<?= htmlspecialchars(Format::moneyRoundedFromCents((int)round($pr['promo'] * 100))) ?></div>
+      <?php if ($pr['variant'] > 0): ?>
+      <form method="post" action="/cart/add">
+        <input type="hidden" name="_csrf" value="<?= htmlspecialchars(Csrf::token()) ?>" />
+        <input type="hidden" name="idcodgusto" value="<?= $pr['variant'] ?>" />
+        <input type="hidden" name="qty" value="1" />
+        <button class="promo-add" type="submit">Agregar al carrito</button>
+      </form>
+      <?php endif; ?>
+    </div>
+    <?php endforeach; ?>
+  </div>
+</div>
+<script>
+function promoScroll(dir) {
+  const t = document.getElementById('promoTrack');
+  if (t) t.scrollBy({left: dir * 220, behavior: 'smooth'});
+}
+(function(){
+  const t = document.getElementById('promoTrack');
+  if (!t) return;
+  const timer = setInterval(function() {
+    if (document.hidden) return;
+    const max = t.scrollWidth - t.clientWidth - 10;
+    if (t.scrollLeft >= max) t.scrollTo({left: 0, behavior: 'smooth'});
+    else t.scrollBy({left: 220, behavior: 'smooth'});
+  }, 6000);
+  ['mouseenter', 'touchstart'].forEach(function(ev) { t.addEventListener(ev, function() { clearInterval(timer); }, {once: true}); });
+})();
+</script>
+<?php endif; ?>
+
 <form class="filters" method="get" action="/buscar" id="formBuscarPortada">
   <input name="q" value="<?= htmlspecialchars($q) ?>" placeholder="Buscar productos, marcas, rutinas, necesidades, contenido..." style="flex:1" />
   <select name="codsub" id="selMarca">
@@ -174,7 +261,13 @@ document.getElementById('formBuscarPortada').addEventListener('submit', function
             <?php endif; ?>
           </div>
           <div class="price">
-            <strong><?= htmlspecialchars(Format::moneyRoundedFromCents((int)round($withIva*100))) ?></strong>
+            <?php $gPromo = $promosByProduct[(int)$p['idprodu']] ?? null; ?>
+            <?php if ($gPromo): ?>
+              <div style="font-size:12px;color:rgba(246,244,239,0.55)"><s>$<?= htmlspecialchars(Format::moneyRoundedFromCents((int)round($withIva*100))) ?></s> <span class="promo-off" style="font-size:11px">-<?= $gPromo['off'] ?>%</span></div>
+              <strong style="color:#7CFC9A">$<?= htmlspecialchars(Format::moneyRoundedFromCents((int)round($gPromo['promo']*100))) ?></strong>
+            <?php else: ?>
+              <strong><?= htmlspecialchars(Format::moneyRoundedFromCents((int)round($withIva*100))) ?></strong>
+            <?php endif; ?>
             <small>IVA inc.</small>
           </div>
         </div>

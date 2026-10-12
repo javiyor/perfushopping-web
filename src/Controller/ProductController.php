@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Perfushopping\Web\Controller;
 
 use Perfushopping\Web\Repo\ProductRepo;
+use Perfushopping\Web\Repo\PromoWebRepo;
 use Perfushopping\Web\Repo\Marketing\ProductContentRepo;
 use Perfushopping\Web\Service\AuthService;
 use Perfushopping\Web\Support\Env;
@@ -42,6 +43,7 @@ final class ProductController
 
         echo View::page('product.php', [
             'product' => $p,
+            'promo' => (new PromoWebRepo())->findActiveByProduct($id),
             'variants' => $variants,
             'user' => $user,
             'isWholesale' => $auth->isWholesaleApproved($user),

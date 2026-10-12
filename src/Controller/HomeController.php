@@ -45,6 +45,7 @@ final class HomeController
             'products' => $products,
             'rubros' => $meta->rubros(),
             'marcas' => $meta->marcasConStock(),
+            'promos' => (new \Perfushopping\Web\Repo\PromoWebRepo())->listActive(),
             'user' => $user,
             'isWholesale' => $auth->isWholesaleApproved($user),
             'portadaInfo' => $portadaInfo,

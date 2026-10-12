@@ -39,7 +39,13 @@ if (!$isWholesale) {
     <div>
       <h2 style="margin:0;font-family:Georgia, 'Times New Roman', serif;letter-spacing:0.6px"><?= htmlspecialchars((string)$p['produ']) ?></h2>
       <div class="kpi">
+        <?php if ($showPromo): ?>
+          <span class="chip" style="text-decoration:line-through;opacity:0.7"><?= htmlspecialchars(Format::moneyRoundedFromCents((int)round($withIva*100))) ?> IVA inc.</span>
+          <span class="chip gold" style="font-size:1.2em"><?= htmlspecialchars(Format::moneyRoundedFromCents((int)round($promoIva*100))) ?> IVA inc.</span>
+          <span class="chip" style="background:#c0392b;color:#fff;font-weight:800">-<?= $promoOff ?>% HOY</span>
+        <?php else: ?>
         <span class="chip gold"><?= htmlspecialchars(Format::moneyRoundedFromCents((int)round($withIva*100))) ?> IVA inc.</span>
+        <?php endif; ?>
         <span class="chip"><?= htmlspecialchars(Format::moneyRoundedFromCents((int)round($base*100))) ?> sin IVA</span>
         <?php if (!$isWholesale): ?>
           <span class="chip">3 cuotas sin interes</span>
