@@ -112,10 +112,38 @@ foreach ([1, 2, 3] as $bi) {
   <?php endif; ?>
 </div>
 
-<form class="filters" method="get" action="/buscar">
+<form class="filters" method="get" action="/buscar" id="formBuscarPortada">
   <input name="q" value="<?= htmlspecialchars($q) ?>" placeholder="Buscar productos, marcas, rutinas, necesidades, contenido..." style="flex:1" />
+  <select name="codsub" id="selMarca">
+    <option value="0">Todas las marcas</option>
+    <?php foreach (($marcas ?? []) as $m): ?>
+    <option value="<?= (int)($m['codsub'] ?? 0) ?>" <?= $codsub === (int)($m['codsub'] ?? 0) ? 'selected' : '' ?>><?= htmlspecialchars(trim((string)($m['nomsub'] ?? ''))) ?></option>
+    <?php endforeach; ?>
+  </select>
+  <select name="codrub" id="selRubro">
+    <option value="0">Todas las categorías</option>
+    <?php foreach (($rubros ?? []) as $r): ?>
+    <option value="<?= (int)($r['codrub'] ?? 0) ?>" <?= $codrub === (int)($r['codrub'] ?? 0) ? 'selected' : '' ?>><?= htmlspecialchars((string)($r['nomrub'] ?? '')) ?></option>
+    <?php endforeach; ?>
+  </select>
   <button class="btn" type="submit">Buscar</button>
 </form>
+<?php if ($codrub > 0 || $codsub > 0): ?>
+<div style="margin-top:8px"><a href="/" style="font-size:12px;color:rgba(246,244,239,0.75)">✕ Limpiar filtros y ver todo</a></div>
+<?php endif; ?>
+<script>
+document.getElementById('formBuscarPortada').addEventListener('submit', function(e) {
+    const q = this.querySelector('input[name="q"]').value.trim();
+    if (q !== '') return;
+    e.preventDefault();
+    const params = new URLSearchParams();
+    const codsub = document.getElementById('selMarca').value;
+    const codrub = document.getElementById('selRubro').value;
+    if (codsub !== '0') params.set('codsub', codsub);
+    if (codrub !== '0') params.set('codrub', codrub);
+    window.location = '/' + (params.toString() ? '?' + params.toString() : '');
+});
+</script>
 
 <?php if (!$products): ?>
   <div class="page">
