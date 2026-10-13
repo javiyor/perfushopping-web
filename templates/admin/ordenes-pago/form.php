@@ -120,7 +120,16 @@ function addPago() {
                 <input class="form-control form-control-sm monto-input" name="pago_monto_cents[]" type="number" min="1" step="0.01" oninput="recalcular()" />
             </div>
         </td>
-        <td class="cheque-data" style="display:none">
+        <td>
+            <div class="transfer-data" style="display:none">
+                <select class="form-select form-select-sm" name="pago_banco_transfer_id[]" title="Banco propio para debitar la transferencia">
+                    <option value="">Banco propio...</option>
+                    <?php foreach ($bancos as $b): ?>
+                        <option value="<?= (int)$b['id'] ?>"><?= htmlspecialchars(trim((string)($b['banco'] ?? '')) . ' — ' . trim((string)($b['numero_cuenta'] ?? ''))) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="cheque-data" style="display:none">
             <select class="form-select form-select-sm mb-1" name="pago_cheque_tercero_id[]" onchange="seleccionarChequeTercero(this)" title="Cheque de tercero en cartera">
                 <option value="">— Usar cheque de tercero en cartera —</option>
                 <?php foreach (($chequesTerceros ?? []) as $ch): ?>
@@ -137,6 +146,7 @@ function addPago() {
             </select>
             <input class="form-control form-control-sm mb-1" name="pago_numero_cheque[]" placeholder="N° cheque" />
             <input class="form-control form-control-sm" name="pago_fecha_vencimiento[]" type="date" title="Vencimiento del cheque" />
+            </div>
         </td>
         <td><button class="btn btn-sm btn-outline-danger" type="button" onclick="removeRow(this)"><i class="bi bi-x"></i></button></td>
     `;
@@ -146,11 +156,15 @@ function addPago() {
 }
 
 function toggleChequeData(sel) {
-    const td = sel.closest('tr').querySelector('.cheque-data');
+    const tr = sel.closest('tr');
+    const chequeDiv = tr.querySelector('.cheque-data');
+    const transferDiv = tr.querySelector('.transfer-data');
     const esCheque = sel.value === 'cheque_propio' || sel.value === 'cheque_tercero';
-    td.style.display = esCheque ? '' : 'none';
+    const esTransfer = sel.value === 'transferencia';
+    if (chequeDiv) chequeDiv.style.display = esCheque ? '' : 'none';
+    if (transferDiv) transferDiv.style.display = esTransfer ? '' : 'none';
     if (!esCheque) {
-        const montoInput = sel.closest('tr').querySelector('.monto-input');
+        const montoInput = tr.querySelector('.monto-input');
         if (montoInput) montoInput.readOnly = false;
     }
     recalcular();

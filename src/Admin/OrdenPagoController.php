@@ -106,6 +106,14 @@ final class OrdenPagoController
             if ($monto <= 0) continue;
 
             $chequeId = null;
+            $bancoTransferId = null;
+            if ($fp === 'transferencia') {
+                $bancoTransferId = (int)($_POST['pago_banco_transfer_id'][$idx] ?? 0);
+                if ($bancoTransferId <= 0) {
+                    $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Seleccioná el banco propio para debitar la transferencia.'];
+                    Response::redirect('/admin/ordenes-pago/nueva');
+                }
+            }
             if ($fp === 'cheque_propio') {
                 $bancoCuentaId = (int)($_POST['pago_banco_cuenta_id'][$idx] ?? 0);
                 $fechaVenc = trim((string)($_POST['pago_fecha_vencimiento'][$idx] ?? ''));
@@ -145,6 +153,7 @@ final class OrdenPagoController
             $pagos[] = [
                 'forma_pago' => $fp,
                 'cheque_id' => $chequeId,
+                'banco_cuenta_id' => $bancoTransferId,
                 'monto_cents' => $monto,
             ];
             $total += $monto;
@@ -181,6 +190,29 @@ final class OrdenPagoController
             }
             $chequeRepo->updateEstado($chequeId, 'entregado');
             $chequeRepo->agregarMovimiento($chequeId, 'entregado', 'op', $id, 'Entregado en OP ' . $codigo, (int)$adminUser['id']);
+        }
+
+        // Debitar las transferencias de sus bancos propios
+        $fechaOp = (string)($_POST['fecha'] ?? date('Y-m-d'));
+        $bm = new \Perfushopping\Web\Repo\BancoMovimientoRepo();
+        foreach ($pagos as $pg) {
+            if (($pg['forma_pago'] ?? '') !== 'transferencia' || (int)($pg['banco_cuenta_id'] ?? 0) <= 0) {
+                continue;
+            }
+            try {
+                $bm->create(
+                    (int)$pg['banco_cuenta_id'],
+                    'debito',
+                    'orden_pago',
+                    $id,
+                    'Transferencia OP ' . $codigo . ' a ' . $proveedorNombre,
+                    (int)($pg['monto_cents'] ?? 0),
+                    $fechaOp,
+                    (int)$adminUser['id']
+                );
+            } catch (\Throwable $e) {
+                error_log('BancoMov OP: ' . $e->getMessage());
+            }
         }
 
         // Asignar el pago a las facturas seleccionadas (solo esas se marcan como pagadas)

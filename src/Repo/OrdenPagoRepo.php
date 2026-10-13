@@ -7,6 +7,18 @@ use Perfushopping\Web\Infra\Db;
 
 final class OrdenPagoRepo
 {
+    private function ensurePagosBanco(): void
+    {
+        try {
+            $like = Db::pdo()->prepare('SHOW COLUMNS FROM `orden_pago_pagos` LIKE :c');
+            $like->execute([':c' => 'banco_cuenta_id']);
+            if ($like->fetch() === false) {
+                Db::pdo()->exec('ALTER TABLE `orden_pago_pagos` ADD COLUMN `banco_cuenta_id` INT UNSIGNED DEFAULT NULL');
+            }
+        } catch (\Throwable $e) {
+        }
+    }
+
     public function search(string $q = '', string $estado = '', int $limit = 60): array
     {
         $limit = max(1, min(200, $limit));
@@ -51,10 +63,13 @@ final class OrdenPagoRepo
 
     public function pagos(int $ordenPagoId): array
     {
+        $this->ensurePagosBanco();
         $st = Db::pdo()->prepare('
-            SELECT op.*, c.tipo AS cheque_tipo, c.banco_emisor, c.numero_cheque, c.estado AS cheque_estado, c.titular AS cheque_titular
+            SELECT op.*, c.tipo AS cheque_tipo, c.banco_emisor, c.numero_cheque, c.estado AS cheque_estado, c.titular AS cheque_titular,
+                   bc.banco AS banco_nombre, bc.numero_cuenta AS banco_cuenta
             FROM orden_pago_pagos op
             LEFT JOIN cheques c ON c.id = op.cheque_id
+            LEFT JOIN banco_cuentas bc ON bc.id = op.banco_cuenta_id
             WHERE op.orden_pago_id = :o ORDER BY op.id ASC
         ');
         $st->execute([':o' => $ordenPagoId]);
@@ -109,6 +124,7 @@ final class OrdenPagoRepo
 
     public function create(array $data, array $pagos, int $createdBy): int
     {
+        $this->ensurePagosBanco();
         $pdo = Db::pdo();
         $pdo->beginTransaction();
         try {
@@ -129,14 +145,15 @@ final class OrdenPagoRepo
             $id = (int)$pdo->lastInsertId();
 
             $stp = $pdo->prepare('
-                INSERT INTO orden_pago_pagos (orden_pago_id, forma_pago, cheque_id, monto_cents)
-                VALUES (:oid, :forma, :chq, :monto)
+                INSERT INTO orden_pago_pagos (orden_pago_id, forma_pago, cheque_id, banco_cuenta_id, monto_cents)
+                VALUES (:oid, :forma, :chq, :banco, :monto)
             ');
             foreach ($pagos as $p) {
                 $stp->execute([
                     ':oid' => $id,
                     ':forma' => $p['forma_pago'],
                     ':chq' => $p['cheque_id'] ?? null,
+                    ':banco' => $p['banco_cuenta_id'] ?? null,
                     ':monto' => (int)($p['monto_cents'] ?? 0),
                 ]);
             }

@@ -67,7 +67,7 @@ $canChange = !in_array($orden['estado'], $noTransition, true);
                                             </a>
                                             <span class="badge bg-<?= ($p['cheque_estado'] ?? '') === 'emitido' ? 'info' : 'secondary' ?>"><?= htmlspecialchars((string)($p['cheque_estado'] ?? '')) ?></span>
                                         <?php elseif ($p['forma_pago'] === 'transferencia'): ?>
-                                            Transferencia bancaria
+                                            Transferencia bancaria<?= !empty($p['banco_nombre']) ? ' — ' . htmlspecialchars((string)$p['banco_nombre'] . ' ' . (string)($p['banco_cuenta'] ?? '')) : '' ?>
                                         <?php else: ?>
                                             <?= htmlspecialchars((string)($p['forma_pago'] ?? '')) ?>
                                         <?php endif; ?>
