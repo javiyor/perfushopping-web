@@ -54,10 +54,6 @@ if (!$isWholesale) {
     </div>
 
     <div class="notice" style="margin-top:12px">
-      Minimo: <strong>$30.000</strong> (con descuento aplicado).
-      Descuentos en envio: <strong>50%</strong> desde $100.000, <strong>75%</strong> desde $180.000, <strong>gratis</strong> desde $250.000.
-    </div>
-    <div class="notice" style="margin-top:12px">
       <strong>Reconquista y Avellaneda</strong> (Santa Fe): envio gratis en horarios de reparto (12:00 y 19:30 hs).
       Fuera de horario disponible con costo adicional.
     </div>
