@@ -66,12 +66,11 @@ final class ReporteRepo
             $pvWhere = ' AND f.punto_venta = :pv';
             $params[':pv'] = $puntoVenta;
         }
-        $aut = $this->soloAutorizadasWhere();
         $total = $this->montoSignado('f.total_cents');
         $st = Db::pdo()->prepare("
             SELECT f.fecha, COUNT(*) AS cantidad, COALESCE(SUM({$total}), 0) AS total_cents
             FROM facturas f
-            WHERE f.estado = 'emitida'{$aut}
+            WHERE f.estado = 'emitida'
               AND f.fecha BETWEEN :desde AND :hasta
               $pvWhere
             GROUP BY f.fecha
@@ -152,13 +151,12 @@ final class ReporteRepo
             $pvWhere = ' AND f.punto_venta = :pv';
             $params[':pv'] = $puntoVenta;
         }
-        $aut = $this->soloAutorizadasWhere();
         $monto = $this->montoSignado('fp.monto_cents');
         $st = Db::pdo()->prepare("
             SELECT fp.forma_pago, SUM({$monto}) AS total_cents, COUNT(DISTINCT fp.factura_id) AS cantidad
             FROM factura_pagos fp
             INNER JOIN facturas f ON f.id = fp.factura_id
-            WHERE f.estado = 'emitida'{$aut}
+            WHERE f.estado = 'emitida'
               AND f.fecha BETWEEN :desde AND :hasta
               $pvWhere
             GROUP BY fp.forma_pago
@@ -286,7 +284,7 @@ final class ReporteRepo
                 LEFT JOIN admin_sucursales s ON s.id = f.sucursal_id
                 LEFT JOIN admin_sucursal_puntos_venta spv ON spv.punto_venta = f.punto_venta
                 LEFT JOIN admin_sucursales spv_suc ON spv_suc.id = spv.sucursal_id
-                WHERE f.estado = 'emitida'{$this->soloAutorizadasWhere()}
+                WHERE f.estado = 'emitida'
                   AND f.fecha BETWEEN :desde AND :hasta
                 GROUP BY sucursal_key
             ");
@@ -324,7 +322,7 @@ final class ReporteRepo
                 LEFT JOIN admin_sucursales s ON s.id = f.sucursal_id
                 LEFT JOIN admin_sucursal_puntos_venta spv ON spv.punto_venta = f.punto_venta
                 LEFT JOIN admin_sucursales spv_suc ON spv_suc.id = spv.sucursal_id
-                WHERE f.estado = 'emitida'{$this->soloAutorizadasWhere()}
+                WHERE f.estado = 'emitida'
                   AND f.fecha BETWEEN :desde AND :hasta
                 GROUP BY sucursal_key
             ");
@@ -405,7 +403,7 @@ final class ReporteRepo
                        COUNT(*) AS cantidad,
                        COALESCE(SUM({$this->montoSignado('f.total_cents')}), 0) AS total_cents
                 FROM facturas f
-                WHERE f.estado = 'emitida'{$this->soloAutorizadasWhere()}
+                WHERE f.estado = 'emitida'
                   AND f.fecha BETWEEN :desde AND :hasta
                   $pvWhere
                 GROUP BY mes
