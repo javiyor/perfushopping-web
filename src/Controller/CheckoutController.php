@@ -352,12 +352,6 @@ final class CheckoutController
             Response::redirect('/checkout');
         }
 
-        // Minimum order
-        if ($totalDisc < 3000000) {
-            $_SESSION['flash'] = ['type' => 'danger', 'text' => 'El minimo de compra es $30.000 (con descuento aplicado).'];
-            Response::redirect('/cart');
-        }
-
         // Affiliate credit (only for logged-in retail). Applies only to products, max 50%.
         $creditApplied = 0;
         if (!$isWholesale && $user) {
