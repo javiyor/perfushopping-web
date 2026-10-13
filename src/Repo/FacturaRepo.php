@@ -311,9 +311,19 @@ final class FacturaRepo
 
     public function nextCodigo(string $tipo = 'FACT-B'): string
     {
+        $prefix = 'F-' . date('Ymd') . '-';
+        try {
+            $st = Db::pdo()->prepare("SELECT codigo FROM facturas WHERE codigo LIKE :like ORDER BY codigo DESC LIMIT 1");
+            $st->execute([':like' => $prefix . '%']);
+            $last = $st->fetchColumn();
+            if (is_string($last) && preg_match('/-(\d+)$/', $last, $m)) {
+                return $prefix . str_pad((string)((int)$m[1] + 1), 4, '0', STR_PAD_LEFT);
+            }
+        } catch (\Throwable $e) {
+        }
         $st = Db::pdo()->query("SELECT COUNT(*) FROM facturas WHERE YEAR(created_at) = YEAR(CURDATE())");
         $count = (int)$st->fetchColumn();
-        return 'F-' . date('Ymd') . '-' . str_pad((string)($count + 1), 4, '0', STR_PAD_LEFT);
+        return $prefix . str_pad((string)($count + 1), 4, '0', STR_PAD_LEFT);
     }
 
     public function create(array $data, array $items, array $pagos): int

@@ -431,7 +431,7 @@ final class FacturaController
             return;
         }
 
-        $id = $repo->create([
+        $facturaData = [
             'codigo' => $codigo,
             'tipo_comprobante' => $tipo,
             'comprobante_asociado_id' => ($tipo === 'NC' || $tipo === 'ND') && $comprobanteAsociadoId > 0 ? $comprobanteAsociadoId : null,
@@ -464,7 +464,26 @@ final class FacturaController
             'notas' => $notas,
             'created_by' => (int)$adminUser['id'],
             'vendedor_id' => $vendedorId,
-        ], $items, $pagos);
+        ];
+
+        // Reintento ante código duplicado (dos grabaciones simultáneas).
+        // create() hace rollback total si falla, así que reintentar es seguro.
+        $id = 0;
+        $intentos = 0;
+        while (true) {
+            try {
+                $facturaData['codigo'] = $codigo;
+                $id = $repo->create($facturaData, $items, $pagos);
+                break;
+            } catch (\PDOException $e) {
+                $esDuplicado = ((int)($e->errorInfo[1] ?? 0) === 1062) && stripos($e->getMessage(), 'codigo') !== false;
+                if (!$esDuplicado || $intentos >= 5) {
+                    throw $e;
+                }
+                $intentos++;
+                $codigo = $repo->nextCodigo($tipo);
+            }
+        }
 
         // Loyalty points: register redemption and accrue the purchase.
         $puntosService = new \Perfushopping\Web\Service\PuntosService();
