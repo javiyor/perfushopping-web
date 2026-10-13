@@ -168,18 +168,6 @@ $showPromos = $promosByProduct || $promoBanners;
     </div>
   </div>
   <div class="promo-track" id="promoTrack">
-    <?php foreach ($promoBanners as $bn):
-        $bnColor = preg_match('/^#[0-9a-fA-F]{6}$/', (string)($bn['color'] ?? '')) ? (string)$bn['color'] : '#FFFFFF';
-        $bnBg = preg_match('/^#[0-9a-fA-F]{6}$/', (string)($bn['bg'] ?? '')) ? (string)$bn['bg'] : '';
-        $bnHref = (string)($bn['href'] ?? '');
-        $bnMarca = trim((string)($bn['nomsub'] ?? ''));
-    ?>
-    <div class="promo-card promo-banner-card" style="color:<?= $bnColor ?>;<?= $bnBg !== '' ? 'background:' . $bnBg . ';border-color:transparent;' : '' ?>">
-      <div class="promo-banner-title"><?= htmlspecialchars((string)($bn['titulo'] ?? '')) ?></div>
-      <?php if (trim((string)($bn['texto'] ?? '')) !== ''): ?><div class="promo-banner-text"><?= htmlspecialchars((string)$bn['texto']) ?></div><?php endif; ?>
-      <?php if ($bnHref !== ''): ?><div><a class="promo-banner-btn" href="<?= htmlspecialchars($bnHref) ?>"><?= $bnMarca !== '' ? 'Ver ' . htmlspecialchars($bnMarca) : 'Ver más' ?></a></div><?php endif; ?>
-    </div>
-    <?php endforeach; ?>
     <?php foreach ($promosByProduct as $pr): ?>
     <div class="promo-card">
       <a href="/p/<?= $pr['idprodu'] ?>" style="text-decoration:none;color:inherit">
@@ -197,6 +185,18 @@ $showPromos = $promosByProduct || $promoBanners;
         <button class="promo-add" type="submit">Agregar al carrito</button>
       </form>
       <?php endif; ?>
+    </div>
+    <?php endforeach; ?>
+    <?php foreach ($promoBanners as $bn):
+        $bnColor = preg_match('/^#[0-9a-fA-F]{6}$/', (string)($bn['color'] ?? '')) ? (string)$bn['color'] : '#FFFFFF';
+        $bnBg = preg_match('/^#[0-9a-fA-F]{6}$/', (string)($bn['bg'] ?? '')) ? (string)$bn['bg'] : '';
+        $bnHref = (string)($bn['href'] ?? '');
+        $bnMarca = trim((string)($bn['nomsub'] ?? ''));
+    ?>
+    <div class="promo-card promo-banner-card" style="color:<?= $bnColor ?>;<?= $bnBg !== '' ? 'background:' . $bnBg . ';border-color:transparent;' : '' ?>">
+      <div class="promo-banner-title"><?= htmlspecialchars((string)($bn['titulo'] ?? '')) ?></div>
+      <?php if (trim((string)($bn['texto'] ?? '')) !== ''): ?><div class="promo-banner-text"><?= htmlspecialchars((string)$bn['texto']) ?></div><?php endif; ?>
+      <?php if ($bnHref !== ''): ?><div><a class="promo-banner-btn" href="<?= htmlspecialchars($bnHref) ?>"><?= $bnMarca !== '' ? 'Ver ' . htmlspecialchars($bnMarca) : 'Ver más' ?></a></div><?php endif; ?>
     </div>
     <?php endforeach; ?>
   </div>
