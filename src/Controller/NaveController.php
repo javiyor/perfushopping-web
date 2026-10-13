@@ -87,6 +87,7 @@ final class NaveController
         Response::json([
             'configured' => $configured,
             'env' => $env,
+            'server_ip' => self::serverEgressIp(),
             'client_id_prefix' => $clientId ? substr($clientId, 0, 6) . '...' : 'vacío',
             'pos_id_prefix' => $posId ? substr($posId, 0, 6) . '...' : 'vacío',
             'curl_loaded' => $curl,
@@ -100,9 +101,21 @@ final class NaveController
         ]);
     }
 
-    public function start(array $params): void
+    private static function serverEgressIp(): string
     {
-        $checkout = $_SESSION['nave_checkout'] ?? null;
+        try {
+            $ctx = stream_context_create(['http' => ['timeout' => 4]]);
+            $ip = @file_get_contents('https://api.ipify.org', false, $ctx);
+            if (is_string($ip) && filter_var(trim($ip), FILTER_VALIDATE_IP)) {
+                return trim($ip);
+            }
+        } catch (\Throwable $e) {
+        }
+        return '';
+    }
+
+    public function start(array $params): void
+    {        $checkout = $_SESSION['nave_checkout'] ?? null;
         if (!is_array($checkout) || !isset($checkout['order_id'], $checkout['order_code'], $checkout['total_cents'])) {
             $_SESSION['flash'] = ['type' => 'danger', 'text' => 'No hay checkout iniciado. Completa el checkout.'];
             Response::redirect('/checkout');
