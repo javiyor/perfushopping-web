@@ -127,6 +127,20 @@ final class PromoWebRepo
         }
     }
 
+    /** Precio neto efectivo: promo si está activa y es menor, si no el normal. */
+    public function effectiveNet(int $idprodu, float $normalNet): float
+    {
+        if ($idprodu <= 0 || $normalNet <= 0) {
+            return $normalNet;
+        }
+        $promo = $this->findActiveByProduct($idprodu);
+        $promoNet = $promo ? (float)($promo['promo_precio'] ?? 0) : 0.0;
+        if ($promoNet > 0 && $promoNet < $normalNet) {
+            return $promoNet;
+        }
+        return $normalNet;
+    }
+
     /** Promos activas para la portada (sólo con promo menor al precio minorista neto). */
     public function listActive(): array
     {

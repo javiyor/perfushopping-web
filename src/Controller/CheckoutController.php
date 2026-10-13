@@ -5,6 +5,7 @@ namespace Perfushopping\Web\Controller;
 
 use Perfushopping\Web\Repo\MetaRepo;
 use Perfushopping\Web\Repo\OrderRepo;
+use Perfushopping\Web\Repo\PromoWebRepo;
 use Perfushopping\Web\Repo\CartSnapshotRepo;
 use Perfushopping\Web\Repo\ProductRepo;
 use Perfushopping\Web\Repo\PromoRepo;
@@ -63,7 +64,10 @@ final class CheckoutController
             if (!$v) {
                 continue;
             }
-            $unitNet = $pricing->cents((float)($isWholesale ? $v['precio1'] : $v['precio']));
+            $unitNet = $pricing->cents((new PromoWebRepo())->effectiveNet(
+                (int)($v['idprodu'] ?? 0),
+                (float)($isWholesale ? $v['precio1'] : $v['precio'])
+            ));
             $lineNet = $unitNet * $qty;
             $lineIva = $pricing->ivaCents($lineNet, (float)($v['tiva'] ?? 0));
             $totalCents += ($lineNet + $lineIva);
@@ -230,7 +234,10 @@ final class CheckoutController
                 $_SESSION['flash'] = ['type' => 'danger', 'text' => 'Hay productos sin stock en el carrito.'];
                 Response::redirect('/cart');
             }
-            $unitNet = $pricing->cents((float)($isWholesale ? $v['precio1'] : $v['precio']));
+            $unitNet = $pricing->cents((new PromoWebRepo())->effectiveNet(
+                (int)($v['idprodu'] ?? 0),
+                (float)($isWholesale ? $v['precio1'] : $v['precio'])
+            ));
             $lineNet = $unitNet * $qty;
             $lineIva = $pricing->ivaCents($lineNet, (float)($v['tiva'] ?? 0));
             $lineTotal = $lineNet + $lineIva;

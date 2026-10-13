@@ -5,9 +5,14 @@ use Perfushopping\Web\Service\InstallmentsService;
 use Perfushopping\Web\Service\PricingService;
 
 $p = $product;
+$promo = $promo ?? null;
 $tiva = (float)($p['tiva'] ?? 0);
 $base = (float)($isWholesale ? $p['precio1'] : $p['precio']);
 $withIva = $base * (1 + $tiva/100);
+$promoNet = is_array($promo) ? (float)($promo['promo_precio'] ?? 0) : 0.0;
+$showPromo = $promoNet > 0 && $base > 0 && $promoNet < $base;
+$promoIva = $promoNet * (1 + $tiva / 100);
+$promoOff = $showPromo ? (int)round((1 - $promoNet / $base) * 100) : 0;
 $img = (string)($p['imagen'] ?: ($p['image'] ?? ''));
 $imgUrl = Format::uploadUrl($img);
 
@@ -15,7 +20,7 @@ $pricing = new PricingService();
 $weekday = (int)date('w') + 1; // 1=domingo
 $inst = null;
 if (!$isWholesale) {
-  $inst = (new InstallmentsService())->computeAllCardsPromo($pricing->cents((float)$withIva), $weekday);
+  $inst = (new InstallmentsService())->computeAllCardsPromo($pricing->cents((float)($showPromo ? $promoIva : $withIva)), $weekday);
 }
 ?>
 

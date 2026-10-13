@@ -72,7 +72,8 @@ final class CartSnapshotRepo
                 if (!$v) {
                     continue;
                 }
-                $unitNet = $pricing->cents((float)($isWholesale ? $v['precio1'] : $v['precio']));
+                $baseNet = (float)($isWholesale ? $v['precio1'] : $v['precio']);
+                $unitNet = $pricing->cents((new PromoWebRepo())->effectiveNet((int)($v['idprodu'] ?? 0), $baseNet));
                 $lineNet = $unitNet * $qty;
                 $lineTotal = $lineNet + $pricing->ivaCents($lineNet, (float)($v['tiva'] ?? 0));
                 $total += $lineTotal;

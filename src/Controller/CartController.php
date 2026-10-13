@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Perfushopping\Web\Controller;
 
 use Perfushopping\Web\Repo\ProductRepo;
+use Perfushopping\Web\Repo\PromoWebRepo;
 use Perfushopping\Web\Repo\CartSnapshotRepo;
 use Perfushopping\Web\Service\AuthService;
 use Perfushopping\Web\Service\CartService;
@@ -46,7 +47,10 @@ final class CartController
             if (!$v) {
                 continue;
             }
-            $unitNet = $pricing->cents((float)($isWholesale ? $v['precio1'] : $v['precio']));
+            $unitNet = $pricing->cents((new PromoWebRepo())->effectiveNet(
+                (int)($v['idprodu'] ?? 0),
+                (float)($isWholesale ? $v['precio1'] : $v['precio'])
+            ));
             $lineNet = $unitNet * $qty;
             $lineIva = $pricing->ivaCents($lineNet, (float)($v['tiva'] ?? 0));
             $lineTotal = $lineNet + $lineIva;
