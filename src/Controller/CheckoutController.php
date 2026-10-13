@@ -121,7 +121,7 @@ final class CheckoutController
             'shippingOptions' => (new ShippingService())->deliveryLocalOptionsForDestination((string)(($_SESSION['checkout_form'] ?? [])['city'] ?? ''), (int)(($_SESSION['checkout_form'] ?? [])['province_codprov'] ?? 0)),
             'correoCost' => $correoCost,
             'cartTotalCents' => $totalCents,
-            'naveAvailable' => (new NaveService())->configured(),
+            'naveAvailable' => (new NaveService())->enabled(),
             'mpAvailable' => Env::get('MP_ACCESS_TOKEN', '') !== '',
             'flash' => $_SESSION['flash'] ?? null,
         ]);
@@ -202,7 +202,7 @@ final class CheckoutController
             $errors[] = 'Selecciona localidad.';
         }
 
-        if (!$isWholesale && $paymentMethod === 'nave' && !(new NaveService())->configured()) {
+        if (!$isWholesale && $paymentMethod === 'nave' && !(new NaveService())->enabled()) {
             $errors[] = 'El pago con Nave no esta disponible por el momento. Elegi otro medio de pago.';
         }
         if (!$isWholesale && $paymentMethod === 'mp' && Env::get('MP_ACCESS_TOKEN', '') === '') {

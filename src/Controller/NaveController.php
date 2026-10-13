@@ -129,7 +129,7 @@ final class NaveController
 
         try {
             $nave = new NaveService();
-            if (!$nave->configured()) {
+            if (!$nave->enabled()) {
                 $_SESSION['flash'] = ['type' => 'danger', 'text' => 'El pago con Nave no esta disponible por el momento. Elegi otro metodo.'];
                 Response::redirect('/checkout');
             }

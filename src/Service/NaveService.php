@@ -17,6 +17,12 @@ final class NaveService
             && Env::get('NAVE_POS_ID', '') !== '';
     }
 
+    /** Interruptor de disponibilidad en checkout (false = desactivado por el momento). */
+    public function enabled(): bool
+    {
+        return false;
+    }
+
     private function baseUrl(): string
     {
         return Env::get('NAVE_ENV', 'sandbox') === 'production'
