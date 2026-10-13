@@ -32,7 +32,7 @@ final class CtaCteProveedorRepo
             {$where}
             GROUP BY m.proveedor_id, m.proveedor_nombre
             {$having}
-            ORDER BY saldo_cents DESC, m.proveedor_nombre ASC
+            ORDER BY m.proveedor_nombre ASC
             LIMIT 100
         ";
         $st = Db::pdo()->prepare($sql);

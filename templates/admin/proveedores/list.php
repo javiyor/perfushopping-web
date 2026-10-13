@@ -12,6 +12,19 @@ $list = $list ?? [];
     </button>
 </div>
 
+<div class="card shadow-sm mb-3">
+    <div class="card-body py-2">
+        <form method="get" action="/admin/proveedores" class="row g-2">
+            <div class="col-lg-10">
+                <input class="form-control form-control-sm" name="q" value="<?= htmlspecialchars($q ?? '') ?>" placeholder="Buscar por razón social, código o CUIT" />
+            </div>
+            <div class="col-lg-2">
+                <button class="btn btn-accent btn-sm w-100" type="submit"><i class="bi bi-search"></i> Buscar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div class="card shadow-sm">
     <div class="table-responsive">
         <table class="table table-admin table-hover mb-0">

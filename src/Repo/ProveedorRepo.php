@@ -7,15 +7,29 @@ use Perfushopping\Web\Infra\Db;
 
 final class ProveedorRepo
 {
-    public function findAll(): array
+    public function findAll(string $q = ''): array
     {
-        $st = Db::pdo()->query('
+        $q = trim($q);
+        if ($q === '') {
+            $st = Db::pdo()->query('
+                SELECT p.*, COUNT(pr.idprodu) AS product_count
+                FROM proveedo p
+                LEFT JOIN producto pr ON pr.codprove = p.idprovee
+                GROUP BY p.idprovee
+                ORDER BY p.razon ASC
+            ');
+            return $st->fetchAll();
+        }
+        $st = Db::pdo()->prepare('
             SELECT p.*, COUNT(pr.idprodu) AS product_count
             FROM proveedo p
             LEFT JOIN producto pr ON pr.codprove = p.idprovee
+            WHERE p.razon LIKE :like OR p.codprove LIKE :like OR p.cuit LIKE :like
             GROUP BY p.idprovee
             ORDER BY p.razon ASC
         ');
+        $like = '%' . $q . '%';
+        $st->execute([':like' => $like]);
         return $st->fetchAll();
     }
 

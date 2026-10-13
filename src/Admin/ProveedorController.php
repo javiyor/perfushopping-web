@@ -16,11 +16,12 @@ final class ProveedorController
         $auth = new AdminAuthService();
         $adminUser = $auth->requirePermiso('compras');
 
-        $list = (new ProveedorRepo())->findAll();
+        $list = (new ProveedorRepo())->findAll(trim((string)($_GET['q'] ?? '')));
 
         echo View::adminPage('admin/proveedores/list.php', [
             'adminUser' => $adminUser,
             'list' => $list,
+            'q' => trim((string)($_GET['q'] ?? '')),
             'csrf' => Csrf::token(),
             'flash' => $_SESSION['admin_flash'] ?? null,
             'pageTitle' => 'Proveedores',
