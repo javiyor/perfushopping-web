@@ -9,8 +9,10 @@ $hasta = (string)($hasta ?? '');
 $page = max(1, (int)($page ?? 1));
 $pages = max(1, (int)($pages ?? 1));
 $total = (int)($total ?? count($list));
+$pv = (int)($pv ?? 0);
+$puntosVenta = $puntosVenta ?? [];
 $estados = ['' => 'Todos', 'pendiente' => 'Pendiente', 'emitida' => 'Emitida', 'anulada' => 'Anulada'];
-$queryBase = http_build_query(array_filter(['q' => $q, 'estado' => $estado, 'desde' => $desde, 'hasta' => $hasta], function($v) { return $v !== ''; }));
+$queryBase = http_build_query(array_filter(['q' => $q, 'estado' => $estado, 'desde' => $desde, 'hasta' => $hasta, 'pv' => $pv > 0 ? (string)$pv : ''], function($v) { return $v !== ''; }));
 $pageUrl = function($p) use ($queryBase) {
     return '/admin/facturas/comprobantes?page=' . $p . ($queryBase !== '' ? '&' . $queryBase : '');
 };
@@ -31,13 +33,21 @@ $tipoBadges = ['FACT-A' => 'primary', 'FACT-B' => 'success', 'FACT-C' => 'second
 <div class="card shadow-sm mb-3">
     <div class="card-body">
         <form method="get" action="/admin/facturas/comprobantes" class="row g-2" id="filtroForm">
-            <div class="col-lg-4">
-                <input class="form-control form-control-sm" id="filtroQ" name="q" value="<?= htmlspecialchars($q) ?>" placeholder="Buscar por código, cliente o CUIT" />
+            <div class="col-lg-3">
+                <input class="form-control form-control-sm" id="filtroQ" name="q" value="<?= htmlspecialchars($q) ?>" placeholder="Buscar por c�digo, cliente o CUIT" />
             </div>
             <div class="col-lg-2">
                 <select class="form-select form-select-sm" id="filtroEstado" name="estado">
                     <?php foreach ($estados as $v => $l): ?>
                         <option value="<?= htmlspecialchars($v) ?>" <?= $estado === $v ? 'selected' : '' ?>><?= htmlspecialchars($l) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-lg-2">
+                <select class="form-select form-select-sm" id="filtroPv" name="pv" title="Punto de venta">
+                    <option value="0">Todos los PV</option>
+                    <?php foreach ($puntosVenta as $pvn): ?>
+                        <option value="<?= (int)$pvn ?>" <?= $pv === (int)$pvn ? 'selected' : '' ?>>PV <?= (int)$pvn ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
@@ -50,9 +60,9 @@ $tipoBadges = ['FACT-A' => 'primary', 'FACT-B' => 'success', 'FACT-C' => 'second
             <div class="col-lg-1">
                 <button class="btn btn-accent btn-sm w-100" type="submit"><i class="bi bi-search"></i></button>
             </div>
-            <div class="col-lg-1">
-                <?php if ($q !== '' || $estado !== '' || $desde !== '' || $hasta !== ''): ?>
-                    <button class="btn btn-outline-secondary btn-sm w-100" type="button" onclick="limpiarFiltros()" title="Limpiar filtros">Limpiar</button>
+            <div class="col-lg-12 mt-2">
+                <?php if ($q !== '' || $estado !== '' || $desde !== '' || $hasta !== '' || $pv > 0): ?>
+                    <button class="btn btn-outline-secondary btn-sm" type="button" onclick="limpiarFiltros()" title="Limpiar filtros">Limpiar filtros</button>
                 <?php endif; ?>
             </div>
         </form>
@@ -190,6 +200,7 @@ $tipoBadges = ['FACT-A' => 'primary', 'FACT-B' => 'success', 'FACT-C' => 'second
     function limpiarFiltros() {
         document.getElementById('filtroQ').value = '';
         document.getElementById('filtroEstado').value = '';
+        document.getElementById('filtroPv').value = '0';
         document.getElementById('filtroDesde').value = '';
         document.getElementById('filtroHasta').value = '';
         document.getElementById('filtroForm').submit();

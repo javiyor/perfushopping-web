@@ -29,6 +29,7 @@ final class FacturaController
         $estado = trim((string)($_GET['estado'] ?? ''));
         $desde = trim((string)($_GET['desde'] ?? ''));
         $hasta = trim((string)($_GET['hasta'] ?? ''));
+        $pv = max(0, (int)($_GET['pv'] ?? 0));
         // Por defecto, el primer ingreso muestra solo las facturas del día de hoy.
         if (empty($_GET)) {
             $desde = $hasta = date('Y-m-d');
@@ -37,12 +38,12 @@ final class FacturaController
         $perPage = 60;
 
         $repo = new FacturaRepo();
-        $total = $repo->countSearch($q, $estado, $desde, $hasta);
+        $total = $repo->countSearch($q, $estado, $desde, $hasta, $pv);
         $pages = max(1, (int)ceil($total / $perPage));
         if ($page > $pages) {
             $page = $pages;
         }
-        $list = $repo->search($q, $estado, $perPage, ($page - 1) * $perPage, $desde, $hasta);
+        $list = $repo->search($q, $estado, $perPage, ($page - 1) * $perPage, $desde, $hasta, $pv);
 
         echo View::adminPage('admin/facturas/list.php', [
             'adminUser' => $adminUser,
@@ -51,6 +52,8 @@ final class FacturaController
             'estado' => $estado,
             'desde' => $desde,
             'hasta' => $hasta,
+            'pv' => $pv,
+            'puntosVenta' => $repo->puntosVenta(),
             'page' => $page,
             'pages' => $pages,
             'total' => $total,
