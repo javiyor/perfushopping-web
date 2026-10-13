@@ -52,7 +52,7 @@ final class NaveService
             'grant_type' => 'client_credentials',
         ], JSON_UNESCAPED_SLASHES);
 
-        $res = $this->request($url, 'POST', $payload, [], false);
+        $res = $this->request($url, 'POST', $payload, [], false, 'auth');
         $token = (string)($res['access_token'] ?? '');
         if ($token === '') {
             throw new \RuntimeException('Nave: no se obtuvo access_token.');
@@ -97,11 +97,12 @@ final class NaveService
     /**
      * @return array<string,mixed>
      */
-    private function request(string $url, string $method, string $body = '', array $headers = [], bool $withAuth = true): array
+    private function request(string $url, string $method, string $body = '', array $headers = [], bool $withAuth = true, string $step = 'api'): array
     {
         $default = [
             'Content-Type'  => 'application/json',
             'Accept'        => 'application/json',
+            'User-Agent'    => 'Perfushopping-Web/1.0 (+https://perfushopping.ar)',
         ];
         if ($withAuth) {
             $default['Authorization'] = 'Bearer ' . $this->getToken();
@@ -138,7 +139,7 @@ final class NaveService
         curl_close($ch);
         $json = json_decode($raw, true);
         if ($code < 200 || $code >= 300 || !is_array($json)) {
-            throw new \RuntimeException('Nave: HTTP ' . $code . ' ' . substr($raw, 0, 400));
+            throw new \RuntimeException('Nave ' . $step . ': HTTP ' . $code . ' ' . substr($raw, 0, 400));
         }
         return $json;
     }
