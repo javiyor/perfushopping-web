@@ -771,12 +771,12 @@ final class FacturaController
         }));
     }
 
-    /** Tarjeta o MercadoPago: al facturar siempre intentan autorizar en ARCA. */
+    /** Tarjeta, MercadoPago o Billetera/QR: al facturar siempre intentan autorizar en ARCA. */
     private function pagosRequierenArca(array $pagos): bool
     {
         foreach ($pagos as $pg) {
             $fp = (string)($pg['forma_pago'] ?? '');
-            if ($fp === 'mercadopago') {
+            if ($fp === 'mercadopago' || $fp === 'billetera') {
                 return true;
             }
             try {
