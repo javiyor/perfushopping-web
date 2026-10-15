@@ -250,6 +250,7 @@
             <?php if ($can('clientes')): ?><a href="/admin/clientes" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Base de clientes y fichas"><i class="bi bi-people"></i>Clientes</a><?php endif; ?>
             <?php if ($can('clientes')): ?><a href="/admin/users" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Usuarios web registrados"><i class="bi bi-person-gear"></i>Usuarios web<span class="badge-count green" id="badgeUsuariosNuevos" style="display:none">0</span></a><?php endif; ?>
             <?php if ($can('clientes')): ?><a href="/admin/puntos" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Programa de puntos y fidelización"><i class="bi bi-stars"></i>Puntos</a><?php endif; ?>
+            <?php if ($can('clientes')): ?><a href="/admin/email" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Bandeja de email integrada"><i class="bi bi-envelope"></i>Email</a><?php endif; ?>
 
             <?php $hasCompras = $can('compras') || $can('pagos_proveedores'); if ($hasCompras): ?><div class="nav-section">Compras</div><?php endif; ?>
             <?php if ($can('compras')): ?><a href="/admin/compras" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Facturas de compra a proveedores"><i class="bi bi-receipt"></i>Facturas compra</a><?php endif; ?>
@@ -277,7 +278,6 @@
             <?php if ($can('usuarios_admin')): ?><a href="/admin/empresa" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Datos de la empresa y logo"><i class="bi bi-building"></i>Empresa</a><?php endif; ?>
             <?php if ($can('usuarios_admin')): ?><a href="/admin/sucursales" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Sucursales y puntos de venta ARCA"><i class="bi bi-building"></i>Sucursales</a><?php endif; ?>
             <?php if ($can('estadisticas') || $can('marketing_promos')): ?><a href="/admin/promo-tarjetas" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Promociones con tarjetas bancarias"><i class="bi bi-credit-card-2-front"></i>Promo Tarjetas</a><?php endif; ?>
-            <?php if ($can('estadisticas')): ?><a href="/admin/email" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Bandeja de email integrada"><i class="bi bi-envelope"></i>Email</a><?php endif; ?>
         </nav>
     </aside>
 
