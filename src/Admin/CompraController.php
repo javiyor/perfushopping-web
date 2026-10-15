@@ -354,8 +354,15 @@ final class CompraController
 
         $items = $this->parseItems();
 
+        $oldItems = [];
+        $oldDepo = 0;
         if ($id > 0) {
-            $wasCompleta = ((string)($repo->findById($id)['estado'] ?? '') === 'completa');
+            $prev = $repo->findById($id);
+            $wasCompleta = ((string)($prev['estado'] ?? '') === 'completa');
+            if ($wasCompleta) {
+                $oldItems = $repo->itemsActuales($id);
+                $oldDepo = (int)($prev['iddepo'] ?? 0);
+            }
             $data['estado'] = $items ? 'completa' : ($wasCompleta ? 'completa' : 'pendiente');
             $repo->update($id, $data);
             $compraId = $id;
@@ -367,12 +374,13 @@ final class CompraController
 
         if ($items) {
             $wasCompleta = $wasCompleta ?? false;
+            $iddepo = (int)$data['iddepo'] > 0 ? (int)$data['iddepo'] : $repo->depositoPrincipal();
+            $notasBase = 'Compra ' . (string)$data['tipo'] . ' ' . (string)$data['punto_venta'] . '-' . (string)$data['numero_desde'];
             if ($id > 0 && $wasCompleta) {
-                // Ya aplicada: solo persistimos los ítems sin volver a sumar stock.
-                $repo->reemplazarItems($compraId, $items);
+                // Ya aplicada: revierte el efecto anterior y aplica los nuevos (stock + precios).
+                $repo->reaplicarItems($compraId, $oldItems, $oldDepo, $items, $iddepo, (string)$data['fecha'], 'Reversión edición ' . $notasBase);
             } else {
-                $iddepo = (int)$data['iddepo'] > 0 ? (int)$data['iddepo'] : $repo->depositoPrincipal();
-                $repo->aplicarItems($compraId, $items, $iddepo, (string)$data['fecha'], 'Compra ' . (string)$data['tipo'] . ' ' . (string)$data['punto_venta'] . '-' . (string)$data['numero_desde']);
+                $repo->aplicarItems($compraId, $items, $iddepo, (string)$data['fecha'], $notasBase);
             }
         }
 

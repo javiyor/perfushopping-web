@@ -697,6 +697,57 @@ final class CompraRepo
         }
     }
 
+    /** Ítems guardados actualmente (para revertir al editar). */
+    public function itemsActuales(int $facturaCompraId): array
+    {
+        $st = Db::pdo()->prepare('SELECT idprodu, idcodgusto, qty FROM factura_compra_items WHERE factura_compra_id = :id');
+        $st->execute([':id' => $facturaCompraId]);
+        return $st->fetchAll();
+    }
+
+    /**
+     * Re-aplicar ítems de una compra ya aplicada: revierte el efecto anterior
+     * con egresos compensatorios (tipo devolucion_compra) y aplica los nuevos
+     * (precios + ingreso de stock).
+     * @param array<int, array{idprodu:int, idcodgusto:?int, qty:float}> $oldItems
+     * @param array<int, array{idprodu:int, idcodgusto:?int, product_name:string, qty:float, unit_cost:float, bonif_pct:float}> $newItems
+     */
+    public function reaplicarItems(int $facturaCompraId, array $oldItems, int $oldDepo, array $newItems, int $newDepo, string $fecha, string $notas): void
+    {
+        $pdo = Db::pdo();
+        $pdo->beginTransaction();
+        try {
+            foreach ($oldItems as $it) {
+                $idprodu = (int)($it['idprodu'] ?? 0);
+                if ($idprodu <= 0) {
+                    continue;
+                }
+                $idcodgusto = ((int)($it['idcodgusto'] ?? 0)) > 0 ? (int)$it['idcodgusto'] : null;
+                $qty = (float)($it['qty'] ?? 0);
+                if ($qty <= 0 || $oldDepo <= 0) {
+                    continue;
+                }
+                if (!$this->productoCosto($idprodu)) {
+                    continue;
+                }
+                $pdo->prepare("INSERT INTO stockcab (iddepoh, iddepod, fecha, notas, tipo_movimiento)
+                    VALUES (NULL, :depod, :fecha, :notas, 'devolucion_compra')")
+                    ->execute([':depod' => $oldDepo, ':fecha' => $fecha, ':notas' => $notas]);
+                $cabId = (int)$pdo->lastInsertId();
+                $pdo->prepare('INSERT INTO stockdet (idstockcab, idprodu, idcodgusto, canti)
+                    VALUES (:cab, :prod, :gusto, :cant)')
+                    ->execute([':cab' => $cabId, ':prod' => $idprodu, ':gusto' => $idcodgusto, ':cant' => $qty]);
+                $this->addStockDeposito($pdo, $idprodu, $idcodgusto, $oldDepo, -$qty);
+                $this->recalcularProducto($pdo, $idprodu, $idcodgusto);
+            }
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+        $this->aplicarItems($facturaCompraId, $newItems, $newDepo, $fecha, $notas);
+    }
+
     private function addStockDeposito(\PDO $pdo, int $idprodu, ?int $idcodgusto, int $iddepo, float $qty): void
     {
         $st = $pdo->prepare('
