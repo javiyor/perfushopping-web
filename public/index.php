@@ -562,6 +562,8 @@ $router->get('/admin/email/nuevos', [AdminEmailController::class, 'nuevos']);
 $router->get('/admin/email/(?P<uid>\d+)', [AdminEmailController::class, 'view']);
 $router->post('/admin/email/carpeta', [AdminEmailController::class, 'crearCarpeta']);
 $router->post('/admin/email/mover', [AdminEmailController::class, 'mover']);
+$router->post('/admin/email/mover-grupo', [AdminEmailController::class, 'moverGrupo']);
+$router->post('/admin/email/eliminar', [AdminEmailController::class, 'eliminar']);
 $router->post('/admin/email/quitar', [AdminEmailController::class, 'quitar']);
 
  // Admin - Mensajes de redes

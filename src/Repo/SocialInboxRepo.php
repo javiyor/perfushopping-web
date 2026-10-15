@@ -225,7 +225,7 @@ final class SocialInboxRepo
         return (int)Db::pdo()->lastInsertId();
     }
 
-    public function listConversations(string $tab, int $adminId, string $q = ''): array
+    public function listConversations(string $tab, int $adminId, string $q = '', string $channel = ''): array
     {
         $this->ensureTables();
         $where = [];
@@ -246,6 +246,10 @@ final class SocialInboxRepo
         if ($q !== '') {
             $where[] = '(ct.display_name LIKE :q OR ct.phone LIKE :q OR ct.external_id LIKE :q OR c.last_message_preview LIKE :q)';
             $params[':q'] = '%' . $q . '%';
+        }
+        if (in_array($channel, ['whatsapp', 'instagram', 'facebook'], true)) {
+            $where[] = 'c.channel = :ch';
+            $params[':ch'] = $channel;
         }
 
         $sql = 'SELECT c.*, ct.display_name, ct.phone, ct.external_id, au.nombre AS assigned_admin_nombre

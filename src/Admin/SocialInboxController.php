@@ -22,10 +22,14 @@ final class SocialInboxController
             $tab = 'unassigned';
         }
         $q = trim((string)($_GET['q'] ?? ''));
+        $channel = trim((string)($_GET['channel'] ?? ''));
+        if (!in_array($channel, ['whatsapp', 'instagram', 'facebook'], true)) {
+            $channel = '';
+        }
         $selectedId = (int)($_GET['c'] ?? 0);
 
         $repo = new SocialInboxRepo();
-        $conversations = $repo->listConversations($tab, (int)$adminUser['id'], $q);
+        $conversations = $repo->listConversations($tab, (int)$adminUser['id'], $q, $channel);
 
         if ($selectedId <= 0 && $conversations) {
             $selectedId = (int)$conversations[0]['id'];
@@ -45,6 +49,7 @@ final class SocialInboxController
             'adminUser' => $adminUser,
             'tab' => $tab,
             'q' => $q,
+            'channel' => $channel,
             'conversations' => $conversations,
             'selected' => $selected,
             'messages' => $messages,

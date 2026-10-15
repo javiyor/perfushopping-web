@@ -59,13 +59,31 @@ $folderName = static function (int $id) use ($folders): string {
 </ul>
 
 <?php if ($emails): ?>
+<div class="card shadow-sm mb-2">
+    <div class="card-body py-2 d-flex gap-2 align-items-center flex-wrap">
+        <input type="checkbox" id="checkAllMail" title="Seleccionar todos" />
+        <label for="checkAllMail" class="small text-muted mb-0">Todos</label>
+        <span class="small text-muted" id="selCount"></span>
+        <?php if ($folders): ?>
+        <select class="form-select form-select-sm" id="bulkFolder" style="max-width:180px">
+            <option value="0">Mover a...</option>
+            <?php foreach ($folders as $f): ?>
+            <option value="<?= (int)$f['id'] ?>"><?= htmlspecialchars((string)($f['nombre'] ?? '')) ?></option>
+            <?php endforeach; ?>
+        </select>
+        <button class="btn btn-outline-secondary btn-sm" type="button" onclick="moverSeleccionados()"><i class="bi bi-folder-symlink"></i> Mover</button>
+        <?php endif; ?>
+        <button class="btn btn-outline-danger btn-sm" type="button" onclick="eliminarSeleccionados()"><i class="bi bi-trash"></i> Eliminar</button>
+    </div>
+</div>
 <div class="card shadow-sm">
     <div class="list-group list-group-flush">
         <?php foreach ($emails as $e):
             $mid = (string)($e['message_id'] ?? '');
             $fid = (int)($labels[$mid] ?? 0);
         ?>
-        <div class="list-group-item d-flex gap-3 align-items-start py-3">
+        <div class="list-group-item d-flex gap-2 align-items-start py-3">
+            <input type="checkbox" class="mail-check mt-2" value="<?= htmlspecialchars($mid) ?>" data-msgno="<?= (int)$e['uid'] ?>" title="Seleccionar" />
             <a href="/admin/email/<?= (int)$e['uid'] ?>" class="d-flex gap-3 align-items-start flex-grow-1 min-w-0 text-decoration-none text-body">
                 <div class="flex-shrink-0">
                     <div class="rounded-circle bg-accent text-white d-flex align-items-center justify-content-center" style="width:40px;height:40px;font-weight:700;font-size:14px">
@@ -112,4 +130,53 @@ $folderName = static function (int $id) use ($folders): string {
     var b = document.getElementById('badgeEmailsNuevos');
     if (b) b.style.display = 'none';
 })();
+function checkedMails() {
+    return Array.from(document.querySelectorAll('.mail-check:checked'));
+}
+function updateSelCount() {
+    var n = checkedMails().length;
+    var el = document.getElementById('selCount');
+    if (el) el.textContent = n > 0 ? n + ' seleccionado(s)' : '';
+}
+document.addEventListener('change', function(e) {
+    if (e.target && e.target.id === 'checkAllMail') {
+        document.querySelectorAll('.mail-check').forEach(function(c) { c.checked = e.target.checked; });
+    }
+    if (e.target && (e.target.id === 'checkAllMail' || e.target.classList.contains('mail-check'))) {
+        updateSelCount();
+    }
+});
+function mailPost(action, data) {
+    var f = document.createElement('form');
+    f.method = 'post';
+    f.action = action;
+    var csrf = document.createElement('input');
+    csrf.type = 'hidden'; csrf.name = '_csrf'; csrf.value = <?= json_encode($csrf) ?>;
+    f.appendChild(csrf);
+    Object.keys(data).forEach(function(k) {
+        var vals = Array.isArray(data[k]) ? data[k] : [data[k]];
+        vals.forEach(function(v) {
+            var inp = document.createElement('input');
+            inp.type = 'hidden'; inp.name = k; inp.value = v;
+            f.appendChild(inp);
+        });
+    });
+    var folder = document.createElement('input');
+    folder.type = 'hidden'; folder.name = 'folder'; folder.value = '<?= $folderFilter ?>';
+    f.appendChild(folder);
+    document.body.appendChild(f); f.submit();
+}
+function moverSeleccionados() {
+    var sel = checkedMails().map(function(c) { return c.value; }).filter(function(v) { return v !== ''; });
+    if (sel.length === 0) { alert('Seleccioná al menos un mensaje.'); return; }
+    var fid = document.getElementById('bulkFolder').value;
+    if (!fid || fid === '0') { alert('Elegí la carpeta destino.'); return; }
+    mailPost('/admin/email/mover-grupo', {'message_ids[]': sel, 'folder_id': fid});
+}
+function eliminarSeleccionados() {
+    var sel = checkedMails().map(function(c) { return c.getAttribute('data-msgno'); }).filter(function(v) { return v && v !== '0'; });
+    if (sel.length === 0) { alert('Seleccioná al menos un mensaje.'); return; }
+    if (!confirm('¿Eliminar ' + sel.length + ' mensaje(s) del servidor?')) return;
+    mailPost('/admin/email/eliminar', {'msgnos[]': sel});
+}
 </script>

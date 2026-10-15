@@ -5,12 +5,22 @@ $conversations = $conversations ?? [];
 $selected = $selected ?? null;
 $messages = $messages ?? [];
 $notes = $notes ?? [];
+$channel = (string)($channel ?? '');
 
 $tabLabels = [
     'unassigned' => 'Sin asignar',
     'mine' => 'Mis conversaciones',
     'closed' => 'Cerradas',
 ];
+
+$channelLabels = [
+    '' => 'Todos',
+    'whatsapp' => 'WhatsApp',
+    'instagram' => 'Instagram',
+    'facebook' => 'Facebook',
+];
+$chanParam = static fn (string $ch): string => $ch !== '' ? '&channel=' . urlencode($ch) : '';
+$qParam = $q !== '' ? '&q=' . urlencode((string)$q) : '';
 
 $channelBadge = [
     'whatsapp' => 'success',
@@ -35,6 +45,7 @@ $sendStatusLabel = ['sent' => 'Enviado', 'delivered' => 'Entregado', 'read' => '
     </div>
     <div class="col-md-4">
         <input type="hidden" name="tab" value="<?= htmlspecialchars((string)$tab) ?>" />
+        <?php if ($channel !== ''): ?><input type="hidden" name="channel" value="<?= htmlspecialchars($channel) ?>" /><?php endif; ?>
         <button class="btn btn-outline-secondary btn-sm" type="submit"><i class="bi bi-search"></i> Buscar</button>
     </div>
 </form>
@@ -42,7 +53,15 @@ $sendStatusLabel = ['sent' => 'Enviado', 'delivered' => 'Entregado', 'read' => '
 <ul class="nav nav-pills mb-3">
     <?php foreach ($tabLabels as $tabKey => $label): ?>
     <li class="nav-item me-2">
-        <a class="nav-link <?= $tab === $tabKey ? 'active' : '' ?>" href="/admin/mensajes?tab=<?= urlencode($tabKey) ?><?= $q !== '' ? '&q=' . urlencode((string)$q) : '' ?>"><?= htmlspecialchars($label) ?></a>
+        <a class="nav-link <?= $tab === $tabKey ? 'active' : '' ?>" href="/admin/mensajes?tab=<?= urlencode($tabKey) ?><?= $qParam ?><?= $chanParam($channel) ?>"><?= htmlspecialchars($label) ?></a>
+    </li>
+    <?php endforeach; ?>
+</ul>
+
+<ul class="nav nav-pills mb-3">
+    <?php foreach ($channelLabels as $chKey => $chLabel): ?>
+    <li class="nav-item me-2">
+        <a class="nav-link <?= $channel === $chKey ? 'active' : '' ?>" href="/admin/mensajes?tab=<?= urlencode($tab) ?><?= $qParam ?><?= $chanParam($chKey) ?>"><?= htmlspecialchars($chLabel) ?></a>
     </li>
     <?php endforeach; ?>
 </ul>
@@ -60,14 +79,14 @@ $sendStatusLabel = ['sent' => 'Enviado', 'delivered' => 'Entregado', 'read' => '
                 <?php endif; ?>
                 <?php foreach ($conversations as $c): ?>
                     <?php $isActive = $selected && (int)$selected['id'] === (int)$c['id']; ?>
-                    <?php $channel = (string)($c['channel'] ?? ''); ?>
-                    <a href="/admin/mensajes?tab=<?= urlencode((string)$tab) ?>&c=<?= (int)$c['id'] ?><?= $q !== '' ? '&q=' . urlencode((string)$q) : '' ?>"
+                    <?php $chRow = (string)($c['channel'] ?? ''); ?>
+                    <a href="/admin/mensajes?tab=<?= urlencode((string)$tab) ?>&c=<?= (int)$c['id'] ?><?= $qParam ?><?= $chanParam($channel) ?>"
                        class="list-group-item list-group-item-action <?= $isActive ? 'active' : '' ?>">
                         <div class="d-flex justify-content-between align-items-center mb-1">
                             <strong class="text-truncate" style="max-width:70%">
                                 <?= htmlspecialchars((string)($c['display_name'] ?: $c['phone'] ?: $c['external_id'])) ?>
                             </strong>
-                            <span class="badge bg-<?= htmlspecialchars($channelBadge[$channel] ?? 'secondary') ?>"><?= htmlspecialchars($channel) ?></span>
+                            <span class="badge bg-<?= htmlspecialchars($channelBadge[$chRow] ?? 'secondary') ?>"><?= htmlspecialchars($chRow) ?></span>
                         </div>
                         <div class="small text-muted text-truncate"><?= htmlspecialchars((string)($c['last_message_preview'] ?? '')) ?></div>
                         <div class="d-flex justify-content-between align-items-center mt-1">

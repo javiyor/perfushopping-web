@@ -485,4 +485,73 @@ final class EmailController
         }
         Response::redirect($back);
     }
+
+    public function moverGrupo(array $params): void
+    {
+        (new AdminAuthService())->requirePermiso('clientes');
+        Csrf::check($_POST['_csrf'] ?? null);
+        $ids = (array)($_POST['message_ids'] ?? []);
+        $folderId = (int)($_POST['folder_id'] ?? 0);
+        $n = 0;
+        if ($ids && $folderId > 0) {
+            $repo = new EmailFolderRepo();
+            foreach ($ids as $mid) {
+                $mid = trim((string)$mid);
+                if ($mid === '') {
+                    continue;
+                }
+                if ($repo->assign($mid, $folderId)) {
+                    $n++;
+                }
+            }
+        }
+        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Movidos a carpeta: ' . $n . '.'];
+        $back = '/admin/email';
+        $folder = (int)($_POST['folder'] ?? 0);
+        if ($folder > 0) {
+            $back .= '?folder=' . $folder;
+        }
+        Response::redirect($back);
+    }
+
+    public function eliminar(array $params): void
+    {
+        (new AdminAuthService())->requirePermiso('clientes');
+        Csrf::check($_POST['_csrf'] ?? null);
+        $msgnos = array_values(array_unique(array_filter(array_map('intval', (array)($_POST['msgnos'] ?? [])))));
+        $n = 0;
+        if ($msgnos && function_exists('imap_open')) {
+            try {
+                $mbox = $this->conectar();
+                if ($mbox) {
+                    $repo = new EmailFolderRepo();
+                    foreach ($msgnos as $msgno) {
+                        if ($msgno <= 0) {
+                            continue;
+                        }
+                        $header = @imap_headerinfo($mbox, $msgno);
+                        if ($header) {
+                            $mid = self::normalizeMessageId((string)($header->message_id ?? ''));
+                            if ($mid !== '') {
+                                $repo->unassign($mid);
+                            }
+                        }
+                        if (@imap_delete($mbox, $msgno)) {
+                            $n++;
+                        }
+                    }
+                    @imap_expunge($mbox);
+                    imap_close($mbox);
+                }
+            } catch (\Throwable $e) {
+            }
+        }
+        $_SESSION['admin_flash'] = ['type' => $n > 0 ? 'ok' : 'warning', 'text' => $n > 0 ? ('Eliminados: ' . $n . '.') : 'No se eliminó ningún mensaje.'];
+        $back = '/admin/email';
+        $folder = (int)($_POST['folder'] ?? 0);
+        if ($folder > 0) {
+            $back .= '?folder=' . $folder;
+        }
+        Response::redirect($back);
+    }
 }
