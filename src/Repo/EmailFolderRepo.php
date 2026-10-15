@@ -43,6 +43,16 @@ final class EmailFolderRepo
                 }
             }
         }
+        $pdo->exec("CREATE TABLE IF NOT EXISTS email_seen (
+            message_id VARCHAR(255) NOT NULL,
+            first_seen_at DATETIME NOT NULL,
+            PRIMARY KEY (message_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS email_user_state (
+            admin_user_id INT UNSIGNED NOT NULL,
+            last_seen_at DATETIME NOT NULL,
+            PRIMARY KEY (admin_user_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
         self::$ready = true;
     }
 
@@ -187,5 +197,70 @@ final class EmailFolderRepo
             }
         }
         return null;
+    }
+
+    /** Registra Message-IDs ya vistos (primera vez = first_seen_at). */
+    public function markSeen(array $messageIds): void
+    {
+        $this->ensure();
+        $ids = array_values(array_unique(array_filter(array_map(static fn ($v) => mb_substr(trim((string)$v), 0, 255), $messageIds))));
+        if (!$ids) {
+            return;
+        }
+        try {
+            $pdo = Db::pdo();
+            $ins = $pdo->prepare("INSERT IGNORE INTO email_seen (message_id, first_seen_at) VALUES (:m, NOW())");
+            foreach ($ids as $mid) {
+                $ins->execute([':m' => $mid]);
+            }
+        } catch (\Throwable $e) {
+        }
+    }
+
+    public function touchSeen(int $adminId): void
+    {
+        $this->ensure();
+        if ($adminId <= 0) {
+            return;
+        }
+        try {
+            $st = Db::pdo()->prepare("INSERT INTO email_user_state (admin_user_id, last_seen_at) VALUES (:a, NOW())
+                ON DUPLICATE KEY UPDATE last_seen_at = VALUES(last_seen_at)");
+            $st->execute([':a' => $adminId]);
+        } catch (\Throwable $e) {
+        }
+    }
+
+    public function lastSeen(int $adminId): ?string
+    {
+        $this->ensure();
+        if ($adminId <= 0) {
+            return null;
+        }
+        try {
+            $st = Db::pdo()->prepare("SELECT last_seen_at FROM email_user_state WHERE admin_user_id = :a LIMIT 1");
+            $st->execute([':a' => $adminId]);
+            $v = $st->fetchColumn();
+            return is_string($v) && $v !== '' ? $v : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /** Cantidad de mails descubiertos después de $since (0 si nunca visitó). */
+    public function countNew(?string $since, int $limit = 99): int
+    {
+        $this->ensure();
+        if ($since === null || $since === '') {
+            return 0;
+        }
+        try {
+            $limit = max(1, min(500, $limit));
+            $st = Db::pdo()->prepare("SELECT COUNT(*) FROM (SELECT 1 FROM email_seen WHERE first_seen_at > :s LIMIT {$limit}) t");
+            $st->execute([':s' => $since]);
+            return (int)$st->fetchColumn();
+        } catch (\Throwable $e) {
+            return 0;
+        }
     }
 }

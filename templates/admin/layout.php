@@ -250,7 +250,7 @@
             <?php if ($can('clientes')): ?><a href="/admin/clientes" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Base de clientes y fichas"><i class="bi bi-people"></i>Clientes</a><?php endif; ?>
             <?php if ($can('clientes')): ?><a href="/admin/users" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Usuarios web registrados"><i class="bi bi-person-gear"></i>Usuarios web<span class="badge-count green" id="badgeUsuariosNuevos" style="display:none">0</span></a><?php endif; ?>
             <?php if ($can('clientes')): ?><a href="/admin/puntos" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Programa de puntos y fidelización"><i class="bi bi-stars"></i>Puntos</a><?php endif; ?>
-            <?php if ($can('clientes')): ?><a href="/admin/email" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Bandeja de email integrada"><i class="bi bi-envelope"></i>Email</a><?php endif; ?>
+            <?php if ($can('clientes')): ?><a href="/admin/email" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Bandeja de email integrada"><i class="bi bi-envelope"></i>Email<span class="badge-count red" id="badgeEmailsNuevos" style="display:none">0</span></a><?php endif; ?>
 
             <?php $hasCompras = $can('compras') || $can('pagos_proveedores'); if ($hasCompras): ?><div class="nav-section">Compras</div><?php endif; ?>
             <?php if ($can('compras')): ?><a href="/admin/compras" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Facturas de compra a proveedores"><i class="bi bi-receipt"></i>Facturas compra</a><?php endif; ?>
@@ -411,6 +411,18 @@
         } catch(e) {}
     }
     document.addEventListener('DOMContentLoaded', function() { fetchBadges(); setInterval(fetchBadges, 30000); });
+    async function fetchEmailNuevos() {
+        try {
+            var r = await fetch('/admin/email/nuevos');
+            if (!r.ok) return;
+            var d = await r.json();
+            var b = document.getElementById('badgeEmailsNuevos');
+            if (!b) return;
+            if (d.nuevos > 0) { b.textContent = d.nuevos > 99 ? '99+' : d.nuevos; b.style.display = ''; }
+            else { b.style.display = 'none'; }
+        } catch(e) {}
+    }
+    document.addEventListener('DOMContentLoaded', function() { fetchEmailNuevos(); setInterval(fetchEmailNuevos, 300000); });
     // Demo tooltips (solo organizing-web)
     document.addEventListener('DOMContentLoaded', function() {
         if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {

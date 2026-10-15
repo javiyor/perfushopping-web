@@ -107,3 +107,9 @@ $folderName = static function (int $id) use ($folders): string {
 <?php elseif (!$error): ?>
     <div class="alert alert-info">Bandeja de entrada vacía.</div>
 <?php endif; ?>
+<script>
+(function() {
+    var b = document.getElementById('badgeEmailsNuevos');
+    if (b) b.style.display = 'none';
+})();
+</script>

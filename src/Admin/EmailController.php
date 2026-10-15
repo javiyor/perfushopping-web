@@ -5,6 +5,7 @@ namespace Perfushopping\Web\Admin;
 
 use Perfushopping\Web\Repo\EmailFolderRepo;
 use Perfushopping\Web\Service\AdminAuthService;
+use Perfushopping\Web\Support\Csrf;
 use Perfushopping\Web\Support\Env;
 use Perfushopping\Web\Support\Response;
 use Perfushopping\Web\Support\View;
@@ -301,6 +302,12 @@ final class EmailController
         } catch (\Throwable $e) {
         }
 
+        try {
+            $folderRepo->markSeen(array_column($emails, 'message_id'));
+            $folderRepo->touchSeen((int)$adminUser['id']);
+        } catch (\Throwable $e) {
+        }
+
         if ($folderFilter > 0) {
             $emails = array_values(array_filter($emails, static fn (array $e) => (int)($labels[$e['message_id'] ?? ''] ?? 0) === $folderFilter));
         }
@@ -370,6 +377,7 @@ final class EmailController
             if ($email && ($email['message_id'] ?? '') !== '') {
                 $map = $folderRepo->labelsFor([$email['message_id']]);
                 $folderId = (int)($map[$email['message_id']] ?? 0);
+                $folderRepo->markSeen([$email['message_id']]);
             }
             if ($email && ($email['from'] ?? '') !== '') {
                 $cliente = $folderRepo->matchCliente((string)$email['from']);
@@ -389,6 +397,49 @@ final class EmailController
             'csrf' => Csrf::token(),
             'pageTitle' => 'Email: ' . ($email['subject'] ?? ''),
         ]);
+    }
+
+    /** Chequeo liviano para el badge (cabeceras de los últimos 30, sin cuerpos). */
+    public function nuevos(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $u = $auth->user();
+        if (!$u || !$auth->checkPermiso('clientes')) {
+            Response::json(['nuevos' => 0]);
+            return;
+        }
+        $adminId = (int)$u['id'];
+        $repo = new EmailFolderRepo();
+        try {
+            if (function_exists('imap_open')) {
+                $mbox = $this->conectar();
+                if ($mbox) {
+                    $num = imap_num_msg($mbox);
+                    $ids = [];
+                    for ($i = $num; $i >= max(1, $num - 29); $i--) {
+                        $header = @imap_headerinfo($mbox, $i);
+                        if (!$header) {
+                            continue;
+                        }
+                        $mid = self::normalizeMessageId((string)($header->message_id ?? ''));
+                        if ($mid !== '') {
+                            $ids[] = $mid;
+                        }
+                    }
+                    imap_close($mbox);
+                    $repo->markSeen($ids);
+                }
+            }
+            $since = $repo->lastSeen($adminId);
+            if ($since === null) {
+                $repo->touchSeen($adminId);
+                Response::json(['nuevos' => 0]);
+                return;
+            }
+            Response::json(['nuevos' => $repo->countNew($since)]);
+        } catch (\Throwable $e) {
+            Response::json(['nuevos' => 0]);
+        }
     }
 
     public function crearCarpeta(array $params): void
