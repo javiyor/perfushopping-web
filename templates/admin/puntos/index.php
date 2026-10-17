@@ -1,6 +1,9 @@
 <?php
 $cuentas = $cuentas ?? [];
 $q = (string)($q ?? '');
+$mes = (string)($mes ?? date('Y-m'));
+$orden = (string)($orden ?? 'saldo');
+$resumenPeriodo = $resumenPeriodo ?? [];
 $pctGeneral = (float)($pctGeneral ?? 1);
 $marcas = $marcas ?? [];
 $productos = $productos ?? [];
@@ -25,15 +28,44 @@ $csrfToken = $csrf ?? '';
     <div class="tab-pane fade show active" id="tabCuentas" role="tabpanel">
         <div class="card shadow-sm mb-3">
             <div class="card-body">
-                <form method="get" action="/admin/puntos" class="row g-2">
-                    <div class="col-lg-6">
-                        <input class="form-control form-control-sm" name="q" value="<?= htmlspecialchars($q) ?>" placeholder="Buscar cliente por nombre o CUIT..." />
+                <form method="get" action="/admin/puntos" class="row g-2 align-items-end">
+                    <div class="col-lg-4">
+                        <label class="form-label small mb-1">Cliente / DNI / CUIT</label>
+                        <input class="form-control form-control-sm" name="q" value="<?= htmlspecialchars($q) ?>" placeholder="Buscar por nombre, DNI o CUIT..." />
+                    </div>
+                    <div class="col-lg-2">
+                        <label class="form-label small mb-1">Mes de movimientos</label>
+                        <input class="form-control form-control-sm" type="month" name="mes" value="<?= htmlspecialchars($mes) ?>" />
+                    </div>
+                    <div class="col-lg-3">
+                        <label class="form-label small mb-1">Ordenar cuentas</label>
+                        <select class="form-select form-select-sm" name="orden">
+                            <option value="saldo" <?= $orden === 'saldo' ? 'selected' : '' ?>>Mayor saldo</option>
+                            <option value="cliente" <?= $orden === 'cliente' ? 'selected' : '' ?>>Cliente A–Z</option>
+                        </select>
                     </div>
                     <div class="col-lg-2">
                         <button class="btn btn-accent btn-sm w-100" type="submit"><i class="bi bi-search"></i> Buscar</button>
                     </div>
                 </form>
             </div>
+        </div>
+
+        <div class="row g-2 mb-3">
+            <?php foreach ([
+                ['Puntos asignados en el mes', 'asignados', 'text-success'],
+                ['Puntos canjeados en el mes', 'canjeados', 'text-warning'],
+                ['Acumulados históricos', 'acumulados', ''],
+                ['Canjeados históricos', 'usados', ''],
+                ['Saldo total', 'saldo', 'text-primary'],
+            ] as [$label, $key, $color]): ?>
+                <div class="col-6 col-md">
+                    <div class="card shadow-sm h-100"><div class="card-body py-2 px-3">
+                        <div class="small text-muted"><?= htmlspecialchars($label) ?></div>
+                        <div class="fw-bold <?= $color ?>"><?= number_format((int)($resumenPeriodo[$key] ?? 0), 0, ',', '.') ?></div>
+                    </div></div>
+                </div>
+            <?php endforeach; ?>
         </div>
 
         <div class="card shadow-sm">
@@ -47,12 +79,14 @@ $csrfToken = $csrf ?? '';
                             <th class="text-end">Acumulados</th>
                             <th class="text-end">Usados</th>
                             <th class="text-end">Saldo</th>
+                            <th class="text-end">Asignados mes</th>
+                            <th class="text-end">Canjeados mes</th>
                             <th style="width:50px"></th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (!$cuentas): ?>
-                            <tr><td colspan="7" class="text-muted text-center">Sin cuentas con puntos.</td></tr>
+                            <tr><td colspan="9" class="text-muted text-center">Sin cuentas con puntos.</td></tr>
                         <?php else: ?>
                             <?php foreach ($cuentas as $c): ?>
                                 <?php $saldo = (int)($c['saldo_puntos'] ?? 0); ?>
@@ -63,6 +97,8 @@ $csrfToken = $csrf ?? '';
                                     <td class="text-end"><?= number_format((int)($c['total_acumulado'] ?? 0), 0, ',', '.') ?></td>
                                     <td class="text-end"><?= number_format((int)($c['total_usados'] ?? 0), 0, ',', '.') ?></td>
                                     <td class="text-end fw-bold <?= $saldo > 0 ? 'text-success' : '' ?>"><?= number_format($saldo, 0, ',', '.') ?></td>
+                                    <td class="text-end"><?= number_format((int)($c['periodo_asignados'] ?? 0), 0, ',', '.') ?></td>
+                                    <td class="text-end"><?= number_format((int)($c['periodo_canjeados'] ?? 0), 0, ',', '.') ?></td>
                                     <td><a class="btn btn-sm btn-outline-secondary" href="/admin/puntos/<?= (int)($c['idclien'] ?? 0) ?>"><i class="bi bi-eye"></i></a></td>
                                 </tr>
                             <?php endforeach; ?>

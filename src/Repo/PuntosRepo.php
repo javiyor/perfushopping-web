@@ -124,7 +124,7 @@ final class PuntosRepo
     }
 
     /** @return array<int, array<string,mixed>> */
-    public function listarCuentas(string $q = '', int $limit = 100): array
+    public function listarCuentas(string $q = '', int $limit = 100, string $desde = '', string $hasta = '', string $orden = 'saldo'): array
     {
         $limit = max(1, min(500, $limit));
         $q = trim($q);
@@ -135,17 +135,66 @@ final class PuntosRepo
             $params[':like'] = '%' . $q . '%';
             $params[':like2'] = '%' . $q . '%';
         }
+        $sortSql = $orden === 'cliente' ? 'c.razon ASC, p.idclien ASC' : 'p.saldo_puntos DESC, p.updated_at DESC';
+        $periodSelect = '';
+        if ($desde !== '' && $hasta !== '') {
+            $periodSelect = ",
+                   COALESCE((SELECT SUM(m.puntos) FROM puntos_movimientos m WHERE m.idclien = p.idclien AND m.tipo = 'acumulacion' AND m.created_at >= :desde AND m.created_at < :hasta), 0) AS periodo_asignados,
+                   COALESCE((SELECT SUM(m.puntos) FROM puntos_movimientos m WHERE m.idclien = p.idclien AND m.tipo = 'uso' AND m.created_at >= :desde2 AND m.created_at < :hasta2), 0) AS periodo_canjeados";
+            $params[':desde'] = $desde;
+            $params[':hasta'] = $hasta;
+            $params[':desde2'] = $desde;
+            $params[':hasta2'] = $hasta;
+        } else {
+            $periodSelect = ', 0 AS periodo_asignados, 0 AS periodo_canjeados';
+        }
         $st = Db::pdo()->prepare('
-            SELECT p.*, c.razon, c.cuit, c.tele AS phone, c.mail AS email, c.Localidad AS city,
+            SELECT p.*, c.razon, c.cuit, c.tele AS phone, c.mail AS email, c.Localidad AS city' . $periodSelect . ',
                    (SELECT COUNT(*) FROM puntos_movimientos m WHERE m.idclien = p.idclien) AS mov_count
             FROM puntos_cuentas p
             INNER JOIN clientes c ON c.idclien = p.idclien
             WHERE 1=1 ' . $where . '
-            ORDER BY p.saldo_puntos DESC, p.updated_at DESC
+            ORDER BY ' . $sortSql . '
             LIMIT ' . $limit
         );
         $st->execute($params);
         return $st->fetchAll();
+    }
+
+    /** @return array{asignados:int,canjeados:int,acumulados:int,usados:int,saldo:int} */
+    public function resumenPeriodo(string $desde, string $hasta, string $q = ''): array
+    {
+        $where = '';
+        $params = [':desde' => $desde, ':hasta' => $hasta];
+        if (trim($q) !== '') {
+            $where = ' AND (c.razon LIKE :like OR c.cuit LIKE :like2)';
+            $params[':like'] = '%' . trim($q) . '%';
+            $params[':like2'] = '%' . trim($q) . '%';
+        }
+        $st = Db::pdo()->prepare("
+            SELECT COALESCE(SUM(CASE WHEN m.tipo = 'acumulacion' THEN m.puntos ELSE 0 END), 0) AS asignados,
+                   COALESCE(SUM(CASE WHEN m.tipo = 'uso' THEN m.puntos ELSE 0 END), 0) AS canjeados,
+                   COALESCE((SELECT SUM(p.total_acumulado) FROM puntos_cuentas p INNER JOIN clientes c2 ON c2.idclien = p.idclien WHERE 1=1" . ($where !== '' ? ' AND (c2.razon LIKE :like3 OR c2.cuit LIKE :like4)' : '') . "), 0) AS acumulados,
+                   COALESCE((SELECT SUM(p.total_usados) FROM puntos_cuentas p INNER JOIN clientes c3 ON c3.idclien = p.idclien WHERE 1=1" . ($where !== '' ? ' AND (c3.razon LIKE :like5 OR c3.cuit LIKE :like6)' : '') . "), 0) AS usados,
+                   COALESCE((SELECT SUM(p.saldo_puntos) FROM puntos_cuentas p INNER JOIN clientes c4 ON c4.idclien = p.idclien WHERE 1=1" . ($where !== '' ? ' AND (c4.razon LIKE :like7 OR c4.cuit LIKE :like8)' : '') . "), 0) AS saldo
+            FROM puntos_movimientos m
+            INNER JOIN clientes c ON c.idclien = m.idclien
+            WHERE m.created_at >= :desde AND m.created_at < :hasta" . $where
+        );
+        if (trim($q) !== '') {
+            for ($i = 3; $i <= 8; $i++) {
+                $params[':like' . $i] = '%' . trim($q) . '%';
+            }
+        }
+        $st->execute($params);
+        $row = $st->fetch() ?: [];
+        return [
+            'asignados' => (int)($row['asignados'] ?? 0),
+            'canjeados' => (int)($row['canjeados'] ?? 0),
+            'acumulados' => (int)($row['acumulados'] ?? 0),
+            'usados' => (int)($row['usados'] ?? 0),
+            'saldo' => (int)($row['saldo'] ?? 0),
+        ];
     }
 
     public function config(string $clave, string $default = ''): string

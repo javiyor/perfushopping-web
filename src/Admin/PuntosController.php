@@ -18,13 +18,32 @@ final class PuntosController
         $adminUser = $auth->requirePermiso('clientes');
 
         $q = trim((string)($_GET['q'] ?? ''));
+        $mes = trim((string)($_GET['mes'] ?? date('Y-m')));
+        if (!preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $mes)) {
+            $mes = date('Y-m');
+        }
+        $inicio = \DateTimeImmutable::createFromFormat('!Y-m-d', $mes . '-01');
+        if (!$inicio) {
+            $mes = date('Y-m');
+            $inicio = new \DateTimeImmutable('first day of this month');
+        }
+        $desde = $inicio->format('Y-m-d 00:00:00');
+        $hasta = $inicio->modify('+1 month')->format('Y-m-d 00:00:00');
+        $orden = (string)($_GET['orden'] ?? 'saldo');
+        if (!in_array($orden, ['saldo', 'cliente'], true)) {
+            $orden = 'saldo';
+        }
         $repo = new PuntosRepo();
-        $cuentas = $repo->listarCuentas($q);
+        $cuentas = $repo->listarCuentas($q, 100, $desde, $hasta, $orden);
+        $resumenPeriodo = $repo->resumenPeriodo($desde, $hasta, $q);
 
         echo View::adminPage('admin/puntos/index.php', [
             'adminUser' => $adminUser,
             'cuentas' => $cuentas,
             'q' => $q,
+            'mes' => $mes,
+            'orden' => $orden,
+            'resumenPeriodo' => $resumenPeriodo,
             'pctGeneral' => $repo->pctGeneral(),
             'marcas' => $repo->listarMarcas(),
             'productos' => $repo->listarProductos(),
