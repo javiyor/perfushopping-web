@@ -13,6 +13,7 @@ $plazos = $plazos ?? [];
 $csrfToken = $csrf ?? '';
 $solicitudId = (int)($solicitudId ?? 0);
 $motivoSolicitud = (string)($motivoSolicitud ?? '');
+$puedeAplicarDirectamente = (bool)($puedeAplicarPagosDirectamente ?? false);
 $codigosActivos = array_map(static fn(array $f): string => (string)($f['codigo'] ?? ''), $formasPago);
 $tarjetaIds = array_map(static fn(array $x): int => (int)($x['idtarje'] ?? 0), $tarjetas);
 $equipoIds = array_map(static fn(array $x): int => (int)($x['idequipo'] ?? 0), $equipos);
@@ -29,9 +30,10 @@ $bancoIds = array_map(static fn(array $x): int => (int)($x['idban'] ?? 0), $banc
 </div>
 
 <div class="alert alert-info small">
-    Solo se modifican las formas de pago y sus datos. No se cambian los productos, importes, datos del cliente, fecha ni estado/CAE de la factura. Al enviar, la corrección queda pendiente; solo otro superadmin puede aprobarla. Hasta entonces la factura y sus impactos contables permanecen sin cambios.
+    Solo se modifican las formas de pago y sus datos. No se cambian los productos, importes, datos del cliente, fecha ni estado/CAE de la factura.
+    <?php if ($puedeAplicarDirectamente): ?>Tu usuario tiene permiso de administración: la corrección se aplicará al guardar, sin autorización adicional.<?php else: ?>Al enviar, la corrección quedará pendiente y otro superadmin deberá aprobarla; hasta entonces la factura y sus impactos contables permanecen sin cambios.<?php endif; ?>
 </div>
-<?php if ($solicitudId > 0): ?><div class="alert alert-warning small">Estás editando la solicitud #<?= $solicitudId ?>. Al guardar se actualizará la misma solicitud, que seguirá pendiente de aprobación.</div><?php endif; ?>
+<?php if ($solicitudId > 0): ?><div class="alert alert-warning small">Estás editando la solicitud #<?= $solicitudId ?>. <?= $puedeAplicarDirectamente ? 'Al guardar se aplicará la corrección y se cerrará la solicitud.' : 'Al guardar se actualizará la misma solicitud, que seguirá pendiente de aprobación.' ?></div><?php endif; ?>
 
 <div class="row g-3 mb-3">
     <div class="col-md-4"><div class="card shadow-sm"><div class="card-body py-2"><span class="small text-muted">Comprobante</span><div class="fw-bold"><?= htmlspecialchars((string)($factura['codigo'] ?? '')) ?> · <?= htmlspecialchars((string)($factura['estado'] ?? '')) ?><?= !empty($factura['cae']) ? ' · CAE ' . htmlspecialchars((string)$factura['cae']) : '' ?></div></div></div></div>
@@ -119,11 +121,11 @@ $bancoIds = array_map(static fn(array $x): int => (int)($x['idban'] ?? 0), $banc
     <?php endforeach; ?>
 
     <div class="card shadow-sm mb-3">
-        <div class="card-header bg-white fw-semibold">Enviar a autorización</div>
+        <div class="card-header bg-white fw-semibold"><?= $puedeAplicarDirectamente ? 'Aplicar corrección' : 'Enviar a autorización' ?></div>
         <div class="card-body row g-2">
             <div class="col-12"><label class="form-label small">Motivo de la corrección</label><textarea class="form-control form-control-sm" name="motivo" rows="2" maxlength="500" required placeholder="Explicá qué dato de pago debe corregirse y por qué"><?= htmlspecialchars($motivoSolicitud) ?></textarea></div>
-            <div class="col-12"><span class="small text-muted">La suma de los pagos debe coincidir con el total de la factura. Los cambios quedarán pendientes y no tendrán efecto hasta que otro superadmin los apruebe.</span></div>
+            <div class="col-12"><span class="small text-muted">La suma de los pagos debe coincidir con el total de la factura. <?= $puedeAplicarDirectamente ? 'Los cambios se aplicarán inmediatamente.' : 'Los cambios quedarán pendientes y no tendrán efecto hasta que otro superadmin los apruebe.' ?></span></div>
         </div>
     </div>
-    <button class="btn btn-accent" type="submit"><i class="bi bi-send"></i> <?= $solicitudId > 0 ? 'Actualizar y reenviar solicitud' : 'Enviar solicitud' ?></button>
+    <button class="btn btn-accent" type="submit"><i class="bi bi-<?= $puedeAplicarDirectamente ? 'check-lg' : 'send' ?>"></i> <?= $puedeAplicarDirectamente ? 'Guardar corrección' : ($solicitudId > 0 ? 'Actualizar y reenviar solicitud' : 'Enviar solicitud') ?></button>
 </form>

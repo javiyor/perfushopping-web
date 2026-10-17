@@ -2201,6 +2201,7 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
             'pagos' => $pagos,
             'solicitudId' => $solicitudId,
             'motivoSolicitud' => $motivoSolicitud,
+            'puedeAplicarPagosDirectamente' => AdminAuthService::adminPuedeAutorizar($adminUser),
             'formasPago' => (new \Perfushopping\Web\Repo\FormaPagoRepo())->findActivas(),
             'bancos' => $this->bancos(),
             'bancosCuentas' => $this->bancosCuentas(),
@@ -2345,7 +2346,43 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
         }
 
         try {
-            if ($solicitudPropia) {
+            if (AdminAuthService::adminPuedeAutorizar($adminUser)) {
+                $snapshot = $repo->pagosSnapshot($id);
+                $fingerprint = hash('sha256', json_encode($snapshot, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
+                // Inicializa la tabla de solicitudes antes de empezar la transacción de pagos.
+                $solRepo->propias((int)$adminUser['id'], 1);
+                $pdo = \Perfushopping\Web\Infra\Db::pdo();
+                $pdo->beginTransaction();
+                try {
+                    $lockFactura = $pdo->prepare('SELECT id FROM facturas WHERE id = :id LIMIT 1 FOR UPDATE');
+                    $lockFactura->execute([':id' => $id]);
+                    if (!$lockFactura->fetchColumn()) {
+                        throw new \RuntimeException('La factura dejó de existir antes de guardar los pagos.');
+                    }
+                    $facturaActual = $repo->findById($id);
+                    if (!$facturaActual) {
+                        throw new \RuntimeException('No se pudo volver a cargar la factura.');
+                    }
+                    $this->aplicarCorreccionPagos($repo, $facturaActual, $pagos, $chequesUpdates, $fingerprint, (int)$adminUser['id']);
+                    if ($solicitudPropia) {
+                        $solRepo->aprobarPropiaDirectamente($solicitudId, (int)$adminUser['id'], (string)($adminUser['nombre'] ?? ''));
+                    } else {
+                        $solRepo->cerrarPendientesPorCorreccionDirecta(
+                            $id,
+                            (int)$adminUser['id'],
+                            (string)($adminUser['nombre'] ?? ''),
+                            'Sustituida por una corrección aplicada directamente por administración.'
+                        );
+                    }
+                    $pdo->commit();
+                } catch (\Throwable $e) {
+                    if ($pdo->inTransaction()) {
+                        $pdo->rollBack();
+                    }
+                    throw $e;
+                }
+                $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Corrección de pagos aplicada directamente por administración; movimientos bancarios y de cuenta corriente actualizados.'];
+            } elseif ($solicitudPropia) {
                 $solRepo->actualizarPropiaPendiente($solicitudId, (int)$adminUser['id'], $motivo, $pagos, $chequesUpdates);
                 $_SESSION['admin_flash'] = ['type' => 'info', 'text' => 'Solicitud #' . $solicitudId . ' corregida y enviada nuevamente a aprobación. Los pagos siguen pendientes.'];
             } else {
@@ -2364,7 +2401,8 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
                 $_SESSION['admin_flash'] = ['type' => 'info', 'text' => 'Solicitud #' . $solicitudId . ' enviada. Los pagos y sus impactos no cambiarán hasta que otro superadmin la apruebe.'];
             }
         } catch (\Throwable $e) {
-            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se pudo enviar la solicitud: ' . $e->getMessage()];
+            $accion = AdminAuthService::adminPuedeAutorizar($adminUser) ? 'aplicar la corrección directa' : 'enviar la solicitud';
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se pudo ' . $accion . ': ' . $e->getMessage()];
         }
         Response::redirect($editUrl);
     }

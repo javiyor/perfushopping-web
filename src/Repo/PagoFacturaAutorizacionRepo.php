@@ -152,6 +152,37 @@ final class PagoFacturaAutorizacionRepo
         }
     }
 
+    public function aprobarPropiaDirectamente(int $id, int $adminId, string $adminNombre): void
+    {
+        $this->ensureTable();
+        $st = Db::pdo()->prepare("UPDATE factura_pago_autorizaciones
+            SET status = 'aprobada', decided_by = :admin, decided_by_nombre = :nombre, decided_at = NOW(), updated_at = NOW()
+            WHERE id = :id AND requested_by = :admin2 AND status = 'pendiente' LIMIT 1");
+        $st->execute([
+            ':admin' => $adminId,
+            ':nombre' => mb_substr($adminNombre, 0, 120),
+            ':id' => $id,
+            ':admin2' => $adminId,
+        ]);
+        if ($st->rowCount() <= 0) {
+            throw new \RuntimeException('La solicitud propia dejó de estar pendiente; no se aplicó la corrección.');
+        }
+    }
+
+    public function cerrarPendientesPorCorreccionDirecta(int $facturaId, int $adminId, string $adminNombre, string $nota): void
+    {
+        $this->ensureTable();
+        Db::pdo()->prepare("UPDATE factura_pago_autorizaciones
+            SET status = 'rechazada', decided_by = :admin, decided_by_nombre = :nombre, decided_at = NOW(), rejection_note = :nota, updated_at = NOW()
+            WHERE factura_id = :factura AND status = 'pendiente'")
+            ->execute([
+                ':admin' => $adminId,
+                ':nombre' => mb_substr($adminNombre, 0, 120),
+                ':nota' => mb_substr($nota, 0, 255),
+                ':factura' => $facturaId,
+            ]);
+    }
+
     public function tomarParaAprobar(int $id, int $adminId, string $adminNombre): array
     {
         $this->ensureTable();
