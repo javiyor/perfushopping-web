@@ -9,6 +9,32 @@ $counts = $counts ?? [];
 $totalCents = (int)($totalCents ?? 0);
 $puedeEditar = (bool)($puedeEditar ?? false);
 $formaPagoLabels = $formaPagoLabels ?? [];
+$solicitudesPendientes = $solicitudesPendientes ?? [];
+$misSolicitudes = $misSolicitudes ?? [];
+$esSuperadmin = (bool)($esSuperadmin ?? false);
+$adminUser = $adminUser ?? [];
+$csrfToken = $csrf ?? '';
+$detallePago = static function (array $p, ?array $cheque = null): string {
+    $items = [];
+    foreach ([
+        'cupon_numero' => 'Cupón', 'tarjeta_id' => 'Tarjeta ID', 'equipo_id' => 'POS ID',
+        'banco_cuenta_id' => 'Cuenta ID', 'idplazo' => 'Plazo ID', 'banco_id' => 'Banco ID',
+    ] as $key => $label) {
+        if (($p[$key] ?? '') !== '' && $p[$key] !== null) $items[] = $label . ': ' . (string)$p[$key];
+    }
+    if (!empty($p['cupon_monto_cents'])) $items[] = 'Cupón $: ' . number_format((int)$p['cupon_monto_cents'] / 100, 2, ',', '.');
+    if (!empty($p['moneda'])) $items[] = (string)$p['moneda'] . ': ' . number_format((int)($p['monto_moneda_cents'] ?? 0) / 100, 2, ',', '.') . ' · cotiz. ' . (string)($p['cotizacion'] ?? '');
+    $chequeId = (int)($p['cheque_id'] ?? 0);
+    if ($chequeId > 0) {
+        $items[] = 'Cheque #' . $chequeId;
+        if ($cheque) {
+            foreach (['banco_emisor', 'numero_cheque', 'titular', 'cuit_titular', 'fecha_vencimiento'] as $key) {
+                if (!empty($cheque[$key])) $items[] = (string)$cheque[$key];
+            }
+        }
+    }
+    return htmlspecialchars($items ? implode(' · ', $items) : '—');
+};
 ?>
 <nav aria-label="breadcrumb" class="mb-3">
     <ol class="breadcrumb">
@@ -16,6 +42,85 @@ $formaPagoLabels = $formaPagoLabels ?? [];
         <li class="breadcrumb-item active">Listado de pagos</li>
     </ol>
 </nav>
+
+<?php if ($esSuperadmin): ?>
+<div class="card shadow-sm mb-3" id="solicitudesPagosPendientes">
+    <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+        <span>Solicitudes de corrección pendientes</span><span class="badge bg-danger"><?= count($solicitudesPendientes) ?></span>
+    </div>
+    <?php if (!$solicitudesPendientes): ?>
+        <div class="card-body small text-muted">No hay solicitudes pendientes.</div>
+    <?php else: ?>
+        <div class="list-group list-group-flush">
+            <?php foreach ($solicitudesPendientes as $s): ?>
+                <?php
+                    $oldSnap = json_decode((string)($s['original_json'] ?? ''), true) ?: [];
+                    $oldRows = $oldSnap['pagos'] ?? [];
+                    $oldCheques = [];
+                    foreach (($oldSnap['cheques'] ?? []) as $chq) $oldCheques[(int)($chq['id'] ?? 0)] = $chq;
+                    $newRows = json_decode((string)($s['pagos_json'] ?? ''), true) ?: [];
+                    $newCheques = json_decode((string)($s['cheques_json'] ?? ''), true) ?: [];
+                    $esPropia = (int)($s['requested_by'] ?? 0) === (int)($adminUser['id'] ?? 0);
+                ?>
+                <div class="list-group-item">
+                    <div class="d-flex flex-wrap justify-content-between gap-2">
+                        <div><strong><?= htmlspecialchars((string)($s['factura_codigo'] ?? 'Factura')) ?></strong> · Solicitó <?= htmlspecialchars((string)($s['requested_by_nombre'] ?? '')) ?> · <?= htmlspecialchars((string)($s['created_at'] ?? '')) ?></div>
+                        <a class="btn btn-sm btn-outline-secondary" href="/admin/facturas/<?= (int)($s['factura_id'] ?? 0) ?>">Ver factura</a>
+                    </div>
+                    <div class="small mt-1"><strong>Motivo:</strong> <?= nl2br(htmlspecialchars((string)($s['motivo'] ?? ''))) ?></div>
+                    <div class="table-responsive mt-2">
+                        <table class="table table-sm table-bordered mb-2">
+                            <thead><tr><th>#</th><th>Forma anterior</th><th>Detalle anterior</th><th class="text-end">Importe anterior</th><th>Forma solicitada</th><th>Detalle solicitado</th><th class="text-end">Importe solicitado</th></tr></thead>
+                            <tbody>
+                                <?php foreach ($newRows as $i => $p): $old = $oldRows[$i] ?? []; ?>
+                                    <tr>
+                                        <td><?= (int)$i + 1 ?></td>
+                                        <td><?= htmlspecialchars($formaPagoLabels[(string)($old['forma_pago'] ?? '')] ?? (string)($old['forma_pago'] ?? '—')) ?></td>
+                                        <td class="small"><?= $detallePago($old, $oldCheques[(int)($old['cheque_id'] ?? 0)] ?? null) ?></td>
+                                        <td class="text-end"><?= htmlspecialchars(Format::moneyFromCents((int)($old['monto_cents'] ?? 0))) ?></td>
+                                        <td><?= htmlspecialchars($formaPagoLabels[(string)($p['forma_pago'] ?? '')] ?? (string)($p['forma_pago'] ?? '—')) ?></td>
+                                        <td class="small"><?= $detallePago($p, $newCheques[(int)($p['cheque_id'] ?? 0)] ?? null) ?></td>
+                                        <td class="text-end fw-semibold"><?= htmlspecialchars(Format::moneyFromCents((int)($p['monto_cents'] ?? 0))) ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <?php if ($esPropia): ?>
+                        <div class="small text-warning">No podés aprobar tu propia solicitud.</div>
+                    <?php else: ?>
+                        <div class="d-flex flex-wrap gap-2">
+                            <form method="post" action="/admin/facturas/pagos/aprobar" onsubmit="return confirm('¿Aprobar la corrección de pagos de esta factura?')">
+                                <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrfToken) ?>" />
+                                <input type="hidden" name="solicitud_id" value="<?= (int)$s['id'] ?>" />
+                                <button class="btn btn-sm btn-accent" type="submit"><i class="bi bi-check-lg"></i> Aprobar y aplicar</button>
+                            </form>
+                            <form method="post" action="/admin/facturas/pagos/rechazar" class="d-flex gap-1" onsubmit="return confirm('¿Rechazar esta solicitud?')">
+                                <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrfToken) ?>" />
+                                <input type="hidden" name="solicitud_id" value="<?= (int)$s['id'] ?>" />
+                                <input class="form-control form-control-sm" name="nota_rechazo" maxlength="255" placeholder="Motivo de rechazo" />
+                                <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-x-lg"></i> Rechazar</button>
+                            </form>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+</div>
+<?php endif; ?>
+
+<?php if ($misSolicitudes): ?>
+<div class="card shadow-sm mb-3">
+    <div class="card-header bg-white fw-semibold">Mis solicitudes recientes</div>
+    <div class="table-responsive"><table class="table table-sm mb-0">
+        <thead><tr><th>Solicitud</th><th>Factura</th><th>Estado</th><th>Motivo</th><th>Respuesta</th><th>Fecha</th></tr></thead>
+        <tbody><?php foreach ($misSolicitudes as $s): $status = (string)($s['status'] ?? 'pendiente'); $badge = $status === 'aprobada' ? 'success' : ($status === 'rechazada' ? 'danger' : 'warning text-dark'); ?>
+            <tr><td>#<?= (int)$s['id'] ?></td><td><?= htmlspecialchars((string)($s['factura_codigo'] ?? '')) ?></td><td><span class="badge bg-<?= $badge ?>"><?= htmlspecialchars($status) ?></span></td><td class="small"><?= htmlspecialchars((string)($s['motivo'] ?? '')) ?></td><td class="small"><?= htmlspecialchars((string)($s['rejection_note'] ?? $s['decided_by_nombre'] ?? '')) ?></td><td class="small"><?= htmlspecialchars((string)($s['updated_at'] ?? $s['created_at'] ?? '')) ?></td></tr>
+        <?php endforeach; ?></tbody>
+    </table></div>
+</div>
+<?php endif; ?>
 
 <div class="card shadow-sm mb-3">
     <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">

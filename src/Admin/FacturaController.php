@@ -792,7 +792,7 @@ final class FacturaController
     }
 
     /** Registra movimientos bancarios por cobros de transferencia/tarjeta. En NC invierte el sentido (débito). */
-    private function registrarBancoMov(array $pagos, int $id, string $codigo, string $fecha, int $adminId, string $tipoComprobante = ''): void
+    private function registrarBancoMov(array $pagos, int $id, string $codigo, string $fecha, int $adminId, string $tipoComprobante = '', bool $lanzarError = false): void
     {
         try {
             $bancoMovRepo = new \Perfushopping\Web\Repo\BancoMovimientoRepo();
@@ -821,7 +821,12 @@ final class FacturaController
                     }
                 }
             }
-        } catch (\Throwable $e) { error_log('BancoMov factura: '.$e->getMessage()); }
+        } catch (\Throwable $e) {
+            error_log('BancoMov factura: ' . $e->getMessage());
+            if ($lanzarError) {
+                throw $e;
+            }
+        }
     }
 
     /**
@@ -2070,7 +2075,7 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
     public function pagos(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requirePermiso('pagos');
+        $adminUser = $auth->requirePermiso('pagos', 'facturacion');
 
         $q = trim((string)($_GET['q'] ?? ''));
         $formaPago = trim((string)($_GET['forma_pago'] ?? ''));
@@ -2111,6 +2116,8 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
         $stCount->execute($queryParams);
         $counts = $stCount->fetchAll(\PDO::FETCH_KEY_PAIR);
         $totalCents = array_sum(array_map(static fn(array $p): int => (int)($p['monto_cents'] ?? 0), $pagos));
+        $solicitudesRepo = new \Perfushopping\Web\Repo\PagoFacturaAutorizacionRepo();
+        $esSuperadmin = (string)($adminUser['rol'] ?? '') === 'superadmin';
 
         echo View::adminPage('admin/facturas/pagos.php', [
             'adminUser' => $adminUser,
@@ -2122,6 +2129,9 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
             'totalCents' => $totalCents,
             'puedeEditar' => ($adminUser['rol'] ?? '') === 'superadmin' || $auth->checkPermiso('facturacion') || $auth->checkPermiso('pagos'),
             'formaPagoLabels' => (new \Perfushopping\Web\Repo\FormaPagoRepo())->labels(),
+            'solicitudesPendientes' => $esSuperadmin ? $solicitudesRepo->pendientes(40) : [],
+            'misSolicitudes' => $solicitudesRepo->propias((int)$adminUser['id'], 25),
+            'esSuperadmin' => $esSuperadmin,
             'csrf' => Csrf::token(),
             'pageTitle' => 'Listado de pagos de facturas',
         ]);
@@ -2173,12 +2183,9 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
             Response::redirect('/admin/facturas/pagos');
         }
 
-        $adminAutoriza = $auth->verificarCredenciales(
-            (string)($_POST['auth_user'] ?? ''),
-            (string)($_POST['auth_pass'] ?? '')
-        );
-        if (!$adminAutoriza || !AdminAuthService::adminPuedeAutorizar($adminAutoriza)) {
-            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Autorización rechazada: se requieren credenciales de un admin autorizado.'];
+        $motivo = trim((string)($_POST['motivo'] ?? ''));
+        if ($motivo === '') {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Indicá el motivo de la solicitud de corrección.'];
             Response::redirect('/admin/facturas/pagos/editar/' . $id);
         }
 
@@ -2276,61 +2283,177 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
         }
 
         try {
-            $repo->actualizarSoloPagos($id, $pagos);
-            $pdo = \Perfushopping\Web\Infra\Db::pdo();
-            $pdo->prepare("DELETE FROM banco_movimientos WHERE origen = 'factura' AND origen_id = :i")
-                ->execute([':i' => $id]);
-            $adminId = (int)($adminAutoriza['id'] ?? $adminUser['id']);
-            $this->registrarBancoMov($pagos, $id, (string)$factura['codigo'], (string)$factura['fecha'], $adminId, (string)$factura['tipo_comprobante']);
-
-            $ctaCte = new \Perfushopping\Web\Repo\CtaCteRepo();
-            $ctaCte->anularMovimientosPorOrigen('factura', $id);
-            $formaPrincipal = (string)($pagos[0]['forma_pago'] ?? '');
-            if (!empty($factura['cliente_id']) && $formaPrincipal === 'cuenta_corriente') {
-                $ctaCte->agregarMovimiento(
-                    (string)$factura['tipo_comprobante'] === 'NC' ? 'credito' : 'debito',
-                    'factura',
-                    $id,
-                    (int)$factura['cliente_id'],
-                    (int)($factura['idclien'] ?? 0) ?: null,
-                    (int)($factura['total_cents'] ?? 0),
-                    'Factura ' . (string)$factura['codigo'] . ' — corrección autorizada de pagos',
-                    $adminId
-                );
-            }
-
-            foreach ($chequesUpdates as $chequeId => $chq) {
-                $fields = ['monto_cents = :monto', 'updated_at = NOW()'];
-                $params = [':monto' => $chq['monto_cents'], ':id' => $chequeId];
-                foreach (['banco_emisor', 'numero_cheque', 'titular', 'cuit_titular', 'fecha_vencimiento'] as $column) {
-                    if ($chq[$column] !== '') {
-                        $fields[] = $column . ' = :' . $column;
-                        $params[':' . $column] = $chq[$column];
-                    }
-                }
-                $pdo->prepare('UPDATE cheques SET ' . implode(', ', $fields) . ' WHERE id = :id LIMIT 1')
-                    ->execute($params);
-            }
-            foreach ($actualPorId as $oldPago) {
-                $oldCheque = (int)($oldPago['cheque_id'] ?? 0);
-                if ($oldCheque <= 0 || $this->chequeReferenciado($oldCheque)) {
-                    continue;
-                }
-                $cheque = (new ChequeRepo())->findById($oldCheque);
-                if ($cheque && ($cheque['estado'] ?? '') === 'en_cartera') {
-                    $pdo->prepare('DELETE FROM cheque_movimientos WHERE cheque_id = :c')->execute([':c' => $oldCheque]);
-                    $pdo->prepare('DELETE FROM cheques WHERE id = :c LIMIT 1')->execute([':c' => $oldCheque]);
-                }
-            }
+            $snapshot = $repo->pagosSnapshot($id);
+            $solicitudId = (new \Perfushopping\Web\Repo\PagoFacturaAutorizacionRepo())->crear(
+                $id,
+                (string)$factura['codigo'],
+                (int)$adminUser['id'],
+                (string)($adminUser['nombre'] ?? ''),
+                $motivo,
+                hash('sha256', json_encode($snapshot, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE)),
+                $snapshot,
+                $pagos,
+                $chequesUpdates
+            );
+            $_SESSION['admin_flash'] = ['type' => 'info', 'text' => 'Solicitud #' . $solicitudId . ' enviada. Los pagos y sus impactos no cambiarán hasta que otro superadmin la apruebe.'];
         } catch (\Throwable $e) {
-            error_log('FacturaController::actualizarPagos: ' . $e->getMessage());
-            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se pudieron guardar los pagos: ' . $e->getMessage()];
-            Response::redirect('/admin/facturas/pagos/editar/' . $id);
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se pudo enviar la solicitud: ' . $e->getMessage()];
+        }
+        Response::redirect('/admin/facturas/pagos/editar/' . $id);
+    }
+
+    public function aprobarSolicitudPagos(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requireRol('superadmin');
+        Csrf::check($_POST['_csrf'] ?? null);
+        $solicitudId = (int)($_POST['solicitud_id'] ?? 0);
+        $solicitudes = new \Perfushopping\Web\Repo\PagoFacturaAutorizacionRepo();
+        if ($solicitudId <= 0) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Solicitud inválida.'];
+            Response::redirect('/admin/facturas/pagos');
+        }
+        try {
+            $solicitud = $solicitudes->tomarParaAprobar($solicitudId, (int)$adminUser['id'], (string)($adminUser['nombre'] ?? ''));
+            $facturaId = (int)$solicitud['factura_id'];
+            $facturaRepo = new FacturaRepo();
+            $factura = $facturaRepo->findById($facturaId);
+            if (!$factura) {
+                $solicitudes->rechazarProcesando($solicitudId, 'La factura ya no existe.');
+                $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'La solicitud fue rechazada: la factura no existe.'];
+                Response::redirect('/admin/facturas/pagos');
+            }
+            if (!hash_equals((string)$solicitud['original_hash'], $facturaRepo->pagosFingerprint($facturaId))) {
+                $solicitudes->rechazarProcesando($solicitudId, 'Los pagos de la factura cambiaron desde que se creó la solicitud.');
+                $_SESSION['admin_flash'] = ['type' => 'warning', 'text' => 'No se aplicó la solicitud: los pagos de la factura cambiaron desde su creación. Se marcó como rechazada por obsoleta.'];
+                Response::redirect('/admin/facturas/pagos');
+            }
+
+            $pagos = json_decode((string)$solicitud['pagos_json'], true, 512, JSON_THROW_ON_ERROR);
+            $cheques = json_decode((string)$solicitud['cheques_json'], true, 512, JSON_THROW_ON_ERROR);
+            if (!is_array($pagos) || !$pagos || !is_array($cheques)) {
+                throw new \RuntimeException('El detalle guardado de la solicitud está incompleto.');
+            }
+            // Inicializa la tabla/config de formas de pago antes de abrir la transacción contable.
+            (new \Perfushopping\Web\Repo\FormaPagoRepo())->findAll();
+            $pdo = \Perfushopping\Web\Infra\Db::pdo();
+            $pdo->beginTransaction();
+            try {
+                $lockFactura = $pdo->prepare('SELECT id FROM facturas WHERE id = :id LIMIT 1 FOR UPDATE');
+                $lockFactura->execute([':id' => $facturaId]);
+                if (!$lockFactura->fetchColumn()) {
+                    throw new \RuntimeException('La factura dejó de existir antes de aplicar la solicitud.');
+                }
+                $factura = $facturaRepo->findById($facturaId);
+                if (!$factura) {
+                    throw new \RuntimeException('No se pudo volver a cargar la factura para aplicar los pagos.');
+                }
+                $this->aplicarCorreccionPagos(
+                    $facturaRepo,
+                    $factura,
+                    $pagos,
+                    $cheques,
+                    (string)$solicitud['original_hash'],
+                    (int)$adminUser['id']
+                );
+                $solicitudes->aprobar($solicitudId);
+                $pdo->commit();
+            } catch (\Throwable $e) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                throw $e;
+            }
+            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Solicitud #' . $solicitudId . ' aprobada. Se actualizaron los pagos y sus impactos contables.'];
+        } catch (\Throwable $e) {
+            error_log('FacturaController::aprobarSolicitudPagos: ' . $e->getMessage());
+            if (isset($pdo) && $pdo instanceof \PDO && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            if (str_contains($e->getMessage(), 'cambiaron desde que se solicitó')) {
+                $solicitudes->rechazarProcesando($solicitudId, $e->getMessage());
+                $_SESSION['admin_flash'] = ['type' => 'warning', 'text' => 'No se aplicó: los pagos cambiaron mientras se aprobaba. La solicitud quedó rechazada.'];
+            } else {
+                $solicitudes->restaurarPendiente($solicitudId);
+                $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se pudo aprobar la solicitud: ' . $e->getMessage()];
+            }
+        }
+        Response::redirect('/admin/facturas/pagos');
+    }
+
+    public function rechazarSolicitudPagos(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requireRol('superadmin');
+        Csrf::check($_POST['_csrf'] ?? null);
+        $solicitudId = (int)($_POST['solicitud_id'] ?? 0);
+        $nota = trim((string)($_POST['nota_rechazo'] ?? '')) ?: 'Rechazada por administración.';
+        try {
+            if ($solicitudId <= 0) {
+                throw new \RuntimeException('Solicitud inválida.');
+            }
+            (new \Perfushopping\Web\Repo\PagoFacturaAutorizacionRepo())->rechazar(
+                $solicitudId,
+                (int)$adminUser['id'],
+                (string)($adminUser['nombre'] ?? ''),
+                $nota
+            );
+            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Solicitud de corrección de pagos rechazada.'];
+        } catch (\Throwable $e) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se pudo rechazar la solicitud: ' . $e->getMessage()];
+        }
+        Response::redirect('/admin/facturas/pagos');
+    }
+
+    /** Aplica una solicitud ya aprobada dentro de la transacción que actualiza su estado. */
+    private function aplicarCorreccionPagos(FacturaRepo $repo, array $factura, array $pagos, array $chequesUpdates, string $expectedHash, int $adminId): void
+    {
+        $id = (int)$factura['id'];
+        $pdo = \Perfushopping\Web\Infra\Db::pdo();
+        $actuales = $repo->pagos($id);
+        $repo->actualizarSoloPagos($id, $pagos, $expectedHash);
+        $pdo->prepare("DELETE FROM banco_movimientos WHERE origen = 'factura' AND origen_id = :i")
+            ->execute([':i' => $id]);
+        $this->registrarBancoMov($pagos, $id, (string)$factura['codigo'], (string)$factura['fecha'], $adminId, (string)$factura['tipo_comprobante'], true);
+
+        $ctaCte = new \Perfushopping\Web\Repo\CtaCteRepo();
+        $ctaCte->anularMovimientosPorOrigen('factura', $id);
+        $formaPrincipal = (string)($pagos[0]['forma_pago'] ?? '');
+        if (!empty($factura['cliente_id']) && $formaPrincipal === 'cuenta_corriente') {
+            $ctaCte->agregarMovimiento(
+                (string)$factura['tipo_comprobante'] === 'NC' ? 'credito' : 'debito',
+                'factura',
+                $id,
+                (int)$factura['cliente_id'],
+                (int)($factura['idclien'] ?? 0) ?: null,
+                (int)($factura['total_cents'] ?? 0),
+                'Factura ' . (string)$factura['codigo'] . ' — corrección autorizada de pagos',
+                $adminId
+            );
         }
 
-        $autorizaNombre = (string)($adminAutoriza['nombre'] ?? $adminAutoriza['username'] ?? 'admin');
-        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Pagos corregidos. Movimientos de banco y cuenta corriente recalculados. Autorizado por ' . $autorizaNombre . '.'];
-        Response::redirect('/admin/facturas/pagos/editar/' . $id);
+        foreach ($chequesUpdates as $chequeId => $chq) {
+            $fields = ['monto_cents = :monto', 'updated_at = NOW()'];
+            $values = [':monto' => (int)$chq['monto_cents'], ':id' => (int)$chequeId];
+            foreach (['banco_emisor', 'numero_cheque', 'titular', 'cuit_titular', 'fecha_vencimiento'] as $column) {
+                if (($chq[$column] ?? '') !== '') {
+                    $fields[] = $column . ' = :' . $column;
+                    $values[':' . $column] = $chq[$column];
+                }
+            }
+            $pdo->prepare('UPDATE cheques SET ' . implode(', ', $fields) . ' WHERE id = :id LIMIT 1')->execute($values);
+        }
+        foreach ($actuales as $oldPago) {
+            $oldCheque = (int)($oldPago['cheque_id'] ?? 0);
+            if ($oldCheque <= 0 || $this->chequeReferenciado($oldCheque)) {
+                continue;
+            }
+            $cheque = (new ChequeRepo())->findById($oldCheque);
+            if ($cheque && ($cheque['estado'] ?? '') === 'en_cartera') {
+                $pdo->prepare('DELETE FROM cheque_movimientos WHERE cheque_id = :c')->execute([':c' => $oldCheque]);
+                $pdo->prepare('DELETE FROM cheques WHERE id = :c LIMIT 1')->execute([':c' => $oldCheque]);
+            }
+        }
     }
 
 }

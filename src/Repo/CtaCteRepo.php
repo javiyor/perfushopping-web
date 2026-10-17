@@ -101,13 +101,17 @@ final class CtaCteRepo
     public function anularMovimientosPorOrigen(string $origen, int $origenId): void
     {
         $pdo = Db::pdo();
-        $st = $pdo->prepare('SELECT * FROM ctacte_movimientos WHERE origen = :o AND origen_id = :oid ORDER BY id ASC');
+        $lock = $pdo->inTransaction() ? ' FOR UPDATE' : '';
+        $st = $pdo->prepare('SELECT * FROM ctacte_movimientos WHERE origen = :o AND origen_id = :oid ORDER BY id ASC' . $lock);
         $st->execute([':o' => $origen, ':oid' => $origenId]);
         $movs = $st->fetchAll();
 
         if (!$movs) return;
 
-        $pdo->beginTransaction();
+        $ownsTransaction = !$pdo->inTransaction();
+        if ($ownsTransaction) {
+            $pdo->beginTransaction();
+        }
         try {
             // Delete the movements (they'll be re-created as credits if needed)
             $del = $pdo->prepare('DELETE FROM ctacte_movimientos WHERE origen = :o AND origen_id = :oid');
@@ -117,18 +121,24 @@ final class CtaCteRepo
             $clienteId = (int)$movs[0]['cliente_id'];
             $this->recalcularSaldos($clienteId);
 
-            $pdo->commit();
+            if ($ownsTransaction) {
+                $pdo->commit();
+            }
         } catch (\Throwable $e) {
-            $pdo->rollBack();
+            if ($ownsTransaction && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             throw $e;
         }
     }
 
     public function recalcularSaldos(int $clienteId): void
     {
-        $movs = Db::pdo()->prepare('
+        $pdo = Db::pdo();
+        $lock = $pdo->inTransaction() ? ' FOR UPDATE' : '';
+        $movs = $pdo->prepare('
             SELECT id, tipo, monto_cents FROM ctacte_movimientos
-            WHERE cliente_id = :c ORDER BY id ASC
+            WHERE cliente_id = :c ORDER BY id ASC' . $lock . '
         ');
         $movs->execute([':c' => $clienteId]);
         $saldo = 0;

@@ -27,7 +27,7 @@ $bancoIds = array_map(static fn(array $x): int => (int)($x['idban'] ?? 0), $banc
 </div>
 
 <div class="alert alert-info small">
-    Solo se modifican las formas de pago y sus datos. No se cambian los productos, importes, datos del cliente, fecha ni estado/CAE de la factura. Se requiere autorización de un admin; los impactos bancarios y de cuenta corriente se recalculan.
+    Solo se modifican las formas de pago y sus datos. No se cambian los productos, importes, datos del cliente, fecha ni estado/CAE de la factura. Al enviar, la corrección queda pendiente; solo otro superadmin puede aprobarla. Hasta entonces la factura y sus impactos contables permanecen sin cambios.
 </div>
 
 <div class="row g-3 mb-3">
@@ -115,12 +115,11 @@ $bancoIds = array_map(static fn(array $x): int => (int)($x['idban'] ?? 0), $banc
     <?php endforeach; ?>
 
     <div class="card shadow-sm mb-3">
-        <div class="card-header bg-white fw-semibold">Autorización administrativa</div>
+        <div class="card-header bg-white fw-semibold">Enviar a autorización</div>
         <div class="card-body row g-2">
-            <div class="col-md-6"><label class="form-label small">Usuario admin</label><input class="form-control form-control-sm" name="auth_user" autocomplete="off" required /></div>
-            <div class="col-md-6"><label class="form-label small">Contraseña</label><input class="form-control form-control-sm" type="password" name="auth_pass" autocomplete="new-password" required /></div>
-            <div class="col-12"><span class="small text-muted">La suma de los pagos debe coincidir con el total de la factura.</span></div>
+            <div class="col-12"><label class="form-label small">Motivo de la corrección</label><textarea class="form-control form-control-sm" name="motivo" rows="2" maxlength="500" required placeholder="Explicá qué dato de pago debe corregirse y por qué"></textarea></div>
+            <div class="col-12"><span class="small text-muted">La suma de los pagos debe coincidir con el total de la factura. Los cambios quedarán pendientes y no tendrán efecto hasta que otro superadmin los apruebe.</span></div>
         </div>
     </div>
-    <button class="btn btn-accent" type="submit"><i class="bi bi-check-lg"></i> Guardar corrección de pagos</button>
+    <button class="btn btn-accent" type="submit"><i class="bi bi-send"></i> Enviar solicitud</button>
 </form>

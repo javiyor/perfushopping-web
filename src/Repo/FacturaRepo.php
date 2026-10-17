@@ -595,8 +595,35 @@ $st = $pdo->prepare('
         }
     }
 
+    /** Estado original de los medios de pago, para detectar solicitudes obsoletas. */
+    public function pagosSnapshot(int $facturaId): array
+    {
+        $pdo = Db::pdo();
+        $lock = $pdo->inTransaction() ? ' FOR UPDATE' : '';
+        $st = $pdo->prepare('SELECT forma_pago FROM facturas WHERE id = :id LIMIT 1' . $lock);
+        $st->execute([':id' => $facturaId]);
+        $forma = $st->fetchColumn();
+        $st = $pdo->prepare('SELECT * FROM factura_pagos WHERE factura_id = :id ORDER BY id ASC' . $lock);
+        $st->execute([':id' => $facturaId]);
+        $pagos = $st->fetchAll();
+        $chequeIds = array_values(array_unique(array_filter(array_map(static fn(array $p): int => (int)($p['cheque_id'] ?? 0), $pagos))));
+        $cheques = [];
+        if ($chequeIds) {
+            $marks = implode(',', array_fill(0, count($chequeIds), '?'));
+            $st = $pdo->prepare('SELECT id, monto_cents, banco_emisor, numero_cheque, titular, cuit_titular, fecha_vencimiento FROM cheques WHERE id IN (' . $marks . ') ORDER BY id ASC' . $lock);
+            $st->execute($chequeIds);
+            $cheques = $st->fetchAll();
+        }
+        return ['forma_pago' => (string)($forma ?: ''), 'pagos' => $pagos, 'cheques' => $cheques];
+    }
+
+    public function pagosFingerprint(int $facturaId): string
+    {
+        return hash('sha256', json_encode($this->pagosSnapshot($facturaId), JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
+    }
+
     /** Actualiza solo los medios y datos de pago, sin alterar el comprobante ni sus items. */
-    public function actualizarSoloPagos(int $facturaId, array $pagos): void
+    public function actualizarSoloPagos(int $facturaId, array $pagos, string $expectedHash): void
     {
         if ($facturaId <= 0 || !$pagos) {
             throw new \InvalidArgumentException('La factura y sus pagos son obligatorios.');
@@ -609,8 +636,19 @@ $st = $pdo->prepare('
             'monto_moneda_cents', 'cotizacion', 'cheque_id',
         ];
         $fields = array_values(array_intersect($allowed, $columns));
-        $pdo->beginTransaction();
+        $ownsTransaction = !$pdo->inTransaction();
+        if ($ownsTransaction) {
+            $pdo->beginTransaction();
+        }
         try {
+            $lock = $pdo->prepare('SELECT id FROM facturas WHERE id = :id LIMIT 1 FOR UPDATE');
+            $lock->execute([':id' => $facturaId]);
+            if (!$lock->fetchColumn()) {
+                throw new \RuntimeException('Factura no encontrada.');
+            }
+            if (!hash_equals($expectedHash, $this->pagosFingerprint($facturaId))) {
+                throw new \RuntimeException('Los pagos de esta factura cambiaron desde que se solicitó la corrección.');
+            }
             $setSql = implode(', ', array_map(static fn(string $f): string => '`' . $f . '` = :' . $f, $fields));
             $stmt = $pdo->prepare('UPDATE factura_pagos SET ' . $setSql . ' WHERE id = :id AND factura_id = :factura');
             foreach ($pagos as $pago) {
@@ -623,9 +661,11 @@ $st = $pdo->prepare('
             $formaPago = (string)($pagos[0]['forma_pago'] ?? '');
             $pdo->prepare('UPDATE facturas SET forma_pago = :forma, updated_at = NOW() WHERE id = :id LIMIT 1')
                 ->execute([':forma' => $formaPago, ':id' => $facturaId]);
-            $pdo->commit();
+            if ($ownsTransaction) {
+                $pdo->commit();
+            }
         } catch (\Throwable $e) {
-            if ($pdo->inTransaction()) {
+            if ($ownsTransaction && $pdo->inTransaction()) {
                 $pdo->rollBack();
             }
             throw $e;
