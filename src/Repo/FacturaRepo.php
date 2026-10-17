@@ -595,6 +595,43 @@ $st = $pdo->prepare('
         }
     }
 
+    /** Actualiza solo los medios y datos de pago, sin alterar el comprobante ni sus items. */
+    public function actualizarSoloPagos(int $facturaId, array $pagos): void
+    {
+        if ($facturaId <= 0 || !$pagos) {
+            throw new \InvalidArgumentException('La factura y sus pagos son obligatorios.');
+        }
+        $pdo = Db::pdo();
+        $columns = array_column($pdo->query('SHOW COLUMNS FROM factura_pagos')->fetchAll(), 'Field');
+        $allowed = [
+            'forma_pago', 'monto_cents', 'cupon_numero', 'cupon_monto_cents', 'idplazo',
+            'banco_id', 'tarjeta_id', 'equipo_id', 'banco_cuenta_id', 'moneda',
+            'monto_moneda_cents', 'cotizacion', 'cheque_id',
+        ];
+        $fields = array_values(array_intersect($allowed, $columns));
+        $pdo->beginTransaction();
+        try {
+            $setSql = implode(', ', array_map(static fn(string $f): string => '`' . $f . '` = :' . $f, $fields));
+            $stmt = $pdo->prepare('UPDATE factura_pagos SET ' . $setSql . ' WHERE id = :id AND factura_id = :factura');
+            foreach ($pagos as $pago) {
+                $values = [':id' => (int)$pago['id'], ':factura' => $facturaId];
+                foreach ($fields as $field) {
+                    $values[':' . $field] = $pago[$field] ?? null;
+                }
+                $stmt->execute($values);
+            }
+            $formaPago = (string)($pagos[0]['forma_pago'] ?? '');
+            $pdo->prepare('UPDATE facturas SET forma_pago = :forma, updated_at = NOW() WHERE id = :id LIMIT 1')
+                ->execute([':forma' => $formaPago, ':id' => $facturaId]);
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
+
     public function listarEnvios(?string $estado = null, int $limit = 100): array
     {
         $this->ensureEntregaColumns();

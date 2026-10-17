@@ -93,10 +93,8 @@ $formaPagoLabels = $formaPagoLabels ?? [];
                         </td>
                         <td class="text-end">
                             <a class="btn btn-sm btn-outline-primary" href="/admin/facturas/<?= (int)($pg['factura_id'] ?? 0) ?>">Ver factura</a>
-                            <?php if ($puedeEditar && empty($pg['cae']) && ($pg['factura_estado'] ?? '') !== 'anulada'): ?>
-                                <a class="btn btn-sm btn-outline-secondary" href="/admin/facturas/editar/<?= (int)($pg['factura_id'] ?? 0) ?>">Editar factura</a>
-                            <?php elseif ($puedeEditar): ?>
-                                <span class="small text-muted">Bloqueado (ARCA/anulada)</span>
+                            <?php if ($puedeEditar): ?>
+                                <a class="btn btn-sm btn-outline-secondary" href="/admin/facturas/pagos/editar/<?= (int)($pg['factura_id'] ?? 0) ?>">Editar pagos</a>
                             <?php endif; ?>
                         </td>
                     </tr>

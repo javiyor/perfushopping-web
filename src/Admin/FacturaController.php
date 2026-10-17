@@ -2120,11 +2120,217 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
             'fecha' => $fecha,
             'counts' => $counts,
             'totalCents' => $totalCents,
-            'puedeEditar' => ($adminUser['rol'] ?? '') === 'superadmin' || $auth->checkPermiso('facturacion'),
+            'puedeEditar' => ($adminUser['rol'] ?? '') === 'superadmin' || $auth->checkPermiso('facturacion') || $auth->checkPermiso('pagos'),
             'formaPagoLabels' => (new \Perfushopping\Web\Repo\FormaPagoRepo())->labels(),
             'csrf' => Csrf::token(),
             'pageTitle' => 'Listado de pagos de facturas',
         ]);
+    }
+
+    public function editarPagos(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requirePermiso('facturacion', 'pagos');
+        $id = (int)($params['id'] ?? 0);
+        $repo = new FacturaRepo();
+        $factura = $repo->findById($id);
+        if (!$factura) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Factura no encontrada.'];
+            Response::redirect('/admin/facturas/pagos');
+        }
+        $pagos = $repo->pagos($id);
+        if (!$pagos) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'La factura no tiene pagos para corregir.'];
+            Response::redirect('/admin/facturas/pagos');
+        }
+        echo View::adminPage('admin/facturas/pagos-editar.php', [
+            'adminUser' => $adminUser,
+            'factura' => $factura,
+            'pagos' => $pagos,
+            'formasPago' => (new \Perfushopping\Web\Repo\FormaPagoRepo())->findActivas(),
+            'bancos' => $this->bancos(),
+            'bancosCuentas' => $this->bancosCuentas(),
+            'tarjetas' => $this->tarjetas(),
+            'equipos' => $this->equipos((int)$auth->getSucursalId()),
+            'plazos' => $this->plazos(),
+            'csrf' => Csrf::token(),
+            'formasPagoLabels' => (new \Perfushopping\Web\Repo\FormaPagoRepo())->labels(),
+            'pageTitle' => 'Corregir pagos ' . ($factura['codigo'] ?? ''),
+        ]);
+    }
+
+    public function actualizarPagos(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requirePermiso('facturacion', 'pagos');
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $id = (int)($_POST['factura_id'] ?? 0);
+        $repo = new FacturaRepo();
+        $factura = $repo->findById($id);
+        if (!$factura || !is_array($_POST['pagos'] ?? null)) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Factura o datos de pago inválidos.'];
+            Response::redirect('/admin/facturas/pagos');
+        }
+
+        $adminAutoriza = $auth->verificarCredenciales(
+            (string)($_POST['auth_user'] ?? ''),
+            (string)($_POST['auth_pass'] ?? '')
+        );
+        if (!$adminAutoriza || !AdminAuthService::adminPuedeAutorizar($adminAutoriza)) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Autorización rechazada: se requieren credenciales de un admin autorizado.'];
+            Response::redirect('/admin/facturas/pagos/editar/' . $id);
+        }
+
+        $actuales = $repo->pagos($id);
+        $actualPorId = [];
+        foreach ($actuales as $pago) {
+            $actualPorId[(int)$pago['id']] = $pago;
+        }
+        $inputPagos = $_POST['pagos'];
+        if (count($inputPagos) !== count($actualPorId)) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se pueden agregar ni quitar pagos desde esta corrección; revisá todos los renglones existentes.'];
+            Response::redirect('/admin/facturas/pagos/editar/' . $id);
+        }
+
+        $formas = (new \Perfushopping\Web\Repo\FormaPagoRepo())->findAll();
+        $formaPorCodigo = [];
+        foreach ($formas as $forma) {
+            $formaPorCodigo[(string)$forma['codigo']] = $forma;
+        }
+        $bancoNombres = [];
+        foreach ($this->bancos() as $banco) {
+            $bancoNombres[(int)$banco['idban']] = (string)$banco['nombanc'];
+        }
+        $pagos = [];
+        $chequesUpdates = [];
+        $vistoIds = [];
+        $totalPagos = 0;
+        foreach ($inputPagos as $row) {
+            $pagoId = (int)($row['id'] ?? 0);
+            if (!isset($actualPorId[$pagoId]) || isset($vistoIds[$pagoId])) {
+                $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Se detectó un renglón de pago inválido.'];
+                Response::redirect('/admin/facturas/pagos/editar/' . $id);
+            }
+            $vistoIds[$pagoId] = true;
+            $old = $actualPorId[$pagoId];
+            $forma = trim((string)($row['forma_pago'] ?? ''));
+            if ($forma === '' || (!isset($formaPorCodigo[$forma]) && $forma !== (string)$old['forma_pago'])) {
+                $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Seleccioná una forma de pago válida.'];
+                Response::redirect('/admin/facturas/pagos/editar/' . $id);
+            }
+            $tipoForma = (string)($formaPorCodigo[$forma]['tipo'] ?? \Perfushopping\Web\Repo\FormaPagoRepo::tipoDe($forma));
+            $monto = (int)round(max(0, (float)str_replace(',', '.', (string)($row['monto'] ?? '0'))) * 100);
+            if ($monto <= 0) {
+                $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Cada medio de pago debe tener un importe mayor a cero.'];
+                Response::redirect('/admin/facturas/pagos/editar/' . $id);
+            }
+            $chequeId = (int)($old['cheque_id'] ?? 0);
+            if ($tipoForma === 'cheque' && $chequeId <= 0) {
+                $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Para cambiar a cheque hay que registrar un cheque desde la emisión del recibo/factura.'];
+                Response::redirect('/admin/facturas/pagos/editar/' . $id);
+            }
+            $cuponMonto = (int)round(max(0, (float)str_replace(',', '.', (string)($row['cupon_monto'] ?? '0'))) * 100);
+            $monedaMonto = (int)round(max(0, (float)str_replace(',', '.', (string)($row['monto_moneda'] ?? '0'))) * 100);
+            $cotizacion = max(0, (float)str_replace(',', '.', (string)($row['cotizacion'] ?? '0')));
+            if ($tipoForma === 'moneda') {
+                if ($monedaMonto <= 0 || $cotizacion <= 0) {
+                    $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Completá el importe en moneda extranjera y su cotización.'];
+                    Response::redirect('/admin/facturas/pagos/editar/' . $id);
+                }
+                $monto = (int)round($monedaMonto * $cotizacion);
+            }
+            $pago = [
+                'id' => $pagoId,
+                'forma_pago' => $forma,
+                'monto_cents' => $monto,
+                'cheque_id' => $tipoForma === 'cheque' ? $chequeId : null,
+                'cupon_numero' => $tipoForma === 'tarjeta' ? trim((string)($row['cupon_numero'] ?? '')) : null,
+                'cupon_monto_cents' => $tipoForma === 'tarjeta' ? ($cuponMonto ?: $monto) : null,
+                'idplazo' => $tipoForma === 'ctacte' ? ((int)($row['idplazo'] ?? 0) ?: null) : null,
+                'banco_id' => $tipoForma === 'cheque' ? ((int)($row['banco_id'] ?? 0) ?: null) : null,
+                'tarjeta_id' => $tipoForma === 'tarjeta' ? ((int)($row['tarjeta_id'] ?? 0) ?: null) : null,
+                'equipo_id' => $tipoForma === 'tarjeta' ? ((int)($row['equipo_id'] ?? 0) ?: null) : null,
+                'banco_cuenta_id' => in_array($tipoForma, ['banco', 'tarjeta'], true) ? ((int)($row['banco_cuenta_id'] ?? 0) ?: null) : null,
+                'moneda' => $tipoForma === 'moneda' ? (string)($formaPorCodigo[$forma]['moneda'] ?? '') : null,
+                'monto_moneda_cents' => $tipoForma === 'moneda' ? $monedaMonto : null,
+                'cotizacion' => $tipoForma === 'moneda' ? $cotizacion : null,
+            ];
+            if ($tipoForma === 'cheque' && $chequeId > 0) {
+                $chequesUpdates[$chequeId] = [
+                    'monto_cents' => $monto,
+                    'banco_emisor' => $bancoNombres[(int)($row['banco_id'] ?? 0)] ?? '',
+                    'numero_cheque' => trim((string)($row['cheque_numero'] ?? '')),
+                    'titular' => trim((string)($row['cheque_titular'] ?? '')),
+                    'cuit_titular' => trim((string)($row['cheque_cuit'] ?? '')),
+                    'fecha_vencimiento' => trim((string)($row['cheque_vencimiento'] ?? '')),
+                ];
+            }
+            $pagos[] = $pago;
+            $totalPagos += $monto;
+        }
+
+        if (count($pagos) !== count($actualPorId) || count($vistoIds) !== count($actualPorId) || $totalPagos !== (int)($factura['total_cents'] ?? 0)) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'La suma de los pagos debe coincidir exactamente con el total de la factura (' . \Perfushopping\Web\Support\Format::moneyFromCents((int)$factura['total_cents']) . ').'];
+            Response::redirect('/admin/facturas/pagos/editar/' . $id);
+        }
+
+        try {
+            $repo->actualizarSoloPagos($id, $pagos);
+            $pdo = \Perfushopping\Web\Infra\Db::pdo();
+            $pdo->prepare("DELETE FROM banco_movimientos WHERE origen = 'factura' AND origen_id = :i")
+                ->execute([':i' => $id]);
+            $adminId = (int)($adminAutoriza['id'] ?? $adminUser['id']);
+            $this->registrarBancoMov($pagos, $id, (string)$factura['codigo'], (string)$factura['fecha'], $adminId, (string)$factura['tipo_comprobante']);
+
+            $ctaCte = new \Perfushopping\Web\Repo\CtaCteRepo();
+            $ctaCte->anularMovimientosPorOrigen('factura', $id);
+            $formaPrincipal = (string)($pagos[0]['forma_pago'] ?? '');
+            if (!empty($factura['cliente_id']) && $formaPrincipal === 'cuenta_corriente') {
+                $ctaCte->agregarMovimiento(
+                    (string)$factura['tipo_comprobante'] === 'NC' ? 'credito' : 'debito',
+                    'factura',
+                    $id,
+                    (int)$factura['cliente_id'],
+                    (int)($factura['idclien'] ?? 0) ?: null,
+                    (int)($factura['total_cents'] ?? 0),
+                    'Factura ' . (string)$factura['codigo'] . ' — corrección autorizada de pagos',
+                    $adminId
+                );
+            }
+
+            foreach ($chequesUpdates as $chequeId => $chq) {
+                $fields = ['monto_cents = :monto', 'updated_at = NOW()'];
+                $params = [':monto' => $chq['monto_cents'], ':id' => $chequeId];
+                foreach (['banco_emisor', 'numero_cheque', 'titular', 'cuit_titular', 'fecha_vencimiento'] as $column) {
+                    if ($chq[$column] !== '') {
+                        $fields[] = $column . ' = :' . $column;
+                        $params[':' . $column] = $chq[$column];
+                    }
+                }
+                $pdo->prepare('UPDATE cheques SET ' . implode(', ', $fields) . ' WHERE id = :id LIMIT 1')
+                    ->execute($params);
+            }
+            foreach ($actualPorId as $oldPago) {
+                $oldCheque = (int)($oldPago['cheque_id'] ?? 0);
+                if ($oldCheque <= 0 || $this->chequeReferenciado($oldCheque)) {
+                    continue;
+                }
+                $cheque = (new ChequeRepo())->findById($oldCheque);
+                if ($cheque && ($cheque['estado'] ?? '') === 'en_cartera') {
+                    $pdo->prepare('DELETE FROM cheque_movimientos WHERE cheque_id = :c')->execute([':c' => $oldCheque]);
+                    $pdo->prepare('DELETE FROM cheques WHERE id = :c LIMIT 1')->execute([':c' => $oldCheque]);
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('FacturaController::actualizarPagos: ' . $e->getMessage());
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se pudieron guardar los pagos: ' . $e->getMessage()];
+            Response::redirect('/admin/facturas/pagos/editar/' . $id);
+        }
+
+        $autorizaNombre = (string)($adminAutoriza['nombre'] ?? $adminAutoriza['username'] ?? 'admin');
+        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Pagos corregidos. Movimientos de banco y cuenta corriente recalculados. Autorizado por ' . $autorizaNombre . '.'];
+        Response::redirect('/admin/facturas/pagos/editar/' . $id);
     }
 
 }

@@ -403,6 +403,8 @@ $router->get('/admin/facturas/diagnostico-stock', [AdminFacturaController::class
 $router->get('/admin/facturas/nueva', [AdminFacturaController::class, 'pos']);
 $router->post('/admin/facturas/guardar', [AdminFacturaController::class, 'store']);
 $router->get('/admin/facturas/pagos', [AdminFacturaController::class, 'pagos']);
+$router->get('/admin/facturas/pagos/editar/(?P<id>\d+)', [AdminFacturaController::class, 'editarPagos']);
+$router->post('/admin/facturas/pagos/actualizar', [AdminFacturaController::class, 'actualizarPagos']);
 $router->get('/admin/facturas/editar/(?P<id>\d+)', [AdminFacturaController::class, 'editar']);
 $router->post('/admin/facturas/actualizar', [AdminFacturaController::class, 'actualizar']);
 $router->get('/admin/facturas/(?P<id>\d+)', [AdminFacturaController::class, 'show']);
