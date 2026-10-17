@@ -1772,9 +1772,11 @@ function submitFactura() {
         return;
     }
     const totalFactura = totalBruto - descuentoCents;
+    const puntosCanje = Math.max(0, parseInt(document.getElementById('posPuntosUsar').value) || 0);
+    const totalACobrar = totalFactura - puntosCanje * 100;
     const totalPagado = pagos.reduce((s, p) => s + p.monto_cents, 0);
-    if (totalPagado < totalFactura) {
-        const ok = confirm('El total pagado ($' + fmtPrice(totalPagado) + ') es menor que el total de la factura ($' + fmtPrice(totalFactura) + '). ¿Continuar igual?');
+    if (totalPagado < totalACobrar) {
+        const ok = confirm('El total pagado ($' + fmtPrice(totalPagado) + ') es menor que el total a cobrar ($' + fmtPrice(totalACobrar) + '). ¿Continuar igual?');
         if (!ok) {
             btn.disabled = false;
             btn.innerHTML = BTN_LABEL;
