@@ -2153,10 +2153,54 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'La factura no tiene pagos para corregir.'];
             Response::redirect('/admin/facturas/pagos');
         }
+        $solicitudId = (int)($_GET['solicitud_id'] ?? 0);
+        $motivoSolicitud = '';
+        if ($solicitudId > 0) {
+            $solRepo = new \Perfushopping\Web\Repo\PagoFacturaAutorizacionRepo();
+            $solicitud = $solRepo->findById($solicitudId);
+            if (!$solicitud
+                || (int)$solicitud['factura_id'] !== $id
+                || (int)$solicitud['requested_by'] !== (int)$adminUser['id']
+                || (string)$solicitud['status'] !== 'pendiente') {
+                $_SESSION['admin_flash'] = ['type' => 'warning', 'text' => 'Solo podés corregir una solicitud propia que siga pendiente.'];
+                Response::redirect('/admin/facturas/pagos');
+            }
+            if (!hash_equals((string)$solicitud['original_hash'], $repo->pagosFingerprint($id))) {
+                $_SESSION['admin_flash'] = ['type' => 'warning', 'text' => 'La factura cambió desde que se solicitó esta corrección. Pedí que se rechace la solicitud anterior y generá una nueva.'];
+                Response::redirect('/admin/facturas/pagos');
+            }
+            $propuesta = json_decode((string)$solicitud['pagos_json'], true) ?: [];
+            $chequesPropuestos = json_decode((string)$solicitud['cheques_json'], true) ?: [];
+            $pagosActuales = [];
+            foreach ($pagos as $pagoActual) {
+                $pagosActuales[(int)$pagoActual['id']] = $pagoActual;
+            }
+            $pagos = [];
+            foreach ($propuesta as $propuesto) {
+                $pagoId = (int)($propuesto['id'] ?? 0);
+                if (!isset($pagosActuales[$pagoId])) {
+                    $_SESSION['admin_flash'] = ['type' => 'warning', 'text' => 'La factura cambió desde que se solicitó la corrección.'];
+                    Response::redirect('/admin/facturas/pagos');
+                }
+                $merged = array_replace($pagosActuales[$pagoId], $propuesto);
+                $chequeId = (int)($propuesto['cheque_id'] ?? 0);
+                if ($chequeId > 0 && isset($chequesPropuestos[$chequeId])) {
+                    $chq = $chequesPropuestos[$chequeId];
+                    $merged['cheque_numero'] = $chq['numero_cheque'] ?? $merged['numero_cheque'] ?? '';
+                    $merged['cheque_titular'] = $chq['titular'] ?? $merged['cheque_titular'] ?? '';
+                    $merged['cheque_cuit'] = $chq['cuit_titular'] ?? $merged['cheque_cuit'] ?? '';
+                    $merged['cheque_vto'] = $chq['fecha_vencimiento'] ?? $merged['cheque_vto'] ?? '';
+                }
+                $pagos[] = $merged;
+            }
+            $motivoSolicitud = (string)($solicitud['motivo'] ?? '');
+        }
         echo View::adminPage('admin/facturas/pagos-editar.php', [
             'adminUser' => $adminUser,
             'factura' => $factura,
             'pagos' => $pagos,
+            'solicitudId' => $solicitudId,
+            'motivoSolicitud' => $motivoSolicitud,
             'formasPago' => (new \Perfushopping\Web\Repo\FormaPagoRepo())->findActivas(),
             'bancos' => $this->bancos(),
             'bancosCuentas' => $this->bancosCuentas(),
@@ -2182,11 +2226,29 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Factura o datos de pago inválidos.'];
             Response::redirect('/admin/facturas/pagos');
         }
+        $solicitudId = (int)($_POST['solicitud_id'] ?? 0);
+        $editUrl = '/admin/facturas/pagos/editar/' . $id . ($solicitudId > 0 ? '?solicitud_id=' . $solicitudId : '');
+        $solRepo = new \Perfushopping\Web\Repo\PagoFacturaAutorizacionRepo();
+        $solicitudPropia = null;
+        if ($solicitudId > 0) {
+            $solicitudPropia = $solRepo->findById($solicitudId);
+            if (!$solicitudPropia
+                || (int)$solicitudPropia['factura_id'] !== $id
+                || (int)$solicitudPropia['requested_by'] !== (int)$adminUser['id']
+                || (string)$solicitudPropia['status'] !== 'pendiente') {
+                $_SESSION['admin_flash'] = ['type' => 'warning', 'text' => 'La solicitud ya no está pendiente o no pertenece a tu usuario.'];
+                Response::redirect('/admin/facturas/pagos');
+            }
+            if (!hash_equals((string)$solicitudPropia['original_hash'], $repo->pagosFingerprint($id))) {
+                $_SESSION['admin_flash'] = ['type' => 'warning', 'text' => 'Los pagos base cambiaron. Pedí que se rechace la solicitud anterior antes de iniciar otra.'];
+                Response::redirect('/admin/facturas/pagos');
+            }
+        }
 
         $motivo = trim((string)($_POST['motivo'] ?? ''));
         if ($motivo === '') {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Indicá el motivo de la solicitud de corrección.'];
-            Response::redirect('/admin/facturas/pagos/editar/' . $id);
+            Response::redirect($editUrl);
         }
 
         $actuales = $repo->pagos($id);
@@ -2197,7 +2259,7 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
         $inputPagos = $_POST['pagos'];
         if (count($inputPagos) !== count($actualPorId)) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se pueden agregar ni quitar pagos desde esta corrección; revisá todos los renglones existentes.'];
-            Response::redirect('/admin/facturas/pagos/editar/' . $id);
+            Response::redirect($editUrl);
         }
 
         $formas = (new \Perfushopping\Web\Repo\FormaPagoRepo())->findAll();
@@ -2217,25 +2279,25 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
             $pagoId = (int)($row['id'] ?? 0);
             if (!isset($actualPorId[$pagoId]) || isset($vistoIds[$pagoId])) {
                 $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Se detectó un renglón de pago inválido.'];
-                Response::redirect('/admin/facturas/pagos/editar/' . $id);
+                Response::redirect($editUrl);
             }
             $vistoIds[$pagoId] = true;
             $old = $actualPorId[$pagoId];
             $forma = trim((string)($row['forma_pago'] ?? ''));
             if ($forma === '' || (!isset($formaPorCodigo[$forma]) && $forma !== (string)$old['forma_pago'])) {
                 $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Seleccioná una forma de pago válida.'];
-                Response::redirect('/admin/facturas/pagos/editar/' . $id);
+                Response::redirect($editUrl);
             }
             $tipoForma = (string)($formaPorCodigo[$forma]['tipo'] ?? \Perfushopping\Web\Repo\FormaPagoRepo::tipoDe($forma));
             $monto = (int)round(max(0, (float)str_replace(',', '.', (string)($row['monto'] ?? '0'))) * 100);
             if ($monto <= 0) {
                 $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Cada medio de pago debe tener un importe mayor a cero.'];
-                Response::redirect('/admin/facturas/pagos/editar/' . $id);
+                Response::redirect($editUrl);
             }
             $chequeId = (int)($old['cheque_id'] ?? 0);
             if ($tipoForma === 'cheque' && $chequeId <= 0) {
                 $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Para cambiar a cheque hay que registrar un cheque desde la emisión del recibo/factura.'];
-                Response::redirect('/admin/facturas/pagos/editar/' . $id);
+                Response::redirect($editUrl);
             }
             $cuponMonto = (int)round(max(0, (float)str_replace(',', '.', (string)($row['cupon_monto'] ?? '0'))) * 100);
             $monedaMonto = (int)round(max(0, (float)str_replace(',', '.', (string)($row['monto_moneda'] ?? '0'))) * 100);
@@ -2243,7 +2305,7 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
             if ($tipoForma === 'moneda') {
                 if ($monedaMonto <= 0 || $cotizacion <= 0) {
                     $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Completá el importe en moneda extranjera y su cotización.'];
-                    Response::redirect('/admin/facturas/pagos/editar/' . $id);
+                    Response::redirect($editUrl);
                 }
                 $monto = (int)round($monedaMonto * $cotizacion);
             }
@@ -2279,27 +2341,32 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
 
         if (count($pagos) !== count($actualPorId) || count($vistoIds) !== count($actualPorId) || $totalPagos !== (int)($factura['total_cents'] ?? 0)) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'La suma de los pagos debe coincidir exactamente con el total de la factura (' . \Perfushopping\Web\Support\Format::moneyFromCents((int)$factura['total_cents']) . ').'];
-            Response::redirect('/admin/facturas/pagos/editar/' . $id);
+            Response::redirect($editUrl);
         }
 
         try {
-            $snapshot = $repo->pagosSnapshot($id);
-            $solicitudId = (new \Perfushopping\Web\Repo\PagoFacturaAutorizacionRepo())->crear(
-                $id,
-                (string)$factura['codigo'],
-                (int)$adminUser['id'],
-                (string)($adminUser['nombre'] ?? ''),
-                $motivo,
-                hash('sha256', json_encode($snapshot, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE)),
-                $snapshot,
-                $pagos,
-                $chequesUpdates
-            );
-            $_SESSION['admin_flash'] = ['type' => 'info', 'text' => 'Solicitud #' . $solicitudId . ' enviada. Los pagos y sus impactos no cambiarán hasta que otro superadmin la apruebe.'];
+            if ($solicitudPropia) {
+                $solRepo->actualizarPropiaPendiente($solicitudId, (int)$adminUser['id'], $motivo, $pagos, $chequesUpdates);
+                $_SESSION['admin_flash'] = ['type' => 'info', 'text' => 'Solicitud #' . $solicitudId . ' corregida y enviada nuevamente a aprobación. Los pagos siguen pendientes.'];
+            } else {
+                $snapshot = $repo->pagosSnapshot($id);
+                $solicitudId = $solRepo->crear(
+                    $id,
+                    (string)$factura['codigo'],
+                    (int)$adminUser['id'],
+                    (string)($adminUser['nombre'] ?? ''),
+                    $motivo,
+                    hash('sha256', json_encode($snapshot, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE)),
+                    $snapshot,
+                    $pagos,
+                    $chequesUpdates
+                );
+                $_SESSION['admin_flash'] = ['type' => 'info', 'text' => 'Solicitud #' . $solicitudId . ' enviada. Los pagos y sus impactos no cambiarán hasta que otro superadmin la apruebe.'];
+            }
         } catch (\Throwable $e) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se pudo enviar la solicitud: ' . $e->getMessage()];
         }
-        Response::redirect('/admin/facturas/pagos/editar/' . $id);
+        Response::redirect($editUrl);
     }
 
     public function aprobarSolicitudPagos(array $params): void

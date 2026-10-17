@@ -114,9 +114,9 @@ $detallePago = static function (array $p, ?array $cheque = null): string {
 <div class="card shadow-sm mb-3">
     <div class="card-header bg-white fw-semibold">Mis solicitudes recientes</div>
     <div class="table-responsive"><table class="table table-sm mb-0">
-        <thead><tr><th>Solicitud</th><th>Factura</th><th>Estado</th><th>Motivo</th><th>Respuesta</th><th>Fecha</th></tr></thead>
+        <thead><tr><th>Solicitud</th><th>Factura</th><th>Estado</th><th>Motivo</th><th>Respuesta</th><th>Fecha</th><th></th></tr></thead>
         <tbody><?php foreach ($misSolicitudes as $s): $status = (string)($s['status'] ?? 'pendiente'); $badge = $status === 'aprobada' ? 'success' : ($status === 'rechazada' ? 'danger' : 'warning text-dark'); ?>
-            <tr><td>#<?= (int)$s['id'] ?></td><td><?= htmlspecialchars((string)($s['factura_codigo'] ?? '')) ?></td><td><span class="badge bg-<?= $badge ?>"><?= htmlspecialchars($status) ?></span></td><td class="small"><?= htmlspecialchars((string)($s['motivo'] ?? '')) ?></td><td class="small"><?= htmlspecialchars((string)($s['rejection_note'] ?? $s['decided_by_nombre'] ?? '')) ?></td><td class="small"><?= htmlspecialchars((string)($s['updated_at'] ?? $s['created_at'] ?? '')) ?></td></tr>
+            <tr><td>#<?= (int)$s['id'] ?></td><td><?= htmlspecialchars((string)($s['factura_codigo'] ?? '')) ?></td><td><span class="badge bg-<?= $badge ?>"><?= htmlspecialchars($status) ?></span></td><td class="small"><?= htmlspecialchars((string)($s['motivo'] ?? '')) ?></td><td class="small"><?= htmlspecialchars((string)($s['rejection_note'] ?? $s['decided_by_nombre'] ?? '')) ?></td><td class="small"><?= htmlspecialchars((string)($s['updated_at'] ?? $s['created_at'] ?? '')) ?></td><td><?php if ($status === 'pendiente'): ?><a class="btn btn-sm btn-outline-primary" href="/admin/facturas/pagos/editar/<?= (int)$s['factura_id'] ?>?solicitud_id=<?= (int)$s['id'] ?>"><i class="bi bi-pencil"></i> Corregir</a><?php endif; ?></td></tr>
         <?php endforeach; ?></tbody>
     </table></div>
 </div>

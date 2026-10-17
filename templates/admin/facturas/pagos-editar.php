@@ -11,6 +11,8 @@ $tarjetas = $tarjetas ?? [];
 $equipos = $equipos ?? [];
 $plazos = $plazos ?? [];
 $csrfToken = $csrf ?? '';
+$solicitudId = (int)($solicitudId ?? 0);
+$motivoSolicitud = (string)($motivoSolicitud ?? '');
 $codigosActivos = array_map(static fn(array $f): string => (string)($f['codigo'] ?? ''), $formasPago);
 $tarjetaIds = array_map(static fn(array $x): int => (int)($x['idtarje'] ?? 0), $tarjetas);
 $equipoIds = array_map(static fn(array $x): int => (int)($x['idequipo'] ?? 0), $equipos);
@@ -20,7 +22,7 @@ $bancoIds = array_map(static fn(array $x): int => (int)($x['idban'] ?? 0), $banc
 ?>
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
-        <h4 class="fw-bold mb-1">Corregir pagos de factura</h4>
+        <h4 class="fw-bold mb-1"><?= $solicitudId > 0 ? 'Corregir solicitud pendiente' : 'Corregir pagos de factura' ?></h4>
         <p class="text-muted small mb-0">Factura <?= htmlspecialchars((string)($factura['codigo'] ?? '')) ?> · <?= htmlspecialchars((string)($factura['cliente_nombre'] ?? '')) ?></p>
     </div>
     <a class="btn btn-outline-secondary btn-sm" href="/admin/facturas/pagos"><i class="bi bi-arrow-left"></i> Volver a cobranzas</a>
@@ -29,6 +31,7 @@ $bancoIds = array_map(static fn(array $x): int => (int)($x['idban'] ?? 0), $banc
 <div class="alert alert-info small">
     Solo se modifican las formas de pago y sus datos. No se cambian los productos, importes, datos del cliente, fecha ni estado/CAE de la factura. Al enviar, la corrección queda pendiente; solo otro superadmin puede aprobarla. Hasta entonces la factura y sus impactos contables permanecen sin cambios.
 </div>
+<?php if ($solicitudId > 0): ?><div class="alert alert-warning small">Estás editando la solicitud #<?= $solicitudId ?>. Al guardar se actualizará la misma solicitud, que seguirá pendiente de aprobación.</div><?php endif; ?>
 
 <div class="row g-3 mb-3">
     <div class="col-md-4"><div class="card shadow-sm"><div class="card-body py-2"><span class="small text-muted">Comprobante</span><div class="fw-bold"><?= htmlspecialchars((string)($factura['codigo'] ?? '')) ?> · <?= htmlspecialchars((string)($factura['estado'] ?? '')) ?><?= !empty($factura['cae']) ? ' · CAE ' . htmlspecialchars((string)$factura['cae']) : '' ?></div></div></div></div>
@@ -39,6 +42,7 @@ $bancoIds = array_map(static fn(array $x): int => (int)($x['idban'] ?? 0), $banc
 <form method="post" action="/admin/facturas/pagos/actualizar">
     <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrfToken) ?>" />
     <input type="hidden" name="factura_id" value="<?= (int)($factura['id'] ?? 0) ?>" />
+    <input type="hidden" name="solicitud_id" value="<?= $solicitudId ?>" />
     <?php foreach ($pagos as $i => $p): ?>
         <?php $pagoId = (int)($p['id'] ?? 0); $chequeId = (int)($p['cheque_id'] ?? 0); ?>
         <div class="card shadow-sm mb-3">
@@ -117,9 +121,9 @@ $bancoIds = array_map(static fn(array $x): int => (int)($x['idban'] ?? 0), $banc
     <div class="card shadow-sm mb-3">
         <div class="card-header bg-white fw-semibold">Enviar a autorización</div>
         <div class="card-body row g-2">
-            <div class="col-12"><label class="form-label small">Motivo de la corrección</label><textarea class="form-control form-control-sm" name="motivo" rows="2" maxlength="500" required placeholder="Explicá qué dato de pago debe corregirse y por qué"></textarea></div>
+            <div class="col-12"><label class="form-label small">Motivo de la corrección</label><textarea class="form-control form-control-sm" name="motivo" rows="2" maxlength="500" required placeholder="Explicá qué dato de pago debe corregirse y por qué"><?= htmlspecialchars($motivoSolicitud) ?></textarea></div>
             <div class="col-12"><span class="small text-muted">La suma de los pagos debe coincidir con el total de la factura. Los cambios quedarán pendientes y no tendrán efecto hasta que otro superadmin los apruebe.</span></div>
         </div>
     </div>
-    <button class="btn btn-accent" type="submit"><i class="bi bi-send"></i> Enviar solicitud</button>
+    <button class="btn btn-accent" type="submit"><i class="bi bi-send"></i> <?= $solicitudId > 0 ? 'Actualizar y reenviar solicitud' : 'Enviar solicitud' ?></button>
 </form>

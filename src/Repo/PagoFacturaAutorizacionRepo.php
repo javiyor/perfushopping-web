@@ -113,6 +113,45 @@ final class PagoFacturaAutorizacionRepo
         return $st->fetchAll();
     }
 
+    public function findById(int $id): ?array
+    {
+        $this->ensureTable();
+        $st = Db::pdo()->prepare('SELECT * FROM factura_pago_autorizaciones WHERE id = :id LIMIT 1');
+        $st->execute([':id' => $id]);
+        return $st->fetch() ?: null;
+    }
+
+    public function actualizarPropiaPendiente(int $id, int $requestedBy, string $motivo, array $pagos, array $cheques): void
+    {
+        $this->ensureTable();
+        $pdo = Db::pdo();
+        $pdo->beginTransaction();
+        try {
+            $check = $pdo->prepare('SELECT requested_by, status FROM factura_pago_autorizaciones WHERE id = :id LIMIT 1 FOR UPDATE');
+            $check->execute([':id' => $id]);
+            $row = $check->fetch();
+            if (!$row || (int)$row['requested_by'] !== $requestedBy || (string)$row['status'] !== 'pendiente') {
+                throw new \RuntimeException('La solicitud ya no está pendiente o no pertenece a tu usuario.');
+            }
+            $st = $pdo->prepare("UPDATE factura_pago_autorizaciones
+                SET motivo = :motivo, pagos_json = :pagos, cheques_json = :cheques, updated_at = NOW()
+                WHERE id = :id AND requested_by = :u AND status = 'pendiente' LIMIT 1");
+            $st->execute([
+                ':motivo' => mb_substr(trim($motivo), 0, 500),
+                ':pagos' => json_encode($pagos, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
+                ':cheques' => json_encode($cheques, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
+                ':id' => $id,
+                ':u' => $requestedBy,
+            ]);
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
+
     public function tomarParaAprobar(int $id, int $adminId, string $adminNombre): array
     {
         $this->ensureTable();
