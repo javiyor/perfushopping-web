@@ -2109,7 +2109,7 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
 
         $stCount = Db::pdo()->prepare('SELECT fp.forma_pago, COUNT(*) AS total ' . $sqlFrom . ' GROUP BY fp.forma_pago');
         $stCount->execute($queryParams);
-        $counts = $stCount->fetchAll(PDO::FETCH_KEY_PAIR);
+        $counts = $stCount->fetchAll(\PDO::FETCH_KEY_PAIR);
         $totalCents = array_sum(array_map(static fn(array $p): int => (int)($p['monto_cents'] ?? 0), $pagos));
 
         echo View::adminPage('admin/facturas/pagos.php', [
