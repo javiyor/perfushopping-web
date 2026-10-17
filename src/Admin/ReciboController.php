@@ -22,13 +22,18 @@ final class ReciboController
 
         $q = trim((string)($_GET['q'] ?? ''));
         $estado = trim((string)($_GET['estado'] ?? ''));
-        $list = (new ReciboRepo())->search($q, $estado);
+        $fecha = trim((string)($_GET['fecha'] ?? date('Y-m-d')));
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha) || !strtotime($fecha)) {
+            $fecha = date('Y-m-d');
+        }
+        $list = (new ReciboRepo())->search($q, $estado, 60, $fecha);
 
         echo View::adminPage('admin/recibos/list.php', [
             'adminUser' => $adminUser,
             'list' => $list,
             'q' => $q,
             'estado' => $estado,
+            'fecha' => $fecha,
             'formasPagoLabels' => (new \Perfushopping\Web\Repo\FormaPagoRepo())->labels(),
             'csrf' => Csrf::token(),
             'pageTitle' => 'Recibos',
@@ -220,7 +225,20 @@ final class ReciboController
             Response::redirect('/admin/recibos');
         }
 
+        $adminAutoriza = $auth->verificarCredenciales(
+            (string)($_POST['auth_user'] ?? ''),
+            (string)($_POST['auth_pass'] ?? '')
+        );
+        if (!$adminAutoriza || !AdminAuthService::adminPuedeAutorizar($adminAutoriza)) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Autorización rechazada: se requieren credenciales de un admin autorizado.'];
+            Response::redirect('/admin/recibos/' . $id);
+        }
+
         $oldEstado = $r['estado'] ?? '';
+        if ($oldEstado === 'anulado' && $estado === 'emitido') {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Un recibo anulado no se puede reactivar; emití uno nuevo.'];
+            Response::redirect('/admin/recibos/' . $id);
+        }
         $repo->updateEstado($id, $estado);
 
         // Reverse ctacte credits if recibo is anulated
@@ -245,6 +263,45 @@ final class ReciboController
         Response::redirect('/admin/recibos/' . $id);
     }
 
+    public function update(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $auth->requirePermiso('recibos');
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $id = (int)($_POST['id'] ?? 0);
+        $repo = new ReciboRepo();
+        $recibo = $repo->findById($id);
+        if (!$recibo || ($recibo['estado'] ?? '') !== 'emitido') {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Solo se pueden corregir recibos emitidos.'];
+            Response::redirect('/admin/recibos/comprobantes');
+        }
+
+        $adminAutoriza = $auth->verificarCredenciales(
+            (string)($_POST['auth_user'] ?? ''),
+            (string)($_POST['auth_pass'] ?? '')
+        );
+        if (!$adminAutoriza || !AdminAuthService::adminPuedeAutorizar($adminAutoriza)) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Autorización rechazada: se requieren credenciales de un admin autorizado.'];
+            Response::redirect('/admin/recibos/' . $id);
+        }
+
+        $fecha = trim((string)($_POST['fecha'] ?? ''));
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha) || !strtotime($fecha)) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'La fecha indicada no es válida.'];
+            Response::redirect('/admin/recibos/' . $id);
+        }
+        $repo->updateDatos(
+            $id,
+            $fecha,
+            trim((string)($_POST['concepto'] ?? '')),
+            trim((string)($_POST['notas'] ?? ''))
+        );
+        $nombre = (string)($adminAutoriza['nombre'] ?? $adminAutoriza['username'] ?? 'admin');
+        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Datos del recibo corregidos con autorización de ' . $nombre . '.'];
+        Response::redirect('/admin/recibos/' . $id);
+    }
+
     public function delete(array $params): void
     {
         $auth = new AdminAuthService();
@@ -254,7 +311,22 @@ final class ReciboController
         $id = (int)($_POST['id'] ?? 0);
         if ($id <= 0) Response::redirect('/admin/recibos');
 
-        (new ReciboRepo())->delete($id);
+        $repo = new ReciboRepo();
+        $recibo = $repo->findById($id);
+        if (!$recibo || ($recibo['estado'] ?? '') !== 'anulado') {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Para eliminar un recibo, primero debe estar anulado.'];
+            Response::redirect('/admin/recibos/' . $id);
+        }
+        $adminAutoriza = $auth->verificarCredenciales(
+            (string)($_POST['auth_user'] ?? ''),
+            (string)($_POST['auth_pass'] ?? '')
+        );
+        if (!$adminAutoriza || !AdminAuthService::adminPuedeAutorizar($adminAutoriza)) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Autorización rechazada: se requieren credenciales de un admin autorizado.'];
+            Response::redirect('/admin/recibos/' . $id);
+        }
+
+        $repo->delete($id);
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Recibo eliminado.'];
         Response::redirect('/admin/recibos');
     }

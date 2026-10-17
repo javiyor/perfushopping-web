@@ -42,7 +42,7 @@ $formaPagoLabels = ($formasPagoLabels ?? []) + [
                         <i class="bi bi-printer"></i> Imprimir
                     </a>
                     <?php if (($recibo['estado'] ?? '') !== 'anulado'): ?>
-                        <form method="post" action="/admin/recibos/estado" style="display:inline">
+                        <form method="post" action="/admin/recibos/estado" style="display:inline" onsubmit="return autorizarEdicionRecibo(this)">
                             <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
                             <input type="hidden" name="id" value="<?= (int)($recibo['id'] ?? 0) ?>" />
                             <input type="hidden" name="estado" value="anulado" />
@@ -51,11 +51,13 @@ $formaPagoLabels = ($formasPagoLabels ?? []) + [
                             </button>
                         </form>
                     <?php endif; ?>
-                    <form method="post" action="/admin/recibos/delete" onsubmit="return confirm('Eliminar este recibo?')" style="display:inline">
+                    <?php if (($recibo['estado'] ?? '') === 'anulado'): ?>
+                    <form method="post" action="/admin/recibos/delete" onsubmit="return confirmarYAutorizarRecibo(this)" style="display:inline">
                         <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
                         <input type="hidden" name="id" value="<?= (int)($recibo['id'] ?? 0) ?>" />
                         <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i> Eliminar</button>
                     </form>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -91,6 +93,22 @@ $formaPagoLabels = ($formasPagoLabels ?? []) + [
                 </dl>
             </div>
         </div>
+        <?php if (($recibo['estado'] ?? '') === 'emitido'): ?>
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-white fw-semibold">Corregir datos <span class="small text-muted">(requiere autorización admin)</span></div>
+            <div class="card-body">
+                <p class="small text-muted">Esta corrección cambia fecha, concepto y notas. Para cambiar el importe o las imputaciones, anulá el recibo y emití uno nuevo.</p>
+                <form method="post" action="/admin/recibos/actualizar" onsubmit="return autorizarEdicionRecibo(this)">
+                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                    <input type="hidden" name="id" value="<?= (int)($recibo['id'] ?? 0) ?>" />
+                    <div class="mb-2"><label class="form-label small">Fecha</label><input class="form-control form-control-sm" type="date" name="fecha" value="<?= htmlspecialchars((string)($recibo['fecha'] ?? '')) ?>" required /></div>
+                    <div class="mb-2"><label class="form-label small">Concepto</label><input class="form-control form-control-sm" name="concepto" maxlength="255" value="<?= htmlspecialchars((string)($recibo['concepto'] ?? '')) ?>" /></div>
+                    <div class="mb-2"><label class="form-label small">Notas</label><textarea class="form-control form-control-sm" name="notas" rows="2"><?= htmlspecialchars((string)($recibo['notas'] ?? '')) ?></textarea></div>
+                    <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-pencil"></i> Guardar corrección</button>
+                </form>
+            </div>
+        </div>
+        <?php endif; ?>
     </div>
 
     <div class="col-lg-8">
@@ -167,6 +185,18 @@ $formaPagoLabels = ($formasPagoLabels ?? []) + [
         </div>
 
 <script>
+function autorizarEdicionRecibo(form) {
+    var user = prompt('Usuario de admin que autoriza la corrección:');
+    if (!user) return false;
+    var pass = prompt('Contraseña del admin autorizante:');
+    if (!pass) return false;
+    var u = document.createElement('input'); u.type = 'hidden'; u.name = 'auth_user'; u.value = user; form.appendChild(u);
+    var p = document.createElement('input'); p.type = 'hidden'; p.name = 'auth_pass'; p.value = pass; form.appendChild(p);
+    return true;
+}
+function confirmarYAutorizarRecibo(form) {
+    return confirm('Eliminar este recibo anulado?') && autorizarEdicionRecibo(form);
+}
 (function() {
     var link = document.getElementById('printLinkRecibo');
     if (link) {

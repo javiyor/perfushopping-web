@@ -402,6 +402,7 @@ $router->get('/admin/facturas/comprobantes', [AdminFacturaController::class, 'in
 $router->get('/admin/facturas/diagnostico-stock', [AdminFacturaController::class, 'diagnosticoStock']);
 $router->get('/admin/facturas/nueva', [AdminFacturaController::class, 'pos']);
 $router->post('/admin/facturas/guardar', [AdminFacturaController::class, 'store']);
+$router->get('/admin/facturas/pagos', [AdminFacturaController::class, 'pagos']);
 $router->get('/admin/facturas/editar/(?P<id>\d+)', [AdminFacturaController::class, 'editar']);
 $router->post('/admin/facturas/actualizar', [AdminFacturaController::class, 'actualizar']);
 $router->get('/admin/facturas/(?P<id>\d+)', [AdminFacturaController::class, 'show']);
@@ -426,6 +427,7 @@ $router->get('/admin/recibos', [AdminReciboController::class, 'create']);
 $router->get('/admin/recibos/comprobantes', [AdminReciboController::class, 'index']);
 $router->get('/admin/recibos/nuevo', [AdminReciboController::class, 'create']);
 $router->post('/admin/recibos/guardar', [AdminReciboController::class, 'store']);
+$router->post('/admin/recibos/actualizar', [AdminReciboController::class, 'update']);
 $router->get('/admin/recibos/(?P<id>\d+)', [AdminReciboController::class, 'show']);
 $router->post('/admin/recibos/estado', [AdminReciboController::class, 'estado']);
 $router->post('/admin/recibos/delete', [AdminReciboController::class, 'delete']);

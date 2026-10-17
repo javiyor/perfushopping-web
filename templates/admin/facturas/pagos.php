@@ -4,7 +4,11 @@ use Perfushopping\Web\Support\Format;
 $pagos = $pagos ?? [];
 $q = (string)($q ?? '');
 $formaPago = (string)($formaPago ?? '');
+$fecha = (string)($fecha ?? date('Y-m-d'));
 $counts = $counts ?? [];
+$totalCents = (int)($totalCents ?? 0);
+$puedeEditar = (bool)($puedeEditar ?? false);
+$formaPagoLabels = $formaPagoLabels ?? [];
 ?>
 <nav aria-label="breadcrumb" class="mb-3">
     <ol class="breadcrumb">
@@ -16,28 +20,29 @@ $counts = $counts ?? [];
 <div class="card shadow-sm mb-3">
     <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
         <h5 class="mb-0">Listado de pagos de facturas</h5>
-        <span class="text-muted small">Total de registros: <?= count($pagos) ?></span>
+        <span class="text-muted small"><?= count($pagos) ?> pagos · Total <?= Format::moneyRoundedFromCents($totalCents) ?></span>
     </div>
     <div class="card-body">
         <form method="get" class="row g-2 mb-3">
-            <div class="col-lg-4">
-                <input class="form-control form-control-sm" name="q" value="<?= htmlspecialchars($q) ?>" placeholder="Buscar factura por código..." />
+            <div class="col-lg-3">
+                <input class="form-control form-control-sm" name="q" value="<?= htmlspecialchars($q) ?>" placeholder="Buscar factura o cliente..." />
+            </div>
+            <div class="col-lg-3">
+                <input class="form-control form-control-sm" type="date" name="fecha" value="<?= htmlspecialchars($fecha) ?>" />
             </div>
             <div class="col-lg-3">
                 <select class="form-select form-select-sm" name="forma_pago">
                     <option value="">Todas las formas de pago</option>
-                    <option value="efectivo" <?= $formaPago === 'efectivo' ? 'selected' : '' ?>>Efectivo</option>
-                    <option value="transferencia" <?= $formaPago === 'transferencia' ? 'selected' : '' ?>>Transferencia</option>
-                    <option value="tarjeta" <?= $formaPago === 'tarjeta' ? 'selected' : '' ?>>Tarjetas</option>
-                    <option value="cheque" <?= $formaPago === 'cheque' ? 'selected' : '' ?>>Cheque</option>
-                    <option value="cuenta_corriente" <?= $formaPago === 'cuenta_corriente' ? 'selected' : '' ?>>Cta. corriente</option>
+                    <?php foreach ($formaPagoLabels as $codigo => $label): ?>
+                        <option value="<?= htmlspecialchars((string)$codigo) ?>" <?= $formaPago === (string)$codigo ? 'selected' : '' ?>><?= htmlspecialchars((string)$label) ?></option>
+                    <?php endforeach; ?>
                 </select>
             </div>
-            <div class="col-lg-2">
+            <div class="col-lg-1">
                 <button class="btn btn-accent btn-sm w-100" type="submit"><i class="bi bi-search"></i> Filtrar</button>
             </div>
-            <div class="col-lg-3">
-                <a class="btn btn-outline-secondary btn-sm w-100" href="/admin/facturas">
+            <div class="col-lg-2">
+                <a class="btn btn-outline-secondary btn-sm w-100" href="/admin/facturas/pagos">
                     <i class="bi bi-x"></i> Limpiar filtros
                 </a>
             </div>
@@ -49,6 +54,7 @@ $counts = $counts ?? [];
                 <thead>
                     <tr>
                         <th>Factura</th>
+                        <th>Cliente</th>
                         <th>Fecha</th>
                         <th style="width:150px">Forma de pago</th>
                         <th class="text-end" style="width:120px">Monto</th>
@@ -63,6 +69,7 @@ $counts = $counts ?? [];
                             <strong><?= htmlspecialchars((string)($pg['codigo'] ?? '')) ?></strong>
                             <small class="text-muted">#<?= (int)($pg['factura_id'] ?? 0) ?></small>
                         </td>
+                        <td class="small"><?= htmlspecialchars((string)($pg['cliente_nombre'] ?? '—')) ?></td>
                         <td><?= $pg['fecha'] ? date('d/m/Y', strtotime($pg['fecha'])) : '—' ?></td>
                         <td>
                             <span class="badge bg-<?= $pg['forma_pago'] === 'cheque' ? 'info' : ($pg['forma_pago'] === 'cuenta_corriente' ? 'warning text-dark' : ($pg['forma_pago'] === 'tarjeta' ? 'primary' : 'info')) ?>">
@@ -86,8 +93,10 @@ $counts = $counts ?? [];
                         </td>
                         <td class="text-end">
                             <a class="btn btn-sm btn-outline-primary" href="/admin/facturas/detail/<?= (int)($pg['factura_id'] ?? 0) ?>">Ver factura</a>
-                            <?php if (in_array((string)($pg['forma_pago'] ?? ''), ['efectivo', 'transferencia'], true)): ?>
+                            <?php if ($puedeEditar && empty($pg['cae']) && ($pg['factura_estado'] ?? '') !== 'anulada'): ?>
                                 <a class="btn btn-sm btn-outline-secondary" href="/admin/facturas/editar/<?= (int)($pg['factura_id'] ?? 0) ?>">Editar factura</a>
+                            <?php elseif ($puedeEditar): ?>
+                                <span class="small text-muted">Bloqueado (ARCA/anulada)</span>
                             <?php endif; ?>
                         </td>
                     </tr>

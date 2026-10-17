@@ -1787,9 +1787,27 @@ function submitFactura() {
     const presupuestoId = parseInt(document.getElementById('presupuestoId').value) || 0;
     const vendedorEl = document.getElementById('vendedorId');
     const entregaTipo = document.querySelector('input[name="entrega_tipo"]:checked')?.value || 'local';
+    let adminAuthUser = '';
+    let adminAuthPass = '';
+    if (EDITAR_ID > 0) {
+        adminAuthUser = prompt('Usuario de admin que autoriza la modificación:') || '';
+        if (!adminAuthUser) {
+            btn.disabled = false;
+            btn.innerHTML = BTN_LABEL;
+            return;
+        }
+        adminAuthPass = prompt('Contraseña del admin autorizante:') || '';
+        if (!adminAuthPass) {
+            btn.disabled = false;
+            btn.innerHTML = BTN_LABEL;
+            return;
+        }
+    }
     const payload = {
         _csrf: document.getElementById('csrfToken').value,
         editar_id: EDITAR_ID,
+        admin_auth_user: adminAuthUser,
+        admin_auth_pass: adminAuthPass,
         tipo_comprobante: tipo,
         comprobante_asociado_id: asociadaId > 0 ? asociadaId : null,
         forma_pago: pagos[0].forma_pago,

@@ -7,7 +7,7 @@ use Perfushopping\Web\Infra\Db;
 
 final class ReciboRepo
 {
-    public function search(string $q = '', string $estado = '', int $limit = 60): array
+    public function search(string $q = '', string $estado = '', int $limit = 60, string $fecha = ''): array
     {
         try {
             $limit = max(1, min(200, $limit));
@@ -23,6 +23,10 @@ final class ReciboRepo
             if ($estado !== '') {
                 $where[] = 'r.estado = :estado';
                 $params[':estado'] = $estado;
+            }
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha)) {
+                $where[] = 'r.fecha = :fecha';
+                $params[':fecha'] = $fecha;
             }
 
             $sql = '
@@ -136,6 +140,12 @@ final class ReciboRepo
     {
         $st = Db::pdo()->prepare('UPDATE recibos SET estado = :e, updated_at = NOW() WHERE id = :i LIMIT 1');
         $st->execute([':e' => $estado, ':i' => $id]);
+    }
+
+    public function updateDatos(int $id, string $fecha, string $concepto, string $notas): void
+    {
+        $st = Db::pdo()->prepare('UPDATE recibos SET fecha = :f, concepto = :c, notas = :n, updated_at = NOW() WHERE id = :i LIMIT 1');
+        $st->execute([':f' => $fecha, ':c' => $concepto, ':n' => $notas, ':i' => $id]);
     }
 
     public function delete(int $id): void

@@ -4,6 +4,7 @@ use Perfushopping\Web\Support\Format;
 $list = $list ?? [];
 $q = (string)($q ?? '');
 $estado = (string)($estado ?? '');
+$fecha = (string)($fecha ?? date('Y-m-d'));
 $estados = ['' => 'Todos', 'emitido' => 'Emitido', 'anulado' => 'Anulado'];
 $formaPagoLabels = ($formasPagoLabels ?? []) + [
     'efectivo'=>'Efectivo', 'transferencia'=>'Transferencia', 'tarjeta_credito'=>'Tarjeta crédito',
@@ -21,9 +22,13 @@ $formaPagoLabels = ($formasPagoLabels ?? []) + [
 
 <div class="card shadow-sm mb-3">
     <div class="card-body">
-        <form method="get" action="/admin/recibos" class="row g-2">
-            <div class="col-lg-6">
+        <form method="get" action="/admin/recibos/comprobantes" class="row g-2 align-items-end">
+            <div class="col-lg-4">
                 <input class="form-control form-control-sm" name="q" value="<?= htmlspecialchars($q) ?>" placeholder="Buscar por código, cliente o CUIT" />
+            </div>
+            <div class="col-lg-2">
+                <label class="form-label small mb-1">Fecha de cobranza</label>
+                <input class="form-control form-control-sm" type="date" name="fecha" value="<?= htmlspecialchars($fecha) ?>" />
             </div>
             <div class="col-lg-2">
                 <select class="form-select form-select-sm" name="estado">
@@ -36,8 +41,8 @@ $formaPagoLabels = ($formasPagoLabels ?? []) + [
                 <button class="btn btn-accent btn-sm w-100" type="submit"><i class="bi bi-search"></i> Buscar</button>
             </div>
             <div class="col-lg-2">
-                <?php if ($q !== '' || $estado !== ''): ?>
-                    <a class="btn btn-outline-secondary btn-sm w-100" href="/admin/recibos">Limpiar</a>
+                <?php if ($q !== '' || $estado !== '' || $fecha !== date('Y-m-d')): ?>
+                    <a class="btn btn-outline-secondary btn-sm w-100" href="/admin/recibos/comprobantes">Limpiar</a>
                 <?php endif; ?>
             </div>
         </form>

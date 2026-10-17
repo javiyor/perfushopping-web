@@ -889,6 +889,7 @@ final class FacturaController
     public function editar(array $params): void
     {
         $auth = new AdminAuthService();
+        $auth->requirePermiso('facturacion');
 
         $id = (int)($params['id'] ?? 0);
         $repo = new FacturaRepo();
@@ -949,6 +950,15 @@ final class FacturaController
         $motivo = $this->motivoNoEditable($old, $editarId);
         if ($motivo) {
             Response::json(['ok' => false, 'error' => $motivo], 422);
+            return;
+        }
+
+        $adminAutoriza = $auth->verificarCredenciales(
+            (string)($input['admin_auth_user'] ?? ''),
+            (string)($input['admin_auth_pass'] ?? '')
+        );
+        if (!$adminAutoriza || !AdminAuthService::adminPuedeAutorizar($adminAutoriza)) {
+            Response::json(['ok' => false, 'error' => 'Autorización rechazada: ingresá las credenciales de un admin autorizado para corregir cobranzas.'], 403);
             return;
         }
 
@@ -2063,84 +2073,54 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
 
         $q = trim((string)($_GET['q'] ?? ''));
         $formaPago = trim((string)($_GET['forma_pago'] ?? ''));
-
-        $repo = new FacturaRepo();
-        $st = Db::pdo()->prepare(''
-            . 'SELECT fp.*, f.codigo, f.total_cents, f.fecha, '
-            . 'fp.forma_pago, fp.monto_cents, '
-            . 'b.nombanc AS banco_nombre, c.numero_cheque, c.titular AS cheque_titular, '
-            . 'p.descripcion AS plazo_descripcion '
-            . 'FROM factura_pagos fp '
-            . 'JOIN facturas f ON f.id = fp.factura_id '
-            . 'LEFT JOIN cheques c ON c.id = fp.cheque_id '
-            . 'LEFT JOIN bancos b ON b.idban = fp.banco_id '
-            . 'LEFT JOIN plazopago p ON p.idplazo = fp.idplazo '
-            . 'WHERE 1=1'
-        );
-        $params = [':f' => (int)($q ?? '')];
-
-        if ($formaPago) {
-            $st->bindValue(':fp_forma', $formaPago, PDO::PARAM_STR);
-            $sql_where = ' AND fp.forma_pago = :fp_forma';
-        } else {
-            $sql_where = '';
+        $fecha = trim((string)($_GET['fecha'] ?? date('Y-m-d')));
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha) || !strtotime($fecha)) {
+            $fecha = date('Y-m-d');
         }
-
-        // Build the full query with proper WHERE clause
-        $query = "
-            SELECT fp.*, f.codigo, f.total_cents, f.fecha, 
-                   fp.forma_pago, fp.monto_cents, 
-                   b.nombanc AS banco_nombre, c.numero_cheque, c.titular AS cheque_titular, 
-                   p.descripcion AS plazo_descripcion
+        $where = ['f.fecha = :fecha'];
+        $queryParams = [':fecha' => $fecha];
+        if ($q !== '') {
+            $where[] = '(f.codigo LIKE :q OR f.cliente_nombre LIKE :q2 OR f.cliente_cuit LIKE :q3)';
+            $queryParams[':q'] = '%' . $q . '%';
+            $queryParams[':q2'] = '%' . $q . '%';
+            $queryParams[':q3'] = '%' . $q . '%';
+        }
+        if ($formaPago !== '') {
+            $where[] = 'fp.forma_pago = :fp';
+            $queryParams[':fp'] = $formaPago;
+        }
+        $sqlFrom = '
             FROM factura_pagos fp
             JOIN facturas f ON f.id = fp.factura_id
             LEFT JOIN cheques c ON c.id = fp.cheque_id
             LEFT JOIN bancos b ON b.idban = fp.banco_id
             LEFT JOIN plazopago p ON p.idplazo = fp.idplazo
-            WHERE 1=1
-        ";
-        $queryParams = [];
-
-        if ($q) {
-            $query .= ' AND f.codigo LIKE :q';
-            $queryParams[':q'] = '%' . $q . '%';
-        }
-        if ($formaPago) {
-            $query .= ' AND fp.forma_pago = :fp';
-            $queryParams[':fp'] = $formaPago;
-        }
-
+            WHERE ' . implode(' AND ', $where);
+        $query = "
+            SELECT fp.*, f.codigo, f.total_cents, f.fecha, f.cae, f.estado AS factura_estado,
+                   f.cliente_nombre, f.cliente_cuit,
+                   b.nombanc AS banco_nombre, c.numero_cheque, c.titular AS cheque_titular,
+                   p.descripcion AS plazo_descripcion
+        " . $sqlFrom . ' ORDER BY f.created_at DESC, fp.id ASC';
         $st = Db::pdo()->prepare($query);
-        foreach ($queryParams as $name => $val) {
-            $st->bindValue($name, $val);
-        }
-        $st->execute();
+        $st->execute($queryParams);
         $pagos = $st->fetchAll();
 
-        // Count by forma_pago for filter stats
-        $stCount = Db::pdo()->prepare(""
-            . "SELECT fp.forma_pago, COUNT(*) as total "
-            . "FROM factura_pagos fp "
-            . "JOIN facturas f ON f.id = fp.factura_id "
-            . "WHERE 1=1"
-        );
-        $countParams = [];
-        if ($q) {
-            $stCount->bindValue(':q', '%' . $q . '%', PDO::PARAM_STR);
-            $countParams[':q'] = '%' . $q . '%';
-        }
-        if ($formaPago) {
-            // already added via $queryParams
-        }
-        $stCount->execute($countParams);
+        $stCount = Db::pdo()->prepare('SELECT fp.forma_pago, COUNT(*) AS total ' . $sqlFrom . ' GROUP BY fp.forma_pago');
+        $stCount->execute($queryParams);
         $counts = $stCount->fetchAll(PDO::FETCH_KEY_PAIR);
+        $totalCents = array_sum(array_map(static fn(array $p): int => (int)($p['monto_cents'] ?? 0), $pagos));
 
         echo View::adminPage('admin/facturas/pagos.php', [
             'adminUser' => $adminUser,
             'pagos' => $pagos,
             'q' => $q,
             'formaPago' => $formaPago,
+            'fecha' => $fecha,
             'counts' => $counts,
+            'totalCents' => $totalCents,
+            'puedeEditar' => ($adminUser['rol'] ?? '') === 'superadmin' || $auth->checkPermiso('facturacion'),
+            'formaPagoLabels' => (new \Perfushopping\Web\Repo\FormaPagoRepo())->labels(),
             'csrf' => Csrf::token(),
             'pageTitle' => 'Listado de pagos de facturas',
         ]);
