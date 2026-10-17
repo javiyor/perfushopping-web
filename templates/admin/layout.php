@@ -308,7 +308,7 @@
                     <button class="btn btn-sm btn-warning" id="btnUpdateApp" type="button" style="display:none" title="Actualizar app">
                         <i class="bi bi-arrow-repeat"></i>
                     </button>
-                    <button class="btn btn-sm btn-outline-info" id="btnLocation" type="button" title="Compartir mi ubicación cada 5 minutos">
+                    <button class="btn btn-sm btn-outline-info" id="btnLocation" type="button" style="display:none" title="Compartir mi ubicación cada 5 minutos">
                         <i class="bi bi-geo-alt"></i>
                     </button>
                     <form method="post" action="/admin/logout" style="margin:0">
@@ -600,6 +600,17 @@
         var GRACE = 15000;
         var btn = document.getElementById('btnLocation');
         if (!btn) return;
+        var ua = window.navigator.userAgent || '';
+        var platform = window.navigator.platform || '';
+        var isMobileDevice = /Android|iPhone|iPad|iPod|Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua)
+            || !!(window.navigator.userAgentData && window.navigator.userAgentData.mobile)
+            || (/MacIntel|Macintosh/i.test(platform + ' ' + ua) && (window.navigator.maxTouchPoints || 0) > 1);
+        if (!isMobileDevice) {
+            // No solicitar ubicación ni mostrar el bloqueo en equipos de escritorio.
+            btn.style.display = 'none';
+            return;
+        }
+        btn.style.display = '';
         var isAdmin = (typeof isSuperadmin !== 'undefined') && !!isSuperadmin;
         var csrf = <?= json_encode(\Perfushopping\Web\Support\Csrf::token()) ?>;
 
