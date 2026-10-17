@@ -51,7 +51,7 @@ $puntosVentaMap = $puntosVentaMap ?? [];
 
                     <?php if (!$isMobile): ?>
                     <div class="mb-4">
-                        <label class="form-label fw-semibold">Vendedores que trabajan este turno</label>
+                        <label class="form-label fw-semibold">Personal que trabaja este turno</label>
                         <?php if (!$vendedores): ?>
                             <p class="text-muted small">No hay vendedores disponibles.</p>
                         <?php else: ?>

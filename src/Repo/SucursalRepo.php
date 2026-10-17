@@ -290,7 +290,7 @@ final class SucursalRepo
         $st = Db::pdo()->query("
             SELECT id, nombre, username, rol
             FROM admin_users
-            WHERE activo = 1 AND (rol = 'superadmin' OR rol = 'ventas')
+            WHERE activo = 1
             ORDER BY nombre ASC
         ");
         return $st->fetchAll();

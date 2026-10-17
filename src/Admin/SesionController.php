@@ -74,7 +74,10 @@ final class SesionController
         $sucursalId = (int)($_POST['sucursal_id'] ?? 0);
         $puntoVenta = (int)($_POST['punto_venta'] ?? 0);
         $turno = (string)($_POST['turno'] ?? '');
-        $vendedores = array_map('intval', (array)($_POST['vendedores'] ?? []));
+        $vendedoresSolicitados = array_values(array_unique(array_map('intval', (array)($_POST['vendedores'] ?? []))));
+        $personalActivo = (new SucursalRepo())->vendedoresDisponibles();
+        $personalActivoIds = array_fill_keys(array_map(static fn(array $u): int => (int)$u['id'], $personalActivo), true);
+        $vendedores = array_values(array_filter($vendedoresSolicitados, static fn(int $id): bool => $id > 0 && isset($personalActivoIds[$id])));
 
         if ($sucursalId <= 0 || !in_array($turno, ['manana', 'tarde'], true)) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Seleccioná sucursal y turno.'];
