@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Perfushopping\Web\Admin;
 
 use Perfushopping\Web\Infra\SmtpMailer;
+use Perfushopping\Web\Infra\Db;
 use Perfushopping\Web\Repo\FacturaRepo;
 use Perfushopping\Web\Repo\BancoCuentaRepo;
 use Perfushopping\Web\Repo\ChequeRepo;
