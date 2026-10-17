@@ -92,7 +92,7 @@ $formaPagoLabels = $formaPagoLabels ?? [];
                             <?php endif; ?>
                         </td>
                         <td class="text-end">
-                            <a class="btn btn-sm btn-outline-primary" href="/admin/facturas/detail/<?= (int)($pg['factura_id'] ?? 0) ?>">Ver factura</a>
+                            <a class="btn btn-sm btn-outline-primary" href="/admin/facturas/<?= (int)($pg['factura_id'] ?? 0) ?>">Ver factura</a>
                             <?php if ($puedeEditar && empty($pg['cae']) && ($pg['factura_estado'] ?? '') !== 'anulada'): ?>
                                 <a class="btn btn-sm btn-outline-secondary" href="/admin/facturas/editar/<?= (int)($pg['factura_id'] ?? 0) ?>">Editar factura</a>
                             <?php elseif ($puedeEditar): ?>
