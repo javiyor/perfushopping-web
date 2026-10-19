@@ -567,14 +567,33 @@ public function searchAjusteProductos(array $params): void
         }
 
         foreach ($products as $i => $p) {
-            $products[$i]['variants'] = $repo->variantesPorProducto((int)$p['idprodu']);
+            $variants = $repo->variantesPorProducto((int)$p['idprodu']);
+            $matchedId = (int)($p['matched_variant_id'] ?? 0);
+            if ($matchedId > 0) {
+                $hasMatchedVariant = false;
+                foreach ($variants as $variant) {
+                    if ((int)($variant['idcodgusto'] ?? 0) === $matchedId) {
+                        $hasMatchedVariant = true;
+                        break;
+                    }
+                }
+                if (!$hasMatchedVariant) {
+                    $variants[] = [
+                        'idcodgusto' => $matchedId,
+                        'nomgusto' => (string)($p['matched_nomgusto'] ?? ''),
+                        'codscan' => (string)($p['matched_codscan'] ?? $q),
+                        'stockact' => 0,
+                    ];
+                }
+            }
+            $products[$i]['variants'] = $variants;
         }
 
         // Para un código de barras exacto, devolver el producto completo con sus variantes
         // y la variante correspondiente ya marcada para que el formulario la seleccione.
         $autoLoad = false;
         $autoLoadProduct = null;
-        if (ctype_digit($q) && strlen($q) >= 8) {
+        if (ctype_digit($q)) {
             foreach ($products as $i => $p) {
                 $matchedVariantId = (int)($p['matched_variant_id'] ?? $p['barcode_variant_id'] ?? 0);
                 if ($matchedVariantId <= 0) {

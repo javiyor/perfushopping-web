@@ -360,11 +360,14 @@ function addItemRow(product) {
     const code = (product.codprodu || '').trim();
     const price = parseFloat(product.precio || 0);
     const variants = Array.isArray(product.variants) ? product.variants : [];
+    const matchedVariantLabel = product.matched_nomgusto
+        ? '<div class="small text-primary">Variedad: ' + escHtml(product.matched_nomgusto) + '</div>'
+        : '';
 
     tr.innerHTML =
         '<td>' +
             '<input type="hidden" name="idprodu[]" value="' + (product.idprodu || 0) + '" />' +
-            '<div class="fw-semibold">' + escHtml(product.produ || '') + '</div>' +
+            '<div class="fw-semibold">' + escHtml(product.produ || '') + '</div>' + matchedVariantLabel +
             '<div class="small text-muted">' + escHtml(code) + ' · Stock: ' + (product.stocact ?? 0) + ' · $' + (isNaN(price) ? '0,00' : price.toLocaleString('es-AR', {minimumFractionDigits:2})) + '</div>' +
         '</td>' +
         '<td>' +

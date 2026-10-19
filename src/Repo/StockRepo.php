@@ -691,33 +691,38 @@ final class StockRepo
         }
         $products = $st->fetchAll();
 
-        // Buscar variante exacta por codscan (idéntico a FacturaRepo)
-        if (ctype_digit($q) || preg_match('/^\d{8,13}$/', $q)) {
+        // Resolver el scan directamente en gustos y unir su producto por idprodu.
+        if (ctype_digit($q)) {
             try {
                 $st2 = Db::pdo()->prepare('
-                    SELECT g.idcodgusto, g.idprodu, g.nomgusto, g.codscan,
-                           p.idprodu, p.codprodu, p.produ, p.precio, p.precio1, p.precomp, p.codprodup, p.enweb, p.stocact,
-                           i.codivaprodu, i.tiva
+                    SELECT g.idcodgusto AS matched_variant_id,
+                           g.nomgusto AS matched_nomgusto,
+                           g.codscan AS matched_codscan,
+                           p.idprodu, p.codprodu, p.produ, p.codprodup, p.precio, p.precomp, p.stocact,
+                           ' . $codbarraSelect . '
                     FROM gustos g
                     INNER JOIN producto p ON p.idprodu = g.idprodu
-                    LEFT JOIN ivaprodu i ON i.codivaprodu = p.iva
-                    WHERE g.codscan = :c
-                    GROUP BY p.idprodu
+                    WHERE g.codscan = :c AND g.discont = 0
+                    ORDER BY g.idcodgusto ASC
                     LIMIT 1
                 ');
                 $st2->execute([':c' => $q]);
                 $byCode = $st2->fetch();
                 if ($byCode) {
-                    $matchedVariant = [
-                        'idcodgusto' => (int)$byCode['idcodgusto'],
-                        'nomgusto' => $byCode['nomgusto'],
-                        'codscan' => $q,
-                    ];
-                    $exists = false;
-                    foreach ($products as $pr) {
-                        if ((int)$pr['idprodu'] === (int)$byCode['idprodu']) { $exists = true; break; }
+                    $existsIndex = null;
+                    foreach ($products as $idx => $pr) {
+                        if ((int)$pr['idprodu'] === (int)$byCode['idprodu']) {
+                            $existsIndex = $idx;
+                            break;
+                        }
                     }
-                    if (!$exists) array_unshift($products, $byCode);
+                    if ($existsIndex === null) {
+                        $products[] = $byCode;
+                    } else {
+                        $products[$existsIndex]['matched_variant_id'] = (int)$byCode['matched_variant_id'];
+                        $products[$existsIndex]['matched_nomgusto'] = (string)$byCode['matched_nomgusto'];
+                        $products[$existsIndex]['matched_codscan'] = (string)$byCode['matched_codscan'];
+                    }
                 }
             } catch (\Throwable $e) {
                 error_log('StockRepo searchProducts exact barcode error: ' . $e->getMessage());
