@@ -557,6 +557,23 @@ public function searchAjusteProductos(array $params): void
 
         $repo = new StockRepo();
 
+        // Priorizar el escaneo exacto: resolver la variedad directamente en gustos.codscan.
+        if (ctype_digit($q)) {
+            try {
+                $productoEscaneado = $repo->productoPorCodscan($q);
+                if ($productoEscaneado) {
+                    Response::json([
+                        'products' => [$productoEscaneado],
+                        'auto_load' => true,
+                        'auto_load_product' => $productoEscaneado,
+                    ]);
+                    return;
+                }
+            } catch (\Throwable $e) {
+                error_log('StockController::searchAjusteProductos codscan exacto error: ' . $e->getMessage());
+            }
+        }
+
         try {
             $products = $repo->searchProducts($q, 15);
             error_log('StockController::searchAjusteProductos q=' . $q . ' | found=' . count($products) . ' products');

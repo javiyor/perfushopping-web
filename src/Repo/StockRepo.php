@@ -626,6 +626,38 @@ final class StockRepo
         return self::$productoColumns;
     }
 
+    /** Producto y variedad exactos por código de barras de la tabla gustos. */
+    public function productoPorCodscan(string $codscan): ?array
+    {
+        $codscan = trim($codscan);
+        if ($codscan === '' || !ctype_digit($codscan)) {
+            return null;
+        }
+        $codbarraSelect = in_array('codbarra', $this->productoColumns(), true) ? 'p.codbarra' : 'NULL AS codbarra';
+        $st = Db::pdo()->prepare('
+            SELECT g.idcodgusto AS matched_variant_id,
+                   g.nomgusto AS matched_nomgusto,
+                   g.codscan AS matched_codscan,
+                   p.idprodu, p.codprodu, p.produ, p.codprodup, p.precio, p.precomp, p.stocact,
+                   ' . $codbarraSelect . '
+            FROM gustos g
+            INNER JOIN producto p ON p.idprodu = g.idprodu
+            WHERE g.codscan = :codscan AND g.discont = 0
+            ORDER BY g.idcodgusto ASC
+            LIMIT 1
+        ');
+        $st->execute([':codscan' => $codscan]);
+        $row = $st->fetch();
+        if (!$row) {
+            return null;
+        }
+        $row['idprodu'] = (int)$row['idprodu'];
+        $row['matched_variant_id'] = (int)$row['matched_variant_id'];
+        $row['variants'] = $this->variantesPorProducto((int)$row['idprodu']);
+        $row['stock_total'] = (int)($row['stocact'] ?? 0);
+        return $row;
+    }
+
     public function searchProducts(string $q, int $limit = 20): array
     {
         $limit = max(1, min(100, $limit));
