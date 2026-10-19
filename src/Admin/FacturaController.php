@@ -542,7 +542,7 @@ final class FacturaController
         } catch (\Throwable $e) { error_log('PrintJob encolar: '.$e->getMessage()); }
 
         // Auto-post to current account if forma_pago = cuenta_corriente
-        if ($clienteId && $formaPago === 'cuenta_corriente') {
+        if (($clienteId || $clienteErpId) && $formaPago === 'cuenta_corriente') {
             $ctaCte = new \Perfushopping\Web\Repo\CtaCteRepo();
             // Una NC en cuenta corriente acredita (descuenta deuda); facturas y ND debitan.
             $ctaCte->agregarMovimiento(
@@ -551,7 +551,7 @@ final class FacturaController
                 $id,
                 $clienteId,
                 $clienteErpId,
-                $subtotal + $ivaTotal - $descuento,
+                $totalFacturado,
                 ($tipo === 'NC' ? 'NC ' : 'Factura ') . $codigo . ' — ' . $clienteNombre,
                 (int)$adminUser['id']
             );
@@ -1174,14 +1174,14 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
         // Cuenta corriente: rearmar el débito con los nuevos importes.
         $ctaCte = new \Perfushopping\Web\Repo\CtaCteRepo();
         $ctaCte->anularMovimientosPorOrigen('factura', $editarId);
-        if ($clienteId && $formaPago === 'cuenta_corriente') {
+        if (($clienteId || $clienteErpId) && $formaPago === 'cuenta_corriente') {
             $ctaCte->agregarMovimiento(
                 $tipo === 'NC' ? 'credito' : 'debito',
                 'factura',
                 $editarId,
                 $clienteId,
                 $clienteErpId,
-                $subtotal + $ivaTotal - $descuento,
+                $totalFacturado,
                 ($tipo === 'NC' ? 'NC ' : 'Factura ') . $codigo . ' — ' . $clienteNombre,
                 (int)$adminUser['id']
             );
@@ -1398,7 +1398,7 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
         }
 
         // Reverse ctacte movement if factura is anulated and was cta.cte.
-        if ($estado === 'anulada' && $oldEstado !== 'anulada' && ($f['forma_pago'] ?? '') === 'cuenta_corriente' && $f['cliente_id']) {
+        if ($estado === 'anulada' && $oldEstado !== 'anulada' && ($f['forma_pago'] ?? '') === 'cuenta_corriente' && (!empty($f['cliente_id']) || !empty($f['idclien']))) {
             $ctaCte = new \Perfushopping\Web\Repo\CtaCteRepo();
             // Anular una NC revierte al revés: re-debita la deuda que la NC había acreditado.
             $esNC = (string)($f['tipo_comprobante'] ?? '') === 'NC';
@@ -1406,7 +1406,7 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
                 $esNC ? 'debito' : 'credito',
                 'factura',
                 $id,
-                (int)$f['cliente_id'],
+                (int)($f['cliente_id'] ?? 0) ?: null,
                 (int)($f['idclien'] ?? 0) ?: null,
                 (int)($f['total_cents'] ?? 0),
                 'Anulación ' . ($esNC ? 'NC ' : 'Factura ') . ($f['codigo'] ?? ''),
@@ -2524,12 +2524,12 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
         $ctaCte = new \Perfushopping\Web\Repo\CtaCteRepo();
         $ctaCte->anularMovimientosPorOrigen('factura', $id);
         $formaPrincipal = (string)($pagos[0]['forma_pago'] ?? '');
-        if (!empty($factura['cliente_id']) && $formaPrincipal === 'cuenta_corriente') {
+        if ((!empty($factura['cliente_id']) || !empty($factura['idclien'])) && $formaPrincipal === 'cuenta_corriente') {
             $ctaCte->agregarMovimiento(
                 (string)$factura['tipo_comprobante'] === 'NC' ? 'credito' : 'debito',
                 'factura',
                 $id,
-                (int)$factura['cliente_id'],
+                (int)($factura['cliente_id'] ?? 0) ?: null,
                 (int)($factura['idclien'] ?? 0) ?: null,
                 (int)($factura['total_cents'] ?? 0),
                 'Factura ' . (string)$factura['codigo'] . ' — corrección autorizada de pagos',

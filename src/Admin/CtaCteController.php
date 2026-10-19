@@ -67,6 +67,34 @@ final class CtaCteController
         ]);
     }
 
+    public function showErp(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requirePermiso('cta_cte');
+        $idclien = (int)($params['id'] ?? 0);
+        if ($idclien <= 0) {
+            Response::redirect('/admin/ctacte');
+        }
+
+        $st = Db::pdo()->prepare('SELECT idclien, razon AS name, cuit, mail AS email, tele AS phone FROM clientes WHERE idclien = :id LIMIT 1');
+        $st->execute([':id' => $idclien]);
+        $cliente = $st->fetch();
+        if (!$cliente) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Cliente ERP no encontrado.'];
+            Response::redirect('/admin/ctacte');
+        }
+        $cliente['id'] = 0;
+        $repo = new CtaCteRepo();
+        echo View::adminPage('admin/ctacte/show.php', [
+            'adminUser' => $adminUser,
+            'cliente' => $cliente,
+            'saldo' => $repo->saldoActualErp($idclien),
+            'movimientos' => $repo->movimientosErp($idclien),
+            'csrf' => Csrf::token(),
+            'pageTitle' => 'Cta. cte. — ' . ($cliente['name'] ?? ''),
+        ]);
+    }
+
     public function ajuste(array $params): void
     {
         $auth = new AdminAuthService();

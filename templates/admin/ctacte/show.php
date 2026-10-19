@@ -27,7 +27,9 @@ $origenLabels = ['factura'=>'Factura','recibo'=>'Recibo','ajuste'=>'Ajuste manua
         <span class="fs-4 fw-bold <?= $saldo > 0 ? 'text-danger' : ($saldo < 0 ? 'text-success' : '') ?>">
             Saldo: <?= htmlspecialchars(Format::moneyFromCents($saldo)) ?>
         </span>
-        <a class="btn btn-outline-primary btn-sm" href="/admin/ctacte/ajuste/<?= (int)($cliente['id'] ?? 0) ?>"><i class="bi bi-pencil"></i> Ajuste manual</a>
+        <?php if ((int)($cliente['id'] ?? 0) > 0): ?>
+            <a class="btn btn-outline-primary btn-sm" href="/admin/ctacte/ajuste/<?= (int)$cliente['id'] ?>"><i class="bi bi-pencil"></i> Ajuste manual</a>
+        <?php endif; ?>
     </div>
 </div>
 

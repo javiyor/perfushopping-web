@@ -49,7 +49,14 @@ $q = (string)($q ?? '');
                     <tr><td colspan="8" class="text-muted text-center">Sin movimientos.</td></tr>
                 <?php else: ?>
                     <?php foreach ($list as $c): ?>
-                        <?php $saldo = (int)($c['saldo_cents'] ?? 0); ?>
+                        <?php
+                            $saldo = (int)($c['saldo_cents'] ?? 0);
+                            $clienteWebId = (int)($c['id'] ?? 0);
+                            $clienteErpId = (int)($c['idclien'] ?? 0);
+                            $detalleUrl = $clienteWebId > 0
+                                ? '/admin/ctacte/' . $clienteWebId
+                                : '/admin/ctacte/erp/' . $clienteErpId;
+                        ?>
                         <tr>
                             <td><strong><?= htmlspecialchars($c['name'] ?? '-') ?></strong></td>
                             <td class="small"><?= htmlspecialchars((string)($c['email'] ?? '-')) ?></td>
@@ -60,7 +67,7 @@ $q = (string)($q ?? '');
                                 <?= htmlspecialchars(Format::moneyFromCents($saldo)) ?>
                             </td>
                             <td class="small text-muted"><?= htmlspecialchars((string)($c['ultimo_mov'] ?? '-')) ?></td>
-                            <td><a class="btn btn-sm btn-outline-secondary" href="/admin/ctacte/<?= (int)($c['id'] ?? 0) ?>"><i class="bi bi-eye"></i></a></td>
+                            <td><a class="btn btn-sm btn-outline-secondary" href="<?= htmlspecialchars($detalleUrl) ?>"><i class="bi bi-eye"></i></a></td>
                         </tr>
                     <?php endforeach; ?>
                 <?php endif; ?>

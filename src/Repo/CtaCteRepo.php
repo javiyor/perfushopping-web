@@ -12,26 +12,32 @@ final class CtaCteRepo
         $q = trim($q);
         $params = [];
         $having = 'HAVING saldo_cents != 0';
-
-        $where = '';
+        $where = 'WHERE (m.cliente_id IS NOT NULL OR m.idclien IS NOT NULL)';
         if ($q !== '') {
-            $where = 'WHERE (w.name LIKE :like OR w.email LIKE :like OR w.phone LIKE :like)';
-            $params[':like'] = '%' . $q . '%';
+            $where .= ' AND (w.name LIKE :like1 OR c.razon LIKE :like2 OR c.cuit LIKE :like3 OR w.email LIKE :like4 OR w.phone LIKE :like5 OR c.mail LIKE :like6 OR c.tele LIKE :like7)';
+            for ($i = 1; $i <= 7; $i++) {
+                $params[':like' . $i] = '%' . $q . '%';
+            }
             $having = ''; // don't filter by balance when searching
         }
 
+        $accountKey = "CASE WHEN m.cliente_id IS NOT NULL THEN CONCAT('web:', m.cliente_id) ELSE CONCAT('erp:', m.idclien) END";
         $sql = "
-            SELECT w.id, w.name, w.email, w.phone,
+            SELECT COALESCE(MAX(w.id), 0) AS id, MAX(m.idclien) AS idclien,
+                   COALESCE(MAX(w.name), MAX(c.razon), CONCAT('Cliente ERP #', MAX(m.idclien))) AS name,
+                   COALESCE(MAX(w.email), MAX(c.mail)) AS email,
+                   COALESCE(MAX(w.phone), MAX(c.tele)) AS phone,
                    COALESCE(SUM(CASE WHEN m.tipo = 'debito' THEN m.monto_cents ELSE 0 END), 0) AS debitos,
                    COALESCE(SUM(CASE WHEN m.tipo = 'credito' THEN m.monto_cents ELSE 0 END), 0) AS creditos,
                    COALESCE(SUM(CASE WHEN m.tipo = 'debito' THEN m.monto_cents ELSE -m.monto_cents END), 0) AS saldo_cents,
                    MAX(m.created_at) AS ultimo_mov
             FROM ctacte_movimientos m
-            INNER JOIN web_users w ON w.id = m.cliente_id
+            LEFT JOIN web_users w ON w.id = m.cliente_id
+            LEFT JOIN clientes c ON c.idclien = m.idclien
             {$where}
-            GROUP BY w.id, w.name, w.email, w.phone
+            GROUP BY {$accountKey}
             {$having}
-            ORDER BY saldo_cents DESC, w.name ASC
+            ORDER BY saldo_cents DESC, name ASC
             LIMIT 100
         ";
         $st = Db::pdo()->prepare($sql);
@@ -64,6 +70,14 @@ final class CtaCteRepo
         return (int)$st->fetchColumn();
     }
 
+    public function saldoActualErp(int $idclien): int
+    {
+        $st = Db::pdo()->prepare("SELECT COALESCE(SUM(CASE WHEN tipo = 'debito' THEN monto_cents ELSE -monto_cents END), 0)
+            FROM ctacte_movimientos WHERE cliente_id IS NULL AND idclien = :c");
+        $st->execute([':c' => $idclien]);
+        return (int)$st->fetchColumn();
+    }
+
     public function ultimoSaldo(int $clienteId): int
     {
         $st = Db::pdo()->prepare('
@@ -75,9 +89,23 @@ final class CtaCteRepo
         return $val !== false ? (int)$val : 0;
     }
 
-    public function agregarMovimiento(string $tipo, string $origen, ?int $origenId, int $clienteId, ?int $idclien, int $montoCents, string $concepto, int $createdBy): int
+    public function ultimoSaldoErp(int $idclien): int
     {
-        $saldoActual = $this->ultimoSaldo($clienteId);
+        $st = Db::pdo()->prepare('SELECT saldo_after_cents FROM ctacte_movimientos WHERE cliente_id IS NULL AND idclien = :c ORDER BY id DESC LIMIT 1');
+        $st->execute([':c' => $idclien]);
+        $val = $st->fetchColumn();
+        return $val !== false ? (int)$val : 0;
+    }
+
+    public function agregarMovimiento(string $tipo, string $origen, ?int $origenId, ?int $clienteId, ?int $idclien, int $montoCents, string $concepto, int $createdBy): int
+    {
+        if (($clienteId ?? 0) > 0) {
+            $saldoActual = $this->ultimoSaldo((int)$clienteId);
+        } elseif (($idclien ?? 0) > 0) {
+            $saldoActual = $this->ultimoSaldoErp((int)$idclien);
+        } else {
+            throw new \InvalidArgumentException('El movimiento de cuenta corriente requiere un cliente web o ERP.');
+        }
         $saldoAfter = $tipo === 'debito' ? $saldoActual + $montoCents : $saldoActual - $montoCents;
 
         $st = Db::pdo()->prepare('
@@ -85,7 +113,7 @@ final class CtaCteRepo
             VALUES (:cliente_id, :idclien, :tipo, :origen, :origen_id, :monto, :saldo_after, :concepto, :created_by, NOW())
         ');
         $st->execute([
-            ':cliente_id' => $clienteId,
+            ':cliente_id' => ($clienteId ?? 0) > 0 ? $clienteId : null,
             ':idclien' => $idclien,
             ':tipo' => $tipo,
             ':origen' => $origen,
@@ -118,8 +146,15 @@ final class CtaCteRepo
             $del->execute([':o' => $origen, ':oid' => $origenId]);
 
             // Recalculate all subsequent balances for this client
-            $clienteId = (int)$movs[0]['cliente_id'];
-            $this->recalcularSaldos($clienteId);
+            $clienteId = (int)($movs[0]['cliente_id'] ?? 0);
+            if ($clienteId > 0) {
+                $this->recalcularSaldos($clienteId);
+            } else {
+                $idclien = (int)($movs[0]['idclien'] ?? 0);
+                if ($idclien > 0) {
+                    $this->recalcularSaldosErp($idclien);
+                }
+            }
 
             if ($ownsTransaction) {
                 $pdo->commit();
@@ -151,5 +186,27 @@ final class CtaCteRepo
             }
             $upd->execute([':s' => $saldo, ':id' => $m['id']]);
         }
+    }
+
+    private function recalcularSaldosErp(int $idclien): void
+    {
+        $pdo = Db::pdo();
+        $lock = $pdo->inTransaction() ? ' FOR UPDATE' : '';
+        $movs = $pdo->prepare("SELECT id, tipo, monto_cents FROM ctacte_movimientos WHERE cliente_id IS NULL AND idclien = :c ORDER BY id ASC" . $lock);
+        $movs->execute([':c' => $idclien]);
+        $saldo = 0;
+        $upd = $pdo->prepare('UPDATE ctacte_movimientos SET saldo_after_cents = :s WHERE id = :id');
+        foreach ($movs as $m) {
+            $saldo += $m['tipo'] === 'debito' ? (int)$m['monto_cents'] : -(int)$m['monto_cents'];
+            $upd->execute([':s' => $saldo, ':id' => $m['id']]);
+        }
+    }
+
+    public function movimientosErp(int $idclien, int $limit = 100): array
+    {
+        $limit = max(1, min(500, $limit));
+        $st = Db::pdo()->prepare('SELECT m.*, a.nombre AS created_by_nombre FROM ctacte_movimientos m LEFT JOIN admin_users a ON a.id = m.created_by WHERE m.cliente_id IS NULL AND m.idclien = :c ORDER BY m.id DESC LIMIT ' . $limit);
+        $st->execute([':c' => $idclien]);
+        return $st->fetchAll();
     }
 }

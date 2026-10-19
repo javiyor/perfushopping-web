@@ -439,6 +439,7 @@ $router->get('/admin/recibos/buscar-clientes', [AdminReciboController::class, 's
 $router->get('/admin/recibos/buscar-facturas', [AdminReciboController::class, 'searchFacturas']);
 $router->get('/admin/recibos/imprimir/(?P<id>\d+)', [AdminReciboController::class, 'print']);
 $router->get('/admin/ctacte', [AdminCtaCteController::class, 'index']);
+$router->get('/admin/ctacte/erp/(?P<id>\d+)', [AdminCtaCteController::class, 'showErp']);
 $router->get('/admin/ctacte/(?P<id>\d+)', [AdminCtaCteController::class, 'show']);
 $router->get('/admin/ctacte/ajuste/(?P<id>\d+)', [AdminCtaCteController::class, 'ajuste']);
 $router->post('/admin/ctacte/ajuste/guardar', [AdminCtaCteController::class, 'storeAjuste']);
