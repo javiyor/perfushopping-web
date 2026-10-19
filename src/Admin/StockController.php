@@ -283,7 +283,7 @@ final class StockController
         $repo = new StockRepo();
         $depositos = $repo->depositos();
         $esSuperadmin = (string)($adminUser['rol'] ?? '') === 'superadmin';
-        $solicitudesPendientes = $esSuperadmin ? $repo->solicitudesAjustePendientes(40) : [];
+        $solicitudesPendientes = $esSuperadmin ? $repo->solicitudesAjustePendientes(200) : [];
         $misSolicitudes = $repo->solicitudesAjustePorSolicitante((int)$adminUser['id'], 20);
 
         $productoId = (int)($params['id'] ?? 0);
@@ -456,6 +456,49 @@ final class StockController
         Response::redirect('/admin/stock/ajuste');
     }
 
+    public function aprobarSolicitudesAjuste(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requirePermiso('productos');
+        Csrf::check($_POST['_csrf'] ?? null);
+        if ((string)($adminUser['rol'] ?? '') !== 'superadmin') {
+            $_SESSION['admin_flash'] = ['type' => 'info', 'text' => 'Solo un superadmin puede autorizar las solicitudes.'];
+            Response::redirect('/admin/stock/ajuste');
+        }
+
+        $rawIds = $_POST['solicitud_ids'] ?? [];
+        $ids = is_array($rawIds) ? array_values(array_unique(array_filter(array_map('intval', $rawIds), static fn(int $id): bool => $id > 0))) : [];
+        if (!$ids) {
+            $_SESSION['admin_flash'] = ['type' => 'warning', 'text' => 'Tildá al menos un artículo para aprobar.'];
+            Response::redirect('/admin/stock/ajuste');
+        }
+        if (count($ids) > 200) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Podés aprobar como máximo 200 solicitudes por vez.'];
+            Response::redirect('/admin/stock/ajuste');
+        }
+
+        $repo = new StockRepo();
+        $aprobadas = 0;
+        $fallidas = [];
+        foreach ($ids as $id) {
+            try {
+                $repo->aprobarSolicitudAjuste($id, (int)$adminUser['id'], (string)($adminUser['nombre'] ?? ''));
+                $aprobadas++;
+            } catch (\Throwable $e) {
+                $fallidas[] = '#' . $id . ': ' . $e->getMessage();
+            }
+        }
+        if (!$fallidas) {
+            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Se aprobaron y aplicaron ' . $aprobadas . ' solicitudes de ajuste.'];
+        } else {
+            $_SESSION['admin_flash'] = [
+                'type' => $aprobadas > 0 ? 'warning' : 'danger',
+                'text' => 'Aprobadas: ' . $aprobadas . '. Con error: ' . implode(' · ', $fallidas),
+            ];
+        }
+        Response::redirect('/admin/stock/ajuste');
+    }
+
     public function rechazarSolicitudAjuste(array $params): void
     {
         $auth = new AdminAuthService();
@@ -523,41 +566,35 @@ public function searchAjusteProductos(array $params): void
             return;
         }
 
-        // Detectar coincidencia exacta de código de barras para auto-carga
+        foreach ($products as $i => $p) {
+            $products[$i]['variants'] = $repo->variantesPorProducto((int)$p['idprodu']);
+        }
+
+        // Para un código de barras exacto, devolver el producto completo con sus variantes
+        // y la variante correspondiente ya marcada para que el formulario la seleccione.
         $autoLoad = false;
         $autoLoadProduct = null;
         if (ctype_digit($q) && strlen($q) >= 8) {
-            foreach ($products as $p) {
-                // Coincidencia exacta en codbarra del producto
-                if (isset($p['codbarra']) && $p['codbarra'] === $q) {
-                    $autoLoad = true;
-                    $autoLoadProduct = $p;
-                    break;
-                }
-                // Coincidencia exacta en codscan de variante (matched_variant_id o barcode_variant_id)
-                $matchedVariantId = $p['matched_variant_id'] ?? $p['barcode_variant_id'] ?? 0;
-                if ($matchedVariantId > 0) {
-                    $autoLoad = true;
-                    $autoLoadProduct = $p;
-                    $p['matched_variant_id'] = $matchedVariantId;
-                    break;
-                }
-                // Coincidencia exacta en codscan de variante (buscar en variants)
-                if (isset($p['variants'])) {
-                    foreach ($p['variants'] as $v) {
-                        if (isset($v['codscan']) && $v['codscan'] === $q) {
-                            $autoLoad = true;
-                            $autoLoadProduct = $p;
-                            $p['matched_variant_id'] = $v['idcodgusto'];
-                            break 2;
+            foreach ($products as $i => $p) {
+                $matchedVariantId = (int)($p['matched_variant_id'] ?? $p['barcode_variant_id'] ?? 0);
+                if ($matchedVariantId <= 0) {
+                    foreach (($p['variants'] ?? []) as $variant) {
+                        if ((string)($variant['codscan'] ?? '') === $q) {
+                            $matchedVariantId = (int)($variant['idcodgusto'] ?? 0);
+                            break;
                         }
                     }
                 }
+                $coincideCodbarra = (string)($p['codbarra'] ?? '') === $q;
+                if ($matchedVariantId > 0 || $coincideCodbarra) {
+                    if ($matchedVariantId > 0) {
+                        $products[$i]['matched_variant_id'] = $matchedVariantId;
+                    }
+                    $autoLoad = true;
+                    $autoLoadProduct = $products[$i];
+                    break;
+                }
             }
-        }
-
-        foreach ($products as $i => $p) {
-            $products[$i]['variants'] = $repo->variantesPorProducto((int)$p['idprodu']);
         }
 
         Response::json([

@@ -5,8 +5,10 @@ $variantes = $variantes ?? [];
 $initialAjusteItems = $initialAjusteItems ?? [];
 $solicitudesPendientes = $solicitudesPendientes ?? [];
 $misSolicitudes = $misSolicitudes ?? [];
+$adminUser = $adminUser ?? [];
 $historialAjustes = $historialAjustes ?? [];
 $esSuperadmin = $esSuperadmin ?? false;
+$solicitudesAprobables = array_values(array_filter($solicitudesPendientes, static fn(array $s): bool => (int)($s['requested_by'] ?? 0) !== (int)($adminUser['id'] ?? 0)));
 $histDesde = $histDesde ?? '';
 $histHasta = $histHasta ?? '';
 $histDepDesde = (int)($histDepDesde ?? 0);
@@ -112,6 +114,15 @@ $histWinStart = max(1, $histWinEnd - 6);
                 <span>Autorizaciones pendientes</span>
                 <span class="badge bg-danger"><?= count($solicitudesPendientes) ?></span>
             </div>
+            <?php if ($solicitudesAprobables): ?>
+                <div class="px-3 pt-3 d-flex flex-wrap gap-2 justify-content-between align-items-center">
+                    <form id="aprobarVariasForm" method="post" action="/admin/stock/ajuste/aprobar-varias" onsubmit="return confirmarAprobacionMasiva(this)">
+                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                        <button class="btn btn-sm btn-accent" type="submit"><i class="bi bi-check-all"></i> Aprobar seleccionados</button>
+                    </form>
+                    <label class="form-check-label small"><input class="form-check-input me-1" id="seleccionarTodasAprobables" type="checkbox" /> Seleccionar todos</label>
+                </div>
+            <?php endif; ?>
             <div class="card-body small p-0">
                 <?php if (!$solicitudesPendientes): ?>
                     <div class="p-3 text-muted">No hay solicitudes pendientes.</div>
@@ -132,6 +143,10 @@ $histWinStart = max(1, $histWinEnd - 6);
                                 <?php if ($esPropia): ?>
                                     <div class="mt-2 text-warning">No podés autorizar tu propia solicitud.</div>
                                 <?php else: ?>
+                                    <label class="form-check small mb-2">
+                                        <input class="form-check-input solicitud-ajuste-check" type="checkbox" form="aprobarVariasForm" name="solicitud_ids[]" value="<?= (int)$s['id'] ?>" />
+                                        <span class="form-check-label">Incluir en aprobación masiva</span>
+                                    </label>
                                     <div class="d-flex gap-2 mt-2">
                                         <form method="post" action="/admin/stock/ajuste/aprobar" onsubmit="return confirm('Aprobar esta solicitud de ajuste?')">
                                             <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
@@ -311,6 +326,22 @@ const resultsDiv = document.getElementById('productoResults');
 const clearBtn = document.getElementById('clearProductoSearch');
 const itemsBody = document.getElementById('itemsBody');
 const ajusteForm = document.getElementById('ajusteForm');
+
+function confirmarAprobacionMasiva(form) {
+    const seleccionadas = document.querySelectorAll('input.solicitud-ajuste-check[form="aprobarVariasForm"]:checked').length;
+    if (!seleccionadas) {
+        alert('Tildá al menos un artículo para aprobar.');
+        return false;
+    }
+    return confirm('¿Aprobar y aplicar ' + seleccionadas + ' solicitud(es) de ajuste?');
+}
+
+document.addEventListener('change', function(e) {
+    if (!e.target || e.target.id !== 'seleccionarTodasAprobables') return;
+    document.querySelectorAll('input.solicitud-ajuste-check[form="aprobarVariasForm"]').forEach(function(box) {
+        box.checked = e.target.checked;
+    });
+});
 
 function buildVariantOptions(variants) {
     let html = '<option value="0">Todas (producto base)</option>';

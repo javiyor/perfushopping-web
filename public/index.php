@@ -463,6 +463,7 @@ $router->get('/admin/stock/ajuste', [AdminStockController::class, 'ajuste']);
 $router->get('/admin/stock/ajuste/(?P<id>\d+)', [AdminStockController::class, 'ajuste']);
 $router->post('/admin/stock/ajuste/guardar', [AdminStockController::class, 'storeAjuste']);
 $router->post('/admin/stock/ajuste/aprobar', [AdminStockController::class, 'aprobarSolicitudAjuste']);
+$router->post('/admin/stock/ajuste/aprobar-varias', [AdminStockController::class, 'aprobarSolicitudesAjuste']);
 $router->post('/admin/stock/ajuste/rechazar', [AdminStockController::class, 'rechazarSolicitudAjuste']);
 $router->get('/admin/stock/ajuste/buscar-productos', [AdminStockController::class, 'searchAjusteProductos']);
 $router->get('/admin/stock/ajuste/variantes', [AdminStockController::class, 'ajusteVariantes']);
