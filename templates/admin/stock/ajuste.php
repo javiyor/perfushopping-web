@@ -360,18 +360,24 @@ function addItemRow(product) {
     const code = (product.codprodu || '').trim();
     const price = parseFloat(product.precio || 0);
     const variants = Array.isArray(product.variants) ? product.variants : [];
-    const matchedVariantLabel = product.matched_nomgusto
-        ? '<div class="small text-primary">Variedad: ' + escHtml(product.matched_nomgusto) + '</div>'
-        : '';
+    const matchedVariantId = parseInt(product.matched_variant_id) || 0;
+    const matchedVariant = variants.find(v => (parseInt(v.idcodgusto) || 0) === matchedVariantId);
+    const matchedVariantName = product.matched_nomgusto || (matchedVariant && matchedVariant.nomgusto) || '';
+    const matchedVariantCodscan = product.matched_codscan || (matchedVariant && matchedVariant.codscan) || '';
+    const variantCell = matchedVariantId > 0
+        ? '<input type="hidden" name="idcodgusto[]" value="' + matchedVariantId + '" />' +
+            '<div class="fw-semibold text-primary">' + escHtml(matchedVariantName) + '</div>' +
+            '<div class="small text-muted">Codscan: ' + escHtml(matchedVariantCodscan) + '</div>'
+        : '<select class="form-select form-select-sm" name="idcodgusto[]">' + buildVariantOptions(variants) + '</select>';
 
     tr.innerHTML =
         '<td>' +
             '<input type="hidden" name="idprodu[]" value="' + (product.idprodu || 0) + '" />' +
-            '<div class="fw-semibold">' + escHtml(product.produ || '') + '</div>' + matchedVariantLabel +
+            '<div class="fw-semibold">' + escHtml(product.produ || '') + '</div>' +
             '<div class="small text-muted">' + escHtml(code) + ' · Stock: ' + (product.stocact ?? 0) + ' · $' + (isNaN(price) ? '0,00' : price.toLocaleString('es-AR', {minimumFractionDigits:2})) + '</div>' +
         '</td>' +
         '<td>' +
-            '<select class="form-select form-select-sm" name="idcodgusto[]">' + buildVariantOptions(variants) + '</select>' +
+            variantCell +
         '</td>' +
         '<td class="text-center">' +
             '<span class="badge bg-secondary stock-destino" data-stock="0">—</span>' +
@@ -404,6 +410,7 @@ function addItemRow(product) {
 
     // Update stock when variant changes
     variantSelect?.addEventListener('change', () => updateRowStock(tr));
+    updateRowStock(tr);
 
     return tr;
 }
@@ -551,8 +558,8 @@ document.getElementById('iddepodesde').addEventListener('change', updateAllRowsS
 // Función para actualizar el stock en el depósito destino de una fila
 function updateRowStock(tr) {
     const idprodu = tr.dataset.productId;
-    const variantSelect = tr.querySelector('select[name="idcodgusto[]"]');
-    const idcodgusto = variantSelect ? parseInt(variantSelect.value) : 0;
+    const variantField = tr.querySelector('[name="idcodgusto[]"]');
+    const idcodgusto = variantField ? parseInt(variantField.value) || 0 : 0;
     const iddepo = document.getElementById('iddepohasta').value;
     const stockBadge = tr.querySelector('.stock-destino');
 
@@ -573,7 +580,7 @@ function updateRowStock(tr) {
     const params = new URLSearchParams({
         idprodu: idprodu,
         iddepo: iddepo,
-        idcodgusto: variantSelect ? parseInt(variantSelect.value) : 0
+        idcodgusto: variantField ? parseInt(variantField.value) || 0 : 0
     });
 
     fetch('/admin/stock/ajuste/stock-deposito?' + params.toString())
