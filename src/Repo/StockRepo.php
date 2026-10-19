@@ -630,7 +630,7 @@ final class StockRepo
     public function productoPorCodscan(string $codscan): ?array
     {
         $codscan = trim($codscan);
-        if ($codscan === '' || !ctype_digit($codscan)) {
+        if ($codscan === '') {
             return null;
         }
         $codbarraSelect = in_array('codbarra', $this->productoColumns(), true) ? 'p.codbarra' : 'NULL AS codbarra';
@@ -642,7 +642,7 @@ final class StockRepo
                    ' . $codbarraSelect . '
             FROM gustos g
             INNER JOIN producto p ON p.idprodu = g.idprodu
-            WHERE g.codscan = :codscan AND g.discont = 0
+            WHERE TRIM(g.codscan) = :codscan
             ORDER BY g.idcodgusto ASC
             LIMIT 1
         ');
