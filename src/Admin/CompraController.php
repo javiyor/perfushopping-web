@@ -433,13 +433,21 @@ final class CompraController
 
         $id = (int)($_POST['id'] ?? 0);
         if ($id > 0) {
+            // Eliminar revierte primero los ítems aplicados a stock y los precios de producto.
+            $preciosNoReconstruidos = (new CompraRepo())->delete($id);
             try {
                 (new CtaCteProveedorRepo())->anularMovimientosPorOrigen('compra', $id);
             } catch (\Throwable $e) {
                 error_log('ctacte compra anular: ' . $e->getMessage());
             }
-            (new CompraRepo())->delete($id);
-            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Factura de compra eliminada.'];
+            if ($preciosNoReconstruidos) {
+                $_SESSION['admin_flash'] = [
+                    'type' => 'warning',
+                    'text' => 'Factura eliminada y stock revertido. No había historial de precio anterior para los productos: ' . implode(', ', $preciosNoReconstruidos) . '. Revisá sus precios.',
+                ];
+            } else {
+                $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Factura eliminada; stock y precios anteriores revertidos.'];
+            }
         }
         Response::redirect('/admin/compras');
     }

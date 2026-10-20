@@ -42,6 +42,33 @@ final class CompraRepo
         return self::$itemsColumns;
     }
 
+    /** Agrega snapshots de precios para poder revertir compras aplicadas. */
+    private function ensurePriceSnapshotColumns(): bool
+    {
+        $definitions = [
+            'prev_precomp' => 'ADD COLUMN prev_precomp DECIMAL(14,2) NULL DEFAULT NULL',
+            'prev_precio' => 'ADD COLUMN prev_precio DECIMAL(14,2) NULL DEFAULT NULL',
+            'prev_precio1' => 'ADD COLUMN prev_precio1 DECIMAL(14,2) NULL DEFAULT NULL',
+            'prev_fecompra' => 'ADD COLUMN prev_fecompra DATE NULL DEFAULT NULL',
+            'applied_precomp' => 'ADD COLUMN applied_precomp DECIMAL(14,2) NULL DEFAULT NULL',
+            'applied_precio' => 'ADD COLUMN applied_precio DECIMAL(14,2) NULL DEFAULT NULL',
+            'applied_precio1' => 'ADD COLUMN applied_precio1 DECIMAL(14,2) NULL DEFAULT NULL',
+            'applied_fecompra' => 'ADD COLUMN applied_fecompra DATE NULL DEFAULT NULL',
+        ];
+        $columns = $this->itemsColumns();
+        foreach ($definitions as $column => $ddl) {
+            if (in_array($column, $columns, true)) continue;
+            try {
+                Db::pdo()->exec("ALTER TABLE factura_compra_items {$ddl}");
+            } catch (\Throwable $e) {
+                // Si la columna ya existe por una petición concurrente, refrescar y continuar.
+            }
+            self::$itemsColumns = null;
+            $columns = $this->itemsColumns();
+        }
+        return count(array_intersect(array_keys($definitions), $columns)) === count($definitions);
+    }
+
     /** @param array{q?:string, estado?:string, desde?:string, hasta?:string} $f
      *  @return array<int, array<string,mixed>>
      */
@@ -267,9 +294,20 @@ final class CompraRepo
         $st->execute($p);
     }
 
-    public function delete(int $id): void
+    /** @return array<int> productos cuyo precio histórico anterior no pudo reconstruirse. */
+    public function delete(int $id): array
     {
+        $precioNoReconstruido = [];
+        $compra = $this->findById($id);
+        if ($compra && (string)($compra['estado'] ?? '') === 'completa') {
+            $items = $this->itemsActuales($id);
+            if ($items) {
+                $precioNoReconstruido = $this->revertirCompraAplicada($compra, $items);
+            }
+        }
+        (new StockRepo())->desenlazarCompra($id);
         Db::pdo()->prepare('DELETE FROM factura_compra WHERE id = :id LIMIT 1')->execute([':id' => $id]);
+        return $precioNoReconstruido;
     }
 
     /** @return array<string,mixed> */
@@ -536,6 +574,7 @@ final class CompraRepo
      */
     public function aplicarItems(int $facturaCompraId, array $items, int $iddepo, string $fecha, ?string $notas): void
     {
+        $hasPriceSnapshot = $this->ensurePriceSnapshotColumns();
         $pdo = Db::pdo();
         $pdo->beginTransaction();
         try {
@@ -543,12 +582,25 @@ final class CompraRepo
             $pdo->prepare('DELETE FROM factura_compra_items WHERE factura_compra_id = :id')->execute([':id' => $facturaCompraId]);
 
             $hasBonif = in_array('bonif_pct', $this->itemsColumns(), true);
+            $itemColumns = ['factura_compra_id', 'idprodu', 'idcodgusto', 'product_name', 'qty', 'unit_cost', 'line_total'];
+            $itemValues = [':fc', ':prod', ':gusto', ':name', ':qty', ':cost', ':line'];
+            if ($hasBonif) {
+                $itemColumns[] = 'bonif_pct';
+                $itemValues[] = ':bonif';
+            }
+            if ($hasPriceSnapshot) {
+                foreach (['prev_precomp','prev_precio','prev_precio1','prev_fecompra'] as $column) {
+                    $itemColumns[] = $column;
+                    $itemValues[] = ':' . $column;
+                }
+            }
             $stItem = $pdo->prepare('
-                INSERT INTO factura_compra_items (factura_compra_id, idprodu, idcodgusto, product_name, qty, unit_cost, line_total' . ($hasBonif ? ', bonif_pct' : '') . ')
-                VALUES (:fc, :prod, :gusto, :name, :qty, :cost, :line' . ($hasBonif ? ', :bonif' : '') . ')
+                INSERT INTO factura_compra_items (' . implode(', ', $itemColumns) . ')
+                VALUES (' . implode(', ', $itemValues) . ')
             ');
 
             $cabIds = [];
+            $priceBeforeByProduct = [];
             foreach ($items as $it) {
                 $idprodu = (int)($it['idprodu'] ?? 0);
                 if ($idprodu <= 0) {
@@ -567,6 +619,9 @@ final class CompraRepo
                 // Stock + precios por producto
                 $prod = $this->productoCosto($idprodu);
                 if ($prod) {
+                    if (!isset($priceBeforeByProduct[$idprodu])) {
+                        $priceBeforeByProduct[$idprodu] = $prod;
+                    }
                     if ($idcodgusto === null) {
                         $idcodgusto = $this->resolveVariant($idprodu);
                     }
@@ -614,7 +669,32 @@ final class CompraRepo
                 if ($hasBonif) {
                     $itemParams[':bonif'] = $bonif;
                 }
+                if ($hasPriceSnapshot) {
+                    $previous = $priceBeforeByProduct[$idprodu] ?? [];
+                    $itemParams[':prev_precomp'] = $previous['precomp'] ?? null;
+                    $itemParams[':prev_precio'] = $previous['precio'] ?? null;
+                    $itemParams[':prev_precio1'] = $previous['precio1'] ?? null;
+                    $itemParams[':prev_fecompra'] = $previous['fecompra'] ?? null;
+                }
                 $stItem->execute($itemParams);
+            }
+
+            if ($hasPriceSnapshot) {
+                $getPrice = $pdo->prepare('SELECT precomp, precio, precio1, fecompra FROM producto WHERE idprodu = :id LIMIT 1');
+                $setApplied = $pdo->prepare('UPDATE factura_compra_items SET applied_precomp = :precomp, applied_precio = :precio, applied_precio1 = :precio1, applied_fecompra = :fecompra WHERE factura_compra_id = :fc AND idprodu = :id');
+                foreach (array_keys($priceBeforeByProduct) as $idprodu) {
+                    $getPrice->execute([':id' => $idprodu]);
+                    $now = $getPrice->fetch();
+                    if (!$now) continue;
+                    $setApplied->execute([
+                        ':precomp' => $now['precomp'],
+                        ':precio' => $now['precio'],
+                        ':precio1' => $now['precio1'],
+                        ':fecompra' => $now['fecompra'],
+                        ':fc' => $facturaCompraId,
+                        ':id' => $idprodu,
+                    ]);
+                }
             }
 
             $pdo->commit();
@@ -626,7 +706,9 @@ final class CompraRepo
         // Un solo grupo por factura de compra (fuera de la transacción: el ensure hace DDL)
         if (!empty($cabIds)) {
             try {
-                (new StockRepo())->asegurarGrupo($cabIds);
+                $stockRepo = new StockRepo();
+                $stockRepo->asegurarGrupo($cabIds);
+                $stockRepo->enlazarCompra($cabIds, $facturaCompraId);
             } catch (\Throwable $e) {
                 error_log('CompraRepo::aplicarItems asegurarGrupo: ' . $e->getMessage());
             }
@@ -636,7 +718,7 @@ final class CompraRepo
     /** @return array<string,mixed>|null */
     private function productoCosto(int $idprodu): ?array
     {
-        $st = Db::pdo()->prepare('SELECT idprodu, precomp, ganan1, ganan2 FROM producto WHERE idprodu = :id LIMIT 1');
+        $st = Db::pdo()->prepare('SELECT idprodu, precomp, precio, precio1, ganan1, ganan2, fecompra FROM producto WHERE idprodu = :id LIMIT 1');
         $st->execute([':id' => $idprodu]);
         return $st->fetch() ?: null;
     }
@@ -700,7 +782,7 @@ final class CompraRepo
     /** Ítems guardados actualmente (para revertir al editar). */
     public function itemsActuales(int $facturaCompraId): array
     {
-        $st = Db::pdo()->prepare('SELECT idprodu, idcodgusto, qty FROM factura_compra_items WHERE factura_compra_id = :id');
+        $st = Db::pdo()->prepare('SELECT * FROM factura_compra_items WHERE factura_compra_id = :id ORDER BY id ASC');
         $st->execute([':id' => $facturaCompraId]);
         return $st->fetchAll();
     }
@@ -714,6 +796,7 @@ final class CompraRepo
      */
     public function reaplicarItems(int $facturaCompraId, array $oldItems, int $oldDepo, array $newItems, int $newDepo, string $fecha, string $notas): void
     {
+        $this->ensurePriceSnapshotColumns();
         $pdo = Db::pdo();
         $pdo->beginTransaction();
         try {
@@ -740,12 +823,183 @@ final class CompraRepo
                 $this->addStockDeposito($pdo, $idprodu, $idcodgusto, $oldDepo, -$qty);
                 $this->recalcularProducto($pdo, $idprodu, $idcodgusto);
             }
+            $this->restaurarPreciosCompra($facturaCompraId, $oldItems, false);
             $pdo->commit();
         } catch (\Throwable $e) {
             $pdo->rollBack();
             throw $e;
         }
         $this->aplicarItems($facturaCompraId, $newItems, $newDepo, $fecha, $notas);
+    }
+
+    /** Revierte stock y precios modificados por una compra completada antes de borrarla. */
+    private function revertirCompraAplicada(array $compra, array $items): array
+    {
+        $this->ensurePriceSnapshotColumns();
+        $stockRepo = new StockRepo();
+        $hasGrupo = $stockRepo->ensureGrupoColumn();
+        $pdo = Db::pdo();
+        $compraId = (int)$compra['id'];
+        $iddepo = (int)($compra['iddepo'] ?? 0);
+        if ($iddepo <= 0) {
+            $iddepo = $this->depositoPrincipal();
+        }
+        $cabIds = [];
+        $grupo = null;
+        $preciosNoReconstruidos = [];
+        $pdo->beginTransaction();
+        try {
+            if ($iddepo > 0) {
+                foreach ($items as $item) {
+                    $idprodu = (int)($item['idprodu'] ?? 0);
+                    $idgusto = ((int)($item['idcodgusto'] ?? 0)) > 0 ? (int)$item['idcodgusto'] : null;
+                    $qty = (float)($item['qty'] ?? 0);
+                    if ($idprodu <= 0 || $qty <= 0 || !$this->productoCosto($idprodu)) {
+                        continue;
+                    }
+                    if ($hasGrupo) {
+                        $stCab = $pdo->prepare("INSERT INTO stockcab (iddepoh, iddepod, fecha, notas, tipo_movimiento, grupo_id)
+                            VALUES (NULL, :depo, CURDATE(), :notas, 'devolucion_compra', :grupo)");
+                        $stCab->execute([
+                            ':depo' => $iddepo,
+                            ':notas' => 'Anulación factura de compra #' . $compraId,
+                            ':grupo' => $grupo,
+                        ]);
+                    } else {
+                        $stCab = $pdo->prepare("INSERT INTO stockcab (iddepoh, iddepod, fecha, notas, tipo_movimiento)
+                            VALUES (NULL, :depo, CURDATE(), :notas, 'devolucion_compra')");
+                        $stCab->execute([':depo' => $iddepo, ':notas' => 'Anulación factura de compra #' . $compraId]);
+                    }
+                    $cabId = (int)$pdo->lastInsertId();
+                    if ($grupo === null) {
+                        $grupo = $cabId;
+                        if ($hasGrupo) {
+                            $pdo->prepare('UPDATE stockcab SET grupo_id = :g WHERE idcabstock = :id LIMIT 1')->execute([':g' => $grupo, ':id' => $cabId]);
+                        }
+                    } elseif ($hasGrupo) {
+                        $pdo->prepare('UPDATE stockcab SET grupo_id = :g WHERE idcabstock = :id LIMIT 1')->execute([':g' => $grupo, ':id' => $cabId]);
+                    }
+                    $cabIds[] = $cabId;
+                    $pdo->prepare('INSERT INTO stockdet (idstockcab, idprodu, idcodgusto, canti) VALUES (:cab, :prod, :gusto, :qty)')
+                        ->execute([':cab' => $cabId, ':prod' => $idprodu, ':gusto' => $idgusto, ':qty' => $qty]);
+                    $this->addStockDeposito($pdo, $idprodu, $idgusto, $iddepo, -$qty);
+                    $this->recalcularProducto($pdo, $idprodu, $idgusto);
+                }
+            }
+
+            $preciosNoReconstruidos = $this->restaurarPreciosCompra($compraId, $items, true, $compra);
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+        if ($cabIds) {
+            try {
+                $stockRepo->asegurarGrupo($cabIds);
+            } catch (\Throwable $e) {
+                error_log('CompraRepo::revertirCompraAplicada asegurarGrupo: ' . $e->getMessage());
+            }
+        }
+        return $preciosNoReconstruidos;
+    }
+
+    /** Restaura el snapshot previo, o el costo de la compra completa anterior en datos históricos. */
+    private function restaurarPreciosCompra(int $compraId, array $items, bool $soloSiEsUltimaAplicacion, ?array $compra = null): array
+    {
+        $pdo = Db::pdo();
+        $itemsCols = $this->itemsColumns();
+        $hasSnapshots = in_array('prev_precomp', $itemsCols, true)
+            && in_array('applied_precomp', $itemsCols, true);
+        $porProducto = [];
+        $sinPrecio = [];
+        foreach ($items as $item) {
+            $idprodu = (int)($item['idprodu'] ?? 0);
+            if ($idprodu > 0 && !isset($porProducto[$idprodu])) {
+                $porProducto[$idprodu] = $item;
+            }
+        }
+        foreach ($porProducto as $idprodu => $item) {
+            $latest = $pdo->prepare("SELECT fc.id, fc.updated_at FROM factura_compra_items i
+                INNER JOIN factura_compra fc ON fc.id = i.factura_compra_id
+                WHERE i.idprodu = :p AND fc.id <> :fc AND fc.estado = 'completa'
+                ORDER BY fc.updated_at DESC, fc.id DESC LIMIT 1");
+            $latest->execute([':p' => $idprodu, ':fc' => $compraId]);
+            $otraCompra = $latest->fetch() ?: null;
+            if ($soloSiEsUltimaAplicacion && $otraCompra && $compra) {
+                $fechaOtra = strtotime((string)($otraCompra['updated_at'] ?? '')) ?: 0;
+                $fechaEsta = strtotime((string)($compra['updated_at'] ?? '')) ?: 0;
+                if ($fechaOtra > $fechaEsta || ($fechaOtra === $fechaEsta && (int)$otraCompra['id'] > $compraId)) {
+                    continue;
+                }
+            }
+
+            $prod = $this->productoCosto((int)$idprodu);
+            if (!$prod) continue;
+            if ($soloSiEsUltimaAplicacion && $hasSnapshots) {
+                $priceStillFromThisCompra = true;
+                foreach (['precomp', 'precio', 'precio1'] as $field) {
+                    $appliedField = 'applied_' . $field;
+                    if (isset($item[$appliedField]) && $item[$appliedField] !== null
+                        && round((float)$prod[$field], 2) !== round((float)$item[$appliedField], 2)) {
+                        $priceStillFromThisCompra = false;
+                        break;
+                    }
+                }
+                if ($priceStillFromThisCompra && ($item['applied_precomp'] ?? null) === null) {
+                    $bonif = in_array('bonif_pct', $itemsCols, true) ? (float)($item['bonif_pct'] ?? 0) : 0.0;
+                    $expected = round((float)($item['unit_cost'] ?? 0) * (1 - min(100, max(0, $bonif)) / 100), 2);
+                    if (round((float)$prod['precomp'], 2) !== $expected) {
+                        $priceStillFromThisCompra = false;
+                    }
+                }
+                if (!$priceStillFromThisCompra) {
+                    // Un cambio de precio posterior/manual ya reemplazó al de esta compra.
+                    continue;
+                }
+            }
+
+            $restaurado = false;
+            if ($hasSnapshots && isset($item['prev_precomp']) && $item['prev_precomp'] !== null) {
+                $pdo->prepare('UPDATE producto SET precomp = :pc, precio = :p, precio1 = :p1, fecompra = :f WHERE idprodu = :id LIMIT 1')
+                    ->execute([
+                        ':pc' => (float)$item['prev_precomp'],
+                        ':p' => (float)($item['prev_precio'] ?? 0),
+                        ':p1' => (float)($item['prev_precio1'] ?? 0),
+                        ':f' => $item['prev_fecompra'] ?? null,
+                        ':id' => (int)$idprodu,
+                    ]);
+                $restaurado = true;
+            } elseif ($otraCompra) {
+                $hasBonif = in_array('bonif_pct', $itemsCols, true);
+                $bonifSelect = $hasBonif ? 'i.bonif_pct' : '0 AS bonif_pct';
+                $appliedPrecompSelect = in_array('applied_precomp', $itemsCols, true) ? 'i.applied_precomp' : 'NULL AS applied_precomp';
+                $appliedPrecioSelect = in_array('applied_precio', $itemsCols, true) ? 'i.applied_precio' : 'NULL AS applied_precio';
+                $appliedPrecio1Select = in_array('applied_precio1', $itemsCols, true) ? 'i.applied_precio1' : 'NULL AS applied_precio1';
+                $prev = $pdo->prepare("SELECT i.unit_cost, {$bonifSelect}, fc.fecha, {$appliedPrecompSelect}, {$appliedPrecioSelect}, {$appliedPrecio1Select}
+                    FROM factura_compra_items i
+                    INNER JOIN factura_compra fc ON fc.id = i.factura_compra_id
+                    WHERE i.idprodu = :p AND fc.id <> :fc AND fc.estado = 'completa'
+                    ORDER BY fc.updated_at DESC, fc.id DESC, i.id DESC LIMIT 1");
+                $prev->execute([':p' => $idprodu, ':fc' => $compraId]);
+                $prevRow = $prev->fetch() ?: null;
+                if ($prevRow) {
+                    $neto = round((float)$prevRow['unit_cost'] * (1 - min(100, max(0, (float)$prevRow['bonif_pct'])) / 100), 2);
+                    $precio = $prevRow['applied_precio'] !== null ? (float)$prevRow['applied_precio'] : round($neto * (1 + (float)$prod['ganan1'] / 100), 2);
+                    $precio1 = $prevRow['applied_precio1'] !== null ? (float)$prevRow['applied_precio1'] : round($neto * (1 + (float)$prod['ganan2'] / 100), 2);
+                    if ($prevRow['applied_precomp'] !== null) $neto = (float)$prevRow['applied_precomp'];
+                    $pdo->prepare('UPDATE producto SET precomp = :pc, precio = :p, precio1 = :p1, fecompra = :f WHERE idprodu = :id LIMIT 1')
+                        ->execute([':pc' => $neto, ':p' => $precio, ':p1' => $precio1, ':f' => $prevRow['fecha'] ?? null, ':id' => (int)$idprodu]);
+                    $restaurado = true;
+                }
+            }
+            if (!$restaurado && $soloSiEsUltimaAplicacion) {
+                error_log('CompraRepo: no hay snapshot previo de precios para producto ' . $idprodu . ' al eliminar compra ' . $compraId);
+                $sinPrecio[] = (int)$idprodu;
+            }
+        }
+        return array_values(array_unique($sinPrecio));
     }
 
     private function addStockDeposito(\PDO $pdo, int $idprodu, ?int $idcodgusto, int $iddepo, float $qty): void

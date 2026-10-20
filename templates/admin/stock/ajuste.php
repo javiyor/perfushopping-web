@@ -3,6 +3,10 @@ $depositos = $depositos ?? [];
 $producto = $producto ?? null;
 $variantes = $variantes ?? [];
 $initialAjusteItems = $initialAjusteItems ?? [];
+$grupoEditarId = (int)($grupoEditarId ?? 0);
+$grupoEditarDesde = (int)($grupoEditarDesde ?? 0);
+$grupoEditarHasta = (int)($grupoEditarHasta ?? 0);
+$grupoEditarMotivo = (string)($grupoEditarMotivo ?? '');
 $solicitudesPendientes = $solicitudesPendientes ?? [];
 $misSolicitudes = $misSolicitudes ?? [];
 $adminUser = $adminUser ?? [];
@@ -42,10 +46,11 @@ $histWinStart = max(1, $histWinEnd - 6);
 <div class="row g-3">
     <div class="col-lg-8">
         <div class="card shadow-sm">
-            <div class="card-header bg-white fw-semibold">Registrar ajuste de stock</div>
+            <div class="card-header bg-white fw-semibold"><?= $grupoEditarId > 0 ? 'Modificar grupo de ajuste #' . $grupoEditarId : 'Registrar ajuste de stock' ?></div>
             <div class="card-body">
                 <form method="post" action="/admin/stock/ajuste/guardar" id="ajusteForm">
                     <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                    <input type="hidden" name="grupo_editar_id" value="<?= $grupoEditarId ?>" />
 
                     <div class="mb-3">
                         <label class="form-label small fw-semibold">Agregar productos al movimiento</label>
@@ -80,7 +85,7 @@ $histWinStart = max(1, $histWinEnd - 6);
                             <select class="form-select form-select-sm" name="iddepodesde" id="iddepodesde">
                                 <option value="">Ninguno (solo ingreso)</option>
                                 <?php foreach ($depositos as $d): ?>
-                                    <option value="<?= (int)$d['iddepo'] ?>"><?= htmlspecialchars($d['nomdepo'] ?? '') ?></option>
+                                <option value="<?= (int)$d['iddepo'] ?>" <?= $grupoEditarDesde === (int)$d['iddepo'] ? 'selected' : '' ?>><?= htmlspecialchars($d['nomdepo'] ?? '') ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -89,7 +94,7 @@ $histWinStart = max(1, $histWinEnd - 6);
                             <select class="form-select form-select-sm" name="iddepohasta" id="iddepohasta">
                                 <option value="">Ninguno (solo egreso)</option>
                                 <?php foreach ($depositos as $d): ?>
-                                    <option value="<?= (int)$d['iddepo'] ?>"><?= htmlspecialchars($d['nomdepo'] ?? '') ?></option>
+                                <option value="<?= (int)$d['iddepo'] ?>" <?= $grupoEditarHasta === (int)$d['iddepo'] ? 'selected' : '' ?>><?= htmlspecialchars($d['nomdepo'] ?? '') ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -97,10 +102,10 @@ $histWinStart = max(1, $histWinEnd - 6);
 
                     <div class="mb-3">
                         <label class="form-label small fw-semibold">Motivo del ajuste</label>
-                        <textarea class="form-control form-control-sm" name="motivo" rows="2" required placeholder="Ej: Rotura, vencimiento, sobrante de inventario, corrección..."></textarea>
+                        <textarea class="form-control form-control-sm" name="motivo" rows="2" required placeholder="Ej: Rotura, vencimiento, sobrante de inventario, corrección..."><?= htmlspecialchars($grupoEditarMotivo) ?></textarea>
                     </div>
 
-                    <button class="btn btn-accent" type="submit"><i class="bi bi-check-lg"></i> Registrar ajuste</button>
+                    <button class="btn btn-accent" type="submit"><i class="bi bi-check-lg"></i> <?= $grupoEditarId > 0 ? 'Guardar modificación' : 'Registrar ajuste' ?></button>
                     <a class="btn btn-outline-secondary" href="/admin/stock">Cancelar</a>
                 </form>
             </div>
@@ -229,7 +234,7 @@ $histWinStart = max(1, $histWinEnd - 6);
     </div>
 </div>
 
-<div class="card shadow-sm mt-3">
+<div class="card shadow-sm mt-3" id="historialStock">
     <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
         <span>Grupos de ajuste generados</span>
         <span class="badge bg-secondary"><?= $histTotal ?><?= $histPages > 1 ? ' · pág. ' . $histPage . '/' . $histPages : '' ?></span>
@@ -287,6 +292,11 @@ $histWinStart = max(1, $histWinEnd - 6);
                     <td class="text-center"><?= (int)($h['unidades'] ?? 0) ?></td>
                     <td class="text-end text-nowrap">
                         <a class="btn btn-sm btn-outline-primary py-0 px-1" title="Reimprimir grupo" href="/admin/stock/ajuste/imprimir?ids=<?= htmlspecialchars((string)($h['ids'] ?? $h['id'])) ?>" target="_blank"><i class="bi bi-printer"></i></a>
+                        <?php if ($esSuperadmin && (string)($h['tipo'] ?? '') === 'ajuste'): ?>
+                            <a class="btn btn-sm btn-outline-secondary py-0 px-1" title="Modificar grupo" href="/admin/stock/ajuste?editar_grupo=<?= (int)$h['id'] ?>#ajusteForm"><i class="bi bi-pencil"></i></a>
+                        <?php elseif (!empty($h['factura_compra_id'])): ?>
+                            <a class="btn btn-sm btn-outline-secondary py-0 px-1" title="Modificar factura de compra" href="/admin/compras/<?= (int)$h['factura_compra_id'] ?>/editar"><i class="bi bi-pencil"></i></a>
+                        <?php endif; ?>
                         <form method="post" action="/admin/stock/ajuste/anular" style="display:inline" onsubmit="return confirm('Anular el grupo #<?= (int)$h['id'] ?> generando el movimiento inverso?')">
                             <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
                             <input type="hidden" name="idcabstock" value="<?= (int)$h['id'] ?>" />
@@ -361,6 +371,8 @@ function addItemRow(product) {
     const price = parseFloat(product.precio || 0);
     const variants = Array.isArray(product.variants) ? product.variants : [];
     const matchedVariantId = parseInt(product.matched_variant_id) || 0;
+    const selectedVariantId = parseInt(product.selected_variant_id) || 0;
+    const cantidad = Math.max(1, parseInt(product.cantidad) || 1);
     const matchedVariant = variants.find(v => (parseInt(v.idcodgusto) || 0) === matchedVariantId);
     const matchedVariantName = product.matched_nomgusto || (matchedVariant && matchedVariant.nomgusto) || '';
     const matchedVariantCodscan = product.matched_codscan || (matchedVariant && matchedVariant.codscan) || '';
@@ -383,7 +395,7 @@ function addItemRow(product) {
             '<span class="badge bg-secondary stock-destino" data-stock="0">—</span>' +
         '</td>' +
         '<td>' +
-            '<input class="form-control form-control-sm" type="number" name="cantidad[]" min="1" step="1" value="1" required />' +
+            '<input class="form-control form-control-sm" type="number" name="cantidad[]" min="1" step="1" value="' + cantidad + '" required />' +
         '</td>' +
         '<td class="text-end">' +
             '<button class="btn btn-sm btn-outline-danger" type="button"><i class="bi bi-trash"></i></button>' +
@@ -400,6 +412,8 @@ function addItemRow(product) {
         const matchedId = product.matched_variant_id;
         if (matchedId && matchedId > 0) {
             variantSelect.value = matchedId;
+        } else if (selectedVariantId > 0) {
+            variantSelect.value = selectedVariantId;
         } else {
             const firstVariant = Array.from(variantSelect.options).find(o => o.value > 0);
             if (firstVariant) {

@@ -290,6 +290,10 @@ final class StockController
         $producto = null;
         $variantes = [];
         $initialAjusteItems = [];
+        $grupoEditarId = 0;
+        $grupoEditarDesde = 0;
+        $grupoEditarHasta = 0;
+        $grupoEditarMotivo = '';
         if ($productoId > 0) {
             $producto = $repo->productoDetalle($productoId);
             if ($producto) {
@@ -303,6 +307,49 @@ final class StockController
                     'variants' => $variantes,
                 ];
             }
+        }
+
+        $grupoEditarId = (int)($_GET['editar_grupo'] ?? 0);
+        if ($grupoEditarId > 0) {
+            if (!$esSuperadmin) {
+                $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Solo un superadmin puede modificar grupos de ajustes existentes.'];
+                Response::redirect('/admin/stock/ajuste');
+            }
+            $grupoEditar = $repo->ajusteGrupoDetalle($grupoEditarId);
+            if (!$grupoEditar || (string)($grupoEditar['tipo'] ?? '') !== 'ajuste') {
+                $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Solo se pueden modificar grupos de ajustes manuales.'];
+                Response::redirect('/admin/stock/ajuste');
+            }
+            $initialAjusteItems = [];
+            foreach (($grupoEditar['items'] ?? []) as $item) {
+                $idprodu = (int)($item['idprodu'] ?? 0);
+                $detalle = $repo->productoDetalle($idprodu);
+                if ($idprodu <= 0 || !$detalle) continue;
+                $idcodgusto = (int)($item['idcodgusto'] ?? 0);
+                $variantesItem = $repo->variantesPorProducto($idprodu);
+                if ($idcodgusto > 0 && !array_filter($variantesItem, static fn(array $v): bool => (int)($v['idcodgusto'] ?? 0) === $idcodgusto)) {
+                    if (!empty($item['nomgusto'])) {
+                        $variantesItem[] = ['idcodgusto' => $idcodgusto, 'nomgusto' => (string)$item['nomgusto'], 'codscan' => (string)($item['codscan'] ?? '')];
+                    }
+                }
+                $initialAjusteItems[] = [
+                    'idprodu' => $idprodu,
+                    'idcodgusto' => $idcodgusto,
+                    'selected_variant_id' => $idcodgusto,
+                    'produ' => (string)($detalle['produ'] ?? $item['produ'] ?? ''),
+                    'codprodu' => (string)($detalle['codprodu'] ?? $item['codprodu'] ?? ''),
+                    'precio' => (float)($detalle['precio'] ?? 0),
+                    'stocact' => (int)($detalle['stocact'] ?? 0),
+                    'cantidad' => (int)($item['canti'] ?? 1),
+                    'variants' => $variantesItem,
+                ];
+            }
+            $grupoEditarDesde = (int)($grupoEditar['iddepod'] ?? 0);
+            $grupoEditarHasta = (int)($grupoEditar['iddepoh'] ?? 0);
+            $grupoEditarMotivo = (string)($grupoEditar['motivo'] ?? '');
+            $productoId = 0;
+            $producto = null;
+            $variantes = [];
         }
 
         // Historial: filtros de fecha y depósito + paginación.
@@ -333,6 +380,10 @@ final class StockController
             'producto' => $producto,
             'variantes' => $variantes,
             'initialAjusteItems' => $initialAjusteItems,
+            'grupoEditarId' => $grupoEditarId,
+            'grupoEditarDesde' => $grupoEditarDesde,
+            'grupoEditarHasta' => $grupoEditarHasta,
+            'grupoEditarMotivo' => $grupoEditarMotivo,
             'solicitudesPendientes' => $solicitudesPendientes,
             'misSolicitudes' => $misSolicitudes,
             'historialAjustes' => $historialAjustes,
@@ -358,6 +409,7 @@ final class StockController
         $iddepodesde = (int)($_POST['iddepodesde'] ?? 0);
         $iddepohasta = (int)($_POST['iddepohasta'] ?? 0);
         $motivo = trim((string)($_POST['motivo'] ?? ''));
+        $grupoEditarId = (int)($_POST['grupo_editar_id'] ?? 0);
 
         $idproduRaw = $_POST['idprodu'] ?? [];
         $idcodgustoRaw = $_POST['idcodgusto'] ?? [];
@@ -390,6 +442,15 @@ final class StockController
 
         try {
             $repo = new StockRepo();
+            if ($grupoEditarId > 0) {
+                if ((string)($adminUser['rol'] ?? '') !== 'superadmin') {
+                    $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Solo un superadmin puede modificar grupos de ajustes existentes.'];
+                    Response::redirect('/admin/stock/ajuste');
+                }
+                $repo->editarAjusteGrupo($grupoEditarId, $items, $iddepodesde, $iddepohasta, $motivo, (int)$adminUser['id']);
+                $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Se modificó el grupo de ajuste #' . $grupoEditarId . ' y se actualizaron los saldos de stock.'];
+                Response::redirect('/admin/stock/ajuste#historialStock');
+            }
             $requiereAuth = $repo->requiereAutorizacionAjuste($iddepodesde, $iddepohasta, (string)($adminUser['rol'] ?? ''));
 
             if ($requiereAuth) {

@@ -48,6 +48,7 @@ $qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $
         </form>
         <button class="btn btn-accent btn-sm" id="btnNotaPedido" onclick="irANotaPedido()"><i class="bi bi-file-text"></i> Nota de pedido <span id="npCount" class="badge bg-light text-dark" style="display:none"></span></button>
         <button class="btn btn-outline-secondary btn-sm" id="btnNpLimpiar" type="button" title="Limpiar cantidades acumuladas de todas las páginas"><i class="bi bi-x-lg"></i></button>
+        <a class="btn btn-outline-primary btn-sm" href="/admin/stock/ajuste#historialStock"><i class="bi bi-clock-history"></i> Movimientos por grupo</a>
         <a class="btn btn-accent btn-sm" href="/admin/stock/ajuste"><i class="bi bi-pencil-square"></i> Ajuste manual</a>
         <a class="btn btn-outline-success btn-sm" href="/admin/stock/exportar-excel?<?= htmlspecialchars($_SERVER['QUERY_STRING'] ?? '') ?>" onclick="return irStockExport(this.href)"><i class="bi bi-file-earmark-excel"></i> Excel</a>
             <a class="btn btn-outline-primary btn-sm" href="/admin/stock/imprimir?<?= htmlspecialchars($_SERVER['QUERY_STRING'] ?? '') ?>" onclick="return irStockExport(this.href)"><i class="bi bi-printer"></i> Imprimir</a>

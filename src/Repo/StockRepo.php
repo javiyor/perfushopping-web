@@ -931,6 +931,46 @@ final class StockRepo
         return self::$grupoColReady;
     }
 
+    private static ?bool $compraIdColumnReady = null;
+
+    public function ensureCompraIdColumn(): bool
+    {
+        if (self::$compraIdColumnReady !== null) {
+            return self::$compraIdColumnReady;
+        }
+        try {
+            $cols = array_column(Db::pdo()->query('SHOW COLUMNS FROM stockcab')->fetchAll(), 'Field');
+            if (!in_array('factura_compra_id', $cols, true)) {
+                Db::pdo()->exec('ALTER TABLE stockcab ADD COLUMN factura_compra_id BIGINT UNSIGNED NULL DEFAULT NULL, ADD KEY idx_stockcab_compra (factura_compra_id)');
+            }
+            $cols = array_column(Db::pdo()->query('SHOW COLUMNS FROM stockcab')->fetchAll(), 'Field');
+            self::$compraIdColumnReady = in_array('factura_compra_id', $cols, true);
+        } catch (\Throwable $e) {
+            error_log('StockRepo::ensureCompraIdColumn: ' . $e->getMessage());
+            self::$compraIdColumnReady = false;
+        }
+        return self::$compraIdColumnReady;
+    }
+
+    public function enlazarCompra(array $cabIds, int $compraId): void
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $cabIds), static fn(int $id): bool => $id > 0)));
+        if (!$ids || $compraId <= 0 || !$this->ensureCompraIdColumn()) {
+            return;
+        }
+        $in = implode(',', $ids);
+        Db::pdo()->prepare("UPDATE stockcab SET factura_compra_id = :compra WHERE idcabstock IN ({$in})")
+            ->execute([':compra' => $compraId]);
+    }
+
+    public function desenlazarCompra(int $compraId): void
+    {
+        if ($compraId > 0 && $this->ensureCompraIdColumn()) {
+            Db::pdo()->prepare('UPDATE stockcab SET factura_compra_id = NULL WHERE factura_compra_id = :compra')
+                ->execute([':compra' => $compraId]);
+        }
+    }
+
     /**
      * Registra varios productos como UN grupo de ajuste (una registración).
      * @param array<int, array{idprodu:int, idcodgusto:?int, cantidad:int}> $items
@@ -1062,11 +1102,14 @@ final class StockRepo
         $grupoExpr = $this->ensureGrupoColumn()
             ? 'COALESCE(sc.grupo_id, sc.idcabstock)'
             : 'sc.idcabstock';
+        $compraSelect = $this->ensureCompraIdColumn()
+            ? 'MAX(sc.factura_compra_id)'
+            : 'NULL';
         $st = Db::pdo()->prepare("
             SELECT {$grupoExpr} AS id,
                    GROUP_CONCAT(sc.idcabstock ORDER BY sc.idcabstock ASC) AS ids,
                    MAX(sc.fecha) AS fecha, MAX(sc.notas) AS motivo, MAX(sc.tipo_movimiento) AS tipo,
-                   MAX(sc.iddepoh) AS iddepoh, MAX(sc.iddepod) AS iddepod,
+                   MAX(sc.iddepoh) AS iddepoh, MAX(sc.iddepod) AS iddepod, {$compraSelect} AS factura_compra_id,
                    MAX(dh.nomdepo) AS depo_hasta, MAX(dd.nomdepo) AS depo_desde,
                    COUNT(sd.idprodu) AS items, COALESCE(SUM(sd.canti), 0) AS unidades
             FROM stockcab sc
@@ -1221,6 +1264,104 @@ final class StockRepo
         $cabRow['depo_desde_label'] = self::etiquetaDeposito($cabRow['depo_desde'] ?? null, (string)($cabRow['tipo'] ?? ''), 'desde');
         $cabRow['depo_hasta_label'] = self::etiquetaDeposito($cabRow['depo_hasta'] ?? null, (string)($cabRow['tipo'] ?? ''), 'hasta');
         return $cabRow;
+    }
+
+    /** Reemplaza ítems/destinos de un grupo manual, actualizando el stock en una transacción. */
+    public function editarAjusteGrupo(int $grupoId, array $items, int $desdeNuevo, int $hastaNuevo, string $motivo, int $adminUserId): void
+    {
+        if ($grupoId <= 0 || !$items) {
+            throw new \InvalidArgumentException('El grupo y al menos un producto son obligatorios.');
+        }
+        $hasGrupo = $this->ensureGrupoColumn();
+        $pdo = Db::pdo();
+        $pdo->beginTransaction();
+        try {
+            $cabWhere = $hasGrupo ? '(idcabstock = :id OR grupo_id = :grupo)' : 'idcabstock = :id';
+            $cabIdsSt = $pdo->prepare('SELECT idcabstock FROM stockcab WHERE ' . $cabWhere . ' ORDER BY idcabstock ASC FOR UPDATE');
+            $cabIdsSt->execute($hasGrupo ? [':id' => $grupoId, ':grupo' => $grupoId] : [':id' => $grupoId]);
+            $cabIds = array_map('intval', $cabIdsSt->fetchAll(\PDO::FETCH_COLUMN));
+            if (!$cabIds) {
+                throw new \RuntimeException('Grupo de movimientos no encontrado.');
+            }
+            $old = $this->ajusteGrupoDetalle($grupoId);
+            if (!$old || (string)($old['tipo'] ?? '') !== 'ajuste') {
+                throw new \RuntimeException('Solo se pueden modificar grupos de ajustes manuales. Las cargas de compra se modifican desde la factura de compra.');
+            }
+
+            $productos = [];
+            foreach ($old['items'] as $item) {
+                $idprodu = (int)($item['idprodu'] ?? 0);
+                $idgusto = (int)($item['idcodgusto'] ?? 0) ?: null;
+                $qty = (int)($item['canti'] ?? 0);
+                if ($idprodu <= 0 || $qty <= 0) continue;
+                $productos[$idprodu] = true;
+                if ((int)($old['iddepod'] ?? 0) > 0) {
+                    $this->updateStockDeposit($idprodu, $idgusto, (int)$old['iddepod'], $qty);
+                }
+                if ((int)($old['iddepoh'] ?? 0) > 0) {
+                    $this->updateStockDeposit($idprodu, $idgusto, (int)$old['iddepoh'], -$qty);
+                }
+            }
+
+            $rootId = min($cabIds);
+            $fecha = (string)($old['fecha'] ?? date('Y-m-d'));
+            $motivoNuevo = trim($motivo) ?: (string)($old['motivo'] ?? 'Ajuste de stock');
+            $notas = mb_substr('Modificación grupo #' . $grupoId . ' por admin #' . $adminUserId . ': ' . $motivoNuevo . ' (antes: ' . (string)($old['motivo'] ?? '') . ')', 0, 500);
+            $in = implode(',', array_map('intval', $cabIds));
+            $pdo->exec("DELETE FROM stockdet WHERE idstockcab IN ({$in})");
+            if (count($cabIds) > 1) {
+                $pdo->exec("DELETE FROM stockcab WHERE idcabstock IN ({$in}) AND idcabstock <> {$rootId}");
+            }
+            $setGrupoSql = $hasGrupo ? ', grupo_id = :grupo' : '';
+            $updateCab = $pdo->prepare("UPDATE stockcab SET iddepoh = :hasta, iddepod = :desde, fecha = :fecha, notas = :notas, tipo_movimiento = 'ajuste'{$setGrupoSql} WHERE idcabstock = :id LIMIT 1");
+            $updateParams = [
+                ':hasta' => $hastaNuevo > 0 ? $hastaNuevo : null,
+                ':desde' => $desdeNuevo > 0 ? $desdeNuevo : null,
+                ':fecha' => $fecha,
+                ':notas' => $notas,
+                ':id' => $rootId,
+            ];
+            if ($hasGrupo) $updateParams[':grupo'] = $rootId;
+            $updateCab
+                ->execute($updateParams);
+
+            $insert = $pdo->prepare('INSERT INTO stockdet (idstockcab, idprodu, idcodgusto, canti) VALUES (:cab, :prod, :gusto, :qty)');
+            foreach ($items as $item) {
+                $idprodu = (int)($item['idprodu'] ?? 0);
+                $idgusto = (int)($item['idcodgusto'] ?? 0) ?: null;
+                $qty = (int)($item['cantidad'] ?? 0);
+                if ($idprodu <= 0 || $qty <= 0) continue;
+                $productos[$idprodu] = true;
+                $insert->execute([':cab' => $rootId, ':prod' => $idprodu, ':gusto' => $idgusto, ':qty' => $qty]);
+                if ($desdeNuevo > 0) {
+                    $this->updateStockDeposit($idprodu, $idgusto, $desdeNuevo, -$qty);
+                }
+                if ($hastaNuevo > 0) {
+                    $this->updateStockDeposit($idprodu, $idgusto, $hastaNuevo, $qty);
+                }
+            }
+
+            foreach (array_keys($productos) as $idprodu) {
+                $st = $pdo->prepare('SELECT COALESCE(SUM(stock),0) FROM stock WHERE idprodu = :p');
+                $st->execute([':p' => $idprodu]);
+                $pdo->prepare('UPDATE producto SET stocact = :s WHERE idprodu = :p LIMIT 1')
+                    ->execute([':s' => (int)$st->fetchColumn(), ':p' => $idprodu]);
+                $gustoIds = $pdo->prepare('SELECT DISTINCT idcodgusto FROM stock WHERE idprodu = :p AND idcodgusto IS NOT NULL');
+                $gustoIds->execute([':p' => $idprodu]);
+                foreach ($gustoIds->fetchAll(\PDO::FETCH_COLUMN) as $gustoId) {
+                    $stockGusto = $pdo->prepare('SELECT COALESCE(SUM(stock),0) FROM stock WHERE idcodgusto = :g');
+                    $stockGusto->execute([':g' => (int)$gustoId]);
+                    $pdo->prepare('UPDATE gustos SET stockact = :s WHERE idcodgusto = :g LIMIT 1')
+                        ->execute([':s' => (int)$stockGusto->fetchColumn(), ':g' => (int)$gustoId]);
+                }
+            }
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
     }
 
     /**
