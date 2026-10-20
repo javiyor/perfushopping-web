@@ -480,6 +480,29 @@ final class CompraController
         $repo = new StockRepo();
 
         try {
+            $scanned = $repo->productoPorCodscan($q);
+            if ($scanned) {
+                Response::json([[
+                    'idprodu' => (int)$scanned['idprodu'],
+                    'codprodu' => (string)($scanned['codprodu'] ?? ''),
+                    'codprodup' => (string)($scanned['codprodup'] ?? ''),
+                    'produ' => (string)($scanned['produ'] ?? ''),
+                    'precomp' => (float)($scanned['precomp'] ?? 0),
+                    'precio' => (float)($scanned['precio'] ?? 0),
+                    'matched_variant' => [
+                        'idcodgusto' => (int)$scanned['matched_variant_id'],
+                        'nomgusto' => (string)($scanned['matched_nomgusto'] ?? ''),
+                        'codscan' => trim((string)($scanned['matched_codscan'] ?? $q)),
+                    ],
+                    'variants' => $scanned['variants'] ?? [],
+                ]]);
+                return;
+            }
+        } catch (\Throwable $e) {
+            error_log('CompraController::searchProducts codscan exact error: ' . $e->getMessage());
+        }
+
+        try {
             $prod = $repo->searchProducts($q, $limit);
         } catch (\Throwable $e) {
             error_log('CompraController::searchProducts error: ' . $e->getMessage());
@@ -524,6 +547,11 @@ final class CompraController
     private function formData(array $adminUser, array $compra, array $items): array
     {
         $repo = new CompraRepo();
+        $stockRepo = new StockRepo();
+        foreach ($items as $i => $item) {
+            $idprodu = (int)($item['idprodu'] ?? 0);
+            $items[$i]['variants'] = $idprodu > 0 ? $stockRepo->variantesPorProducto($idprodu) : [];
+        }
         // El formulario muestra la razón real aunque la factura se haya guardado vacía.
         $compra['razon_proveedor'] = trim((string)($compra['razon_proveedor'] ?? ''))
             ?: trim((string)($compra['proveedor_razon'] ?? ''));

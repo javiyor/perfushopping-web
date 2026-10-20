@@ -67,13 +67,13 @@ $idcta1Sel = (int)($compra['idcta1'] ?? 0);
                     <table class="table table-sm mb-0" id="itemsTable">
                         <thead>
                             <tr>
-                                <th style="min-width:150px">Producto</th>
-                                <th>Variedad</th>
-                                <th style="width:70px">Cant.</th>
-                                <th style="width:110px">Costo unit.</th>
-                                <th style="width:80px">Bonif %</th>
-                                <th style="width:100px">Subtotal</th>
-                                <th style="width:36px"></th>
+                                <th style="min-width:240px">Producto</th>
+                                <th style="min-width:130px">Variedad</th>
+                                <th style="width:54px">Cant.</th>
+                                <th style="width:82px">Costo unit.</th>
+                                <th style="width:58px">Bonif %</th>
+                                <th style="width:85px">Subtotal</th>
+                                <th style="width:28px"></th>
                             </tr>
                         </thead>
                         <tbody id="itemsBody"></tbody>
@@ -305,9 +305,24 @@ $idcta1Sel = (int)($compra['idcta1'] ?? 0);
 
 <style>
 .prod-suggestions { position:absolute; z-index:1050; width:100%; }
-.suggestion-item { padding:6px 10px; cursor:pointer; font-size:13px; border-bottom:1px solid #eee; background:#fff; }
+.suggestion-item { padding:4px 8px; cursor:pointer; font-size:12px; line-height:1.15; border-bottom:1px solid #eee; background:#fff; }
 .suggestion-item:hover { background:#f0f0f0; }
 .suggestion-item:last-child { border-radius:0 0 6px 6px; }
+#itemsTable { font-size:.72rem; }
+#itemsTable th, #itemsTable td { padding:.14rem .25rem!important; line-height:1.12; vertical-align:middle; }
+#itemsTable th:nth-child(1) { min-width:240px; width:34%; }
+#itemsTable th:nth-child(2) { min-width:135px; width:18%; }
+#itemsTable th:nth-child(3) { width:54px; }
+#itemsTable th:nth-child(4) { width:94px; }
+#itemsTable th:nth-child(5) { width:62px; }
+#itemsTable th:nth-child(6) { width:88px; }
+#itemsTable th:nth-child(7) { width:30px; }
+#itemsTable .form-control, #itemsTable .form-select { min-height:1.55rem; padding:.1rem .25rem; font-size:.72rem; line-height:1.1; }
+#itemsTable .input-group-text { padding:.1rem .25rem; font-size:.7rem; }
+#itemsTable .btn-sm { padding:.08rem .22rem; font-size:.7rem; line-height:1.1; }
+#itemsTable .prod-input { min-width:220px; }
+#itemsTable .variedad-select { min-width:128px; }
+#itemsTable .line-total { white-space:nowrap; padding-top:.12rem!important; }
 </style>
 
 <script>
@@ -377,7 +392,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 unit_cost: <?= (float)($it['unit_cost'] ?? 0) ?>,
                 precomp: <?= (float)($it['unit_cost'] ?? 0) ?>,
                 bonif_pct: <?= (float)($it['bonif_pct'] ?? 0) ?>,
-                variants: []
+                variants: <?= json_encode($it['variants'] ?? [], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?>
             });
         <?php endforeach; ?>
     <?php else: ?>
@@ -398,14 +413,15 @@ function addRow(data) {
     const bonif = data ? (data.bonif_pct || 0) : 0;
     row.innerHTML = `
         <td>
-            <input class="form-control form-control-sm prod-input" name="item_name[]" placeholder="Buscar producto por nombre, código o ID..." autocomplete="off" value="${esc(name)}" />
+            <input class="form-control form-control-sm prod-input" name="item_name[]" placeholder="Buscar producto por nombre, código o ID..." autocomplete="off" value="${esc(name)}" title="${esc(name)}" />
             <input type="hidden" name="item_idprodu[]" class="idprodu" value="${data ? data.idprodu || '' : ''}" />
             <div class="prod-suggestions"></div>
         </td>
         <td>
-            <select class="form-select form-select-sm variedad-select" name="item_idcodgusto[]">
+            <select class="form-select form-select-sm variedad-select">
                 <option value="">—</option>
             </select>
+            <input type="hidden" class="idcodgusto" name="item_idcodgusto[]" value="" />
         </td>
         <td><input class="form-control form-control-sm qty-input" name="item_qty[]" type="number" value="${qty}" min="0" step="1" /></td>
         <td>
@@ -425,10 +441,34 @@ function addRow(data) {
     `;
     tbody.appendChild(row);
     setupRow(row);
+    const vs = row.querySelector('.variedad-select');
+    const variedadHidden = row.querySelector('.idcodgusto');
+    if (data && Array.isArray(data.variants) && data.variants.length) {
+        const options = ['<option value="">—</option>'];
+        data.variants.forEach(function(v) {
+            const id = parseInt(v.idcodgusto) || 0;
+            const label = (v.nomgusto || '') + (v.codscan ? ' (' + v.codscan + ')' : '');
+            options.push('<option value="' + id + '" data-gusto="' + id + '" data-idprodu="' + (data.idprodu || '') + '">' + esc(label) + '</option>');
+        });
+        vs.innerHTML = options.join('');
+    }
     if (data && data.idcodgusto && nomgusto) {
-        const vs = row.querySelector('.variedad-select');
-        vs.innerHTML = '<option value="">—</option><option value="' + data.idcodgusto + '" selected>' + esc(nomgusto) + '</option>';
+        if (!Array.from(vs.options).some(function(opt) { return String(opt.value) === String(data.idcodgusto); })) {
+            const opt = document.createElement('option');
+            opt.value = String(data.idcodgusto);
+            opt.dataset.gusto = String(data.idcodgusto);
+            opt.dataset.idprodu = String(data.idprodu || '');
+            opt.textContent = nomgusto;
+            vs.appendChild(opt);
+        }
+        vs.value = String(data.idcodgusto);
+    }
+    if (variedadHidden && data && data.idcodgusto) variedadHidden.value = String(data.idcodgusto);
+    if (data && data.lockVariety && data.idcodgusto && nomgusto) {
+        vs.innerHTML = '<option value="' + data.idcodgusto + '" data-gusto="' + data.idcodgusto + '" data-idprodu="' + (data.idprodu || '') + '" selected>' + esc(nomgusto) + '</option>';
+        vs.dataset.locked = '1';
         vs.disabled = true;
+        if (variedadHidden) variedadHidden.value = String(data.idcodgusto);
     }
     rowCounter++;
     recalcular();
@@ -439,6 +479,7 @@ function setupRow(row) {
     const suggestions = row.querySelector('.prod-suggestions');
     const idprodu = row.querySelector('.idprodu');
     const variedadSelect = row.querySelector('.variedad-select');
+    const variedadHidden = row.querySelector('.idcodgusto');
     const qtyInput = row.querySelector('.qty-input');
     const costInput = row.querySelector('.cost-input');
     const bonifInput = row.querySelector('.bonif-input');
@@ -465,8 +506,10 @@ function setupRow(row) {
     });
 
     variedadSelect.addEventListener('change', function() {
+        if (variedadSelect.dataset.locked === '1') return;
         const opt = this.selectedOptions[0];
         idprodu.value = opt && opt.dataset.idprodu ? opt.dataset.idprodu : idprodu.value;
+        if (variedadHidden) variedadHidden.value = opt && opt.dataset.gusto ? opt.dataset.gusto : '';
         variedadSelect.disabled = !(opt && opt.dataset.gusto);
     });
 
@@ -484,7 +527,7 @@ function searchProducts(q, container, row) {
                 container.innerHTML = '<div class="suggestion-item text-muted">Sin resultados</div>';
                 return;
             }
-            if (data.length === 1 && data[0].matched_variant && String(data[0].matched_variant.codscan || '') === q) {
+            if (data.length === 1 && data[0].matched_variant && String(data[0].matched_variant.codscan || '').trim() === q.trim()) {
                 selectProduct(data[0], row, container);
                 return;
             }
@@ -511,15 +554,20 @@ function searchProducts(q, container, row) {
 }
 
 function selectProduct(p, row, container) {
-    row.querySelector('.prod-input').value = p.produ || '';
+    const productInput = row.querySelector('.prod-input');
+    productInput.value = p.produ || '';
+    productInput.title = p.produ || '';
     row.querySelector('.idprodu').value = p.idprodu || '';
     container.innerHTML = '';
     row.querySelector('.cost-input').value = p.precomp || 0;
     recalcular();
 
     const vs = row.querySelector('.variedad-select');
+    const hidden = row.querySelector('.idcodgusto');
     vs.innerHTML = '<option value="">—</option>';
     vs.disabled = false;
+    delete vs.dataset.locked;
+    if (hidden) hidden.value = '';
     row.querySelector('.idprodu').value = p.idprodu || '';
     if (p.variants && p.variants.length > 0) {
         let selectedIdx = -1;
@@ -534,8 +582,36 @@ function selectProduct(p, row, container) {
                 selectedIdx = i + 1;
             }
         });
+        if (p.matched_variant && selectedIdx < 0) {
+            const opt = document.createElement('option');
+            opt.value = p.matched_variant.idcodgusto || '';
+            opt.dataset.gusto = p.matched_variant.idcodgusto || '';
+            opt.dataset.idprodu = p.idprodu || '';
+            opt.textContent = (p.matched_variant.nomgusto || '') + (p.matched_variant.codscan ? ' (' + p.matched_variant.codscan + ')' : '');
+            vs.appendChild(opt);
+            selectedIdx = vs.options.length - 1;
+        }
         vs.selectedIndex = selectedIdx > 0 ? selectedIdx : 1;
+        if (hidden) hidden.value = vs.value || '';
+        if (p.matched_variant && p.matched_variant.idcodgusto) {
+            // Una coincidencia exacta de codscan fija esa variedad en esta línea.
+            vs.value = String(p.matched_variant.idcodgusto);
+            vs.disabled = true;
+            vs.dataset.locked = '1';
+            if (hidden) hidden.value = vs.value;
+        }
         vs.dispatchEvent(new Event('change'));
+    } else if (p.matched_variant && p.matched_variant.idcodgusto) {
+        const opt = document.createElement('option');
+        opt.value = p.matched_variant.idcodgusto;
+        opt.dataset.gusto = p.matched_variant.idcodgusto;
+        opt.dataset.idprodu = p.idprodu || '';
+        opt.textContent = (p.matched_variant.nomgusto || '') + (p.matched_variant.codscan ? ' (' + p.matched_variant.codscan + ')' : '');
+        vs.appendChild(opt);
+        vs.selectedIndex = 1;
+        vs.disabled = true;
+        vs.dataset.locked = '1';
+        if (hidden) hidden.value = vs.value;
     }
 }
 
