@@ -36,11 +36,17 @@ final class CustomerController
         $pagesPres = max(1, (int)ceil($totalPres / $perPage));
         $pagePres = min($page, $pagesPres);
         $presenciales = $repo->searchPresenciales($q, $perPage, ($pagePres - 1) * $perPage);
+        $erpIds = array_merge(
+            array_column($list, 'cliente_id'),
+            array_column($presenciales, 'idclien')
+        );
+        $ctaCteHabilitaciones = (new \Perfushopping\Web\Repo\CtaCteClienteRepo())->mapaHabilitaciones($erpIds);
 
         echo View::adminPage('admin/clientes/list.php', [
             'adminUser' => $adminUser,
             'list' => $list,
             'presenciales' => $presenciales,
+            'ctaCteHabilitaciones' => $ctaCteHabilitaciones,
             'q' => $q,
             'page' => $page,
             'pages' => $pages,
@@ -122,6 +128,48 @@ final class CustomerController
         (new CustomerRepo())->addNota($userId, (int)$adminUser['id'], $texto);
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Nota agregada.'];
         Response::redirect('/admin/clientes/' . $userId);
+    }
+
+    public function habilitarCuentaCorriente(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $auth->requirePermiso('clientes');
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $idclien = (int)($_POST['idclien'] ?? 0);
+        $habilitado = (int)($_POST['habilitado'] ?? 0) === 1;
+        $q = trim((string)($_POST['q'] ?? ''));
+        $back = '/admin/clientes' . ($q !== '' ? '?q=' . rawurlencode($q) : '');
+        $motivo = trim((string)($_POST['motivo'] ?? ''));
+        if ($idclien <= 0 || $motivo === '') {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Seleccioná un cliente y registrá el motivo de la autorización.'];
+            Response::redirect($back);
+        }
+
+        $repo = new CustomerRepo();
+        if (!$repo->clienteErp($idclien)) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Cliente ERP no encontrado.'];
+            Response::redirect($back);
+        }
+        $autoriza = $auth->verificarCredenciales(
+            (string)($_POST['auth_user'] ?? ''),
+            (string)($_POST['auth_pass'] ?? '')
+        );
+        if (!$autoriza || !AdminAuthService::adminPuedeAutorizar($autoriza)) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Autorización rechazada: se requieren credenciales de un admin autorizado.'];
+            Response::redirect($back);
+        }
+
+        (new \Perfushopping\Web\Repo\CtaCteClienteRepo())->actualizar(
+            $idclien,
+            $habilitado,
+            (int)$autoriza['id'],
+            (string)($autoriza['nombre'] ?? $autoriza['username'] ?? 'admin'),
+            $motivo
+        );
+        $estado = $habilitado ? 'habilitada' : 'deshabilitada';
+        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Cuenta corriente ' . $estado . ' para el cliente. Autorizado por ' . (string)($autoriza['nombre'] ?? $autoriza['username'] ?? 'admin') . '.'];
+        Response::redirect($back);
     }
 
     public function editar(array $params): void

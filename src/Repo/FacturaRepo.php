@@ -303,6 +303,13 @@ final class FacturaRepo
         }
     }
 
+    public function tienePagoCuentaCorriente(int $facturaId): bool
+    {
+        $st = Db::pdo()->prepare("SELECT COUNT(*) FROM factura_pagos WHERE factura_id = :f AND forma_pago = 'cuenta_corriente'");
+        $st->execute([':f' => $facturaId]);
+        return (int)$st->fetchColumn() > 0;
+    }
+
     public function countActivas(): int
     {
         $st = Db::pdo()->query("SELECT COUNT(*) FROM facturas WHERE estado <> 'anulada'");

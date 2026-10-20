@@ -369,6 +369,7 @@ $router->post('/admin/departamentos/delete', [AdminDepartamentoController::class
 $router->get('/admin/clientes', [AdminCustomerController::class, 'index']);
 $router->get('/admin/clientes/(?P<id>\d+)', [AdminCustomerController::class, 'detail']);
 $router->post('/admin/clientes/nota', [AdminCustomerController::class, 'addNota']);
+$router->post('/admin/clientes/ctacte/habilitar', [AdminCustomerController::class, 'habilitarCuentaCorriente']);
 $router->post('/admin/clientes/editar', [AdminCustomerController::class, 'editar']);
 $router->post('/admin/clientes/eliminar', [AdminCustomerController::class, 'eliminar']);
 $router->get('/admin/clientes/buscar-arca', [AdminCustomerController::class, 'buscarArca']);
@@ -402,6 +403,7 @@ $router->get('/admin/facturas/comprobantes', [AdminFacturaController::class, 'in
 $router->get('/admin/facturas/diagnostico-stock', [AdminFacturaController::class, 'diagnosticoStock']);
 $router->get('/admin/facturas/nueva', [AdminFacturaController::class, 'pos']);
 $router->post('/admin/facturas/guardar', [AdminFacturaController::class, 'store']);
+$router->get('/admin/facturas/cuenta-corriente-habilitada', [AdminFacturaController::class, 'cuentaCorrienteHabilitada']);
 $router->get('/admin/facturas/pagos', [AdminFacturaController::class, 'pagos']);
 $router->get('/admin/facturas/pagos/editar/(?P<id>\d+)', [AdminFacturaController::class, 'editarPagos']);
 $router->post('/admin/facturas/pagos/actualizar', [AdminFacturaController::class, 'actualizarPagos']);
@@ -439,6 +441,7 @@ $router->get('/admin/recibos/buscar-clientes', [AdminReciboController::class, 's
 $router->get('/admin/recibos/buscar-facturas', [AdminReciboController::class, 'searchFacturas']);
 $router->get('/admin/recibos/imprimir/(?P<id>\d+)', [AdminReciboController::class, 'print']);
 $router->get('/admin/ctacte', [AdminCtaCteController::class, 'index']);
+$router->post('/admin/ctacte/erp/pagar', [AdminCtaCteController::class, 'pagarErp']);
 $router->get('/admin/ctacte/erp/(?P<id>\d+)', [AdminCtaCteController::class, 'showErp']);
 $router->get('/admin/ctacte/(?P<id>\d+)', [AdminCtaCteController::class, 'show']);
 $router->get('/admin/ctacte/ajuste/(?P<id>\d+)', [AdminCtaCteController::class, 'ajuste']);

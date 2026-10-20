@@ -92,7 +92,10 @@ final class ReciboRepo
     public function create(array $data, array $pagos): int
     {
         $pdo = Db::pdo();
-        $pdo->beginTransaction();
+        $ownsTransaction = !$pdo->inTransaction();
+        if ($ownsTransaction) {
+            $pdo->beginTransaction();
+        }
         try {
             $st = $pdo->prepare('
                 INSERT INTO recibos (codigo, tipo_comprobante, cliente_id, idclien, cliente_nombre, cliente_cuit, cliente_direc, cliente_condicion_iva, fecha, monto_cents, forma_pago, concepto, estado, notas, created_by, created_at, updated_at)
@@ -128,10 +131,14 @@ final class ReciboRepo
                 ]);
             }
 
-            $pdo->commit();
+            if ($ownsTransaction) {
+                $pdo->commit();
+            }
             return $id;
         } catch (\Throwable $e) {
-            $pdo->rollBack();
+            if ($ownsTransaction && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             throw $e;
         }
     }
@@ -196,6 +203,40 @@ final class ReciboRepo
             return $st->fetchAll();
         } catch (\Throwable $e) {
             error_log('ReciboRepo::findFacturasPendientes error: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function findFacturasPendientesErp(int $idclien): array
+    {
+        if ($idclien <= 0) {
+            return [];
+        }
+        try {
+            $st = Db::pdo()->prepare("
+                SELECT f.id, f.codigo, f.tipo_comprobante, f.total_cents, f.fecha,
+                       COALESCE(NULLIF((SELECT SUM(fp.monto_cents) FROM factura_pagos fp WHERE fp.factura_id = f.id AND fp.forma_pago = 'cuenta_corriente'), 0), f.total_cents) AS total_ctacte_cents,
+                       COALESCE((SELECT SUM(rp.monto_cents)
+                                 FROM recibo_pagos rp
+                                 INNER JOIN recibos r ON r.id = rp.recibo_id AND r.estado = 'emitido'
+                                 WHERE rp.factura_id = f.id), 0) AS pagado_cents,
+                       COALESCE(NULLIF((SELECT SUM(fp.monto_cents) FROM factura_pagos fp WHERE fp.factura_id = f.id AND fp.forma_pago = 'cuenta_corriente'), 0), f.total_cents)
+                         - COALESCE((SELECT SUM(rp.monto_cents)
+                                     FROM recibo_pagos rp
+                                     INNER JOIN recibos r ON r.id = rp.recibo_id AND r.estado = 'emitido'
+                                     WHERE rp.factura_id = f.id), 0) AS pendiente_cents
+                FROM facturas f
+                WHERE f.idclien = :c
+                  AND f.estado = 'emitida'
+                  AND (f.forma_pago = 'cuenta_corriente' OR EXISTS (SELECT 1 FROM factura_pagos fp WHERE fp.factura_id = f.id AND fp.forma_pago = 'cuenta_corriente'))
+                  AND f.tipo_comprobante IN ('FACT-A','FACT-B','FACT-C','ND')
+                HAVING pendiente_cents > 0
+                ORDER BY f.fecha ASC, f.id ASC
+            ");
+            $st->execute([':c' => $idclien]);
+            return $st->fetchAll();
+        } catch (\Throwable $e) {
+            error_log('ReciboRepo::findFacturasPendientesErp error: ' . $e->getMessage());
             return [];
         }
     }

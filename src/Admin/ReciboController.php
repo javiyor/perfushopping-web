@@ -242,7 +242,7 @@ final class ReciboController
         $repo->updateEstado($id, $estado);
 
         // Reverse ctacte credits if recibo is anulated
-        if ($estado === 'anulado' && $oldEstado !== 'anulado' && $r['cliente_id']) {
+        if ($estado === 'anulado' && $oldEstado !== 'anulado' && (!empty($r['cliente_id']) || !empty($r['idclien']))) {
             $pagos = $repo->pagos($id);
             $ctaCte = new \Perfushopping\Web\Repo\CtaCteRepo();
             foreach ($pagos as $pg) {
@@ -250,7 +250,7 @@ final class ReciboController
                     'debito',
                     'recibo',
                     $id,
-                    (int)$r['cliente_id'],
+                    (int)($r['cliente_id'] ?? 0) ?: null,
                     (int)($r['idclien'] ?? 0) ?: null,
                     (int)($pg['monto_cents'] ?? 0),
                     'Anulación Recibo ' . ($r['codigo'] ?? ''),

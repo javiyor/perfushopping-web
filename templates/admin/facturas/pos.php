@@ -408,6 +408,7 @@ $pedidoDescPct = $pedidoDescPct ?? 0;
             </div>
             <div class="card-body">
                 <div id="pagosContainer"></div>
+                <div id="ctaCtePermisoHint" class="small text-muted mt-2">La cuenta corriente solo está disponible para clientes habilitados por un admin.</div>
                 <div class="d-flex justify-content-between align-items-center small mt-2 pt-2 border-top">
                     <span class="text-muted">Pagado:</span>
                     <strong id="pagosTotal">$0,00</strong>
@@ -438,6 +439,8 @@ $pedidoDescPct = $pedidoDescPct ?? 0;
 <script>
 // ── State ──
 let cart = [];
+let ctaCteHabilitada = false;
+let ctaCteCheckSequence = 0;
 // Mientras la factura está abierta (POS), el layout NO recarga la página
 // al actualizar el service worker: espera la acción del usuario.
 window.__facturaEnProceso = function() { return true; };
@@ -875,6 +878,59 @@ function condIvaTexto(cond) {
     return mapa[cond] || '';
 }
 
+function cuentaCorrientePermitida() {
+    const pagosOriginales = Array.isArray(EDITAR_PAGOS) ? EDITAR_PAGOS : [];
+    const facturaYaUsabaCtaCte = pagosOriginales.some(p => p.forma_pago === 'cuenta_corriente');
+    return ctaCteHabilitada || (EDITAR_ID > 0 && facturaYaUsabaCtaCte);
+}
+
+function actualizarOpcionesCuentaCorriente() {
+    const permitida = cuentaCorrientePermitida();
+    document.querySelectorAll('#pagosContainer .fp-forma').forEach(function(sel) {
+        Array.from(sel.options).forEach(function(opt) {
+            if (opt.value === 'cuenta_corriente') {
+                opt.disabled = !permitida;
+                if (!permitida && sel.value === 'cuenta_corriente') {
+                    sel.value = 'efectivo';
+                    onPagoFormaChange(sel);
+                }
+            }
+        });
+    });
+    const hint = document.getElementById('ctaCtePermisoHint');
+    if (hint) {
+        hint.textContent = permitida
+            ? 'Cuenta corriente habilitada para este cliente.'
+            : 'La cuenta corriente solo está disponible para clientes habilitados por un admin.';
+        hint.className = 'small mt-2 ' + (permitida ? 'text-success' : 'text-muted');
+    }
+}
+
+function consultarHabilitacionCuentaCorriente(idclien) {
+    const seq = ++ctaCteCheckSequence;
+    ctaCteHabilitada = false;
+    actualizarOpcionesCuentaCorriente();
+    idclien = parseInt(idclien) || 0;
+    if (idclien <= 0) return;
+    const hint = document.getElementById('ctaCtePermisoHint');
+    if (hint) {
+        hint.textContent = 'Verificando habilitación de cuenta corriente…';
+        hint.className = 'small mt-2 text-muted';
+    }
+    fetch('/admin/facturas/cuenta-corriente-habilitada?idclien=' + encodeURIComponent(idclien))
+        .then(r => r.json())
+        .then(data => {
+            if (seq !== ctaCteCheckSequence) return;
+            ctaCteHabilitada = !!(data && data.habilitada);
+            actualizarOpcionesCuentaCorriente();
+        })
+        .catch(() => {
+            if (seq !== ctaCteCheckSequence) return;
+            ctaCteHabilitada = false;
+            actualizarOpcionesCuentaCorriente();
+        });
+}
+
 function selectCliente(c) {
     document.getElementById('clienteId').value = c.id || 0;
     document.getElementById('clienteErpId').value = c.idclien || 0;
@@ -912,6 +968,7 @@ function selectCliente(c) {
     renderCart();
 
     loadPuntosSaldo(c.idclien || 0);
+    consultarHabilitacionCuentaCorriente(c.idclien || 0);
 }
 
 let puntosSaldoCliente = 0;
@@ -965,6 +1022,7 @@ function clearCliente() {
     cliInput.value = '';
     cliSuggestions.innerHTML = '';
     loadPuntosSaldo(0);
+    consultarHabilitacionCuentaCorriente(0);
     renderCart();
 }
 
@@ -1547,7 +1605,10 @@ function addPagoLine(forma) {
         <div class="row g-1 align-items-center">
             <div class="col-7">
                 <select class="form-select form-select-sm fp-forma" onchange="onPagoFormaChange(this)">
-                    ${FORMAS_PAGO.map(f => `<option value="${f[0]}"${forma == f[0] ? ' selected' : ''}>${f[1]}</option>`).join('')}
+                    ${FORMAS_PAGO.map(f => {
+                        const deshabilitada = f[0] === 'cuenta_corriente' && !cuentaCorrientePermitida();
+                        return `<option value="${f[0]}"${forma == f[0] ? ' selected' : ''}${deshabilitada ? ' disabled' : ''}>${f[1]}${deshabilitada ? ' (no habilitada)' : ''}</option>`;
+                    }).join('')}
                 </select>
             </div>
             <div class="col-4">

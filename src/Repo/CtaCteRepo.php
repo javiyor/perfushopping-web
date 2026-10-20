@@ -80,10 +80,11 @@ final class CtaCteRepo
 
     public function ultimoSaldo(int $clienteId): int
     {
-        $st = Db::pdo()->prepare('
+        $pdo = Db::pdo();
+        $lock = $pdo->inTransaction() ? ' FOR UPDATE' : '';
+        $st = $pdo->prepare('
             SELECT saldo_after_cents FROM ctacte_movimientos
-            WHERE cliente_id = :c ORDER BY id DESC LIMIT 1
-        ');
+            WHERE cliente_id = :c ORDER BY id DESC LIMIT 1' . $lock);
         $st->execute([':c' => $clienteId]);
         $val = $st->fetchColumn();
         return $val !== false ? (int)$val : 0;
@@ -91,7 +92,9 @@ final class CtaCteRepo
 
     public function ultimoSaldoErp(int $idclien): int
     {
-        $st = Db::pdo()->prepare('SELECT saldo_after_cents FROM ctacte_movimientos WHERE cliente_id IS NULL AND idclien = :c ORDER BY id DESC LIMIT 1');
+        $pdo = Db::pdo();
+        $lock = $pdo->inTransaction() ? ' FOR UPDATE' : '';
+        $st = $pdo->prepare('SELECT saldo_after_cents FROM ctacte_movimientos WHERE cliente_id IS NULL AND idclien = :c ORDER BY id DESC LIMIT 1' . $lock);
         $st->execute([':c' => $idclien]);
         $val = $st->fetchColumn();
         return $val !== false ? (int)$val : 0;
@@ -208,5 +211,61 @@ final class CtaCteRepo
         $st = Db::pdo()->prepare('SELECT m.*, a.nombre AS created_by_nombre FROM ctacte_movimientos m LEFT JOIN admin_users a ON a.id = m.created_by WHERE m.cliente_id IS NULL AND m.idclien = :c ORDER BY m.id DESC LIMIT ' . $limit);
         $st->execute([':c' => $idclien]);
         return $st->fetchAll();
+    }
+
+    /** Backfill idempotente de facturas emitidas a cuenta corriente del cliente ERP. */
+    public function sincronizarFacturasErp(int $idclien, int $adminId): int
+    {
+        if ($idclien <= 0) {
+            return 0;
+        }
+        $pdo = Db::pdo();
+        $pdo->beginTransaction();
+        try {
+            $st = $pdo->prepare("SELECT f.id, f.codigo, f.tipo_comprobante, f.total_cents
+                FROM facturas f
+                WHERE f.idclien = :c AND f.estado = 'emitida'
+                  AND (f.forma_pago = 'cuenta_corriente'
+                       OR EXISTS (SELECT 1 FROM factura_pagos fp WHERE fp.factura_id = f.id AND fp.forma_pago = 'cuenta_corriente'))
+                ORDER BY f.id ASC FOR UPDATE");
+            $st->execute([':c' => $idclien]);
+            $facturas = $st->fetchAll();
+            $montoCta = $pdo->prepare("SELECT COALESCE(SUM(monto_cents), 0) FROM factura_pagos WHERE factura_id = :f AND forma_pago = 'cuenta_corriente'");
+            $existeMov = $pdo->prepare("SELECT COUNT(*) FROM ctacte_movimientos WHERE origen = 'factura' AND origen_id = :f");
+            $insertadas = 0;
+            foreach ($facturas as $factura) {
+                $facturaId = (int)$factura['id'];
+                $existeMov->execute([':f' => $facturaId]);
+                if ((int)$existeMov->fetchColumn() > 0) {
+                    continue;
+                }
+                $montoCta->execute([':f' => $facturaId]);
+                $monto = (int)$montoCta->fetchColumn();
+                if ($monto <= 0) {
+                    $monto = (int)($factura['total_cents'] ?? 0);
+                }
+                if ($monto <= 0) {
+                    continue;
+                }
+                $this->agregarMovimiento(
+                    (string)($factura['tipo_comprobante'] ?? '') === 'NC' ? 'credito' : 'debito',
+                    'factura',
+                    $facturaId,
+                    null,
+                    $idclien,
+                    $monto,
+                    ((string)($factura['tipo_comprobante'] ?? '') === 'NC' ? 'NC ' : 'Factura ') . (string)($factura['codigo'] ?? '') . ' — cuenta corriente',
+                    $adminId
+                );
+                $insertadas++;
+            }
+            $pdo->commit();
+            return $insertadas;
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
     }
 }

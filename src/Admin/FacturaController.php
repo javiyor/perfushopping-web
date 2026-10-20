@@ -164,6 +164,16 @@ final class FacturaController
         ]);
     }
 
+    public function cuentaCorrienteHabilitada(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $auth->requirePermiso('facturacion');
+        $idclien = (int)($_GET['idclien'] ?? 0);
+        Response::json([
+            'habilitada' => $idclien > 0 && (new \Perfushopping\Web\Repo\CtaCteClienteRepo())->habilitado($idclien),
+        ]);
+    }
+
     /** Datos comunes del POS (también usado al editar comprobantes). */
     private function posCommon(AdminAuthService $auth): array
     {
@@ -421,6 +431,12 @@ final class FacturaController
         $pagos = $this->absorberVuelto($pagos, $totalFacturado);
         $formaPago = $pagos[0]['forma_pago'] ?? 'efectivo';
 
+        if ($this->montoCuentaCorriente($pagos) > 0
+            && (!$clienteErpId || !(new \Perfushopping\Web\Repo\CtaCteClienteRepo())->habilitado((int)$clienteErpId))) {
+            Response::json(['ok' => false, 'error' => 'Este cliente no tiene habilitada la cuenta corriente. Un admin autorizado debe habilitarla desde Clientes antes de facturar a cuenta corriente.'], 422);
+            return;
+        }
+
         $errorArca = ArcaValidacionService::validarFactura([
             'tipo_comprobante' => $tipo,
             'cliente_nombre' => $clienteNombre,
@@ -541,8 +557,9 @@ final class FacturaController
             );
         } catch (\Throwable $e) { error_log('PrintJob encolar: '.$e->getMessage()); }
 
-        // Auto-post to current account if forma_pago = cuenta_corriente
-        if (($clienteId || $clienteErpId) && $formaPago === 'cuenta_corriente') {
+        // Cargar en la cuenta corriente solo el importe asignado a ese medio de pago.
+        $montoCuentaCorriente = $this->montoCuentaCorriente($pagos);
+        if ($montoCuentaCorriente > 0 && ($clienteId || $clienteErpId)) {
             $ctaCte = new \Perfushopping\Web\Repo\CtaCteRepo();
             // Una NC en cuenta corriente acredita (descuenta deuda); facturas y ND debitan.
             $ctaCte->agregarMovimiento(
@@ -551,7 +568,7 @@ final class FacturaController
                 $id,
                 $clienteId,
                 $clienteErpId,
-                $totalFacturado,
+                $montoCuentaCorriente,
                 ($tipo === 'NC' ? 'NC ' : 'Factura ') . $codigo . ' — ' . $clienteNombre,
                 (int)$adminUser['id']
             );
@@ -770,6 +787,28 @@ final class FacturaController
         return array_values(array_filter($pagos, static function ($p): bool {
             return (int)$p['monto_cents'] > 0;
         }));
+    }
+
+    private function montoCuentaCorriente(array $pagos): int
+    {
+        $monto = 0;
+        foreach ($pagos as $pago) {
+            if ((string)($pago['forma_pago'] ?? '') === 'cuenta_corriente') {
+                $monto += max(0, (int)($pago['monto_cents'] ?? 0));
+            }
+        }
+        return $monto;
+    }
+
+    private function clienteMismoQueFactura(array $anterior, ?int $clienteIdNuevo, ?int $idclienNuevo): bool
+    {
+        $oldErp = (int)($anterior['idclien'] ?? 0);
+        $newErp = (int)($idclienNuevo ?? 0);
+        if ($oldErp > 0 || $newErp > 0) {
+            return $oldErp > 0 && $oldErp === $newErp;
+        }
+        return (int)($anterior['cliente_id'] ?? 0) > 0
+            && (int)$anterior['cliente_id'] === (int)($clienteIdNuevo ?? 0);
     }
 
     /** Tarjeta, MercadoPago o Billetera/QR: al facturar siempre intentan autorizar en ARCA. */
@@ -1037,6 +1076,16 @@ final class FacturaController
             }
         }
 
+        if ($this->montoCuentaCorriente($pagos) > 0
+            && (!$clienteErpId || !(new \Perfushopping\Web\Repo\CtaCteClienteRepo())->habilitado((int)$clienteErpId))) {
+            $yaUsabaCuenta = $repo->tienePagoCuentaCorriente($editarId)
+                && $this->clienteMismoQueFactura($old, $clienteId, $clienteErpId);
+            if (!$yaUsabaCuenta) {
+                Response::json(['ok' => false, 'error' => 'Este cliente no tiene habilitada la cuenta corriente por un admin autorizado.'], 422);
+                return;
+            }
+        }
+
         $vendedorId = (int)($input['vendedor_id'] ?? 0) ?: null;
         $notas = (string)($input['notas'] ?? '');
 
@@ -1174,14 +1223,15 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
         // Cuenta corriente: rearmar el débito con los nuevos importes.
         $ctaCte = new \Perfushopping\Web\Repo\CtaCteRepo();
         $ctaCte->anularMovimientosPorOrigen('factura', $editarId);
-        if (($clienteId || $clienteErpId) && $formaPago === 'cuenta_corriente') {
+        $montoCuentaCorriente = $this->montoCuentaCorriente($pagos);
+        if (($clienteId || $clienteErpId) && $montoCuentaCorriente > 0) {
             $ctaCte->agregarMovimiento(
                 $tipo === 'NC' ? 'credito' : 'debito',
                 'factura',
                 $editarId,
                 $clienteId,
                 $clienteErpId,
-                $totalFacturado,
+                $montoCuentaCorriente,
                 ($tipo === 'NC' ? 'NC ' : 'Factura ') . $codigo . ' — ' . $clienteNombre,
                 (int)$adminUser['id']
             );
@@ -1397,8 +1447,9 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
             }
         }
 
-        // Reverse ctacte movement if factura is anulated and was cta.cte.
-        if ($estado === 'anulada' && $oldEstado !== 'anulada' && ($f['forma_pago'] ?? '') === 'cuenta_corriente' && (!empty($f['cliente_id']) || !empty($f['idclien']))) {
+        // Reverse only the portion registered as cuenta corriente.
+        $montoCuentaCorriente = $this->montoCuentaCorriente($repo->pagos($id));
+        if ($estado === 'anulada' && $oldEstado !== 'anulada' && $montoCuentaCorriente > 0 && (!empty($f['cliente_id']) || !empty($f['idclien']))) {
             $ctaCte = new \Perfushopping\Web\Repo\CtaCteRepo();
             // Anular una NC revierte al revés: re-debita la deuda que la NC había acreditado.
             $esNC = (string)($f['tipo_comprobante'] ?? '') === 'NC';
@@ -1408,7 +1459,7 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
                 $id,
                 (int)($f['cliente_id'] ?? 0) ?: null,
                 (int)($f['idclien'] ?? 0) ?: null,
-                (int)($f['total_cents'] ?? 0),
+                $montoCuentaCorriente,
                 'Anulación ' . ($esNC ? 'NC ' : 'Factura ') . ($f['codigo'] ?? ''),
                 (int)$adminUser['id']
             );
@@ -2344,6 +2395,14 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'La suma de los pagos debe coincidir exactamente con el total de la factura (' . \Perfushopping\Web\Support\Format::moneyFromCents((int)$factura['total_cents']) . ').'];
             Response::redirect($editUrl);
         }
+        if ($this->montoCuentaCorriente($pagos) > 0) {
+            $habilitada = (int)($factura['idclien'] ?? 0) > 0
+                && (new \Perfushopping\Web\Repo\CtaCteClienteRepo())->habilitado((int)$factura['idclien']);
+            if (!$habilitada && $this->montoCuentaCorriente($actuales) <= 0) {
+                $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se puede agregar cuenta corriente: el cliente no está habilitado por un admin autorizado.'];
+                Response::redirect($editUrl);
+            }
+        }
 
         try {
             if (AdminAuthService::adminPuedeAutorizar($adminUser)) {
@@ -2516,6 +2575,14 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
         $id = (int)$factura['id'];
         $pdo = \Perfushopping\Web\Infra\Db::pdo();
         $actuales = $repo->pagos($id);
+        $montoCuentaCorriente = $this->montoCuentaCorriente($pagos);
+        if ($montoCuentaCorriente > 0) {
+            $habilitada = (int)($factura['idclien'] ?? 0) > 0
+                && (new \Perfushopping\Web\Repo\CtaCteClienteRepo())->habilitado((int)$factura['idclien']);
+            if (!$habilitada && $this->montoCuentaCorriente($actuales) <= 0) {
+                throw new \RuntimeException('El cliente no tiene cuenta corriente habilitada por administración.');
+            }
+        }
         $repo->actualizarSoloPagos($id, $pagos, $expectedHash);
         $pdo->prepare("DELETE FROM banco_movimientos WHERE origen = 'factura' AND origen_id = :i")
             ->execute([':i' => $id]);
@@ -2523,15 +2590,14 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
 
         $ctaCte = new \Perfushopping\Web\Repo\CtaCteRepo();
         $ctaCte->anularMovimientosPorOrigen('factura', $id);
-        $formaPrincipal = (string)($pagos[0]['forma_pago'] ?? '');
-        if ((!empty($factura['cliente_id']) || !empty($factura['idclien'])) && $formaPrincipal === 'cuenta_corriente') {
+        if ((!empty($factura['cliente_id']) || !empty($factura['idclien'])) && $montoCuentaCorriente > 0) {
             $ctaCte->agregarMovimiento(
                 (string)$factura['tipo_comprobante'] === 'NC' ? 'credito' : 'debito',
                 'factura',
                 $id,
                 (int)($factura['cliente_id'] ?? 0) ?: null,
                 (int)($factura['idclien'] ?? 0) ?: null,
-                (int)($factura['total_cents'] ?? 0),
+                $montoCuentaCorriente,
                 'Factura ' . (string)$factura['codigo'] . ' — corrección autorizada de pagos',
                 $adminId
             );

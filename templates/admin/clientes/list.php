@@ -3,6 +3,7 @@ use Perfushopping\Web\Support\Format;
 
 $list = $list ?? [];
 $presenciales = $presenciales ?? [];
+$ctaCteHabilitaciones = $ctaCteHabilitaciones ?? [];
 $q = (string)($q ?? '');
 $erpCols = $erpCols ?? [];
 $page = max(1, (int)($page ?? 1));
@@ -91,16 +92,19 @@ $customerCategories = [
                     <th>Último pedido</th>
                     <th>Registro</th>
                     <th>Estado</th>
+                    <th>Cuenta corriente</th>
                     <th style="width:50px"></th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (!$list): ?>
-                    <tr><td colspan="11" class="text-muted text-center py-4">No se encontraron clientes.</td></tr>
+                    <tr><td colspan="12" class="text-muted text-center py-4">No se encontraron clientes.</td></tr>
                 <?php else: ?>
                     <?php foreach ($list as $u): ?>
                         <?php
                         $isBlocked = !empty($u['disabled_at']);
+                        $idclienCta = (int)($u['cliente_id'] ?? 0);
+                        $ctaCteEnabled = $idclienCta > 0 && !empty($ctaCteHabilitaciones[$idclienCta]);
                         $nombreFacturado = trim((string)($u['cliente_razon'] ?? ''));
                         if ($nombreFacturado === '') {
                             $nombreFacturado = (string)($u['name'] ?? 'Sin nombre');
@@ -136,6 +140,17 @@ $customerCategories = [
                                     <span class="badge bg-secondary">Bloqueado</span>
                                 <?php else: ?>
                                     <span class="badge bg-success">Activo</span>
+                                <?php endif; ?>
+                            </td>
+                            <td class="text-nowrap">
+                                <?php if ($idclienCta > 0): ?>
+                                    <span class="badge bg-<?= $ctaCteEnabled ? 'success' : 'secondary' ?>"><?= $ctaCteEnabled ? 'Habilitada' : 'No habilitada' ?></span>
+                                    <button class="btn btn-sm btn-outline-<?= $ctaCteEnabled ? 'danger' : 'primary' ?> py-0 px-1 ms-1" type="button" onclick="abrirHabilitacionCtaCte(this)" data-idclien="<?= $idclienCta ?>" data-razon="<?= htmlspecialchars($nombreFacturado, ENT_QUOTES) ?>" data-estado="<?= $ctaCteEnabled ? 0 : 1 ?>">
+                                        <?= $ctaCteEnabled ? 'Deshabilitar' : 'Habilitar' ?>
+                                    </button>
+                                    <a class="btn btn-sm btn-outline-secondary py-0 px-1 ms-1" href="/admin/ctacte/<?= (int)($u['id'] ?? 0) ?>" title="Ver cuenta corriente"><i class="bi bi-eye"></i></a>
+                                <?php else: ?>
+                                    <span class="small text-muted">Sin ERP</span>
                                 <?php endif; ?>
                             </td>
                             <td>
@@ -174,17 +189,20 @@ $customerCategories = [
                     <th class="text-end">Total facturado</th>
                     <th>Última factura</th>
                     <th>Tipo</th>
+                    <th>Cuenta corriente</th>
                     <th style="width:70px"></th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (!$presenciales): ?>
-                    <tr><td colspan="9" class="text-muted text-center py-4">Sin clientes presenciales.</td></tr>
+                    <tr><td colspan="10" class="text-muted text-center py-4">Sin clientes presenciales.</td></tr>
                 <?php else: ?>
                     <?php foreach ($presenciales as $p): ?>
                         <?php
                         $movTotal = (int)($p['facturas'] ?? 0) + (int)($p['mov_ctacte'] ?? 0)
                             + (int)($p['mov_puntos'] ?? 0) + (int)($p['mov_recibos'] ?? 0);
+                        $idclienCta = (int)($p['idclien'] ?? 0);
+                        $ctaCteEnabled = !empty($ctaCteHabilitaciones[$idclienCta]);
                         $erpRow = [
                             'idclien' => (int)($p['idclien'] ?? 0),
                             'razon' => (string)($p['razon'] ?? ''),
@@ -209,6 +227,13 @@ $customerCategories = [
                             <td class="text-end"><?= htmlspecialchars(Format::moneyFromCents((int)($p['total_cents'] ?? 0))) ?></td>
                             <td class="small"><?= htmlspecialchars((string)($p['ultima_factura'] ?? '-')) ?></td>
                             <td><span class="badge bg-info">Presencial</span></td>
+                            <td class="text-nowrap">
+                                <span class="badge bg-<?= $ctaCteEnabled ? 'success' : 'secondary' ?>"><?= $ctaCteEnabled ? 'Habilitada' : 'No habilitada' ?></span>
+                                <button class="btn btn-sm btn-outline-<?= $ctaCteEnabled ? 'danger' : 'primary' ?> py-0 px-1 ms-1" type="button" onclick="abrirHabilitacionCtaCte(this)" data-idclien="<?= $idclienCta ?>" data-razon="<?= htmlspecialchars((string)($p['razon'] ?? ''), ENT_QUOTES) ?>" data-estado="<?= $ctaCteEnabled ? 0 : 1 ?>">
+                                    <?= $ctaCteEnabled ? 'Deshabilitar' : 'Habilitar' ?>
+                                </button>
+                                <a class="btn btn-sm btn-outline-secondary py-0 px-1 ms-1" href="/admin/ctacte/erp/<?= $idclienCta ?>" title="Ver cuenta corriente"><i class="bi bi-eye"></i></a>
+                            </td>
                             <td class="text-nowrap">
                                 <button class="btn btn-sm btn-outline-secondary py-0 px-1" title="Editar cliente" onclick="editarPresencial(this)"><i class="bi bi-pencil"></i></button>
                                 <?php if ($movTotal > 0): ?>
@@ -358,8 +383,57 @@ $customerCategories = [
     </div>
 </div>
 
+<div class="modal fade" id="ctaCteAutorizacionModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post" action="/admin/clientes/ctacte/habilitar">
+                <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                <input type="hidden" name="idclien" id="ctaCteIdclien" value="0" />
+                <input type="hidden" name="habilitado" id="ctaCteHabilitado" value="0" />
+                <input type="hidden" name="q" value="<?= htmlspecialchars($q) ?>" />
+                <div class="modal-header">
+                    <h5 class="modal-title">Autorizar cuenta corriente</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">Cliente: <strong id="ctaCteNombre"></strong></p>
+                    <p class="small text-muted">Solo un admin autorizado puede habilitar o deshabilitar el uso de cuenta corriente al facturar. La autorización quedará registrada.</p>
+                    <div class="mb-2">
+                        <label class="form-label small">Motivo</label>
+                        <input class="form-control form-control-sm" name="motivo" maxlength="500" required placeholder="Ej. Crédito aprobado por administración" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">Usuario del admin que autoriza</label>
+                        <input class="form-control form-control-sm" name="auth_user" autocomplete="off" required />
+                    </div>
+                    <div>
+                        <label class="form-label small">Contraseña</label>
+                        <input class="form-control form-control-sm" type="password" name="auth_pass" autocomplete="new-password" required />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-sm btn-accent" id="ctaCteSubmit">Confirmar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
 let ultimaPersona = null;
+
+function abrirHabilitacionCtaCte(btn) {
+    const form = document.querySelector('#ctaCteAutorizacionModal form');
+    form.reset();
+    document.getElementById('ctaCteIdclien').value = btn.dataset.idclien || '0';
+    document.getElementById('ctaCteHabilitado').value = btn.dataset.estado || '0';
+    const habilitar = btn.dataset.estado === '1';
+    document.getElementById('ctaCteNombre').textContent = btn.dataset.razon || 'Cliente';
+    document.querySelector('#ctaCteAutorizacionModal .modal-title').textContent = habilitar ? 'Habilitar cuenta corriente' : 'Deshabilitar cuenta corriente';
+    document.getElementById('ctaCteSubmit').textContent = habilitar ? 'Habilitar' : 'Deshabilitar';
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('ctaCteAutorizacionModal')).show();
+}
 
 function buscarArca() {
     const q = document.getElementById('arcaInput').value.trim();
