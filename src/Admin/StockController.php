@@ -31,10 +31,13 @@ final class StockController
         if ($desde === '') $desde = date('Y-m-01');
         if ($hasta === '') $hasta = date('Y-m-d');
         $page = max(1, (int)($_GET['page'] ?? 1));
-        $perPage = 80;
-        $list = $repo->listarStock($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $perPage, $iddepo ?: null, $desde, $hasta, $page, $enweb === '' ? null : $enweb);
+        $perPageOptions = [50, 80, 100, 200, 300, 500];
+        $requestedPerPage = (int)($_GET['per_page'] ?? 80);
+        $perPage = in_array($requestedPerPage, $perPageOptions, true) ? $requestedPerPage : 80;
         $total = $repo->contarStock($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $iddepo ?: null, $desde, $hasta, $enweb === '' ? null : $enweb);
-        $lastPage = (int)ceil($total / $perPage);
+        $lastPage = max(1, (int)ceil($total / $perPage));
+        $page = min($page, $lastPage);
+        $list = $repo->listarStock($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $perPage, $iddepo ?: null, $desde, $hasta, $page, $enweb === '' ? null : $enweb);
         $rubros = $repo->grillaRubros();
         $subrubros = $repo->grillaSubrubros();
         $proveedores = $repo->grillaProveedores();
@@ -55,6 +58,7 @@ final class StockController
             'hasta' => $hasta,
             'page' => $page,
             'perPage' => $perPage,
+            'perPageOptions' => $perPageOptions,
             'total' => $total,
             'lastPage' => $lastPage,
             'rubros' => $rubros,

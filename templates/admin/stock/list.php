@@ -21,11 +21,12 @@ $page = (int)($page ?? 1);
 $lastPage = (int)($lastPage ?? 1);
 $perPage = (int)($perPage ?? 80);
 $total = (int)($total ?? 0);
-$qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $iddepo, $desde, $hasta, $enweb): string {
+$perPageOptions = $perPageOptions ?? [50, 80, 100, 200, 300, 500];
+$qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $iddepo, $desde, $hasta, $enweb, $perPage): string {
     $p = [
         'q' => $q, 'codepar' => $codepar, 'stock' => $stockFilter,
         'codrub' => $codrub, 'codsub' => $codsub, 'codprove' => $codprove,
-        'iddepo' => $iddepo, 'desde' => $desde, 'hasta' => $hasta, 'enweb' => $enweb,
+        'iddepo' => $iddepo, 'desde' => $desde, 'hasta' => $hasta, 'enweb' => $enweb, 'per_page' => $perPage,
     ];
     foreach ($overrides as $k => $v) {
         $p[$k] = $v;
@@ -248,19 +249,44 @@ $qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $
             <?php endif; ?>
         </table>
     </div>
-    <?php if ($lastPage > 1): ?>
-    <div class="card-footer d-flex justify-content-between align-items-center small py-2">
+    <div class="card-footer d-flex justify-content-between align-items-center flex-wrap gap-2 small py-2">
         <span class="text-muted"><?= $total ?> filas &middot; P&aacute;gina <?= $page ?> de <?= $lastPage ?></span>
-        <div class="d-flex gap-2">
+        <form method="get" action="/admin/stock" class="d-flex flex-wrap align-items-center gap-2">
+            <?php foreach ([
+                'q' => $q, 'codepar' => $codepar, 'stock' => $stockFilter, 'codrub' => $codrub,
+                'codsub' => $codsub, 'codprove' => $codprove, 'iddepo' => $iddepo,
+                'desde' => $desde, 'hasta' => $hasta, 'enweb' => $enweb,
+            ] as $key => $value): if ($value !== '' && $value !== 0): ?>
+                <input type="hidden" name="<?= htmlspecialchars($key) ?>" value="<?= htmlspecialchars((string)$value) ?>" />
+            <?php endif; endforeach; ?>
+            <?php foreach ($colsSel as $selectedColumn): ?>
+                <input type="hidden" name="cols[]" value="<?= htmlspecialchars((string)$selectedColumn) ?>" />
+            <?php endforeach; ?>
+            <label class="d-flex align-items-center gap-1 mb-0">
+                Filas
+                <select class="form-select form-select-sm" name="per_page" style="width:auto" onchange="this.form.submit()">
+                    <?php foreach ($perPageOptions as $option): ?>
+                        <option value="<?= (int)$option ?>" <?= $perPage === (int)$option ? 'selected' : '' ?>><?= (int)$option ?></option>
+                    <?php endforeach; ?>
+                </select>
+                por página
+            </label>
+            <label class="d-flex align-items-center gap-1 mb-0">
+                Ir a página
+                <input class="form-control form-control-sm" type="number" name="page" min="1" max="<?= $lastPage ?>" value="<?= $page ?>" required style="width:82px" />
+                de <?= $lastPage ?>
+            </label>
+            <button class="btn btn-sm btn-outline-primary" type="submit">Ir</button>
+        </form>
+        <?php if ($lastPage > 1): ?><div class="d-flex gap-2">
             <?php if ($page > 1): ?>
                 <a class="btn btn-sm btn-outline-secondary" href="/admin/stock?<?= $qs(['page' => $page - 1]) ?>">&laquo; Anterior</a>
             <?php endif; ?>
             <?php if ($page < $lastPage): ?>
                 <a class="btn btn-sm btn-outline-secondary" href="/admin/stock?<?= $qs(['page' => $page + 1]) ?>">Siguiente &raquo;</a>
             <?php endif; ?>
-        </div>
+        </div><?php endif; ?>
     </div>
-    <?php endif; ?>
 </div>
 
 <script>

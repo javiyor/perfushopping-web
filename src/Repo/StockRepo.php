@@ -42,7 +42,7 @@ final class StockRepo
 
     public function listarStock(string $q = '', int $codepar = 0, string $stockFilter = '', int $codrub = 0, int $codsub = 0, string $codprove = '', int $limit = 80, ?int $iddepo = null, string $desde = '', string $hasta = '', int $page = 1, ?string $enweb = null): array
     {
-        $limit = max(1, min(200, $limit));
+        $limit = max(1, min(500, $limit));
         $page = max(1, $page);
         $offset = ($page - 1) * $limit;
 
