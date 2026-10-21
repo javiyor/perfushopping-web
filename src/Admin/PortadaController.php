@@ -86,7 +86,9 @@ final class PortadaController
             'tamano_precio_producto' => (int)($_POST['tamano_precio_producto'] ?? 18),
         ];
 
-        (new PortadaRepo())->saveConfig($modo, $codrub ?: null, $codsub ?: null, $banner, $theme);
+        $footerText = trim((string)($_POST['footer_text'] ?? ''));
+
+        (new PortadaRepo())->saveConfig($modo, $codrub ?: null, $codsub ?: null, $banner, $theme, $footerText);
 
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Portada actualizada.'];
         Response::redirect('/admin/portada');

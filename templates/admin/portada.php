@@ -129,6 +129,12 @@ $presetFondo = ['#1a1a1a' => 'Negro', '#C9A227' => 'Dorado', '#C0392B' => 'Rojo'
                 </div>
             </div>
 
+            <div class="border rounded p-3 mb-3">
+                <h6 class="fw-bold mb-2"><i class="bi bi-layout-text-window-reverse"></i> Texto del pie de página</h6>
+                <p class="text-muted small mb-2">Este texto se muestra al pie de las páginas públicas, encima de los enlaces legales. Podés dejarlo vacío para ocultarlo.</p>
+                <textarea class="form-control form-control-sm" name="footer_text" rows="3" maxlength="600" placeholder="Ej.: Perfushopping — perfumería, belleza y cuidado personal. Envíos a todo el país."><?= htmlspecialchars((string)($config['footer_text'] ?? '')) ?></textarea>
+            </div>
+
             <div class="row g-3" id="portadaFields">
                 <div class="col-md-6" id="fieldRubro" style="<?= $modo === 'rubro' ? '' : 'display:none' ?>">
                     <label class="form-label small">Rubro</label>

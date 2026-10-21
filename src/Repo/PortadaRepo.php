@@ -64,6 +64,7 @@ final class PortadaRepo
             $this->ensureColumn('portada_config', 'tamano_nombre_producto', 'TINYINT UNSIGNED NOT NULL DEFAULT 14');
             $this->ensureColumn('portada_config', 'color_precio_producto', "VARCHAR(7) NOT NULL DEFAULT '#D8B25A'");
             $this->ensureColumn('portada_config', 'tamano_precio_producto', 'TINYINT UNSIGNED NOT NULL DEFAULT 18');
+            $this->ensureColumn('portada_config', 'footer_text', 'TEXT DEFAULT NULL');
         } catch (\Throwable $e) {
         }
     }
@@ -98,7 +99,7 @@ final class PortadaRepo
             'plantilla' => 'elegante', 'color_fondo' => '#050505', 'color_fondo_secundario' => '#0C0B0A',
             'color_tarjeta' => '#171411', 'color_acento' => '#D8B25A', 'color_texto' => '#F6F4EF',
             'fuente_tarjeta' => 'system', 'color_nombre_producto' => '#F6F4EF', 'tamano_nombre_producto' => 14,
-            'color_precio_producto' => '#D8B25A', 'tamano_precio_producto' => 18];
+            'color_precio_producto' => '#D8B25A', 'tamano_precio_producto' => 18, 'footer_text' => ''];
     }
 
     public static function plantillas(): array
@@ -130,7 +131,7 @@ final class PortadaRepo
     }
 
     /** @param array<string,mixed> $banner */
-    public function saveConfig(string $modo, ?int $codrub, ?int $codsub, array $banner = [], array $theme = []): void
+    public function saveConfig(string $modo, ?int $codrub, ?int $codsub, array $banner = [], array $theme = [], string $footerText = ''): void
     {
         $this->ensureTables();
         if (!in_array($modo, self::MODOS, true)) {
@@ -169,16 +170,17 @@ final class PortadaRepo
             ? strtoupper((string)$theme['color_precio_producto']) : $coloresTema['color_acento'];
         $tamanoNombre = max(12, min(20, (int)($theme['tamano_nombre_producto'] ?? 14)));
         $tamanoPrecio = max(14, min(26, (int)($theme['tamano_precio_producto'] ?? 18)));
+        $footerText = mb_substr(trim($footerText), 0, 600);
         $pdo = Db::pdo();
         $st = $pdo->prepare("
             INSERT INTO portada_config (id, modo, codrub, codsub, banner_text, banner_bold, banner_italic, banner_size, banner_color, banner_bg,
                 banner_sub, banner_sub_bold, banner_sub_italic, banner_sub_size, banner_sub_color,
                 plantilla, color_fondo, color_fondo_secundario, color_tarjeta, color_acento, color_texto,
-                fuente_tarjeta, color_nombre_producto, tamano_nombre_producto, color_precio_producto, tamano_precio_producto)
+                fuente_tarjeta, color_nombre_producto, tamano_nombre_producto, color_precio_producto, tamano_precio_producto, footer_text)
             VALUES (1, :modo, :codrub, :codsub, :btext, :bbold, :bitalic, :bsize, :bcolor, :bbg,
                 :bsub, :bsubbold, :bsubitalic, :bsubsize, :bsubcolor,
                 :plantilla, :color_fondo, :color_fondo_secundario, :color_tarjeta, :color_acento, :color_texto,
-                :fuente_tarjeta, :color_nombre_producto, :tamano_nombre_producto, :color_precio_producto, :tamano_precio_producto)
+                :fuente_tarjeta, :color_nombre_producto, :tamano_nombre_producto, :color_precio_producto, :tamano_precio_producto, :footer_text)
             ON DUPLICATE KEY UPDATE modo=VALUES(modo), codrub=VALUES(codrub), codsub=VALUES(codsub),
                 banner_text=VALUES(banner_text), banner_bold=VALUES(banner_bold), banner_italic=VALUES(banner_italic),
                 banner_size=VALUES(banner_size), banner_color=VALUES(banner_color), banner_bg=VALUES(banner_bg),
@@ -188,7 +190,7 @@ final class PortadaRepo
                 color_tarjeta=VALUES(color_tarjeta), color_acento=VALUES(color_acento), color_texto=VALUES(color_texto),
                 fuente_tarjeta=VALUES(fuente_tarjeta), color_nombre_producto=VALUES(color_nombre_producto),
                 tamano_nombre_producto=VALUES(tamano_nombre_producto), color_precio_producto=VALUES(color_precio_producto),
-                tamano_precio_producto=VALUES(tamano_precio_producto)
+                tamano_precio_producto=VALUES(tamano_precio_producto), footer_text=VALUES(footer_text)
         ");
         $st->execute([
             ':modo' => $modo,
@@ -216,6 +218,7 @@ final class PortadaRepo
             ':tamano_nombre_producto' => $tamanoNombre,
             ':color_precio_producto' => $colorPrecio,
             ':tamano_precio_producto' => $tamanoPrecio,
+            ':footer_text' => $footerText !== '' ? $footerText : null,
         ]);
     }
 

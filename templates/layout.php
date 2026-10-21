@@ -6,6 +6,7 @@ use Perfushopping\Web\Support\Format;
 $appName = Env::get('APP_NAME', 'Perfushopping');
 $empresa = (new \Perfushopping\Web\Repo\EmpresaRepo())->getDefault();
 $portadaConfigGlobal = (new \Perfushopping\Web\Repo\PortadaRepo())->getConfig();
+$footerText = trim((string)($portadaConfigGlobal['footer_text'] ?? ''));
 $temaTienda = \Perfushopping\Web\Repo\PortadaRepo::tema($portadaConfigGlobal);
 $temaTiendaStyle = '--bg0:' . $temaTienda['color_fondo'] . ';'
     . '--bg1:' . $temaTienda['color_fondo_secundario'] . ';'
@@ -131,6 +132,11 @@ try {
 
       <?= $body ?>
 
+      <?php if ($footerText !== ''): ?>
+      <footer style="margin-top:26px;padding:18px 12px 0;border-top:1px solid var(--line);color:var(--text);opacity:.78;text-align:center;font-size:13px;line-height:1.6">
+        <?= nl2br(htmlspecialchars($footerText)) ?>
+      </footer>
+      <?php endif; ?>
       <div style="margin-top:26px;color:rgba(246,244,239,0.62);font-size:12px;display:flex;gap:14px;flex-wrap:wrap;justify-content:center">
         <a href="/terms" style="text-decoration:underline">Terminos</a>
         <a href="/privacy" style="text-decoration:underline">Privacidad y cookies</a>
