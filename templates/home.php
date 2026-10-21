@@ -67,9 +67,9 @@ foreach ([1, 2, 3] as $bi) {
 <div class="page" style="margin-top:16px">
   <?php if ($isNovedades): ?>
     <div style="margin-top:10px;color:rgba(246,244,239,0.72);line-height:1.55">
-      Tel: <a href="https://wa.me/<?= $empresaWhatsapp ?>?text=Hola%20<?= urlencode($empresaNombre) ?>" target="_blank" rel="noopener" style="text-decoration:underline"><strong><?= $empresaTel ?></strong></a> &middot; Mail: <a href="mailto:<?= $empresaMail ?>" style="text-decoration:underline"><?= $empresaMail ?></a><br />
+      <i class="bi bi-whatsapp" aria-label="WhatsApp"></i> Tel: <a href="https://wa.me/<?= $empresaWhatsapp ?>?text=Hola%20<?= urlencode($empresaNombre) ?>" target="_blank" rel="noopener" style="text-decoration:underline"><strong><?= $empresaTel ?></strong></a> &middot; <i class="bi bi-envelope-fill" aria-label="Correo"></i> Mail: <a href="mailto:<?= $empresaMail ?>" style="text-decoration:underline"><?= $empresaMail ?></a><br />
       Direcciones: <?= $empresaDir ?><br />
-      Instagram: <a href="https://www.instagram.com/perfushopping" target="_blank" rel="noopener" style="text-decoration:underline">@perfushopping</a>
+      <i class="bi bi-instagram" aria-label="Instagram"></i> Instagram: <a href="https://www.instagram.com/perfushopping" target="_blank" rel="noopener" style="text-decoration:underline">@perfushopping</a>
     </div>
     <?php
     $portadaTitles = ['auto'=>'Novedades','rubro'=>'Selección por rubro','marca'=>'Selección por marca','ultimos'=>'Últimos ingresos','manual'=>'Destacados'];
@@ -106,9 +106,9 @@ foreach ([1, 2, 3] as $bi) {
   <?php else: ?>
     <h3 style="margin:0;color:var(--gold);font-family:Georgia, 'Times New Roman', serif;letter-spacing:0.7px">Catalogo</h3>
     <div style="margin-top:10px;color:rgba(246,244,239,0.72);line-height:1.55">
-      Tel: <a href="https://wa.me/<?= $empresaWhatsapp ?>?text=Hola%20<?= urlencode($empresaNombre) ?>" target="_blank" rel="noopener" style="text-decoration:underline"><strong><?= $empresaTel ?></strong></a> &middot; Mail: <a href="mailto:<?= $empresaMail ?>" style="text-decoration:underline"><?= $empresaMail ?></a><br />
+      <i class="bi bi-whatsapp" aria-label="WhatsApp"></i> Tel: <a href="https://wa.me/<?= $empresaWhatsapp ?>?text=Hola%20<?= urlencode($empresaNombre) ?>" target="_blank" rel="noopener" style="text-decoration:underline"><strong><?= $empresaTel ?></strong></a> &middot; <i class="bi bi-envelope-fill" aria-label="Correo"></i> Mail: <a href="mailto:<?= $empresaMail ?>" style="text-decoration:underline"><?= $empresaMail ?></a><br />
       Direcciones: <?= $empresaDir ?><br />
-      Instagram: <a href="https://www.instagram.com/perfushopping" target="_blank" rel="noopener" style="text-decoration:underline">@perfushopping</a>
+      <i class="bi bi-instagram" aria-label="Instagram"></i> Instagram: <a href="https://www.instagram.com/perfushopping" target="_blank" rel="noopener" style="text-decoration:underline">@perfushopping</a>
     </div>
   <?php endif; ?>
 </div>

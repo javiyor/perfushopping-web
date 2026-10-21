@@ -5,6 +5,16 @@ use Perfushopping\Web\Support\Format;
 /** @var string $body */
 $appName = Env::get('APP_NAME', 'Perfushopping');
 $empresa = (new \Perfushopping\Web\Repo\EmpresaRepo())->getDefault();
+$portadaConfigGlobal = (new \Perfushopping\Web\Repo\PortadaRepo())->getConfig();
+$temaTienda = \Perfushopping\Web\Repo\PortadaRepo::tema($portadaConfigGlobal);
+$temaTiendaStyle = '--bg0:' . $temaTienda['color_fondo'] . ';'
+    . '--bg1:' . $temaTienda['color_fondo_secundario'] . ';'
+    . '--card:' . $temaTienda['color_tarjeta'] . ';'
+    . '--card2:' . $temaTienda['color_tarjeta'] . ';'
+    . '--text:' . $temaTienda['color_texto'] . ';'
+    . '--gold:' . $temaTienda['color_acento'] . ';'
+    . '--gold2:' . $temaTienda['color_acento'] . ';'
+    . '--line:color-mix(in srgb, ' . $temaTienda['color_acento'] . ' 32%, transparent);';
 $empresaNombre = htmlspecialchars($empresa['nomemp'] ?? $appName);
 $empresaLogo = trim((string)($empresa['logo'] ?? ''));
 $empresaLogoUrl = $empresaLogo !== '' ? Format::uploadUrl($empresaLogo) : '/assets/brand/logo-header.png';
@@ -67,7 +77,7 @@ try {
     /></noscript>
     <!-- End Meta Pixel Code -->
   </head>
-  <body>
+  <body data-theme="<?= htmlspecialchars($temaTienda['mode']) ?>" data-store-theme-mode="<?= htmlspecialchars($temaTienda['mode']) ?>" data-store-template="<?= htmlspecialchars($temaTienda['plantilla']) ?>" style="<?= htmlspecialchars($temaTiendaStyle) ?>">
     <div class="wrap">
       <div class="topbar">
         <a class="brand" href="/">

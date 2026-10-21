@@ -34,6 +34,7 @@ $settings = $block['settings'] ?? [];
             <option value="promo_banner" <?= (($block['block_type'] ?? '') === 'promo_banner') ? 'selected' : '' ?>>Banner promocional</option>
             <option value="seller_program" <?= (($block['block_type'] ?? '') === 'seller_program') ? 'selected' : '' ?>>Programa de vendedores</option>
             <option value="trust_badges" <?= (($block['block_type'] ?? '') === 'trust_badges') ? 'selected' : '' ?>>Confianza / reputación</option>
+            <option value="branches_map" <?= (($block['block_type'] ?? '') === 'branches_map') ? 'selected' : '' ?>>Sucursales y mapa</option>
             <option value="categories_grid" <?= (($block['block_type'] ?? '') === 'categories_grid') ? 'selected' : '' ?>>Grilla de categorías</option>
             <option value="custom_html" <?= (($block['block_type'] ?? '') === 'custom_html') ? 'selected' : '' ?>>HTML libre</option>
           </select>
@@ -198,6 +199,10 @@ $settings = $block['settings'] ?? [];
 
       <div id="categories_grid-settings" class="settings-group row g-3 compact-form">
         <div class="col-md-4"><label class="form-label small">Cantidad</label><input type="number" class="form-control form-control-sm" name="settings[limit]" value="<?= (int)($settings['limit'] ?? 6) ?>" /></div>
+      </div>
+
+      <div id="branches_map-settings" class="settings-group row g-3 compact-form">
+        <div class="col-12"><label class="form-label small">Texto introductorio</label><textarea class="form-control form-control-sm" name="settings[intro]" rows="2"><?= htmlspecialchars((string)($settings['intro'] ?? 'Visitá nuestros locales. Encontrá la sucursal más cercana y cómo llegar.')) ?></textarea><small class="text-muted">El mapa usa las direcciones guardadas en Administración → Sucursales.</small></div>
       </div>
 
       <div id="custom_html-settings" class="settings-group">

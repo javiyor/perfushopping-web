@@ -34,6 +34,8 @@ final class PortadaController
         echo View::adminPage('admin/portada.php', [
             'adminUser' => $adminUser,
             'config' => $config,
+            'tema' => PortadaRepo::tema($config),
+            'plantillas' => PortadaRepo::plantillas(),
             'manual' => $manual,
             'rubros' => $rubros,
             'marcas' => $marcas,
@@ -70,7 +72,16 @@ final class PortadaController
             'sub_color' => trim((string)($_POST['banner_sub_color'] ?? '')),
         ];
 
-        (new PortadaRepo())->saveConfig($modo, $codrub ?: null, $codsub ?: null, $banner);
+        $theme = [
+            'plantilla' => trim((string)($_POST['plantilla'] ?? 'elegante')),
+            'color_fondo' => trim((string)($_POST['color_fondo'] ?? '')),
+            'color_fondo_secundario' => trim((string)($_POST['color_fondo_secundario'] ?? '')),
+            'color_tarjeta' => trim((string)($_POST['color_tarjeta'] ?? '')),
+            'color_acento' => trim((string)($_POST['color_acento'] ?? '')),
+            'color_texto' => trim((string)($_POST['color_texto'] ?? '')),
+        ];
+
+        (new PortadaRepo())->saveConfig($modo, $codrub ?: null, $codsub ?: null, $banner, $theme);
 
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Portada actualizada.'];
         Response::redirect('/admin/portada');

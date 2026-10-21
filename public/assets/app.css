@@ -757,3 +757,37 @@ body[data-theme="light"] .notice {
   .brand-mark { width: 112px; height: 40px; }
   .admin-products-search { grid-template-columns: 1fr; }
 }
+
+/* Storefront themes configured from /admin/portada. */
+body[data-store-template] {
+  color: var(--text);
+  background: linear-gradient(180deg, var(--bg0), var(--bg1));
+}
+body[data-store-template] .topbar,
+body[data-store-template] .page,
+body[data-store-template] .card,
+body[data-store-template] .gallery,
+body[data-store-template] .variant {
+  color: var(--text);
+  background: var(--card);
+  border-color: var(--line);
+}
+body[data-store-template] .hero {
+  color: var(--text);
+  background: linear-gradient(135deg, var(--card), var(--bg1));
+  border-color: var(--line);
+}
+body[data-store-template] .card-title { color: var(--text); }
+body[data-store-template] .btn:not(.secondary):not(.danger) {
+  border-color: var(--gold);
+  background: linear-gradient(135deg, var(--gold), var(--gold2));
+}
+body[data-store-template="minimal"] .topbar,
+body[data-store-template="minimal"] .page,
+body[data-store-template="minimal"] .hero,
+body[data-store-template="minimal"] .card { border-radius: 10px; box-shadow: none; }
+body[data-store-template="boutique"] .topbar,
+body[data-store-template="boutique"] .page,
+body[data-store-template="boutique"] .hero,
+body[data-store-template="boutique"] .card { border-radius: 26px; }
+body[data-store-template="natural"] .hero { border-left: 5px solid var(--gold); }

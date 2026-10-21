@@ -5,6 +5,8 @@ $rubros = $rubros ?? [];
 $marcas = $marcas ?? [];
 $q = $q ?? '';
 $searchResults = $searchResults ?? [];
+$tema = $tema ?? \Perfushopping\Web\Repo\PortadaRepo::tema($config);
+$plantillas = $plantillas ?? \Perfushopping\Web\Repo\PortadaRepo::plantillas();
 $modo = (string)($config['modo'] ?? 'auto');
 $codrub = (int)($config['codrub'] ?? 0);
 $codsub = (int)($config['codsub'] ?? 0);
@@ -54,6 +56,43 @@ $presetFondo = ['#1a1a1a' => 'Negro', '#C9A227' => 'Dorado', '#C0392B' => 'Rojo'
                         <label class="form-check-label small" for="modo_<?= $k ?>"><?= htmlspecialchars($label) ?></label>
                     </div>
                     <?php endforeach; ?>
+                </div>
+            </div>
+
+            <div class="border rounded p-3 mb-3">
+                <h6 class="fw-bold mb-2"><i class="bi bi-palette"></i> Diseño de la tienda</h6>
+                <p class="text-muted small mb-2">Elegí una plantilla visual y ajustá los colores de fondo, tarjetas, texto y acento.</p>
+                <div class="row g-2 mb-3">
+                    <?php foreach ($plantillas as $key => $preset): ?>
+                        <div class="col-6 col-md-3">
+                            <label class="border rounded p-2 d-block h-100" style="cursor:pointer;background:<?= htmlspecialchars($preset['color_fondo']) ?>;color:<?= htmlspecialchars($preset['color_texto']) ?>">
+                                <input class="form-check-input me-1 plantilla-radio" type="radio" name="plantilla" value="<?= htmlspecialchars($key) ?>" data-colors="<?= htmlspecialchars(json_encode($preset, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), ENT_QUOTES) ?>" <?= ($tema['plantilla'] ?? 'elegante') === $key ? 'checked' : '' ?> />
+                                <strong class="small"><?= htmlspecialchars($preset['label']) ?></strong>
+                                <div class="mt-2 rounded" style="height:24px;background:<?= htmlspecialchars($preset['color_tarjeta']) ?>;border:1px solid <?= htmlspecialchars($preset['color_acento']) ?>"></div>
+                            </label>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+                <div class="row g-2 align-items-end">
+                    <?php foreach ([
+                        'color_fondo' => 'Fondo principal',
+                        'color_fondo_secundario' => 'Fondo secundario',
+                        'color_tarjeta' => 'Fondo tarjetas',
+                        'color_acento' => 'Color de acento',
+                        'color_texto' => 'Color de texto',
+                    ] as $field => $label): ?>
+                        <div class="col-6 col-md">
+                            <label class="form-label small mb-1"><?= htmlspecialchars($label) ?></label>
+                            <input class="form-control form-control-sm tema-color" type="color" name="<?= htmlspecialchars($field) ?>" id="<?= htmlspecialchars($field) ?>" value="<?= htmlspecialchars($tema[$field] ?? '#000000') ?>" />
+                        </div>
+                    <?php endforeach; ?>
+                    <div class="col-12">
+                        <div id="portadaThemePreview" class="rounded p-3" style="background:<?= htmlspecialchars($tema['color_fondo'] ?? '#050505') ?>;color:<?= htmlspecialchars($tema['color_texto'] ?? '#F6F4EF') ?>">
+                            <div class="rounded p-3" style="background:<?= htmlspecialchars($tema['color_tarjeta'] ?? '#171411') ?>;border-left:4px solid <?= htmlspecialchars($tema['color_acento'] ?? '#D8B25A') ?>">
+                                <strong>Vista previa de la plantilla</strong><div class="small mt-1">Fondo, tarjeta y color de acento</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -266,6 +305,32 @@ function togglePortadaFields() {
     document.getElementById('fieldMarca').style.display = (modo === 'marca') ? '' : 'none';
     document.getElementById('fieldBanner').style.display = (modo === 'manual') ? '' : 'none';
 }
+function actualizarPreviewTema() {
+    const wrap = document.getElementById('portadaThemePreview');
+    if (!wrap) return;
+    const fondo = document.getElementById('color_fondo').value;
+    const tarjeta = document.getElementById('color_tarjeta').value;
+    const acento = document.getElementById('color_acento').value;
+    const texto = document.getElementById('color_texto').value;
+    wrap.style.background = fondo;
+    wrap.style.color = texto;
+    const sample = wrap.firstElementChild;
+    if (sample) {
+        sample.style.background = tarjeta;
+        sample.style.borderLeftColor = acento;
+    }
+}
+function aplicarPlantilla(radio) {
+    if (!radio || !radio.checked) return;
+    try {
+        const preset = JSON.parse(radio.dataset.colors || '{}');
+        ['color_fondo','color_fondo_secundario','color_tarjeta','color_acento','color_texto'].forEach(function(key) {
+            const field = document.getElementById(key);
+            if (field && preset[key]) field.value = preset[key];
+        });
+    } catch (e) {}
+    actualizarPreviewTema();
+}
 function setBannerColor(hex) {
     document.getElementById('bannerColor').value = hex;
     updateBannerPreview();
@@ -313,6 +378,13 @@ function updateBannerPreview() {
     });
 }
 document.addEventListener('DOMContentLoaded', updateBannerPreview);
+document.querySelectorAll('.plantilla-radio').forEach(function(radio) {
+    radio.addEventListener('change', function() { aplicarPlantilla(this); });
+});
+document.querySelectorAll('.tema-color').forEach(function(input) {
+    input.addEventListener('input', actualizarPreviewTema);
+});
+actualizarPreviewTema();
 function toggleAll(chk) {
     document.querySelectorAll('.chkProd').forEach(c => c.checked = chk.checked);
 }

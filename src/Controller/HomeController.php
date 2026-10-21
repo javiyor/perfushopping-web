@@ -55,6 +55,7 @@ final class HomeController
             'homeVideos' => (new VideoRepo())->findActive(),
             'homeArticles' => (new ArticleRepo())->findAll(true),
             'homeRoutines' => (new RoutineRepo())->findAll(true),
+            'homeBranches' => (new \Perfushopping\Web\Repo\SucursalRepo())->listarActivas(),
         ]);
     }
 }

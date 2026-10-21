@@ -9,9 +9,10 @@
   }
 
   try {
-    applyTheme(localStorage.getItem('perfushopping-theme') || 'dark');
+    var storeMode = document.body.getAttribute('data-store-theme-mode');
+    applyTheme(storeMode || localStorage.getItem('perfushopping-theme') || 'dark');
   } catch (e) {
-    applyTheme('dark');
+    applyTheme(document.body.getAttribute('data-store-theme-mode') || 'dark');
   }
 
   function onThumbClick(e) {

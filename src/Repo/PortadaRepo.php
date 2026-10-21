@@ -8,6 +8,12 @@ use Perfushopping\Web\Infra\Db;
 final class PortadaRepo
 {
     private const MODOS = ['auto', 'rubro', 'marca', 'ultimos', 'manual'];
+    private const PLANTILLAS = [
+        'elegante' => ['label' => 'Elegante oscura', 'mode' => 'dark', 'color_fondo' => '#050505', 'color_fondo_secundario' => '#0C0B0A', 'color_tarjeta' => '#171411', 'color_acento' => '#D8B25A', 'color_texto' => '#F6F4EF'],
+        'minimal' => ['label' => 'Minimalista clara', 'mode' => 'light', 'color_fondo' => '#F6F5F2', 'color_fondo_secundario' => '#ECEAE5', 'color_tarjeta' => '#FFFFFF', 'color_acento' => '#444444', 'color_texto' => '#242424'],
+        'boutique' => ['label' => 'Boutique rosa', 'mode' => 'light', 'color_fondo' => '#F8EEF1', 'color_fondo_secundario' => '#F1E1E7', 'color_tarjeta' => '#FFF9FB', 'color_acento' => '#B13D68', 'color_texto' => '#38212A'],
+        'natural' => ['label' => 'Natural', 'mode' => 'light', 'color_fondo' => '#EEF2E9', 'color_fondo_secundario' => '#DDE6D5', 'color_tarjeta' => '#FAFCF7', 'color_acento' => '#52734D', 'color_texto' => '#263326'],
+    ];
 
     private function ensureTables(): void
     {
@@ -47,6 +53,12 @@ final class PortadaRepo
             $this->ensureColumn('portada_config', 'banner_sub_italic', 'TINYINT(1) NOT NULL DEFAULT 0');
             $this->ensureColumn('portada_config', 'banner_sub_size', "VARCHAR(10) NOT NULL DEFAULT 'normal'");
             $this->ensureColumn('portada_config', 'banner_sub_color', "VARCHAR(7) NOT NULL DEFAULT '#FFFFFF'");
+            $this->ensureColumn('portada_config', 'plantilla', "VARCHAR(24) NOT NULL DEFAULT 'elegante'");
+            $this->ensureColumn('portada_config', 'color_fondo', "VARCHAR(7) NOT NULL DEFAULT '#050505'");
+            $this->ensureColumn('portada_config', 'color_fondo_secundario', "VARCHAR(7) NOT NULL DEFAULT '#0C0B0A'");
+            $this->ensureColumn('portada_config', 'color_tarjeta', "VARCHAR(7) NOT NULL DEFAULT '#171411'");
+            $this->ensureColumn('portada_config', 'color_acento', "VARCHAR(7) NOT NULL DEFAULT '#D8B25A'");
+            $this->ensureColumn('portada_config', 'color_texto', "VARCHAR(7) NOT NULL DEFAULT '#F6F4EF'");
         } catch (\Throwable $e) {
         }
     }
@@ -77,11 +89,32 @@ final class PortadaRepo
             'banner_text' => null, 'banner_bold' => 0, 'banner_italic' => 0,
             'banner_size' => 'grande', 'banner_color' => '#C9A227', 'banner_bg' => null,
             'banner_sub' => null, 'banner_sub_bold' => 0, 'banner_sub_italic' => 0,
-            'banner_sub_size' => 'normal', 'banner_sub_color' => '#FFFFFF'];
+            'banner_sub_size' => 'normal', 'banner_sub_color' => '#FFFFFF',
+            'plantilla' => 'elegante', 'color_fondo' => '#050505', 'color_fondo_secundario' => '#0C0B0A',
+            'color_tarjeta' => '#171411', 'color_acento' => '#D8B25A', 'color_texto' => '#F6F4EF'];
+    }
+
+    public static function plantillas(): array
+    {
+        return self::PLANTILLAS;
+    }
+
+    /** @return array{plantilla:string,mode:string,color_fondo:string,color_fondo_secundario:string,color_tarjeta:string,color_acento:string,color_texto:string} */
+    public static function tema(array $config): array
+    {
+        $key = (string)($config['plantilla'] ?? 'elegante');
+        if (!isset(self::PLANTILLAS[$key])) $key = 'elegante';
+        $tema = self::PLANTILLAS[$key];
+        $tema['plantilla'] = $key;
+        foreach (['color_fondo','color_fondo_secundario','color_tarjeta','color_acento','color_texto'] as $color) {
+            $valor = (string)($config[$color] ?? '');
+            if (preg_match('/^#[0-9a-fA-F]{6}$/', $valor)) $tema[$color] = strtoupper($valor);
+        }
+        return $tema;
     }
 
     /** @param array<string,mixed> $banner */
-    public function saveConfig(string $modo, ?int $codrub, ?int $codsub, array $banner = []): void
+    public function saveConfig(string $modo, ?int $codrub, ?int $codsub, array $banner = [], array $theme = []): void
     {
         $this->ensureTables();
         if (!in_array($modo, self::MODOS, true)) {
@@ -104,17 +137,29 @@ final class PortadaRepo
         $bannerSub = mb_substr(trim((string)($banner['sub'] ?? '')), 0, 160);
         $bannerSubSize = in_array($banner['sub_size'] ?? '', ['chico', 'normal', 'grande'], true) ? (string)$banner['sub_size'] : 'normal';
         $bannerSubColor = preg_match('/^#[0-9a-fA-F]{6}$/', (string)($banner['sub_color'] ?? '')) ? (string)$banner['sub_color'] : '#FFFFFF';
+        $plantilla = (string)($theme['plantilla'] ?? 'elegante');
+        if (!isset(self::PLANTILLAS[$plantilla])) $plantilla = 'elegante';
+        $paleta = self::PLANTILLAS[$plantilla];
+        $coloresTema = [];
+        foreach (['color_fondo','color_fondo_secundario','color_tarjeta','color_acento','color_texto'] as $color) {
+            $valor = (string)($theme[$color] ?? $paleta[$color]);
+            $coloresTema[$color] = preg_match('/^#[0-9a-fA-F]{6}$/', $valor) ? strtoupper($valor) : $paleta[$color];
+        }
         $pdo = Db::pdo();
         $st = $pdo->prepare("
             INSERT INTO portada_config (id, modo, codrub, codsub, banner_text, banner_bold, banner_italic, banner_size, banner_color, banner_bg,
-                banner_sub, banner_sub_bold, banner_sub_italic, banner_sub_size, banner_sub_color)
+                banner_sub, banner_sub_bold, banner_sub_italic, banner_sub_size, banner_sub_color,
+                plantilla, color_fondo, color_fondo_secundario, color_tarjeta, color_acento, color_texto)
             VALUES (1, :modo, :codrub, :codsub, :btext, :bbold, :bitalic, :bsize, :bcolor, :bbg,
-                :bsub, :bsubbold, :bsubitalic, :bsubsize, :bsubcolor)
+                :bsub, :bsubbold, :bsubitalic, :bsubsize, :bsubcolor,
+                :plantilla, :color_fondo, :color_fondo_secundario, :color_tarjeta, :color_acento, :color_texto)
             ON DUPLICATE KEY UPDATE modo=VALUES(modo), codrub=VALUES(codrub), codsub=VALUES(codsub),
                 banner_text=VALUES(banner_text), banner_bold=VALUES(banner_bold), banner_italic=VALUES(banner_italic),
                 banner_size=VALUES(banner_size), banner_color=VALUES(banner_color), banner_bg=VALUES(banner_bg),
                 banner_sub=VALUES(banner_sub), banner_sub_bold=VALUES(banner_sub_bold), banner_sub_italic=VALUES(banner_sub_italic),
-                banner_sub_size=VALUES(banner_sub_size), banner_sub_color=VALUES(banner_sub_color)
+                banner_sub_size=VALUES(banner_sub_size), banner_sub_color=VALUES(banner_sub_color),
+                plantilla=VALUES(plantilla), color_fondo=VALUES(color_fondo), color_fondo_secundario=VALUES(color_fondo_secundario),
+                color_tarjeta=VALUES(color_tarjeta), color_acento=VALUES(color_acento), color_texto=VALUES(color_texto)
         ");
         $st->execute([
             ':modo' => $modo,
@@ -131,6 +176,12 @@ final class PortadaRepo
             ':bsubitalic' => !empty($banner['sub_italic']) ? 1 : 0,
             ':bsubsize' => $bannerSubSize,
             ':bsubcolor' => $bannerSubColor,
+            ':plantilla' => $plantilla,
+            ':color_fondo' => $coloresTema['color_fondo'],
+            ':color_fondo_secundario' => $coloresTema['color_fondo_secundario'],
+            ':color_tarjeta' => $coloresTema['color_tarjeta'],
+            ':color_acento' => $coloresTema['color_acento'],
+            ':color_texto' => $coloresTema['color_texto'],
         ]);
     }
 
