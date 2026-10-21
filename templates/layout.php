@@ -24,6 +24,7 @@ $temaTiendaStyle = '--bg0:' . $temaTienda['color_fondo'] . ';'
     . '--product-name-size:' . $temaTienda['tamano_nombre_producto'] . 'px;'
     . '--product-price-color:' . $temaTienda['color_precio_producto'] . ';'
     . '--product-price-size:' . $temaTienda['tamano_precio_producto'] . 'px;';
+$appCssVersion = (string)(@filemtime(__DIR__ . '/../public/assets/app.css') ?: 1);
 $empresaNombre = htmlspecialchars($empresa['nomemp'] ?? $appName);
 $empresaLogo = trim((string)($empresa['logo'] ?? ''));
 $empresaLogoUrl = $empresaLogo !== '' ? Format::uploadUrl($empresaLogo) : '/assets/brand/logo-header.png';
@@ -60,7 +61,7 @@ try {
     <?php if (!empty($seo['og_image'])): ?><meta property="og:image" content="<?= htmlspecialchars((string)$seo['og_image']) ?>" /><?php endif; ?>
     <?php endif; ?>
     <?= $head ?? '' ?>
-    <link rel="stylesheet" href="/assets/app.css" />
+    <link rel="stylesheet" href="/assets/app.css?v=<?= htmlspecialchars($appCssVersion) ?>" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
     <style>
       .thumb::before {
