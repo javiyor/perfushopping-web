@@ -14,7 +14,16 @@ $temaTiendaStyle = '--bg0:' . $temaTienda['color_fondo'] . ';'
     . '--text:' . $temaTienda['color_texto'] . ';'
     . '--gold:' . $temaTienda['color_acento'] . ';'
     . '--gold2:' . $temaTienda['color_acento'] . ';'
-    . '--line:color-mix(in srgb, ' . $temaTienda['color_acento'] . ' 32%, transparent);';
+    . '--line:color-mix(in srgb, ' . $temaTienda['color_acento'] . ' 32%, transparent);'
+    . '--product-font:' . match ($temaTienda['fuente_tarjeta']) {
+        'serif' => 'Georgia, "Times New Roman", serif',
+        'rounded' => '"Trebuchet MS", Arial, sans-serif',
+        default => 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif',
+    } . ';'
+    . '--product-name-color:' . $temaTienda['color_nombre_producto'] . ';'
+    . '--product-name-size:' . $temaTienda['tamano_nombre_producto'] . 'px;'
+    . '--product-price-color:' . $temaTienda['color_precio_producto'] . ';'
+    . '--product-price-size:' . $temaTienda['tamano_precio_producto'] . 'px;';
 $empresaNombre = htmlspecialchars($empresa['nomemp'] ?? $appName);
 $empresaLogo = trim((string)($empresa['logo'] ?? ''));
 $empresaLogoUrl = $empresaLogo !== '' ? Format::uploadUrl($empresaLogo) : '/assets/brand/logo-header.png';

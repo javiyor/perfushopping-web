@@ -778,6 +778,17 @@ body[data-store-template] .hero {
   border-color: var(--line);
 }
 body[data-store-template] .card-title { color: var(--text); }
+body[data-store-template] .card-title,
+body[data-store-template] .promo-card-title {
+  color: var(--product-name-color) !important;
+  font-family: var(--product-font) !important;
+  font-size: var(--product-name-size) !important;
+}
+body[data-store-template] .price strong {
+  color: var(--product-price-color) !important;
+  font-family: var(--product-font) !important;
+  font-size: var(--product-price-size) !important;
+}
 body[data-store-template] .btn:not(.secondary):not(.danger) {
   border-color: var(--gold);
   background: linear-gradient(135deg, var(--gold), var(--gold2));

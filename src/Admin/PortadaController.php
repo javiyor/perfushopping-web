@@ -79,6 +79,11 @@ final class PortadaController
             'color_tarjeta' => trim((string)($_POST['color_tarjeta'] ?? '')),
             'color_acento' => trim((string)($_POST['color_acento'] ?? '')),
             'color_texto' => trim((string)($_POST['color_texto'] ?? '')),
+            'fuente_tarjeta' => trim((string)($_POST['fuente_tarjeta'] ?? 'system')),
+            'color_nombre_producto' => trim((string)($_POST['color_nombre_producto'] ?? '')),
+            'tamano_nombre_producto' => (int)($_POST['tamano_nombre_producto'] ?? 14),
+            'color_precio_producto' => trim((string)($_POST['color_precio_producto'] ?? '')),
+            'tamano_precio_producto' => (int)($_POST['tamano_precio_producto'] ?? 18),
         ];
 
         (new PortadaRepo())->saveConfig($modo, $codrub ?: null, $codsub ?: null, $banner, $theme);

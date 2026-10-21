@@ -59,6 +59,11 @@ final class PortadaRepo
             $this->ensureColumn('portada_config', 'color_tarjeta', "VARCHAR(7) NOT NULL DEFAULT '#171411'");
             $this->ensureColumn('portada_config', 'color_acento', "VARCHAR(7) NOT NULL DEFAULT '#D8B25A'");
             $this->ensureColumn('portada_config', 'color_texto', "VARCHAR(7) NOT NULL DEFAULT '#F6F4EF'");
+            $this->ensureColumn('portada_config', 'fuente_tarjeta', "VARCHAR(16) NOT NULL DEFAULT 'system'");
+            $this->ensureColumn('portada_config', 'color_nombre_producto', "VARCHAR(7) NOT NULL DEFAULT '#F6F4EF'");
+            $this->ensureColumn('portada_config', 'tamano_nombre_producto', 'TINYINT UNSIGNED NOT NULL DEFAULT 14');
+            $this->ensureColumn('portada_config', 'color_precio_producto', "VARCHAR(7) NOT NULL DEFAULT '#D8B25A'");
+            $this->ensureColumn('portada_config', 'tamano_precio_producto', 'TINYINT UNSIGNED NOT NULL DEFAULT 18');
         } catch (\Throwable $e) {
         }
     }
@@ -91,7 +96,9 @@ final class PortadaRepo
             'banner_sub' => null, 'banner_sub_bold' => 0, 'banner_sub_italic' => 0,
             'banner_sub_size' => 'normal', 'banner_sub_color' => '#FFFFFF',
             'plantilla' => 'elegante', 'color_fondo' => '#050505', 'color_fondo_secundario' => '#0C0B0A',
-            'color_tarjeta' => '#171411', 'color_acento' => '#D8B25A', 'color_texto' => '#F6F4EF'];
+            'color_tarjeta' => '#171411', 'color_acento' => '#D8B25A', 'color_texto' => '#F6F4EF',
+            'fuente_tarjeta' => 'system', 'color_nombre_producto' => '#F6F4EF', 'tamano_nombre_producto' => 14,
+            'color_precio_producto' => '#D8B25A', 'tamano_precio_producto' => 18];
     }
 
     public static function plantillas(): array
@@ -110,6 +117,15 @@ final class PortadaRepo
             $valor = (string)($config[$color] ?? '');
             if (preg_match('/^#[0-9a-fA-F]{6}$/', $valor)) $tema[$color] = strtoupper($valor);
         }
+        $fuente = (string)($config['fuente_tarjeta'] ?? 'system');
+        $tema['fuente_tarjeta'] = in_array($fuente, ['system', 'serif', 'rounded'], true) ? $fuente : 'system';
+        foreach (['color_nombre_producto', 'color_precio_producto'] as $color) {
+            $valor = (string)($config[$color] ?? '');
+            $fallback = $color === 'color_nombre_producto' ? $tema['color_texto'] : $tema['color_acento'];
+            $tema[$color] = preg_match('/^#[0-9a-fA-F]{6}$/', $valor) ? strtoupper($valor) : $fallback;
+        }
+        $tema['tamano_nombre_producto'] = max(12, min(20, (int)($config['tamano_nombre_producto'] ?? 14)));
+        $tema['tamano_precio_producto'] = max(14, min(26, (int)($config['tamano_precio_producto'] ?? 18)));
         return $tema;
     }
 
@@ -145,21 +161,34 @@ final class PortadaRepo
             $valor = (string)($theme[$color] ?? $paleta[$color]);
             $coloresTema[$color] = preg_match('/^#[0-9a-fA-F]{6}$/', $valor) ? strtoupper($valor) : $paleta[$color];
         }
+        $fuenteTarjeta = (string)($theme['fuente_tarjeta'] ?? 'system');
+        if (!in_array($fuenteTarjeta, ['system', 'serif', 'rounded'], true)) $fuenteTarjeta = 'system';
+        $colorNombre = preg_match('/^#[0-9a-fA-F]{6}$/', (string)($theme['color_nombre_producto'] ?? ''))
+            ? strtoupper((string)$theme['color_nombre_producto']) : $coloresTema['color_texto'];
+        $colorPrecio = preg_match('/^#[0-9a-fA-F]{6}$/', (string)($theme['color_precio_producto'] ?? ''))
+            ? strtoupper((string)$theme['color_precio_producto']) : $coloresTema['color_acento'];
+        $tamanoNombre = max(12, min(20, (int)($theme['tamano_nombre_producto'] ?? 14)));
+        $tamanoPrecio = max(14, min(26, (int)($theme['tamano_precio_producto'] ?? 18)));
         $pdo = Db::pdo();
         $st = $pdo->prepare("
             INSERT INTO portada_config (id, modo, codrub, codsub, banner_text, banner_bold, banner_italic, banner_size, banner_color, banner_bg,
                 banner_sub, banner_sub_bold, banner_sub_italic, banner_sub_size, banner_sub_color,
-                plantilla, color_fondo, color_fondo_secundario, color_tarjeta, color_acento, color_texto)
+                plantilla, color_fondo, color_fondo_secundario, color_tarjeta, color_acento, color_texto,
+                fuente_tarjeta, color_nombre_producto, tamano_nombre_producto, color_precio_producto, tamano_precio_producto)
             VALUES (1, :modo, :codrub, :codsub, :btext, :bbold, :bitalic, :bsize, :bcolor, :bbg,
                 :bsub, :bsubbold, :bsubitalic, :bsubsize, :bsubcolor,
-                :plantilla, :color_fondo, :color_fondo_secundario, :color_tarjeta, :color_acento, :color_texto)
+                :plantilla, :color_fondo, :color_fondo_secundario, :color_tarjeta, :color_acento, :color_texto,
+                :fuente_tarjeta, :color_nombre_producto, :tamano_nombre_producto, :color_precio_producto, :tamano_precio_producto)
             ON DUPLICATE KEY UPDATE modo=VALUES(modo), codrub=VALUES(codrub), codsub=VALUES(codsub),
                 banner_text=VALUES(banner_text), banner_bold=VALUES(banner_bold), banner_italic=VALUES(banner_italic),
                 banner_size=VALUES(banner_size), banner_color=VALUES(banner_color), banner_bg=VALUES(banner_bg),
                 banner_sub=VALUES(banner_sub), banner_sub_bold=VALUES(banner_sub_bold), banner_sub_italic=VALUES(banner_sub_italic),
                 banner_sub_size=VALUES(banner_sub_size), banner_sub_color=VALUES(banner_sub_color),
                 plantilla=VALUES(plantilla), color_fondo=VALUES(color_fondo), color_fondo_secundario=VALUES(color_fondo_secundario),
-                color_tarjeta=VALUES(color_tarjeta), color_acento=VALUES(color_acento), color_texto=VALUES(color_texto)
+                color_tarjeta=VALUES(color_tarjeta), color_acento=VALUES(color_acento), color_texto=VALUES(color_texto),
+                fuente_tarjeta=VALUES(fuente_tarjeta), color_nombre_producto=VALUES(color_nombre_producto),
+                tamano_nombre_producto=VALUES(tamano_nombre_producto), color_precio_producto=VALUES(color_precio_producto),
+                tamano_precio_producto=VALUES(tamano_precio_producto)
         ");
         $st->execute([
             ':modo' => $modo,
@@ -182,6 +211,11 @@ final class PortadaRepo
             ':color_tarjeta' => $coloresTema['color_tarjeta'],
             ':color_acento' => $coloresTema['color_acento'],
             ':color_texto' => $coloresTema['color_texto'],
+            ':fuente_tarjeta' => $fuenteTarjeta,
+            ':color_nombre_producto' => $colorNombre,
+            ':tamano_nombre_producto' => $tamanoNombre,
+            ':color_precio_producto' => $colorPrecio,
+            ':tamano_precio_producto' => $tamanoPrecio,
         ]);
     }
 

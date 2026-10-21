@@ -86,10 +86,43 @@ $presetFondo = ['#1a1a1a' => 'Negro', '#C9A227' => 'Dorado', '#C0392B' => 'Rojo'
                             <input class="form-control form-control-sm tema-color" type="color" name="<?= htmlspecialchars($field) ?>" id="<?= htmlspecialchars($field) ?>" value="<?= htmlspecialchars($tema[$field] ?? '#000000') ?>" />
                         </div>
                     <?php endforeach; ?>
+                    <div class="col-12 mt-3"><h6 class="fw-bold mb-2"><i class="bi bi-type"></i> Letras de las tarjetas de productos</h6></div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label small mb-1">Tipografía</label>
+                        <select class="form-select form-select-sm product-type-control" name="fuente_tarjeta" id="fuente_tarjeta">
+                            <option value="system" <?= ($tema['fuente_tarjeta'] ?? 'system') === 'system' ? 'selected' : '' ?>>Moderna</option>
+                            <option value="serif" <?= ($tema['fuente_tarjeta'] ?? '') === 'serif' ? 'selected' : '' ?>>Clásica</option>
+                            <option value="rounded" <?= ($tema['fuente_tarjeta'] ?? '') === 'rounded' ? 'selected' : '' ?>>Redondeada</option>
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <label class="form-label small mb-1">Tamaño nombre</label>
+                        <select class="form-select form-select-sm product-type-control" name="tamano_nombre_producto" id="tamano_nombre_producto">
+                            <?php foreach ([12, 13, 14, 15, 16, 18, 20] as $size): ?><option value="<?= $size ?>" <?= (int)($tema['tamano_nombre_producto'] ?? 14) === $size ? 'selected' : '' ?>><?= $size ?> px</option><?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <label class="form-label small mb-1">Color nombre</label>
+                        <input class="form-control form-control-sm product-type-control" type="color" name="color_nombre_producto" id="color_nombre_producto" value="<?= htmlspecialchars($tema['color_nombre_producto'] ?? '#F6F4EF') ?>" />
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <label class="form-label small mb-1">Tamaño precio</label>
+                        <select class="form-select form-select-sm product-type-control" name="tamano_precio_producto" id="tamano_precio_producto">
+                            <?php foreach ([14, 16, 18, 20, 22, 24, 26] as $size): ?><option value="<?= $size ?>" <?= (int)($tema['tamano_precio_producto'] ?? 18) === $size ? 'selected' : '' ?>><?= $size ?> px</option><?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <label class="form-label small mb-1">Color precio</label>
+                        <input class="form-control form-control-sm product-type-control" type="color" name="color_precio_producto" id="color_precio_producto" value="<?= htmlspecialchars($tema['color_precio_producto'] ?? '#D8B25A') ?>" />
+                    </div>
                     <div class="col-12">
                         <div id="portadaThemePreview" class="rounded p-3" style="background:<?= htmlspecialchars($tema['color_fondo'] ?? '#050505') ?>;color:<?= htmlspecialchars($tema['color_texto'] ?? '#F6F4EF') ?>">
                             <div class="rounded p-3" style="background:<?= htmlspecialchars($tema['color_tarjeta'] ?? '#171411') ?>;border-left:4px solid <?= htmlspecialchars($tema['color_acento'] ?? '#D8B25A') ?>">
                                 <strong>Vista previa de la plantilla</strong><div class="small mt-1">Fondo, tarjeta y color de acento</div>
+                                <div id="productTypographyPreview" class="mt-2 p-2 rounded" style="max-width:300px;background:rgba(127,127,127,.12)">
+                                    <div id="previewProductName">Nombre del producto</div>
+                                    <strong id="previewProductPrice" style="display:block;margin-top:4px">$ 25.990</strong>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -319,6 +352,23 @@ function actualizarPreviewTema() {
         sample.style.background = tarjeta;
         sample.style.borderLeftColor = acento;
     }
+    actualizarPreviewLetras();
+}
+function actualizarPreviewLetras() {
+    const name = document.getElementById('previewProductName');
+    const price = document.getElementById('previewProductPrice');
+    if (!name || !price) return;
+    const fonts = {
+        system: 'ui-sans-serif,system-ui,-apple-system,"Segoe UI",Arial,sans-serif',
+        serif: 'Georgia,"Times New Roman",serif',
+        rounded: '"Trebuchet MS",Arial,sans-serif'
+    };
+    const font = document.getElementById('fuente_tarjeta').value;
+    name.style.fontFamily = price.style.fontFamily = fonts[font] || fonts.system;
+    name.style.fontSize = document.getElementById('tamano_nombre_producto').value + 'px';
+    name.style.color = document.getElementById('color_nombre_producto').value;
+    price.style.fontSize = document.getElementById('tamano_precio_producto').value + 'px';
+    price.style.color = document.getElementById('color_precio_producto').value;
 }
 function aplicarPlantilla(radio) {
     if (!radio || !radio.checked) return;
@@ -383,6 +433,10 @@ document.querySelectorAll('.plantilla-radio').forEach(function(radio) {
 });
 document.querySelectorAll('.tema-color').forEach(function(input) {
     input.addEventListener('input', actualizarPreviewTema);
+});
+document.querySelectorAll('.product-type-control').forEach(function(input) {
+    input.addEventListener('input', actualizarPreviewLetras);
+    input.addEventListener('change', actualizarPreviewLetras);
 });
 actualizarPreviewTema();
 function toggleAll(chk) {
