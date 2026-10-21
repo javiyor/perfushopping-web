@@ -46,6 +46,7 @@ $qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $
             <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
             <button class="btn btn-outline-secondary btn-sm" type="submit"><i class="bi bi-arrow-repeat"></i> Recalcular</button>
         </form>
+        <a class="btn btn-outline-secondary btn-sm" href="/admin/nota-pedido"><i class="bi bi-list-ul"></i> Notas generadas</a>
         <button class="btn btn-accent btn-sm" id="btnNotaPedido" onclick="irANotaPedido()"><i class="bi bi-file-text"></i> Nota de pedido <span id="npCount" class="badge bg-light text-dark" style="display:none"></span></button>
         <button class="btn btn-outline-secondary btn-sm" id="btnNpLimpiar" type="button" title="Limpiar cantidades acumuladas de todas las páginas"><i class="bi bi-x-lg"></i></button>
         <a class="btn btn-outline-primary btn-sm" href="/admin/stock/ajuste#historialStock"><i class="bi bi-clock-history"></i> Movimientos por grupo</a>

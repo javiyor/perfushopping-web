@@ -25,6 +25,9 @@ $temaTiendaStyle = '--bg0:' . $temaTienda['color_fondo'] . ';'
     . '--product-name-size:' . $temaTienda['tamano_nombre_producto'] . 'px;'
     . '--product-price-color:' . $temaTienda['color_precio_producto'] . ';'
     . '--product-price-size:' . $temaTienda['tamano_precio_producto'] . 'px;';
+foreach ($temaTienda['colores_componentes'] as $componentKey => $componentColor) {
+    $temaTiendaStyle .= '--c-' . str_replace('_', '-', $componentKey) . ':' . $componentColor . ';';
+}
 $appCssVersion = (string)(@filemtime(__DIR__ . '/../public/assets/app.css') ?: 1);
 $empresaNombre = htmlspecialchars($empresa['nomemp'] ?? $appName);
 $empresaLogo = trim((string)($empresa['logo'] ?? ''));
@@ -133,11 +136,11 @@ try {
       <?= $body ?>
 
       <?php if ($footerText !== ''): ?>
-      <footer style="margin-top:26px;padding:18px 12px 0;border-top:1px solid var(--line);color:var(--text);opacity:.78;text-align:center;font-size:13px;line-height:1.6">
+      <footer class="store-footer-text">
         <?= nl2br(htmlspecialchars($footerText)) ?>
       </footer>
       <?php endif; ?>
-      <div style="margin-top:26px;color:rgba(246,244,239,0.62);font-size:12px;display:flex;gap:14px;flex-wrap:wrap;justify-content:center">
+      <div class="store-footer-links">
         <a href="/terms" style="text-decoration:underline">Terminos</a>
         <a href="/privacy" style="text-decoration:underline">Privacidad y cookies</a>
         <a href="/terms/affiliate" style="text-decoration:underline">Programa de referidos</a>

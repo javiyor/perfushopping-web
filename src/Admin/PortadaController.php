@@ -36,6 +36,7 @@ final class PortadaController
             'config' => $config,
             'tema' => PortadaRepo::tema($config),
             'plantillas' => PortadaRepo::plantillas(),
+            'coloresComponentes' => PortadaRepo::coloresComponentes(),
             'manual' => $manual,
             'rubros' => $rubros,
             'marcas' => $marcas,
@@ -87,8 +88,10 @@ final class PortadaController
         ];
 
         $footerText = trim((string)($_POST['footer_text'] ?? ''));
+        $componentColors = $_POST['colores_componentes'] ?? [];
+        if (!is_array($componentColors)) $componentColors = [];
 
-        (new PortadaRepo())->saveConfig($modo, $codrub ?: null, $codsub ?: null, $banner, $theme, $footerText);
+        (new PortadaRepo())->saveConfig($modo, $codrub ?: null, $codsub ?: null, $banner, $theme, $footerText, $componentColors);
 
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Portada actualizada.'];
         Response::redirect('/admin/portada');

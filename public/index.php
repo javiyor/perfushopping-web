@@ -481,6 +481,7 @@ $router->post('/admin/stock/discont', [AdminStockController::class, 'toggleDisco
 $router->post('/admin/stock/eliminar-discontinuadas', [AdminStockController::class, 'eliminarDiscontinuadas']);
 
 // Admin - Notas de pedido
+$router->get('/admin/nota-pedido', [AdminNotaPedidoController::class, 'index']);
 $router->get('/admin/nota-pedido/nueva', [AdminNotaPedidoController::class, 'create']);
 $router->post('/admin/nota-pedido/guardar', [AdminNotaPedidoController::class, 'store']);
 $router->get('/admin/nota-pedido/(?P<id>\d+)', [AdminNotaPedidoController::class, 'show']);

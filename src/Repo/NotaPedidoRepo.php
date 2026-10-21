@@ -7,6 +7,29 @@ use Perfushopping\Web\Infra\Db;
 
 final class NotaPedidoRepo
 {
+    /** @return array<int,array<string,mixed>> */
+    public function listRecent(string $q = ''): array
+    {
+        $q = trim($q);
+        $where = '';
+        if ($q !== '') {
+            $where = 'WHERE np.codigo LIKE :codigo_q OR np.proveedor_nombre LIKE :proveedor_q';
+        }
+        $st = Db::pdo()->prepare("
+            SELECT np.*, u.nombre AS created_by_nombre,
+                (SELECT COUNT(*) FROM notas_pedido_items npi WHERE npi.nota_id = np.id) AS items_count,
+                (SELECT COALESCE(SUM(npi.qty), 0) FROM notas_pedido_items npi WHERE npi.nota_id = np.id) AS total_qty
+            FROM notas_pedido np
+            LEFT JOIN admin_users u ON u.id = np.created_by
+            {$where}
+            ORDER BY np.id DESC
+            LIMIT 300
+        ");
+        if ($q !== '') $st->execute([':codigo_q' => '%' . $q . '%', ':proveedor_q' => '%' . $q . '%']);
+        else $st->execute();
+        return $st->fetchAll() ?: [];
+    }
+
     public function nextCodigo(): string
     {
         $year = date('Y');

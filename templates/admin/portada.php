@@ -7,6 +7,7 @@ $q = $q ?? '';
 $searchResults = $searchResults ?? [];
 $tema = $tema ?? \Perfushopping\Web\Repo\PortadaRepo::tema($config);
 $plantillas = $plantillas ?? \Perfushopping\Web\Repo\PortadaRepo::plantillas();
+$coloresComponentes = $coloresComponentes ?? \Perfushopping\Web\Repo\PortadaRepo::coloresComponentes();
 $modo = (string)($config['modo'] ?? 'auto');
 $codrub = (int)($config['codrub'] ?? 0);
 $codsub = (int)($config['codsub'] ?? 0);
@@ -134,6 +135,29 @@ $presetFondo = ['#1a1a1a' => 'Negro', '#C9A227' => 'Dorado', '#C0392B' => 'Rojo'
                 <p class="text-muted small mb-2">Este texto se muestra al pie de las páginas públicas, encima de los enlaces legales. Podés dejarlo vacío para ocultarlo.</p>
                 <textarea class="form-control form-control-sm" name="footer_text" rows="3" maxlength="600" placeholder="Ej.: Perfushopping — perfumería, belleza y cuidado personal. Envíos a todo el país."><?= htmlspecialchars((string)($config['footer_text'] ?? '')) ?></textarea>
             </div>
+
+            <details class="border rounded p-3 mb-3" id="componentColorsSettings">
+                <summary class="fw-bold" style="cursor:pointer"><i class="bi bi-palette2"></i> Colores de todos los componentes</summary>
+                <p class="text-muted small mt-2 mb-3">Personalizá por separado encabezado, navegación, portada, filtros, catálogo, productos, promociones y pie de página.</p>
+                <div class="row g-2">
+                    <?php foreach ($coloresComponentes as $key => [$label, $defaultColor]):
+                        $componentColor = $tema['colores_componentes'][$key] ?? $defaultColor;
+                    ?>
+                    <div class="col-6 col-md-4 col-xl-3">
+                        <label class="form-label small mb-1" for="componentColor_<?= htmlspecialchars($key) ?>"><?= htmlspecialchars($label) ?></label>
+                        <input class="form-control form-control-sm component-color" type="color" name="colores_componentes[<?= htmlspecialchars($key) ?>]" id="componentColor_<?= htmlspecialchars($key) ?>" value="<?= htmlspecialchars($componentColor) ?>" data-component-key="<?= htmlspecialchars(str_replace('_', '-', $key)) ?>" />
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+                <div class="d-flex flex-wrap gap-2 mt-3" id="componentColorsPreview">
+                    <span class="rounded px-3 py-2" data-preview-component="header-bg" style="background:<?= htmlspecialchars($tema['colores_componentes']['header_bg']) ?>;color:<?= htmlspecialchars($tema['colores_componentes']['brand_text']) ?>">Encabezado</span>
+                    <span class="rounded px-3 py-2" data-preview-component="nav-bg" style="background:<?= htmlspecialchars($tema['colores_componentes']['nav_bg']) ?>;color:<?= htmlspecialchars($tema['colores_componentes']['nav_text']) ?>">Navegación</span>
+                    <span class="rounded px-3 py-2" data-preview-component="hero-bg" style="background:<?= htmlspecialchars($tema['colores_componentes']['hero_bg']) ?>;color:<?= htmlspecialchars($tema['colores_componentes']['hero_text']) ?>">Portada</span>
+                    <span class="rounded px-3 py-2" data-preview-component="product-bg" style="background:<?= htmlspecialchars($tema['colores_componentes']['product_bg']) ?>;color:<?= htmlspecialchars($tema['colores_componentes']['product_category']) ?>">Catálogo / productos</span>
+                    <span class="rounded px-3 py-2" data-preview-component="promo-bg" style="background:<?= htmlspecialchars($tema['colores_componentes']['promo_bg']) ?>;color:<?= htmlspecialchars($tema['colores_componentes']['promo_price']) ?>">Promociones</span>
+                    <span class="rounded px-3 py-2" data-preview-component="footer-bg" style="background:<?= htmlspecialchars($tema['colores_componentes']['footer_bg']) ?>;color:<?= htmlspecialchars($tema['colores_componentes']['footer_text']) ?>">Pie de página</span>
+                </div>
+            </details>
 
             <div class="row g-3" id="portadaFields">
                 <div class="col-md-6" id="fieldRubro" style="<?= $modo === 'rubro' ? '' : 'display:none' ?>">
@@ -385,7 +409,55 @@ function aplicarPlantilla(radio) {
             if (field && preset[key]) field.value = preset[key];
         });
     } catch (e) {}
+    aplicarPaletaComponentes(radio);
     actualizarPreviewTema();
+}
+function aplicarPaletaComponentes(radio) {
+    const colors = {
+        header_bg: document.getElementById('color_tarjeta').value,
+        header_border: document.getElementById('color_acento').value,
+        logo_bg: document.getElementById('color_fondo_secundario').value,
+        brand_text: document.getElementById('color_texto').value,
+        brand_subtext: document.getElementById('color_texto').value,
+        nav_bg: document.getElementById('color_fondo_secundario').value,
+        nav_text: document.getElementById('color_texto').value,
+        nav_border: document.getElementById('color_acento').value,
+        hero_bg: document.getElementById('color_tarjeta').value,
+        hero_text: document.getElementById('color_texto').value,
+        hero_accent: document.getElementById('color_acento').value,
+        contact_text: document.getElementById('color_texto').value,
+        section_bg: document.getElementById('color_tarjeta').value,
+        section_border: document.getElementById('color_acento').value,
+        catalog_title: document.getElementById('color_acento').value,
+        filter_bg: document.getElementById('color_fondo_secundario').value,
+        filter_text: document.getElementById('color_texto').value,
+        filter_border: document.getElementById('color_acento').value,
+        product_bg: document.getElementById('color_tarjeta').value,
+        product_border: document.getElementById('color_acento').value,
+        product_hover_bg: document.getElementById('color_fondo_secundario').value,
+        product_hover_border: document.getElementById('color_acento').value,
+        product_media_bg: document.getElementById('color_fondo_secundario').value,
+        product_category: document.getElementById('color_texto').value,
+        promo_title: document.getElementById('color_acento').value,
+        promo_bg: document.getElementById('color_tarjeta').value,
+        promo_border: document.getElementById('color_acento').value,
+        promo_old_price: document.getElementById('color_texto').value,
+        promo_price: document.getElementById('color_acento').value,
+        promo_discount_bg: '#C0392B',
+        promo_discount_text: '#FFFFFF',
+        footer_bg: document.getElementById('color_fondo_secundario').value,
+        footer_text: document.getElementById('color_texto').value,
+        footer_link: document.getElementById('color_acento').value,
+        footer_border: document.getElementById('color_acento').value,
+        button_bg: document.getElementById('color_acento').value,
+        button_text: (radio.dataset.colors || '').indexOf('"mode":"light"') >= 0 ? '#FFFFFF' : '#17140F'
+    };
+    Object.keys(colors).forEach(function(key) {
+        const input = document.getElementById('componentColor_' + key);
+        if (!input) return;
+        input.value = colors[key];
+        input.dispatchEvent(new Event('input', {bubbles:true}));
+    });
 }
 function setBannerColor(hex) {
     document.getElementById('bannerColor').value = hex;
@@ -443,6 +515,21 @@ document.querySelectorAll('.tema-color').forEach(function(input) {
 document.querySelectorAll('.product-type-control').forEach(function(input) {
     input.addEventListener('input', actualizarPreviewLetras);
     input.addEventListener('change', actualizarPreviewLetras);
+});
+document.querySelectorAll('.component-color').forEach(function(input) {
+    input.addEventListener('input', function() {
+        const key = this.dataset.componentKey;
+        const previewMap = {
+            'header-bg':'header-bg', 'nav-bg':'nav-bg', 'hero-bg':'hero-bg',
+            'product-bg':'product-bg', 'promo-bg':'promo-bg', 'footer-bg':'footer-bg',
+            'brand-text':'header-bg', 'nav-text':'nav-bg', 'hero-text':'hero-bg',
+            'product-category':'product-bg', 'promo-price':'promo-bg', 'footer-text':'footer-bg'
+        };
+        const target = document.querySelector('[data-preview-component="' + (previewMap[key] || '') + '"]');
+        if (!target) return;
+        if (key.endsWith('-bg')) target.style.backgroundColor = this.value;
+        else target.style.color = this.value;
+    });
 });
 actualizarPreviewTema();
 function toggleAll(chk) {

@@ -14,6 +14,45 @@ final class PortadaRepo
         'boutique' => ['label' => 'Boutique rosa', 'mode' => 'light', 'color_fondo' => '#F8EEF1', 'color_fondo_secundario' => '#F1E1E7', 'color_tarjeta' => '#FFF9FB', 'color_acento' => '#B13D68', 'color_texto' => '#38212A'],
         'natural' => ['label' => 'Natural', 'mode' => 'light', 'color_fondo' => '#EEF2E9', 'color_fondo_secundario' => '#DDE6D5', 'color_tarjeta' => '#FAFCF7', 'color_acento' => '#52734D', 'color_texto' => '#263326'],
     ];
+    private const COLORES_COMPONENTES = [
+        'header_bg' => ['Encabezado: fondo', '#171411'],
+        'header_border' => ['Encabezado: borde', '#D8B25A'],
+        'logo_bg' => ['Logo: fondo', '#26221B'],
+        'brand_text' => ['Nombre de tienda', '#F6F4EF'],
+        'brand_subtext' => ['Subtítulo de tienda', '#B9B3A8'],
+        'nav_bg' => ['Navegación: fondo', '#26221B'],
+        'nav_text' => ['Navegación: texto', '#F6F4EF'],
+        'nav_border' => ['Navegación: borde', '#D8B25A'],
+        'hero_bg' => ['Portada: fondo destacado', '#26221B'],
+        'hero_text' => ['Portada: texto', '#F6F4EF'],
+        'hero_accent' => ['Portada: títulos y acentos', '#D8B25A'],
+        'contact_text' => ['Contacto: texto', '#D4D0C8'],
+        'section_bg' => ['Secciones: fondo', '#171411'],
+        'section_border' => ['Secciones: borde', '#55462B'],
+        'catalog_title' => ['Catálogo: título', '#D8B25A'],
+        'filter_bg' => ['Filtros: fondo', '#26221B'],
+        'filter_text' => ['Filtros: texto', '#F6F4EF'],
+        'filter_border' => ['Filtros: borde', '#55462B'],
+        'product_bg' => ['Productos: tarjeta', '#171411'],
+        'product_border' => ['Productos: borde', '#55462B'],
+        'product_hover_bg' => ['Productos: fondo al pasar', '#26221B'],
+        'product_hover_border' => ['Productos: borde al pasar', '#D8B25A'],
+        'product_media_bg' => ['Productos: fondo de imagen', '#26221B'],
+        'product_category' => ['Productos: categoría y marca', '#B9B3A8'],
+        'promo_title' => ['Ofertas: título', '#FF6B6B'],
+        'promo_bg' => ['Ofertas: tarjeta', '#26221B'],
+        'promo_border' => ['Ofertas: borde', '#D8B25A'],
+        'promo_old_price' => ['Ofertas: precio anterior', '#B9B3A8'],
+        'promo_price' => ['Ofertas: precio promocional', '#7CFC9A'],
+        'promo_discount_bg' => ['Ofertas: fondo de descuento', '#C0392B'],
+        'promo_discount_text' => ['Ofertas: texto de descuento', '#FFFFFF'],
+        'footer_bg' => ['Pie: fondo', '#171411'],
+        'footer_text' => ['Pie: texto', '#D4D0C8'],
+        'footer_link' => ['Pie: enlaces', '#D8B25A'],
+        'footer_border' => ['Pie: borde', '#55462B'],
+        'button_bg' => ['Botones: fondo', '#D8B25A'],
+        'button_text' => ['Botones: texto', '#17140F'],
+    ];
 
     private function ensureTables(): void
     {
@@ -65,6 +104,7 @@ final class PortadaRepo
             $this->ensureColumn('portada_config', 'color_precio_producto', "VARCHAR(7) NOT NULL DEFAULT '#D8B25A'");
             $this->ensureColumn('portada_config', 'tamano_precio_producto', 'TINYINT UNSIGNED NOT NULL DEFAULT 18');
             $this->ensureColumn('portada_config', 'footer_text', 'TEXT DEFAULT NULL');
+            $this->ensureColumn('portada_config', 'colores_componentes', 'TEXT DEFAULT NULL');
         } catch (\Throwable $e) {
         }
     }
@@ -107,6 +147,36 @@ final class PortadaRepo
         return self::PLANTILLAS;
     }
 
+    /** @return array<string,array{0:string,1:string}> */
+    public static function coloresComponentes(): array
+    {
+        return self::COLORES_COMPONENTES;
+    }
+
+    /** @param array<string,string> $colors @return array<string,string> */
+    private static function defaultsComponentes(array $colors, bool $light): array
+    {
+        $accent = $colors['color_acento'];
+        $card = $colors['color_tarjeta'];
+        $text = $colors['color_texto'];
+        $background = $colors['color_fondo_secundario'];
+        return [
+            'header_bg' => $card, 'header_border' => $accent, 'logo_bg' => $background, 'brand_text' => $text,
+            'brand_subtext' => $text, 'nav_bg' => $background, 'nav_text' => $text,
+            'nav_border' => $accent, 'hero_bg' => $card, 'hero_text' => $text,
+            'hero_accent' => $accent, 'contact_text' => $text, 'section_bg' => $card,
+            'section_border' => $accent, 'catalog_title' => $accent, 'filter_bg' => $background,
+            'filter_text' => $text, 'filter_border' => $accent, 'product_bg' => $card,
+            'product_border' => $accent, 'product_hover_bg' => $background, 'product_hover_border' => $accent,
+            'product_media_bg' => $background, 'product_category' => $text, 'promo_title' => $accent,
+            'promo_bg' => $card, 'promo_border' => $accent, 'promo_old_price' => $text,
+            'promo_price' => $accent, 'promo_discount_bg' => '#C0392B', 'promo_discount_text' => '#FFFFFF',
+            'footer_bg' => $background, 'footer_text' => $text,
+            'footer_link' => $accent, 'footer_border' => $accent, 'button_bg' => $accent,
+            'button_text' => $light ? '#FFFFFF' : '#17140F',
+        ];
+    }
+
     /** @return array{plantilla:string,mode:string,color_fondo:string,color_fondo_secundario:string,color_tarjeta:string,color_acento:string,color_texto:string} */
     public static function tema(array $config): array
     {
@@ -127,11 +197,26 @@ final class PortadaRepo
         }
         $tema['tamano_nombre_producto'] = max(12, min(20, (int)($config['tamano_nombre_producto'] ?? 14)));
         $tema['tamano_precio_producto'] = max(14, min(26, (int)($config['tamano_precio_producto'] ?? 18)));
+        $baseColors = [
+            'color_fondo' => $tema['color_fondo'], 'color_fondo_secundario' => $tema['color_fondo_secundario'],
+            'color_tarjeta' => $tema['color_tarjeta'], 'color_acento' => $tema['color_acento'],
+            'color_texto' => $tema['color_texto'],
+        ];
+        $defaultComponentColors = self::defaultsComponentes($baseColors, $tema['mode'] === 'light');
+        $storedComponentColors = json_decode((string)($config['colores_componentes'] ?? ''), true);
+        if (!is_array($storedComponentColors)) $storedComponentColors = [];
+        $componentColors = [];
+        foreach (self::COLORES_COMPONENTES as $key => [, $default]) {
+            $default = $defaultComponentColors[$key] ?? $default;
+            $value = (string)($storedComponentColors[$key] ?? '');
+            $componentColors[$key] = preg_match('/^#[0-9a-fA-F]{6}$/', $value) ? strtoupper($value) : $default;
+        }
+        $tema['colores_componentes'] = $componentColors;
         return $tema;
     }
 
     /** @param array<string,mixed> $banner */
-    public function saveConfig(string $modo, ?int $codrub, ?int $codsub, array $banner = [], array $theme = [], string $footerText = ''): void
+    public function saveConfig(string $modo, ?int $codrub, ?int $codsub, array $banner = [], array $theme = [], string $footerText = '', array $componentColors = []): void
     {
         $this->ensureTables();
         if (!in_array($modo, self::MODOS, true)) {
@@ -171,16 +256,24 @@ final class PortadaRepo
         $tamanoNombre = max(12, min(20, (int)($theme['tamano_nombre_producto'] ?? 14)));
         $tamanoPrecio = max(14, min(26, (int)($theme['tamano_precio_producto'] ?? 18)));
         $footerText = mb_substr(trim($footerText), 0, 600);
+        $defaultComponentColors = self::defaultsComponentes($coloresTema, $paleta['mode'] === 'light');
+        $validatedComponentColors = [];
+        foreach (self::COLORES_COMPONENTES as $key => [, $default]) {
+            $default = $defaultComponentColors[$key] ?? $default;
+            $value = (string)($componentColors[$key] ?? $default);
+            $validatedComponentColors[$key] = preg_match('/^#[0-9a-fA-F]{6}$/', $value) ? strtoupper($value) : $default;
+        }
+        $componentColorsJson = json_encode($validatedComponentColors, JSON_UNESCAPED_SLASHES);
         $pdo = Db::pdo();
         $st = $pdo->prepare("
             INSERT INTO portada_config (id, modo, codrub, codsub, banner_text, banner_bold, banner_italic, banner_size, banner_color, banner_bg,
                 banner_sub, banner_sub_bold, banner_sub_italic, banner_sub_size, banner_sub_color,
                 plantilla, color_fondo, color_fondo_secundario, color_tarjeta, color_acento, color_texto,
-                fuente_tarjeta, color_nombre_producto, tamano_nombre_producto, color_precio_producto, tamano_precio_producto, footer_text)
+                fuente_tarjeta, color_nombre_producto, tamano_nombre_producto, color_precio_producto, tamano_precio_producto, footer_text, colores_componentes)
             VALUES (1, :modo, :codrub, :codsub, :btext, :bbold, :bitalic, :bsize, :bcolor, :bbg,
                 :bsub, :bsubbold, :bsubitalic, :bsubsize, :bsubcolor,
                 :plantilla, :color_fondo, :color_fondo_secundario, :color_tarjeta, :color_acento, :color_texto,
-                :fuente_tarjeta, :color_nombre_producto, :tamano_nombre_producto, :color_precio_producto, :tamano_precio_producto, :footer_text)
+                :fuente_tarjeta, :color_nombre_producto, :tamano_nombre_producto, :color_precio_producto, :tamano_precio_producto, :footer_text, :colores_componentes)
             ON DUPLICATE KEY UPDATE modo=VALUES(modo), codrub=VALUES(codrub), codsub=VALUES(codsub),
                 banner_text=VALUES(banner_text), banner_bold=VALUES(banner_bold), banner_italic=VALUES(banner_italic),
                 banner_size=VALUES(banner_size), banner_color=VALUES(banner_color), banner_bg=VALUES(banner_bg),
@@ -190,7 +283,8 @@ final class PortadaRepo
                 color_tarjeta=VALUES(color_tarjeta), color_acento=VALUES(color_acento), color_texto=VALUES(color_texto),
                 fuente_tarjeta=VALUES(fuente_tarjeta), color_nombre_producto=VALUES(color_nombre_producto),
                 tamano_nombre_producto=VALUES(tamano_nombre_producto), color_precio_producto=VALUES(color_precio_producto),
-                tamano_precio_producto=VALUES(tamano_precio_producto), footer_text=VALUES(footer_text)
+                tamano_precio_producto=VALUES(tamano_precio_producto), footer_text=VALUES(footer_text),
+                colores_componentes=VALUES(colores_componentes)
         ");
         $st->execute([
             ':modo' => $modo,
@@ -219,6 +313,7 @@ final class PortadaRepo
             ':color_precio_producto' => $colorPrecio,
             ':tamano_precio_producto' => $tamanoPrecio,
             ':footer_text' => $footerText !== '' ? $footerText : null,
+            ':colores_componentes' => $componentColorsJson,
         ]);
     }
 

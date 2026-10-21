@@ -11,6 +11,19 @@ use Perfushopping\Web\Support\View;
 
 final class NotaPedidoController
 {
+    public function index(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requirePermiso('compras');
+        $q = trim((string)($_GET['q'] ?? ''));
+        echo View::adminPage('admin/stock/nota-pedido-list.php', [
+            'adminUser' => $adminUser,
+            'notas' => (new NotaPedidoRepo())->listRecent($q),
+            'q' => $q,
+            'pageTitle' => 'Notas de pedido',
+        ]);
+    }
+
     public function create(array $params): void
     {
         $auth = new AdminAuthService();

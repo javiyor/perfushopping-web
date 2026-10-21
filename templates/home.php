@@ -46,7 +46,7 @@ foreach ([1, 2, 3] as $bi) {
 <?php else: ?>
 <div class="hero">
   <div style="display:flex;justify-content:center;">
-    <img src="<?= htmlspecialchars($empresaBanner) ?>" alt="<?= $empresaNombre ?>" loading="eager" decoding="async" style="width:26%;max-width:300px;height:auto;border-radius:22px;border:1px solid rgba(216,178,90,0.18);box-shadow:0 22px 70px rgba(0,0,0,0.55);" />
+    <img class="store-brand-banner" src="<?= htmlspecialchars($empresaBanner) ?>" alt="<?= $empresaNombre ?>" loading="eager" decoding="async" style="width:26%;max-width:300px;height:auto;border-radius:22px;box-shadow:0 22px 70px rgba(0,0,0,0.55);" />
   </div>
   <h1><?= $empresaNombre ?></h1>
   <p>Carrito de compras. Compra, paga facil y seguro en cuotas con Mercado Pago.</p>
@@ -60,13 +60,13 @@ foreach ([1, 2, 3] as $bi) {
 
 <?php if (($googleUrl ?? '') !== '' && $googleUrl !== '#'): ?>
 <div style="text-align:right;margin:8px 2px 0">
-  <a href="<?= htmlspecialchars($googleUrl) ?>" target="_blank" rel="noopener" style="font-size:11px;color:rgba(246,244,239,0.8);text-decoration:none;border:1px solid rgba(216,178,90,0.4);border-radius:20px;padding:2px 10px;display:inline-block">★ <?= htmlspecialchars($googleScore) ?> en Google<?= $googleReviews !== '' ? ' · ' . htmlspecialchars($googleReviews) . ' opiniones' : '' ?></a>
+  <a class="store-google-rating" href="<?= htmlspecialchars($googleUrl) ?>" target="_blank" rel="noopener" style="font-size:11px;text-decoration:none;border-radius:20px;padding:2px 10px;display:inline-block">★ <?= htmlspecialchars($googleScore) ?> en Google<?= $googleReviews !== '' ? ' · ' . htmlspecialchars($googleReviews) . ' opiniones' : '' ?></a>
 </div>
 <?php endif; ?>
 
-<div class="page" style="margin-top:16px">
+<div class="page store-catalog-section" style="margin-top:16px">
   <?php if ($isNovedades): ?>
-    <div style="margin-top:10px;color:rgba(246,244,239,0.72);line-height:1.55">
+    <div class="store-contact" style="margin-top:10px;line-height:1.55">
       <i class="bi bi-whatsapp" aria-label="WhatsApp"></i> Tel: <a href="https://wa.me/<?= $empresaWhatsapp ?>?text=Hola%20<?= urlencode($empresaNombre) ?>" target="_blank" rel="noopener" style="text-decoration:underline"><strong><?= $empresaTel ?></strong></a> &middot; <i class="bi bi-envelope-fill" aria-label="Correo"></i> Mail: <a href="mailto:<?= $empresaMail ?>" style="text-decoration:underline"><?= $empresaMail ?></a><br />
       Direcciones: <?= $empresaDir ?><br />
       <i class="bi bi-instagram" aria-label="Instagram"></i> Instagram: <a href="https://www.instagram.com/perfushopping" target="_blank" rel="noopener" style="text-decoration:underline">@perfushopping</a>
@@ -101,11 +101,11 @@ foreach ([1, 2, 3] as $bi) {
         <?php if ($bannerSub !== ''): ?><div style="<?= $bSubStyle ?>"><?= htmlspecialchars($bannerSub) ?></div><?php endif; ?>
     </div></div>
     <?php else: ?>
-    <h3 style="margin:10px 0 0;color:var(--gold);font-family:Georgia, 'Times New Roman', serif;letter-spacing:0.7px"><?= htmlspecialchars($portadaLabel) ?></h3>
+    <h3 class="store-catalog-title" style="margin:10px 0 0;font-family:Georgia, 'Times New Roman', serif;letter-spacing:0.7px"><?= htmlspecialchars($portadaLabel) ?></h3>
     <?php endif; ?>
   <?php else: ?>
-    <h3 style="margin:0;color:var(--gold);font-family:Georgia, 'Times New Roman', serif;letter-spacing:0.7px">Catalogo</h3>
-    <div style="margin-top:10px;color:rgba(246,244,239,0.72);line-height:1.55">
+    <h3 class="store-catalog-title" style="margin:0;font-family:Georgia, 'Times New Roman', serif;letter-spacing:0.7px">Catalogo</h3>
+    <div class="store-contact" style="margin-top:10px;line-height:1.55">
       <i class="bi bi-whatsapp" aria-label="WhatsApp"></i> Tel: <a href="https://wa.me/<?= $empresaWhatsapp ?>?text=Hola%20<?= urlencode($empresaNombre) ?>" target="_blank" rel="noopener" style="text-decoration:underline"><strong><?= $empresaTel ?></strong></a> &middot; <i class="bi bi-envelope-fill" aria-label="Correo"></i> Mail: <a href="mailto:<?= $empresaMail ?>" style="text-decoration:underline"><?= $empresaMail ?></a><br />
       Direcciones: <?= $empresaDir ?><br />
       <i class="bi bi-instagram" aria-label="Instagram"></i> Instagram: <a href="https://www.instagram.com/perfushopping" target="_blank" rel="noopener" style="text-decoration:underline">@perfushopping</a>
@@ -143,21 +143,21 @@ $showPromos = $promosByProduct || $promoBanners;
 <style>
 .promo-banda { margin-top:18px; }
 .promo-banda-head { display:flex;justify-content:space-between;align-items:center;margin-bottom:8px; }
-.promo-banda-head h3 { margin:0;color:#ff6b6b;font-family:Georgia,'Times New Roman',serif;letter-spacing:0.7px; }
+.promo-banda-head h3 { margin:0;color:var(--c-promo-title);font-family:Georgia,'Times New Roman',serif;letter-spacing:0.7px; }
 .promo-nav { display:flex;gap:6px; }
-.promo-nav button { width:32px;height:32px;border-radius:50%;border:1px solid rgba(216,178,90,0.5);background:transparent;color:#f6f4ef;font-size:18px;line-height:1;cursor:pointer; }
+.promo-nav button { width:32px;height:32px;border-radius:50%;border:1px solid var(--c-promo-border);background:var(--c-promo-bg);color:var(--c-nav-text);font-size:18px;line-height:1;cursor:pointer; }
 .promo-track { display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding:4px 2px 10px; }
-.promo-card { flex:0 0 200px;scroll-snap-align:start;background:rgba(255,255,255,0.05);border:1px solid rgba(216,178,90,0.35);border-radius:14px;padding:10px;text-align:center; }
+.promo-card { flex:0 0 200px;scroll-snap-align:start;background:var(--c-promo-bg);border:1px solid var(--c-promo-border);border-radius:14px;padding:10px;text-align:center;color:var(--text); }
 .promo-card img { width:100%;height:130px;object-fit:contain;border-radius:8px;background:#fff; }
 .promo-card-title { font-size:13px;margin:6px 0;min-height:32px;color:#f6f4ef; }
-.promo-old { font-size:12px;color:rgba(246,244,239,0.55); }
-.promo-off { display:inline-block;background:#c0392b;color:#fff;font-weight:800;font-size:13px;border-radius:8px;padding:1px 8px;margin:3px 0; }
-.promo-new { font-size:1.4rem;font-weight:800;color:#7CFC9A;line-height:1.2; }
-.promo-add { margin-top:8px;width:100%;padding:8px;border:none;border-radius:10px;background:linear-gradient(135deg,#d8b25a,#f3d48a);color:#17140f;font-weight:800;cursor:pointer; }
+.promo-old { font-size:12px;color:var(--c-promo-old-price); }
+.promo-off { display:inline-block;background:var(--c-promo-discount-bg);color:var(--c-promo-discount-text);font-weight:800;font-size:13px;border-radius:8px;padding:1px 8px;margin:3px 0; }
+.promo-new { font-size:1.4rem;font-weight:800;color:var(--c-promo-price);line-height:1.2; }
+.promo-add { margin-top:8px;width:100%;padding:8px;border:none;border-radius:10px;background:var(--c-button-bg);color:var(--c-button-text);font-weight:800;cursor:pointer; }
 .promo-banner-card { display:flex;flex-direction:column;justify-content:center; }
 .promo-banner-title { font-size:1.15rem;font-weight:800;line-height:1.25;font-family:Georgia,'Times New Roman',serif; }
 .promo-banner-text { font-size:12px;margin-top:6px;opacity:0.92;line-height:1.4; }
-.promo-banner-btn { margin-top:10px;display:inline-block;padding:8px 14px;border-radius:10px;background:rgba(255,255,255,0.92);color:#17140f;font-weight:800;font-size:13px;text-decoration:none; }
+.promo-banner-btn { margin-top:10px;display:inline-block;padding:8px 14px;border-radius:10px;background:var(--c-button-bg);color:var(--c-button-text);font-weight:800;font-size:13px;text-decoration:none; }
 </style>
 <div class="promo-banda">
   <div class="promo-banda-head">
@@ -237,7 +237,7 @@ function promoScroll(dir) {
   <button class="btn" type="submit">Buscar</button>
 </form>
 <?php if ($codrub > 0 || $codsub > 0): ?>
-<div style="margin-top:8px"><a href="/" style="font-size:12px;color:rgba(246,244,239,0.75)">✕ Limpiar filtros y ver todo</a></div>
+<div class="store-clear-filters" style="margin-top:8px"><a href="/" style="font-size:12px">✕ Limpiar filtros y ver todo</a></div>
 <?php endif; ?>
 <script>
 document.getElementById('formBuscarPortada').addEventListener('submit', function(e) {
@@ -275,7 +275,7 @@ document.getElementById('formBuscarPortada').addEventListener('submit', function
         </div>
         <div class="card-body">
           <div class="card-title"><?= htmlspecialchars((string)$p['produ']) ?></div>
-          <div style="margin-top:6px;color:rgba(246,244,239,0.55);font-size:12px">
+          <div class="store-product-category" style="margin-top:6px;font-size:12px">
             <?= htmlspecialchars((string)($p['nomrub'] ?? '')) ?>
             <?php if (!empty($p['nomsub'])): ?>
               &middot; <?= htmlspecialchars(trim((string)$p['nomsub'])) ?>
@@ -284,8 +284,8 @@ document.getElementById('formBuscarPortada').addEventListener('submit', function
           <div class="price">
             <?php $gPromo = $promosByProduct[(int)$p['idprodu']] ?? null; ?>
             <?php if ($gPromo): ?>
-              <div style="font-size:12px;color:rgba(246,244,239,0.55)"><s>$<?= htmlspecialchars(Format::moneyRoundedFromCents((int)round($withIva*100))) ?></s> <span class="promo-off" style="font-size:11px">-<?= $gPromo['off'] ?>%</span></div>
-              <strong style="color:#7CFC9A">$<?= htmlspecialchars(Format::moneyRoundedFromCents((int)round($gPromo['promo']*100))) ?></strong>
+              <div class="store-old-price" style="font-size:12px"><s>$<?= htmlspecialchars(Format::moneyRoundedFromCents((int)round($withIva*100))) ?></s> <span class="promo-off" style="font-size:11px">-<?= $gPromo['off'] ?>%</span></div>
+              <strong class="store-promo-price">$<?= htmlspecialchars(Format::moneyRoundedFromCents((int)round($gPromo['promo']*100))) ?></strong>
             <?php else: ?>
               <strong><?= htmlspecialchars(Format::moneyRoundedFromCents((int)round($withIva*100))) ?></strong>
             <?php endif; ?>
@@ -307,9 +307,9 @@ document.getElementById('formBuscarPortada').addEventListener('submit', function
   ?>
 <?php endif; ?>
 
-<div class="page" style="margin-top:26px;padding-top:18px;border-top:1px solid rgba(216,178,90,0.25)">
-  <h3 style="margin:0;color:var(--gold);font-family:Georgia, 'Times New Roman', serif;letter-spacing:0.7px">Contacto y horarios</h3>
-  <div style="margin-top:10px;color:rgba(246,244,239,0.78);line-height:1.7">
+<div class="page store-contact-section" style="margin-top:26px;padding-top:18px">
+  <h3 class="store-catalog-title" style="margin:0;font-family:Georgia, 'Times New Roman', serif;letter-spacing:0.7px">Contacto y horarios</h3>
+  <div class="store-contact" style="margin-top:10px;line-height:1.7">
     <div>WhatsApp: <a href="https://wa.me/<?= $empresaWhatsapp ?>?text=Hola%20<?= urlencode($empresaNombre) ?>" target="_blank" rel="noopener" style="text-decoration:underline"><strong><?= $empresaTel ?></strong></a></div>
     <div>Mail: <a href="mailto:<?= $empresaMail ?>" style="text-decoration:underline"><?= $empresaMail ?></a></div>
     <div>Direcciones: <?= $empresaDir ?></div>

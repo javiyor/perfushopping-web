@@ -802,3 +802,89 @@ body[data-store-template="boutique"] .page,
 body[data-store-template="boutique"] .hero,
 body[data-store-template="boutique"] .card { border-radius: 26px; }
 body[data-store-template="natural"] .hero { border-left: 5px solid var(--gold); }
+
+/* Per-component color controls configured in /admin/portada. */
+body[data-store-template] .topbar {
+  background: var(--c-header-bg) !important;
+  border-color: var(--c-header-border) !important;
+}
+body[data-store-template] .brand-title { color: var(--c-brand-text); }
+body[data-store-template] .brand-sub { color: var(--c-brand-subtext); }
+body[data-store-template] .brand-mark { background: var(--c-logo-bg) !important; border-color: var(--c-header-border) !important; }
+body[data-store-template] .store-brand-banner { border: 1px solid var(--c-header-border) !important; }
+body[data-store-template] .store-google-rating {
+  color: var(--c-contact-text) !important;
+  border: 1px solid var(--c-hero-accent) !important;
+}
+body[data-store-template] .pill,
+body[data-store-template] .pill.secondary {
+  color: var(--c-nav-text) !important;
+  background: var(--c-nav-bg) !important;
+  border-color: var(--c-nav-border) !important;
+}
+body[data-store-template] .pill.promo-link {
+  color: var(--c-nav-text) !important;
+  border-color: var(--c-nav-border) !important;
+}
+body[data-store-template] .hero {
+  color: var(--c-hero-text) !important;
+  background: var(--c-hero-bg) !important;
+  border-color: var(--c-section-border) !important;
+}
+body[data-store-template] .hero h1,
+body[data-store-template] .hero h2 { color: var(--c-hero-accent); }
+body[data-store-template] .hero p { color: var(--c-hero-text); }
+body[data-store-template] .store-catalog-section,
+body[data-store-template] .store-catalog-section.page,
+body[data-store-template] .store-contact-section.page {
+  background: var(--c-section-bg) !important;
+  border-color: var(--c-section-border) !important;
+}
+body[data-store-template] .store-contact { color: var(--c-contact-text) !important; }
+body[data-store-template] .store-contact a { color: var(--c-contact-text) !important; }
+body[data-store-template] .store-catalog-title { color: var(--c-catalog-title) !important; }
+body[data-store-template] .store-clear-filters a { color: var(--c-contact-text) !important; }
+body[data-store-template] .filters input,
+body[data-store-template] .filters select {
+  background: var(--c-filter-bg) !important;
+  color: var(--c-filter-text) !important;
+  border-color: var(--c-filter-border) !important;
+}
+body[data-store-template] .filters input::placeholder { color: var(--c-filter-text); opacity: .65; }
+body[data-store-template] .btn:not(.secondary):not(.danger),
+body[data-store-template] .promo-add,
+body[data-store-template] .promo-banner-btn {
+  color: var(--c-button-text) !important;
+  background: var(--c-button-bg) !important;
+  border-color: var(--c-button-bg) !important;
+}
+body[data-store-template] .grid > a.card,
+body[data-store-template] .grid > .card {
+  background: var(--c-product-bg) !important;
+  border-color: var(--c-product-border) !important;
+}
+body[data-store-template] .grid > a.card:hover,
+body[data-store-template] .grid > .card:hover {
+  background: var(--c-product-hover-bg) !important;
+  border-color: var(--c-product-hover-border) !important;
+}
+body[data-store-template] .grid > a.card .thumb { background: var(--c-product-media-bg) !important; }
+body[data-store-template] .store-product-category { color: var(--c-product-category) !important; }
+body[data-store-template] .promo-card img { background: var(--c-product-media-bg) !important; }
+body[data-store-template] .store-old-price { color: var(--c-promo-old-price) !important; }
+body[data-store-template] .promo-card {
+  background: var(--c-promo-bg) !important;
+  border-color: var(--c-promo-border) !important;
+}
+body[data-store-template] .price strong.store-promo-price { color: var(--c-promo-price) !important; }
+body[data-store-template] .promo-off {
+  background: var(--c-promo-discount-bg) !important;
+  color: var(--c-promo-discount-text) !important;
+}
+body[data-store-template] .store-footer-text,
+body[data-store-template] .store-footer-links {
+  color: var(--c-footer-text) !important;
+  background: var(--c-footer-bg);
+  border-color: var(--c-footer-border) !important;
+}
+body[data-store-template] .store-footer-links a { color: var(--c-footer-link) !important; }

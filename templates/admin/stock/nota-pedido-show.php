@@ -19,6 +19,7 @@ if (!$nota) { echo '<div class="alert alert-warning">Nota no encontrada.</div>';
     </div>
     <div class="d-flex gap-2">
         <button class="btn btn-accent btn-sm" onclick="window.print()"><i class="bi bi-printer"></i> Imprimir</button>
+        <a class="btn btn-outline-secondary btn-sm" href="/admin/nota-pedido">Listado de notas</a>
         <a class="btn btn-outline-secondary btn-sm" href="/admin/stock">Volver a stock</a>
     </div>
 </div>
