@@ -55,6 +55,31 @@ final class VideoRepo
         return array_map(static fn($r) => (int)$r['product_id'], $st->fetchAll() ?: []);
     }
 
+    /** @param array<int,int|string> $productIds */
+    public function saveProductIds(int $videoId, array $productIds): void
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $productIds), static fn(int $id): bool => $id > 0)));
+        $pdo = Db::pdo();
+        $pdo->beginTransaction();
+        try {
+            $pdo->prepare('DELETE FROM cms_video_product WHERE video_id = :v')->execute([':v' => $videoId]);
+            if ($ids) {
+                $marks = implode(',', array_fill(0, count($ids), '?'));
+                $valid = $pdo->prepare("SELECT idprodu FROM producto WHERE idprodu IN ({$marks})");
+                $valid->execute($ids);
+                $validIds = array_map('intval', $valid->fetchAll(\PDO::FETCH_COLUMN) ?: []);
+                $insert = $pdo->prepare('INSERT INTO cms_video_product (video_id, product_id, sort_order) VALUES (:v, :p, :s)');
+                foreach ($validIds as $order => $productId) {
+                    $insert->execute([':v' => $videoId, ':p' => $productId, ':s' => $order]);
+                }
+            }
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            throw $e;
+        }
+    }
+
     public function save(array $data): int
     {
         $id = (int)($data['id'] ?? 0);
@@ -100,12 +125,18 @@ final class VideoRepo
     public static function youtubeEmbedUrl(string $url): string
     {
         $id = self::youtubeId($url);
-        return $id ? 'https://www.youtube.com/embed/' . $id : '';
+        return $id ? 'https://www.youtube-nocookie.com/embed/' . $id . '?rel=0' : '';
+    }
+
+    public static function youtubeWatchUrl(string $url): string
+    {
+        $id = self::youtubeId($url);
+        return $id ? 'https://www.youtube.com/watch?v=' . $id : '';
     }
 
     public static function youtubeId(string $url): string
     {
-        if (preg_match('/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/', $url, $m)) {
+        if (preg_match('~(?:youtube(?:-nocookie)?\.com/(?:watch\?(?:[^#]*&)?v=|embed/|shorts/|live/|v/)|youtu\.be/)([a-zA-Z0-9_-]{11})~i', $url, $m)) {
             return $m[1];
         }
         return '';

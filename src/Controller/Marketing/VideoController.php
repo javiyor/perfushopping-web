@@ -6,6 +6,7 @@ namespace Perfushopping\Web\Controller\Marketing;
 use Perfushopping\Web\Repo\Marketing\ArticleRepo;
 use Perfushopping\Web\Repo\Marketing\SeoRepo;
 use Perfushopping\Web\Repo\Marketing\VideoRepo;
+use Perfushopping\Web\Repo\AdminProductRepo;
 use Perfushopping\Web\Repo\ProductRepo;
 use Perfushopping\Web\Support\Response;
 use Perfushopping\Web\Support\View;
@@ -27,6 +28,16 @@ final class VideoController
         foreach ($videoRepo->findProductIdsByVideoId((int)$video['id']) as $pid) {
             $p = $productRepo->find($pid);
             if ($p) $products[] = $p;
+        }
+        if (!$products) {
+            $matches = (new AdminProductRepo())->search((string)$video['title'], 0, 0, 10, 'produ', 'asc', 1, 10);
+            $videoTitle = mb_strtolower(trim((string)$video['title']));
+            foreach ($matches['items'] ?? [] as $match) {
+                if (mb_strtolower(trim((string)$match['produ'])) !== $videoTitle) continue;
+                $product = $productRepo->find((int)$match['idprodu']);
+                if ($product) $products[] = $product;
+                break;
+            }
         }
 
         $articles = [];

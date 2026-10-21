@@ -269,12 +269,15 @@ $router->post('/admin/productos/etiquetas-a4/imprimir', [AdminProductControllerN
 // Admin - Marketing
 $router->get('/admin/marketing/videos', [AdminMarketingVideoController::class, 'index']);
 $router->get('/admin/marketing/videos/nuevo', [AdminMarketingVideoController::class, 'create']);
+$router->get('/admin/marketing/videos/buscar-productos', [AdminMarketingVideoController::class, 'searchProducts']);
+$router->get('/admin/marketing/videos/editar/(?P<id>\d+)', [AdminMarketingVideoController::class, 'edit']);
 $router->get('/admin/marketing/videos/(?P<id>\d+)', [AdminMarketingVideoController::class, 'edit']);
 $router->post('/admin/marketing/videos/guardar', [AdminMarketingVideoController::class, 'save']);
 $router->post('/admin/marketing/videos/eliminar', [AdminMarketingVideoController::class, 'delete']);
 
 $router->get('/admin/marketing/articulos', [AdminMarketingArticleController::class, 'index']);
 $router->get('/admin/marketing/articulos/nuevo', [AdminMarketingArticleController::class, 'create']);
+$router->get('/admin/marketing/articulos/editar/(?P<id>\d+)', [AdminMarketingArticleController::class, 'edit']);
 $router->get('/admin/marketing/articulos/(?P<id>\d+)', [AdminMarketingArticleController::class, 'edit']);
 $router->post('/admin/marketing/articulos/guardar', [AdminMarketingArticleController::class, 'save']);
 $router->post('/admin/marketing/articulos/eliminar', [AdminMarketingArticleController::class, 'delete']);

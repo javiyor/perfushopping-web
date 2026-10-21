@@ -5,6 +5,7 @@ namespace Perfushopping\Web\Admin\Marketing;
 
 use Perfushopping\Web\Repo\Marketing\SeoRepo;
 use Perfushopping\Web\Repo\Marketing\VideoRepo;
+use Perfushopping\Web\Repo\AdminProductRepo;
 use Perfushopping\Web\Service\AdminAuthService;
 use Perfushopping\Web\Support\Csrf;
 use Perfushopping\Web\Support\Response;
@@ -64,6 +65,7 @@ final class VideoController
         echo View::adminPage('admin/marketing/videos/form.php', [
             'adminUser' => $adminUser,
             'video' => $video,
+            'selectedProducts' => $this->selectedProducts($this->repo->findProductIdsByVideoId($id)),
             'seo' => $seo,
             'csrf' => Csrf::token(),
             'flash' => $_SESSION['admin_flash'] ?? null,
@@ -114,8 +116,42 @@ final class VideoController
             'indexable' => isset($_POST['active']) ? 1 : 0,
         ]);
 
+        $productIds = $_POST['product_ids'] ?? [];
+        $this->repo->saveProductIds($videoId, is_array($productIds) ? $productIds : []);
+
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Video guardado correctamente.'];
         Response::redirect('/admin/marketing/videos');
+    }
+
+    public function searchProducts(array $params): void
+    {
+        $this->auth->requirePermiso('marketing_videos');
+        $q = trim((string)($_GET['q'] ?? ''));
+        if (mb_strlen($q) < 2) {
+            Response::json(['items' => []]);
+            return;
+        }
+        $result = (new AdminProductRepo())->search($q, 0, 0, 10, 'produ', 'asc', 1, 10);
+        Response::json(['items' => array_map(static fn(array $p): array => [
+            'idprodu' => (int)$p['idprodu'],
+            'produ' => (string)$p['produ'],
+        ], $result['items'] ?? [])]);
+    }
+
+    /** @param array<int,int> $ids @return array<int,array{idprodu:int,produ:string}> */
+    private function selectedProducts(array $ids): array
+    {
+        $products = [];
+        foreach ($ids as $id) {
+            $result = (new AdminProductRepo())->search((string)(int)$id, 0, 0, 1, 'id', 'asc', 1, 1);
+            foreach ($result['items'] ?? [] as $product) {
+                if ((int)$product['idprodu'] === (int)$id) {
+                    $products[] = ['idprodu' => (int)$id, 'produ' => (string)$product['produ']];
+                    break;
+                }
+            }
+        }
+        return $products;
     }
 
     public function delete(array $params): void

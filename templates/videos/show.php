@@ -3,6 +3,8 @@ $video = $video ?? [];
 $products = $products ?? [];
 $articles = $articles ?? [];
 $title = $title ?? ($video['title'] ?? 'Video');
+$embedUrl = \Perfushopping\Web\Repo\Marketing\VideoRepo::youtubeEmbedUrl((string)($video['url'] ?? ''));
+$youtubeUrl = \Perfushopping\Web\Repo\Marketing\VideoRepo::youtubeWatchUrl((string)($video['url'] ?? ''));
 ?>
 <div class="page">
   <nav aria-label="breadcrumb" class="mb-2">
@@ -13,9 +15,15 @@ $title = $title ?? ($video['title'] ?? 'Video');
 
   <h2 style="margin:0 0 12px"><?= htmlspecialchars((string)$video['title']) ?></h2>
 
-  <div style="position:relative;padding-top:56.25%;background:#000;border-radius:12px;overflow:hidden;margin-bottom:16px">
-    <iframe src="<?= htmlspecialchars(\Perfushopping\Web\Repo\Marketing\VideoRepo::youtubeEmbedUrl((string)$video['url'])) ?>" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allowfullscreen></iframe>
-  </div>
+  <?php if ($embedUrl !== ''): ?>
+    <div style="position:relative;padding-top:56.25%;background:#000;border-radius:12px;overflow:hidden;margin-bottom:10px">
+      <iframe src="<?= htmlspecialchars($embedUrl) ?>" title="<?= htmlspecialchars((string)$video['title']) ?>" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+    </div>
+    <?php if ($youtubeUrl !== ''): ?><p style="text-align:right;margin:0 0 16px"><a href="<?= htmlspecialchars($youtubeUrl) ?>" target="_blank" rel="noopener noreferrer"><i class="bi bi-youtube"></i> Ver en YouTube</a></p><?php endif; ?>
+  <?php else: ?>
+    <div class="notice danger">No se pudo reconocer el enlace de YouTube. Revisá la URL en la administración del video.</div>
+    <?php if (!empty($video['url'])): ?><p><a href="<?= htmlspecialchars((string)$video['url']) ?>" target="_blank" rel="noopener noreferrer">Abrir enlace original</a></p><?php endif; ?>
+  <?php endif; ?>
 
   <?php if ($video['description_long']): ?>
   <div class="notice"><?= nl2br(htmlspecialchars((string)$video['description_long'])) ?></div>
@@ -33,6 +41,7 @@ $title = $title ?? ($video['title'] ?? 'Video');
         <img src="/imagenes/<?= htmlspecialchars((string)$p['imagen']) ?>" alt="" style="width:100%;height:140px;object-fit:contain;margin-bottom:8px">
         <?php endif; ?>
         <div class="small"><?= htmlspecialchars((string)$p['produ']) ?></div>
+        <span class="btn btn-sm mt-2"><i class="bi bi-bag"></i> Comprar producto</span>
       </div>
     </a>
     <?php endforeach; ?>
