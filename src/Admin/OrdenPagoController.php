@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Perfushopping\Web\Admin;
 
+use Perfushopping\Web\Infra\Db;
 use Perfushopping\Web\Repo\OrdenPagoRepo;
 use Perfushopping\Web\Repo\CtaCteProveedorRepo;
 use Perfushopping\Web\Repo\ChequeRepo;
