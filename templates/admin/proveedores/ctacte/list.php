@@ -5,6 +5,16 @@ $list = $list ?? [];
 $q = (string)($q ?? '');
 $saldoTotal = (int)($saldoTotal ?? 0);
 ?>
+<style>
+.ctacte-list-compact .ctacte-data-table { font-size: .68rem; }
+.ctacte-list-compact .ctacte-data-table > :not(caption) > * > * { padding: .1rem .28rem; line-height: 1.08; }
+.ctacte-list-compact .ctacte-data-table th,
+.ctacte-list-compact .ctacte-data-table td { border-right: 1px solid #e6e8eb; border-bottom-color: #eceef0; }
+.ctacte-list-compact .ctacte-data-table tr > :last-child { border-right: 0; }
+.ctacte-list-compact .ctacte-data-table thead th { background: #f8f9fa; white-space: nowrap; }
+.ctacte-list-compact .ctacte-data-table .btn-sm { padding: .04rem .2rem; font-size: .62rem; }
+</style>
+<div class="ctacte-list-compact">
     <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
         <h4 class="fw-bold mb-1">Cta Cte — Proveedores</h4>
@@ -38,7 +48,7 @@ $saldoTotal = (int)($saldoTotal ?? 0);
         <span class="badge bg-secondary"><?= count($list) ?> proveedores</span>
     </div>
     <div class="table-responsive">
-        <table class="table table-sm table-hover mb-0">
+        <table class="table table-sm table-hover mb-0 ctacte-data-table">
             <thead>
                 <tr>
                     <th>Proveedor</th>
@@ -99,4 +109,5 @@ $saldoTotal = (int)($saldoTotal ?? 0);
             <?php endif; ?>
         </table>
     </div>
+</div>
 </div>

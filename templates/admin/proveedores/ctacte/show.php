@@ -12,13 +12,17 @@ $mon = static fn ($v) => number_format((float)$v, 2, ',', '.');
 $filtroQs = $q !== '' ? '&q=' . urlencode($q) : '';
 ?>
 <style>
-.ctacte-compact .table { font-size: 0.66rem; }
-.ctacte-compact .table > :not(caption) > * > * { padding: 0.07rem 0.24rem; line-height: 1.08; }
+.ctacte-compact .table { font-size: 0.62rem; }
+.ctacte-compact .table > :not(caption) > * > * { padding: 0.06rem 0.2rem; line-height: 1.04; }
+.ctacte-compact .ctacte-data-table th,
+.ctacte-compact .ctacte-data-table td { border-right: 1px solid #e6e8eb; border-bottom-color: #eceef0; }
+.ctacte-compact .ctacte-data-table tr > :last-child { border-right: 0; }
+.ctacte-compact .ctacte-data-table thead th { background: #f8f9fa; white-space: nowrap; }
 .ctacte-compact .table td { vertical-align: middle; }
-.ctacte-compact .table .small { font-size: 0.58rem; line-height: 1.04; }
-.ctacte-compact .ctacte-installment { white-space: nowrap; margin-right: 0.22rem; }
-.ctacte-compact .table .badge { font-size: 0.58rem; padding: 0.12em 0.32em; }
-.ctacte-compact .table .btn-sm { padding: 0.04rem 0.22rem; font-size: 0.62rem; }
+.ctacte-compact .table .small { font-size: 0.54rem; line-height: 1; }
+.ctacte-compact .ctacte-installment { white-space: nowrap; margin-right: 0.14rem; }
+.ctacte-compact .table .badge { font-size: 0.54rem; padding: 0.1em 0.28em; }
+.ctacte-compact .table .btn-sm { padding: 0.02rem 0.18rem; font-size: 0.58rem; }
 .ctacte-compact .table input[type="checkbox"] { width: 0.9em; height: 0.9em; }
 .ctacte-compact .card-header h5 { font-size: 0.95rem; }
 .ctacte-compact .ctacte-vencido-resumen { font-size: 0.78rem; }
@@ -68,7 +72,7 @@ $filtroQs = $q !== '' ? '&q=' . urlencode($q) : '';
         </div>
     </div>
     <div class="table-responsive">
-        <table class="table table-sm table-hover mb-0">
+        <table class="table table-sm table-hover mb-0 ctacte-data-table">
             <thead>
                 <tr>
                     <th style="width:30px"></th>
@@ -137,7 +141,7 @@ $filtroQs = $q !== '' ? '&q=' . urlencode($q) : '';
         <span class="badge bg-secondary"><?= count($movimientos) ?> registros</span>
     </div>
     <div class="table-responsive">
-        <table class="table table-sm table-hover mb-0">
+        <table class="table table-sm table-hover mb-0 ctacte-data-table">
             <thead>
                 <tr>
                     <th>#</th>
