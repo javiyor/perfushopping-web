@@ -19,6 +19,7 @@ final class ProveedorCtaCteController
         $q = trim((string)($_GET['q'] ?? ''));
         $repo = new CtaCteProveedorRepo();
         try {
+            $repo->normalizarNotasCreditoCompra();
             $repo->sincronizarAsignaciones();
         } catch (\Throwable $e) {
             error_log('ctacte proveedor asignaciones: ' . $e->getMessage());
@@ -71,6 +72,7 @@ final class ProveedorCtaCteController
 
         $repo = new CtaCteProveedorRepo();
         try {
+            $repo->normalizarNotasCreditoCompra();
             // Backfill idempotente: asigna OPs viejas (sin orden_pago_compras) a facturas impagas
             $repo->sincronizarAsignaciones($proveedorId);
         } catch (\Throwable $e) {

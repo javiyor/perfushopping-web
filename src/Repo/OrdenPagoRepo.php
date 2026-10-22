@@ -121,7 +121,7 @@ final class OrdenPagoRepo
             FROM orden_pago_compras opc
             INNER JOIN ordenes_pago o ON o.id = opc.orden_pago_id AND o.estado = 'pagada'
             INNER JOIN factura_compra fc ON fc.id = opc.factura_compra_id AND COALESCE(fc.estado, '') <> 'anulada'
-            WHERE opc.factura_compra_id = :c");
+            WHERE opc.factura_compra_id = :c AND UPPER(fc.tipo) NOT LIKE '%NOTA%CR%DITO%' AND UPPER(fc.tipo) NOT LIKE 'NC%'");
         $st->execute([':c' => $facturaCompraId]);
         return (int)$st->fetchColumn();
     }

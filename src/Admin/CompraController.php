@@ -617,8 +617,8 @@ final class CompraController
     }
 
     /**
-     * Sincroniza el débito de la factura de compra en cuenta corriente de proveedores:
-     * anula movimientos previos del comprobante y vuelve a cargar el débito por el total.
+     * Sincroniza el movimiento de la factura de compra en cuenta corriente de proveedores:
+     * las notas de crédito generan un crédito y las facturas un débito.
      */
     private function sincronizarCtacteCompra(
         int $compraId,
@@ -633,15 +633,17 @@ final class CompraController
         try {
             $ctacte = new CtaCteProveedorRepo();
             $ctacte->anularMovimientosPorOrigen('compra', $compraId);
-            if ($impTotal > 0) {
+            $notaCredito = CompraRepo::esNotaCredito($tipo);
+            $montoCents = (int)round(abs($impTotal) * 100);
+            if ($montoCents > 0) {
                 $ctacte->agregarMovimiento(
-                    'debito',
+                    $notaCredito ? 'credito' : 'debito',
                     'compra',
                     $compraId,
                     $idprovee,
                     $razon !== '' ? $razon : 'Proveedor',
-                    (int)round($impTotal * 100),
-                    'Compra ' . $tipo . ' ' . $puntoVenta . '-' . $numeroDesde . ' — ' . $razon,
+                    $montoCents,
+                    ($notaCredito ? 'Nota de crédito ' : 'Compra ') . $tipo . ' ' . $puntoVenta . '-' . $numeroDesde . ' — ' . $razon,
                     $adminId
                 );
             }

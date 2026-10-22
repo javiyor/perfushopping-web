@@ -509,6 +509,16 @@ final class CompraRepo
         ], true);
     }
 
+    public static function esNotaCredito(string $tipo): bool
+    {
+        $tipo = mb_strtolower(trim($tipo));
+        $ascii = function_exists('iconv') ? @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $tipo) : false;
+        if (is_string($ascii) && $ascii !== '') $tipo = strtolower(str_replace(["'", '`'], '', $ascii));
+        return str_contains($tipo, 'nota de credito')
+            || str_contains($tipo, 'nota credito')
+            || (bool)preg_match('/(?:^|\s)nc(?:$|[\s\/-]|[a-z]$)/i', $tipo);
+    }
+
     /**
      * Razón social efectiva para persistir en la factura: la cargada, o la del
      * proveedor por idprovee / CUIT cuando vino vacía (importación ARCA, QR).

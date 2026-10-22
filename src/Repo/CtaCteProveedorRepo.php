@@ -118,7 +118,7 @@ final class CtaCteProveedorRepo
         foreach ($ids as $id) $summary[$id] = ['vencido_cents' => 0, 'credito_pendiente_cents' => 0, 'vencido_neto_cents' => 0];
 
         $sql = "
-            SELECT fc.id, fc.idprovee, fc.fecha, fc.imp_total, fc.plazo_cuotas, fc.plazo_dias,
+            SELECT fc.id, fc.idprovee, fc.fecha, fc.imp_total, fc.plazo_cuotas, fc.plazo_dias, fc.tipo,
                    COALESCE(asig.total, 0) AS asignado_cents
             FROM factura_compra fc
             LEFT JOIN (
@@ -133,6 +133,7 @@ final class CtaCteProveedorRepo
         $st->execute($ids);
         $today = date('Y-m-d');
         foreach ($st->fetchAll() ?: [] as $row) {
+            if (CompraRepo::esNotaCredito((string)($row['tipo'] ?? ''))) continue;
             $providerId = (int)$row['idprovee'];
             if (!isset($summary[$providerId])) continue;
             $totalCents = max(0, (int)round((float)($row['imp_total'] ?? 0) * 100));
@@ -143,17 +144,22 @@ final class CtaCteProveedorRepo
 
         $credits = Db::pdo()->prepare("SELECT m.proveedor_id, SUM(m.monto_cents)
             FROM ctacte_proveedor_movimientos m
-            INNER JOIN ordenes_pago o ON o.id=m.origen_id AND o.estado='pagada'
-            WHERE m.tipo='credito' AND m.origen='op' AND m.proveedor_id IN ({$marks})
+            LEFT JOIN ordenes_pago o ON o.id=m.origen_id AND m.origen='op'
+            WHERE m.tipo='credito' AND m.proveedor_id IN ({$marks})
+              AND ((m.origen='op' AND o.estado='pagada') OR m.origen='compra')
             GROUP BY m.proveedor_id");
         $credits->execute($ids);
         $creditByProvider = [];
         foreach ($credits->fetchAll(\PDO::FETCH_NUM) ?: [] as $row) $creditByProvider[(int)$row[0]] = (int)$row[1];
 
-        $assigned = Db::pdo()->prepare("SELECT o.proveedor_id, SUM(opc.monto_cents) FROM orden_pago_compras opc INNER JOIN ordenes_pago o ON o.id=opc.orden_pago_id AND o.estado='pagada' INNER JOIN factura_compra fc ON fc.id=opc.factura_compra_id AND COALESCE(fc.estado, '') <> 'anulada' WHERE o.proveedor_id IN ({$marks}) GROUP BY o.proveedor_id");
+        $assigned = Db::pdo()->prepare("SELECT o.proveedor_id, SUM(opc.monto_cents) AS total, fc.tipo FROM orden_pago_compras opc INNER JOIN ordenes_pago o ON o.id=opc.orden_pago_id AND o.estado='pagada' INNER JOIN factura_compra fc ON fc.id=opc.factura_compra_id AND COALESCE(fc.estado, '') <> 'anulada' WHERE o.proveedor_id IN ({$marks}) GROUP BY o.proveedor_id, fc.tipo");
         $assigned->execute($ids);
         $assignedByProvider = [];
-        foreach ($assigned->fetchAll(\PDO::FETCH_NUM) ?: [] as $row) $assignedByProvider[(int)$row[0]] = (int)$row[1];
+        foreach ($assigned->fetchAll() ?: [] as $row) {
+            if (CompraRepo::esNotaCredito((string)($row['tipo'] ?? ''))) continue;
+            $id = (int)$row['proveedor_id'];
+            $assignedByProvider[$id] = ($assignedByProvider[$id] ?? 0) + (int)$row['total'];
+        }
 
         foreach ($summary as $id => &$values) {
             $values['credito_pendiente_cents'] = max(0, ($creditByProvider[$id] ?? 0) - ($assignedByProvider[$id] ?? 0));
@@ -271,27 +277,70 @@ final class CtaCteProveedorRepo
         }
     }
 
+    /** Corrige movimientos previos de notas de crédito cargadas como débito. */
+    public function normalizarNotasCreditoCompra(): int
+    {
+        $st = Db::pdo()->query("
+            SELECT m.id, m.proveedor_id, m.proveedor_nombre, fc.tipo, fc.imp_total
+            FROM ctacte_proveedor_movimientos m
+            INNER JOIN factura_compra fc ON fc.id = m.origen_id
+            WHERE m.origen = 'compra' AND m.tipo = 'debito' AND COALESCE(fc.estado, '') <> 'anulada'
+        ");
+        $movimientos = [];
+        foreach ($st->fetchAll() ?: [] as $row) {
+            if (CompraRepo::esNotaCredito((string)($row['tipo'] ?? ''))) $movimientos[] = $row;
+        }
+        if (!$movimientos) return 0;
+
+        $pdo = Db::pdo();
+        $pdo->beginTransaction();
+        try {
+            $update = $pdo->prepare("UPDATE ctacte_proveedor_movimientos SET tipo='credito', monto_cents=:m WHERE id=:id LIMIT 1");
+            $providers = [];
+            foreach ($movimientos as $row) {
+                $update->execute([
+                    ':m' => (int)round(abs((float)($row['imp_total'] ?? 0)) * 100),
+                    ':id' => (int)$row['id'],
+                ]);
+                $providerId = (int)($row['proveedor_id'] ?? 0);
+                $providerName = (string)($row['proveedor_nombre'] ?? '');
+                $key = $providerId > 0 ? 'id:' . $providerId : 'name:' . $providerName;
+                $providers[$key] = [$providerId, $providerName];
+            }
+            foreach ($providers as [$providerId, $providerName]) {
+                $this->recalcularSaldos($providerId > 0 ? $providerId : null, $providerName);
+            }
+            $pdo->commit();
+            return count($movimientos);
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            throw $e;
+        }
+    }
+
     /**
-     * Backfill: genera el débito en ctacte de todas las facturas de compra,
+     * Backfill: genera débitos/créditos en ctacte de los comprobantes de compra,
      * en orden de fecha, y recalcula saldos. Idempotente.
      * @return array{insertadas:int, omitidas:int}
      */
     public function sincronizarCompras(int $adminId): array
     {
         $pdo = Db::pdo();
-        $rows = $pdo->query('
+        $rows = $pdo->query("
             SELECT fc.id, fc.idprovee, fc.razon_proveedor, fc.cuit_proveedor, fc.tipo,
                    fc.punto_venta, fc.numero_desde, fc.imp_total
             FROM factura_compra fc
+            WHERE COALESCE(fc.estado, '') <> 'anulada'
             ORDER BY fc.fecha ASC, fc.id ASC
-        ')->fetchAll();
+        ")->fetchAll();
 
         $insertadas = 0;
         $omitidas = 0;
         foreach ($rows as $r) {
             $compraId = (int)$r['id'];
             $impTotal = (float)($r['imp_total'] ?? 0);
-            if ($impTotal <= 0) {
+            $notaCredito = CompraRepo::esNotaCredito((string)($r['tipo'] ?? ''));
+            if (abs($impTotal) <= 0) {
                 $omitidas++;
                 continue;
             }
@@ -307,13 +356,13 @@ final class CtaCteProveedorRepo
 
             $this->anularMovimientosPorOrigen('compra', $compraId);
             $this->agregarMovimiento(
-                'debito',
+                $notaCredito ? 'credito' : 'debito',
                 'compra',
                 $compraId,
                 $idprovee,
                 $razon,
-                (int)round($impTotal * 100),
-                'Compra ' . (string)$r['tipo'] . ' ' . (string)$r['punto_venta'] . '-' . (string)$r['numero_desde'] . ' — ' . $razon,
+                (int)round(abs($impTotal) * 100),
+                ($notaCredito ? 'Nota de crédito ' : 'Compra ') . (string)$r['tipo'] . ' ' . (string)$r['punto_venta'] . '-' . (string)$r['numero_desde'] . ' — ' . $razon,
                 $adminId
             );
             $insertadas++;
@@ -342,6 +391,7 @@ final class CtaCteProveedorRepo
                     FROM orden_pago_compras opc
                     INNER JOIN ordenes_pago op ON op.id=opc.orden_pago_id AND op.estado='pagada'
                     INNER JOIN factura_compra fc ON fc.id = opc.factura_compra_id AND COALESCE(fc.estado, '') <> 'anulada'
+                    WHERE UPPER(fc.tipo) NOT LIKE '%NOTA%CR%DITO%' AND UPPER(fc.tipo) NOT LIKE 'NC%'
                     GROUP BY opc.orden_pago_id
                 ) x ON x.orden_pago_id = o.id
                 WHERE o.proveedor_id IS NOT NULL AND o.estado = 'pagada'
@@ -366,7 +416,7 @@ final class CtaCteProveedorRepo
             if (!$ops) {
                 continue;
             }
-            $facts = $pdo->prepare("SELECT id, imp_total FROM factura_compra WHERE idprovee = :p AND COALESCE(estado, '') <> 'anulada' ORDER BY fecha ASC, id ASC");
+            $facts = $pdo->prepare("SELECT id, imp_total FROM factura_compra WHERE idprovee = :p AND COALESCE(estado, '') <> 'anulada' AND UPPER(tipo) NOT LIKE '%NOTA%CR%DITO%' AND UPPER(tipo) NOT LIKE 'NC%' ORDER BY fecha ASC, id ASC");
             $facts->execute([':p' => $pid]);
             $facts = $facts->fetchAll();
             if (!$facts) {
@@ -376,7 +426,7 @@ final class CtaCteProveedorRepo
             $opIds = array_column($ops, 'id');
             $in = implode(',', array_map('intval', $opIds));
             $asigOp = [];
-            foreach ($pdo->query("SELECT opc.orden_pago_id, COALESCE(SUM(opc.monto_cents), 0) AS t FROM orden_pago_compras opc INNER JOIN ordenes_pago op ON op.id=opc.orden_pago_id AND op.estado='pagada' INNER JOIN factura_compra fc ON fc.id=opc.factura_compra_id AND COALESCE(fc.estado, '') <> 'anulada' WHERE opc.orden_pago_id IN ($in) GROUP BY opc.orden_pago_id")->fetchAll() as $r) {
+            foreach ($pdo->query("SELECT opc.orden_pago_id, COALESCE(SUM(opc.monto_cents), 0) AS t FROM orden_pago_compras opc INNER JOIN ordenes_pago op ON op.id=opc.orden_pago_id AND op.estado='pagada' INNER JOIN factura_compra fc ON fc.id=opc.factura_compra_id AND COALESCE(fc.estado, '') <> 'anulada' WHERE opc.orden_pago_id IN ($in) AND UPPER(fc.tipo) NOT LIKE '%NOTA%CR%DITO%' AND UPPER(fc.tipo) NOT LIKE 'NC%' GROUP BY opc.orden_pago_id")->fetchAll() as $r) {
                 $asigOp[(int)$r['orden_pago_id']] = (int)$r['t'];
             }
             $factIds = array_column($facts, 'id');
@@ -451,6 +501,7 @@ final class CtaCteProveedorRepo
         $opRepo = new OrdenPagoRepo();
         $out = [];
         foreach ($comprobantes as $c) {
+            if (CompraRepo::esNotaCredito((string)($c['tipo'] ?? ''))) continue;
             $total = (float)($c['imp_total'] ?? 0);
             $asignadoCents = $opRepo->totalAsignadoCompra((int)$c['id']);
             $asignado = $asignadoCents / 100;
