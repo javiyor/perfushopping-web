@@ -10,7 +10,7 @@ final class SmtpMailer
     /**
      * @param array $attachments [['name'=>'file.pdf','content'=>'raw bytes','mime'=>'application/pdf'], ...]
      */
-    public function send(string $to, string $subject, string $htmlBody, string $textBody = '', array $attachments = []): void
+    public function send(string $to, string $subject, string $htmlBody, string $textBody = '', array $attachments = [], array $extraHeaders = []): void
     {
         $host = Env::get('SMTP_HOST', 'smtp.hostinger.com');
         $port = (int)Env::get('SMTP_PORT', '465');
@@ -59,6 +59,12 @@ final class SmtpMailer
         $headers[] = 'Subject: ' . $this->encodeHeaderName($subject);
         $headers[] = 'MIME-Version: 1.0';
         $headers[] = 'Date: ' . date('r');
+        foreach (['In-Reply-To', 'References'] as $headerName) {
+            $headerValue = trim((string)($extraHeaders[$headerName] ?? ''));
+            if ($headerValue !== '' && !preg_match('/[\r\n]/', $headerValue)) {
+                $headers[] = $headerName . ': ' . $headerValue;
+            }
+        }
 
         if ($hasAttachments) {
             $headers[] = 'Content-Type: multipart/mixed; boundary=' . $boundaryMixed;

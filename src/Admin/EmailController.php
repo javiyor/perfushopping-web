@@ -66,7 +66,7 @@ final class EmailController
 
     /**
      * Recorre el árbol MIME y devuelve las partes de texto.
-     * @return array<int, array{num: string, subtype: string, encoding: int, charset: string, disposition: string}>
+     * @return array<int, array{num: string, subtype: string, encoding: int, charset: string, disposition: string, filename: string, mime: string, bytes: int, is_attachment: bool}>
      */
     private function walkParts(object $struct, string $prefix = ''): array
     {
@@ -93,12 +93,25 @@ final class EmailController
                         }
                     }
                 }
+                $filename = (string)($params['filename*'] ?? $params['filename'] ?? $params['name'] ?? '');
+                if (preg_match("/^([^']*)''(.+)$/", $filename, $fm)) {
+                    $filename = rawurldecode($fm[2]);
+                }
+                $filename = $this->decodeHeader($filename);
+                $types = ['TEXT', 'MULTIPART', 'MESSAGE', 'APPLICATION', 'AUDIO', 'IMAGE', 'VIDEO', 'OTHER'];
+                $primary = strtolower($types[(int)($part->type ?? 7)] ?? 'application');
+                $subtype = strtoupper((string)($part->subtype ?? ''));
+                $mime = $primary . '/' . strtolower($subtype !== '' ? $subtype : 'octet-stream');
                 $out[] = [
                     'num' => $num,
-                    'subtype' => strtoupper((string)($part->subtype ?? '')),
+                    'subtype' => $subtype,
                     'encoding' => (int)($part->encoding ?? 0),
                     'charset' => (string)($params['charset'] ?? ''),
                     'disposition' => strtoupper((string)($part->disposition ?? '')),
+                    'filename' => $filename,
+                    'mime' => $mime,
+                    'bytes' => (int)($part->bytes ?? 0),
+                    'is_attachment' => strtoupper((string)($part->disposition ?? '')) === 'ATTACHMENT' || $filename !== '',
                 ];
             }
             return $out;
@@ -109,6 +122,10 @@ final class EmailController
             'encoding' => (int)($struct->encoding ?? 0),
             'charset' => '',
             'disposition' => '',
+            'filename' => '',
+            'mime' => 'text/' . strtolower((string)($struct->subtype ?? 'plain')),
+            'bytes' => (int)($struct->bytes ?? 0),
+            'is_attachment' => false,
         ]];
     }
 
@@ -136,7 +153,7 @@ final class EmailController
                 return ['html' => '', 'plain' => ''];
             }
             foreach ($this->walkParts($struct) as $p) {
-                if (($p['disposition'] ?? '') === 'ATTACHMENT') {
+                if (!empty($p['is_attachment'])) {
                     continue;
                 }
                 $subtype = (string)($p['subtype'] ?? '');
@@ -166,6 +183,26 @@ final class EmailController
         } catch (\Throwable $e) {
         }
         return ['html' => $html, 'plain' => $plain];
+    }
+
+    /** @return array<int,array{part:string,name:string,mime:string,bytes:int}> */
+    private function fetchAttachments(\IMAP\Connection $mbox, int $msgno): array
+    {
+        $struct = @imap_fetchstructure($mbox, $msgno);
+        if (!is_object($struct)) return [];
+        $attachments = [];
+        foreach ($this->walkParts($struct) as $part) {
+            if (empty($part['is_attachment'])) continue;
+            $name = trim((string)$part['filename']);
+            if ($name === '') $name = 'adjunto-' . (count($attachments) + 1) . '.' . strtolower((string)$part['subtype']);
+            $attachments[] = [
+                'part' => (string)$part['num'],
+                'name' => $name,
+                'mime' => (string)$part['mime'],
+                'bytes' => (int)$part['bytes'],
+            ];
+        }
+        return $attachments;
     }
 
     private function previewText(string $plain, string $html): string
@@ -341,6 +378,7 @@ final class EmailController
         $cliente = null;
         $sugerida = null;
         $folderId = 0;
+        $attachments = [];
 
         try {
             $mbox = $this->conectar();
@@ -351,6 +389,7 @@ final class EmailController
                         ? trim((string)($header->from[0]->mailbox ?? '') . '@' . trim((string)($header->from[0]->host ?? ''), '@'))
                         : '';
                     $content = $this->fetchContent($mbox, $uid);
+                    $attachments = $this->fetchAttachments($mbox, $uid);
                     $messageId = self::normalizeMessageId((string)($header->message_id ?? ''));
                     $email = [
                         'from' => trim($from, '@'),
@@ -388,7 +427,9 @@ final class EmailController
 
         echo View::adminPage('admin/email/view.php', [
             'adminUser' => $adminUser,
+            'uid' => $uid,
             'email' => $email,
+            'attachments' => $attachments,
             'error' => $error,
             'folders' => $folders,
             'folderId' => $folderId,
@@ -397,6 +438,187 @@ final class EmailController
             'csrf' => Csrf::token(),
             'pageTitle' => 'Email: ' . ($email['subject'] ?? ''),
         ]);
+    }
+
+    private static function sanitizeReplyStyle(string $style): string
+    {
+        $allowed = [];
+        foreach (explode(';', $style) as $declaration) {
+            $parts = explode(':', $declaration, 2);
+            if (count($parts) !== 2) continue;
+            $property = strtolower(trim($parts[0]));
+            $value = trim($parts[1]);
+            if ($value === '' || preg_match('/url|expression|@import|[{}]/i', $value)) continue;
+            $valid = match ($property) {
+                'color', 'background-color' => (bool)preg_match('/^(#[0-9a-f]{3,8}|[a-z]{1,20}|rgba?\([0-9\s.,%]+\))$/i', $value),
+                'font-size' => (bool)preg_match('/^(?:[1-9]|[1-6][0-9])(?:px|pt|em|rem|%)$/i', $value),
+                'font-family' => (bool)preg_match('/^[a-z0-9 ,"\'-]{1,80}$/i', $value),
+                'font-weight' => (bool)preg_match('/^(normal|bold|[1-9]00)$/i', $value),
+                'font-style' => in_array(strtolower($value), ['normal', 'italic', 'oblique'], true),
+                'text-decoration' => in_array(strtolower($value), ['none', 'underline', 'line-through'], true),
+                'text-align' => in_array(strtolower($value), ['left', 'center', 'right', 'justify'], true),
+                'line-height' => (bool)preg_match('/^(?:[0-9]+(?:\.[0-9]+)?|[0-9]+(?:px|em|rem|%))$/i', $value),
+                default => false,
+            };
+            if ($valid) $allowed[] = $property . ':' . $value;
+        }
+        return implode(';', $allowed);
+    }
+
+    private static function sanitizeReplyHtml(string $html): string
+    {
+        $doc = new \DOMDocument('1.0', 'UTF-8');
+        libxml_use_internal_errors(true);
+        $doc->loadHTML('<?xml encoding="utf-8"?><div id="reply-root">' . $html . '</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        libxml_clear_errors();
+        $root = $doc->getElementById('reply-root');
+        if (!$root) return '';
+        $allowedTags = ['div', 'p', 'br', 'strong', 'b', 'em', 'i', 'u', 'ul', 'ol', 'li', 'a', 'span', 'font', 'h1', 'h2', 'h3', 'blockquote'];
+        $removeTags = ['script', 'style', 'iframe', 'object', 'embed', 'svg', 'math', 'form', 'input', 'button', 'textarea'];
+        $nodes = [];
+        foreach ($root->getElementsByTagName('*') as $node) $nodes[] = $node;
+        for ($i = count($nodes) - 1; $i >= 0; $i--) {
+            $node = $nodes[$i];
+            if (!$node->parentNode) continue;
+            $tag = strtolower($node->nodeName);
+            if (in_array($tag, $removeTags, true)) {
+                $node->parentNode->removeChild($node);
+                continue;
+            }
+            if (!in_array($tag, $allowedTags, true)) {
+                while ($node->firstChild) $node->parentNode->insertBefore($node->firstChild, $node);
+                $node->parentNode->removeChild($node);
+                continue;
+            }
+            $attributes = [];
+            foreach ($node->attributes ?? [] as $attribute) $attributes[] = $attribute->nodeName;
+            foreach ($attributes as $name) {
+                if ($name === 'style') {
+                    $safeStyle = self::sanitizeReplyStyle((string)$node->getAttribute('style'));
+                    if ($safeStyle !== '') $node->setAttribute('style', $safeStyle);
+                    else $node->removeAttribute('style');
+                } elseif ($tag === 'font' && $name === 'color') {
+                    $color = trim((string)$node->getAttribute('color'));
+                    if (preg_match('/^(#[0-9a-f]{3,8}|[a-z]{1,20})$/i', $color)) {
+                        $existingStyle = trim((string)$node->getAttribute('style'));
+                        $node->setAttribute('style', self::sanitizeReplyStyle($existingStyle . ';color:' . $color));
+                    }
+                    $node->removeAttribute('color');
+                } elseif ($tag === 'a' && $name === 'href') {
+                    $href = trim((string)$node->getAttribute('href'));
+                    if (!preg_match('#^(https?://|mailto:)#i', $href)) $node->removeAttribute('href');
+                } else {
+                    $node->removeAttribute($name);
+                }
+            }
+            if ($tag === 'a' && $node->hasAttribute('href')) {
+                $node->setAttribute('target', '_blank');
+                $node->setAttribute('rel', 'noopener noreferrer');
+            }
+        }
+        $out = '';
+        foreach ($root->childNodes as $child) $out .= $doc->saveHTML($child);
+        return $out;
+    }
+
+    public function responder(array $params): void
+    {
+        (new AdminAuthService())->requirePermiso('clientes');
+        Csrf::check($_POST['_csrf'] ?? null);
+        $msgno = (int)($_POST['uid'] ?? 0);
+        $bodyHtml = trim((string)($_POST['body_html'] ?? ''));
+        if ($msgno <= 0 || mb_strlen($bodyHtml) > 100000 || trim(strip_tags($bodyHtml)) === '') {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Escribí el contenido de la respuesta antes de enviarla.'];
+            Response::redirect('/admin/email/' . max(1, $msgno));
+        }
+
+        $mbox = $this->conectar();
+        if (!$mbox) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se pudo conectar al servidor IMAP para responder.'];
+            Response::redirect('/admin/email/' . $msgno);
+        }
+        try {
+            $header = @imap_headerinfo($mbox, $msgno);
+            if (!$header) throw new \RuntimeException('No se encontró el mensaje original.');
+            $to = isset($header->from[0])
+                ? trim((string)($header->from[0]->mailbox ?? '') . '@' . trim((string)($header->from[0]->host ?? ''), '@'), '@')
+                : '';
+            $to = filter_var($to, FILTER_VALIDATE_EMAIL) ? $to : '';
+            $subject = $this->decodeHeader((string)($header->subject ?? ''));
+            $subject = preg_match('/^re\s*:/i', $subject) ? $subject : 'Re: ' . $subject;
+            $messageId = self::normalizeMessageId((string)($header->message_id ?? ''));
+            $references = preg_replace('/[\r\n]+/', ' ', (string)($header->references ?? '')) ?? '';
+            imap_close($mbox);
+            if ($to === '') throw new \RuntimeException('El remitente del mensaje no tiene una dirección válida.');
+
+            $safeHtml = self::sanitizeReplyHtml($bodyHtml);
+            if (trim(strip_tags($safeHtml)) === '') throw new \RuntimeException('La respuesta quedó vacía luego de quitar contenido no permitido.');
+            $plain = trim(html_entity_decode(strip_tags(str_replace(['<br>', '<br/>', '<br />', '</p>', '</div>', '</li>'], "\n", $safeHtml)), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            $threadHeaders = [];
+            if ($messageId !== '' && !preg_match('/[\r\n<>]/', $messageId)) {
+                $threadHeaders['In-Reply-To'] = '<' . $messageId . '>';
+                $threadHeaders['References'] = trim($references . ' <' . $messageId . '>');
+            }
+            (new \Perfushopping\Web\Infra\SmtpMailer())->send($to, $subject, $safeHtml, $plain, [], $threadHeaders);
+            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Respuesta enviada a ' . $to . '.'];
+        } catch (\Throwable $e) {
+            if (isset($mbox) && $mbox instanceof \IMAP\Connection) @imap_close($mbox);
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se pudo enviar la respuesta: ' . $e->getMessage()];
+        }
+        Response::redirect('/admin/email/' . $msgno);
+    }
+
+    public function adjunto(array $params): void
+    {
+        (new AdminAuthService())->requirePermiso('clientes');
+        $msgno = (int)($params['uid'] ?? 0);
+        $partNo = trim((string)($_GET['part'] ?? ''));
+        if ($msgno <= 0 || !preg_match('/^\d+(?:\.\d+)*$/', $partNo) || !function_exists('imap_open')) {
+            Response::notFound();
+            return;
+        }
+        $mbox = $this->conectar();
+        if (!$mbox) {
+            Response::notFound();
+            return;
+        }
+        $payload = null;
+        try {
+            $struct = @imap_fetchstructure($mbox, $msgno);
+            if (is_object($struct)) {
+                foreach ($this->walkParts($struct) as $part) {
+                    if ((string)$part['num'] !== $partNo || empty($part['is_attachment'])) continue;
+                    $raw = @imap_fetchbody($mbox, $msgno, $partNo);
+                    if (is_string($raw)) {
+                        $payload = [
+                            'content' => $this->decodeTransfer($raw, (int)$part['encoding']),
+                            'name' => (string)$part['filename'],
+                            'mime' => (string)$part['mime'],
+                        ];
+                    }
+                    break;
+                }
+            }
+        } catch (\Throwable $e) {
+        }
+        imap_close($mbox);
+        if (!$payload) {
+            Response::notFound();
+            return;
+        }
+        $name = basename(str_replace('\\', '/', (string)$payload['name']));
+        $name = trim(str_replace(["\r", "\n", '"'], ['', '', '_'], $name));
+        if ($name === '') $name = 'adjunto';
+        $mime = (string)$payload['mime'];
+        if (!preg_match('#^[a-z0-9.+-]+/[a-z0-9.+-]+$#i', $mime)) $mime = 'application/octet-stream';
+        $inline = ($_GET['inline'] ?? '') === '1' && in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'application/pdf'], true);
+        $fallbackName = preg_replace('/[^A-Za-z0-9._-]/', '_', $name) ?: 'adjunto';
+        header('Content-Type: ' . $mime);
+        header('X-Content-Type-Options: nosniff');
+        header('Cache-Control: private, no-store');
+        header('Content-Disposition: ' . ($inline ? 'inline' : 'attachment') . '; filename="' . $fallbackName . '"; filename*=UTF-8\'\'' . rawurlencode($name));
+        header('Content-Length: ' . strlen((string)$payload['content']));
+        echo $payload['content'];
     }
 
     /** Chequeo liviano para el badge (cabeceras de los últimos 30, sin cuerpos). */
