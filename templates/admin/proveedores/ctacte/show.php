@@ -116,10 +116,10 @@ $filtroQs = $q !== '' ? '&q=' . urlencode($q) : '';
                 </tr>
             </thead>
             <tbody>
-                <?php $acumPendiente = 0; foreach ($comprobantes as $c): $acumPendiente += (float)($c['pendiente'] ?? 0); ?>
+                <?php $acumPendiente = 0; foreach ($comprobantes as $c): $esCredito = !empty($c['es_credito']); $acumPendiente += ($esCredito ? -1 : 1) * (float)($c['pendiente'] ?? 0); ?>
                     <tr>
                         <td>
-                            <?php if ($c['pendiente'] > 0): ?>
+                            <?php if (!$esCredito && $c['pendiente'] > 0): ?>
                                 <input type="checkbox" name="compra_ids[]" value="<?= (int)$c['id'] ?>" data-pendiente="<?= (float)$c['pendiente'] ?>" title="Seleccionar para pagar" />
                             <?php endif; ?>
                         </td>
@@ -131,6 +131,8 @@ $filtroQs = $q !== '' ? '&q=' . urlencode($q) : '';
                                     <?php foreach ($c['cronograma'] as $cu): ?>
                                         <span class="ctacte-installment">C<?= (int)$cu['cuota'] ?><?= $cu['dias'] > 0 ? ' +' . (int)$cu['dias'] . 'd' : '' ?> <?= $cu['fecha'] ? date('d/m/y', strtotime((string)$cu['fecha'])) : '—' ?> $<?= $mon($cu['monto']) ?></span>
                                     <?php endforeach; ?>
+                                <?php elseif ($esCredito): ?>
+                                    Crédito sin imputar
                                 <?php else: ?>
                                     Sin plazo
                                 <?php endif; ?>
@@ -138,17 +140,17 @@ $filtroQs = $q !== '' ? '&q=' . urlencode($q) : '';
                         </td>
                         <td class="small"><?= $c['fecha'] ? date('d/m/Y', strtotime((string)$c['fecha'])) : '—' ?></td>
                         <td class="small <?= (!empty($c['vencimiento']) && ($c['pendiente'] ?? 0) > 0 && $c['vencimiento'] < date('Y-m-d')) ? 'text-danger fw-bold' : '' ?>"><?= !empty($c['vencimiento']) ? date('d/m/Y', strtotime((string)$c['vencimiento'])) : '—' ?></td>
-                        <td class="text-end">$<?= $mon($c['imp_total']) ?></td>
-                        <td class="text-center"><?= count($c['cronograma']) ?: 1 ?></td>
+                        <td class="text-end <?= $esCredito ? 'text-success' : '' ?>"><?= $esCredito ? '−' : '' ?>$<?= $mon($c['imp_total']) ?></td>
+                        <td class="text-center"><?= $esCredito ? '—' : (count($c['cronograma']) ?: 1) ?></td>
                         <td>
-                            <?php $est = ['Pagada' => 'success', 'Parcial' => 'warning', 'Pendiente' => 'danger']; ?>
+                            <?php $est = ['Pagada' => 'success', 'Parcial' => 'warning', 'Pendiente' => 'danger', 'Crédito pendiente' => 'info']; ?>
                             <span class="badge bg-<?= $est[$c['estado']] ?? 'secondary' ?>"><?= htmlspecialchars((string)$c['estado']) ?></span>
                         </td>
-                        <td class="text-end <?= $c['pendiente'] > 0 ? 'text-danger' : 'text-success' ?>">$<?= $mon($c['pendiente']) ?></td>
+                        <td class="text-end <?= $esCredito ? 'text-success' : ($c['pendiente'] > 0 ? 'text-danger' : 'text-success') ?>"><?= $esCredito ? '−' : '' ?>$<?= $mon($c['pendiente']) ?></td>
                         <td class="text-end <?= ($c['vencido'] ?? 0) > 0 ? 'text-danger fw-bold' : 'text-muted' ?>">$<?= $mon($c['vencido'] ?? 0) ?></td>
-                        <td class="text-end fw-bold">$<?= $mon($acumPendiente) ?></td>
+                        <td class="text-end fw-bold <?= $acumPendiente > 0 ? 'text-danger' : 'text-success' ?>"><?= $acumPendiente < 0 ? '−' : '' ?>$<?= $mon(abs($acumPendiente)) ?></td>
                         <td class="text-end">
-                            <?php if ($c['pendiente'] > 0): ?>
+                            <?php if (!$esCredito && $c['pendiente'] > 0): ?>
                                 <a class="btn btn-sm btn-outline-success" title="Cargar pago a cuenta (monto editable)"
                                    href="/admin/ordenes-pago/nueva?proveedor_id=<?= (int)$proveedorId ?>&proveedor_nombre=<?= urlencode($proveedorNombre) ?>&monto=<?= $c['pendiente'] ?>&compra_ids=<?= (int)$c['id'] ?>"><i class="bi bi-cash-stack"></i></a>
                             <?php endif; ?>

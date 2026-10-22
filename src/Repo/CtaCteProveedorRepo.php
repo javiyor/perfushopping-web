@@ -501,22 +501,27 @@ final class CtaCteProveedorRepo
         $opRepo = new OrdenPagoRepo();
         $out = [];
         foreach ($comprobantes as $c) {
-            if (CompraRepo::esNotaCredito((string)($c['tipo'] ?? ''))) continue;
-            $total = (float)($c['imp_total'] ?? 0);
-            $asignadoCents = $opRepo->totalAsignadoCompra((int)$c['id']);
+            $esCredito = CompraRepo::esNotaCredito((string)($c['tipo'] ?? ''));
+            $total = abs((float)($c['imp_total'] ?? 0));
+            $asignadoCents = $esCredito ? 0 : $opRepo->totalAsignadoCompra((int)$c['id']);
             $asignado = $asignadoCents / 100;
-            $pendiente = round($total - $asignado, 2);
-            if ($pendiente <= 0) {
-                $estado = 'Pagada';
-                $pendiente = 0;
-            } elseif ($asignado > 0) {
-                $estado = 'Parcial';
+            if ($esCredito) {
+                $estado = 'Crédito pendiente';
+                $pendiente = $total;
             } else {
-                $estado = 'Pendiente';
+                $pendiente = round($total - $asignado, 2);
+                if ($pendiente <= 0) {
+                    $estado = 'Pagada';
+                    $pendiente = 0;
+                } elseif ($asignado > 0) {
+                    $estado = 'Parcial';
+                } else {
+                    $estado = 'Pendiente';
+                }
             }
-            $cronograma = Plazo::cronograma($c);
+            $cronograma = $esCredito ? [] : Plazo::cronograma($c);
             $ultima = end($cronograma);
-            $vencidoCents = $this->vencidoPorCronograma($cronograma, min((int)round($total * 100), max(0, $asignadoCents)), date('Y-m-d'));
+            $vencidoCents = $esCredito ? 0 : $this->vencidoPorCronograma($cronograma, min((int)round($total * 100), max(0, $asignadoCents)), date('Y-m-d'));
             $out[] = [
                 'id' => (int)$c['id'],
                 'tipo' => (string)($c['tipo'] ?? ''),
@@ -528,6 +533,7 @@ final class CtaCteProveedorRepo
                 'vencimiento' => ($ultima['fecha'] ?? null) ?: null,
                 'estado' => $estado,
                 'pendiente' => $pendiente,
+                'es_credito' => $esCredito,
                 'vencido_cents' => $vencidoCents,
                 'vencido' => $vencidoCents / 100,
             ];

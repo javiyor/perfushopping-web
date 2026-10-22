@@ -126,7 +126,7 @@ final class ProveedorCtaCteController
         $vencidoNetoCents = max(0, $vencidoBrutoCents - $creditoPendienteCents);
         // Predeterminado: solo pendientes (oculta las pagadas/imputadas); ?filtro=todos las muestra.
         if ($filtro === 'pendientes') {
-            $comprobantes = array_values(array_filter($comprobantes, static fn (array $c): bool => ($c['estado'] ?? '') !== 'Pagada'));
+            $comprobantes = array_values(array_filter($comprobantes, static fn (array $c): bool => !empty($c['es_credito']) || ($c['estado'] ?? '') !== 'Pagada'));
         }
 
         $proveedorNombre = '';
