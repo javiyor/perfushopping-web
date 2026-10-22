@@ -12,14 +12,16 @@ $mon = static fn ($v) => number_format((float)$v, 2, ',', '.');
 $filtroQs = $q !== '' ? '&q=' . urlencode($q) : '';
 ?>
 <style>
-.ctacte-compact .table { font-size: 0.76rem; }
-.ctacte-compact .table > :not(caption) > * > * { padding: 0.16rem 0.4rem; line-height: 1.25; }
+.ctacte-compact .table { font-size: 0.66rem; }
+.ctacte-compact .table > :not(caption) > * > * { padding: 0.07rem 0.24rem; line-height: 1.08; }
 .ctacte-compact .table td { vertical-align: middle; }
-.ctacte-compact .table .small { font-size: 0.68rem; line-height: 1.3; }
-.ctacte-compact .table .badge { font-size: 0.66rem; padding: 0.2em 0.45em; }
-.ctacte-compact .table .btn-sm { padding: 0.08rem 0.3rem; font-size: 0.7rem; }
+.ctacte-compact .table .small { font-size: 0.58rem; line-height: 1.04; }
+.ctacte-compact .ctacte-installment { white-space: nowrap; margin-right: 0.22rem; }
+.ctacte-compact .table .badge { font-size: 0.58rem; padding: 0.12em 0.32em; }
+.ctacte-compact .table .btn-sm { padding: 0.04rem 0.22rem; font-size: 0.62rem; }
 .ctacte-compact .table input[type="checkbox"] { width: 0.9em; height: 0.9em; }
 .ctacte-compact .card-header h5 { font-size: 0.95rem; }
+.ctacte-compact .ctacte-vencido-resumen { font-size: 0.78rem; }
 </style>
 <div class="ctacte-compact">
 <div class="d-flex justify-content-between align-items-start mb-3">
@@ -30,6 +32,14 @@ $filtroQs = $q !== '' ? '&q=' . urlencode($q) : '';
     <div>
         <span class="fw-bold fs-5 me-3 <?= $saldo > 0 ? 'text-danger' : 'text-success' ?>">Saldo: <?= Format::moneyFromCents($saldo) ?></span>
         <a class="btn btn-outline-secondary btn-sm" href="/admin/proveedores/ctacte">Volver</a>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-2 ctacte-vencido-resumen">
+    <div class="card-body py-1 px-2 d-flex flex-wrap justify-content-between gap-2">
+        <span><span class="text-muted">Vencido bruto:</span> <strong class="text-danger"><?= Format::moneyFromCents($vencidoBrutoCents) ?></strong></span>
+        <span><span class="text-muted">Crédito pendiente de imputar:</span> <strong class="text-success">−<?= Format::moneyFromCents($creditoPendienteCents) ?></strong></span>
+        <span><span class="text-muted">Vencido neto:</span> <strong class="<?= $vencidoNetoCents > 0 ? 'text-danger' : 'text-success' ?>"><?= Format::moneyFromCents($vencidoNetoCents) ?></strong></span>
     </div>
 </div>
 
@@ -69,6 +79,7 @@ $filtroQs = $q !== '' ? '&q=' . urlencode($q) : '';
                     <th>Cuotas</th>
                     <th>Estado</th>
                     <th class="text-end">Pendiente</th>
+                    <th class="text-end">Vencido</th>
                     <th class="text-end">Saldo acum.</th>
                     <th style="width:110px"></th>
                 </tr>
@@ -87,7 +98,7 @@ $filtroQs = $q !== '' ? '&q=' . urlencode($q) : '';
                             <div class="small text-muted">
                                 <?php if ($c['cronograma']): ?>
                                     <?php foreach ($c['cronograma'] as $cu): ?>
-                                        <div>Cuota <?= (int)$cu['cuota'] ?><?= $cu['dias'] > 0 ? ' a ' . (int)$cu['dias'] . 'd' : ' contado' ?>: <?= $cu['fecha'] ? date('d/m/Y', strtotime((string)$cu['fecha'])) : '—' ?> — $<?= $mon($cu['monto']) ?></div>
+                                        <span class="ctacte-installment">C<?= (int)$cu['cuota'] ?><?= $cu['dias'] > 0 ? ' +' . (int)$cu['dias'] . 'd' : '' ?> <?= $cu['fecha'] ? date('d/m/y', strtotime((string)$cu['fecha'])) : '—' ?> $<?= $mon($cu['monto']) ?></span>
                                     <?php endforeach; ?>
                                 <?php else: ?>
                                     Sin plazo
@@ -103,6 +114,7 @@ $filtroQs = $q !== '' ? '&q=' . urlencode($q) : '';
                             <span class="badge bg-<?= $est[$c['estado']] ?? 'secondary' ?>"><?= htmlspecialchars((string)$c['estado']) ?></span>
                         </td>
                         <td class="text-end <?= $c['pendiente'] > 0 ? 'text-danger' : 'text-success' ?>">$<?= $mon($c['pendiente']) ?></td>
+                        <td class="text-end <?= ($c['vencido'] ?? 0) > 0 ? 'text-danger fw-bold' : 'text-muted' ?>">$<?= $mon($c['vencido'] ?? 0) ?></td>
                         <td class="text-end fw-bold">$<?= $mon($acumPendiente) ?></td>
                         <td class="text-end">
                             <?php if ($c['pendiente'] > 0): ?>

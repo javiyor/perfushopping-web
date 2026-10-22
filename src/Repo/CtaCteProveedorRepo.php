@@ -108,6 +108,76 @@ final class CtaCteProveedorRepo
         return $val !== false ? (int)$val : 0;
     }
 
+    /** @param array<int,int> $proveedorIds @return array<int,array{vencido_cents:int,credito_pendiente_cents:int,vencido_neto_cents:int}> */
+    public function resumenVencidoPorProveedor(array $proveedorIds): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $proveedorIds), static fn(int $id): bool => $id > 0)));
+        if (!$ids) return [];
+        $marks = implode(',', array_fill(0, count($ids), '?'));
+        $summary = [];
+        foreach ($ids as $id) $summary[$id] = ['vencido_cents' => 0, 'credito_pendiente_cents' => 0, 'vencido_neto_cents' => 0];
+
+        $sql = "
+            SELECT fc.id, fc.idprovee, fc.fecha, fc.imp_total, fc.plazo_cuotas, fc.plazo_dias,
+                   COALESCE(asig.total, 0) AS asignado_cents
+            FROM factura_compra fc
+            LEFT JOIN (
+                SELECT opc.factura_compra_id, SUM(opc.monto_cents) AS total
+                FROM orden_pago_compras opc
+                INNER JOIN ordenes_pago o ON o.id=opc.orden_pago_id AND o.estado='pagada'
+                GROUP BY opc.factura_compra_id
+            ) asig ON asig.factura_compra_id = fc.id
+            WHERE fc.idprovee IN ({$marks}) AND COALESCE(fc.estado, '') <> 'anulada'
+        ";
+        $st = Db::pdo()->prepare($sql);
+        $st->execute($ids);
+        $today = date('Y-m-d');
+        foreach ($st->fetchAll() ?: [] as $row) {
+            $providerId = (int)$row['idprovee'];
+            if (!isset($summary[$providerId])) continue;
+            $totalCents = max(0, (int)round((float)($row['imp_total'] ?? 0) * 100));
+            $assignedCents = max(0, min($totalCents, (int)($row['asignado_cents'] ?? 0)));
+            $schedule = Plazo::cronograma($row);
+            $summary[$providerId]['vencido_cents'] += $this->vencidoPorCronograma($schedule, $assignedCents, $today);
+        }
+
+        $credits = Db::pdo()->prepare("SELECT m.proveedor_id, SUM(m.monto_cents)
+            FROM ctacte_proveedor_movimientos m
+            INNER JOIN ordenes_pago o ON o.id=m.origen_id AND o.estado='pagada'
+            WHERE m.tipo='credito' AND m.origen='op' AND m.proveedor_id IN ({$marks})
+            GROUP BY m.proveedor_id");
+        $credits->execute($ids);
+        $creditByProvider = [];
+        foreach ($credits->fetchAll(\PDO::FETCH_NUM) ?: [] as $row) $creditByProvider[(int)$row[0]] = (int)$row[1];
+
+        $assigned = Db::pdo()->prepare("SELECT o.proveedor_id, SUM(opc.monto_cents) FROM orden_pago_compras opc INNER JOIN ordenes_pago o ON o.id=opc.orden_pago_id AND o.estado='pagada' INNER JOIN factura_compra fc ON fc.id=opc.factura_compra_id AND COALESCE(fc.estado, '') <> 'anulada' WHERE o.proveedor_id IN ({$marks}) GROUP BY o.proveedor_id");
+        $assigned->execute($ids);
+        $assignedByProvider = [];
+        foreach ($assigned->fetchAll(\PDO::FETCH_NUM) ?: [] as $row) $assignedByProvider[(int)$row[0]] = (int)$row[1];
+
+        foreach ($summary as $id => &$values) {
+            $values['credito_pendiente_cents'] = max(0, ($creditByProvider[$id] ?? 0) - ($assignedByProvider[$id] ?? 0));
+            $values['vencido_neto_cents'] = max(0, $values['vencido_cents'] - $values['credito_pendiente_cents']);
+        }
+        unset($values);
+        return $summary;
+    }
+
+    /** @param array<int,array{fecha:?string,monto:float}> $schedule */
+    private function vencidoPorCronograma(array $schedule, int $assignedCents, string $today): int
+    {
+        $vencido = 0;
+        $saldoAsignado = max(0, $assignedCents);
+        foreach ($schedule as $installment) {
+            $amount = max(0, (int)round((float)($installment['monto'] ?? 0) * 100));
+            $paid = min($amount, $saldoAsignado);
+            $saldoAsignado -= $paid;
+            $dueDate = (string)($installment['fecha'] ?? '');
+            if ($dueDate !== '' && $dueDate < $today) $vencido += $amount - $paid;
+        }
+        return $vencido;
+    }
+
     public function agregarMovimiento(
         string $tipo,
         string $origen,
@@ -268,10 +338,13 @@ final class CtaCteProveedorRepo
                 SELECT o.proveedor_id
                 FROM ordenes_pago o
                 LEFT JOIN (
-                    SELECT orden_pago_id, SUM(monto_cents) AS asignado
-                    FROM orden_pago_compras GROUP BY orden_pago_id
+                    SELECT opc.orden_pago_id, SUM(opc.monto_cents) AS asignado
+                    FROM orden_pago_compras opc
+                    INNER JOIN ordenes_pago op ON op.id=opc.orden_pago_id AND op.estado='pagada'
+                    INNER JOIN factura_compra fc ON fc.id = opc.factura_compra_id AND COALESCE(fc.estado, '') <> 'anulada'
+                    GROUP BY opc.orden_pago_id
                 ) x ON x.orden_pago_id = o.id
-                WHERE o.proveedor_id IS NOT NULL
+                WHERE o.proveedor_id IS NOT NULL AND o.estado = 'pagada'
                   AND (o.monto_cents - COALESCE(x.asignado, 0)) > 0
                 GROUP BY o.proveedor_id
             ");
@@ -287,13 +360,13 @@ final class CtaCteProveedorRepo
             if ($pid <= 0) {
                 continue;
             }
-            $ops = $pdo->prepare('SELECT id, monto_cents FROM ordenes_pago WHERE proveedor_id = :p ORDER BY id ASC');
+            $ops = $pdo->prepare("SELECT id, monto_cents FROM ordenes_pago WHERE proveedor_id = :p AND estado='pagada' ORDER BY id ASC");
             $ops->execute([':p' => $pid]);
             $ops = $ops->fetchAll();
             if (!$ops) {
                 continue;
             }
-            $facts = $pdo->prepare('SELECT id, imp_total FROM factura_compra WHERE idprovee = :p ORDER BY fecha ASC, id ASC');
+            $facts = $pdo->prepare("SELECT id, imp_total FROM factura_compra WHERE idprovee = :p AND COALESCE(estado, '') <> 'anulada' ORDER BY fecha ASC, id ASC");
             $facts->execute([':p' => $pid]);
             $facts = $facts->fetchAll();
             if (!$facts) {
@@ -303,13 +376,13 @@ final class CtaCteProveedorRepo
             $opIds = array_column($ops, 'id');
             $in = implode(',', array_map('intval', $opIds));
             $asigOp = [];
-            foreach ($pdo->query("SELECT orden_pago_id, COALESCE(SUM(monto_cents), 0) AS t FROM orden_pago_compras WHERE orden_pago_id IN ($in) GROUP BY orden_pago_id")->fetchAll() as $r) {
+            foreach ($pdo->query("SELECT opc.orden_pago_id, COALESCE(SUM(opc.monto_cents), 0) AS t FROM orden_pago_compras opc INNER JOIN ordenes_pago op ON op.id=opc.orden_pago_id AND op.estado='pagada' INNER JOIN factura_compra fc ON fc.id=opc.factura_compra_id AND COALESCE(fc.estado, '') <> 'anulada' WHERE opc.orden_pago_id IN ($in) GROUP BY opc.orden_pago_id")->fetchAll() as $r) {
                 $asigOp[(int)$r['orden_pago_id']] = (int)$r['t'];
             }
             $factIds = array_column($facts, 'id');
             $inF = implode(',', array_map('intval', $factIds));
             $asigFact = [];
-            foreach ($pdo->query("SELECT factura_compra_id, COALESCE(SUM(monto_cents), 0) AS t FROM orden_pago_compras WHERE factura_compra_id IN ($inF) GROUP BY factura_compra_id")->fetchAll() as $r) {
+            foreach ($pdo->query("SELECT opc.factura_compra_id, COALESCE(SUM(opc.monto_cents), 0) AS t FROM orden_pago_compras opc INNER JOIN ordenes_pago op ON op.id=opc.orden_pago_id AND op.estado='pagada' WHERE opc.factura_compra_id IN ($inF) GROUP BY opc.factura_compra_id")->fetchAll() as $r) {
                 $asigFact[(int)$r['factura_compra_id']] = (int)$r['t'];
             }
 
@@ -349,7 +422,7 @@ final class CtaCteProveedorRepo
     /**
      * Comprobantes de compra de un proveedor con cronograma y estado según
      * las asignaciones reales de las órdenes de pago.
-     * @return array<int, array{id:int, tipo:string, punto_venta:string, numero_desde:string, fecha:?string, imp_total:float, cronograma:array, estado:string, pendiente:float}>
+     * @return array<int, array{id:int, tipo:string, punto_venta:string, numero_desde:string, fecha:?string, imp_total:float, cronograma:array, estado:string, pendiente:float, vencido:float}>
      */
     public function comprobantesConPlazo(?int $proveedorId, string $cuit = ''): array
     {
@@ -357,10 +430,10 @@ final class CtaCteProveedorRepo
         $params = [];
         $where = '';
         if ($proveedorId !== null) {
-            $where = ' WHERE fc.idprovee = :pid';
+            $where = " WHERE fc.idprovee = :pid AND COALESCE(fc.estado, '') <> 'anulada'";
             $params[':pid'] = $proveedorId;
         } elseif ($cuit !== '') {
-            $where = ' WHERE fc.cuit_proveedor = :c';
+            $where = " WHERE fc.cuit_proveedor = :c AND COALESCE(fc.estado, '') <> 'anulada'";
             $params[':c'] = $cuit;
         } else {
             return [];
@@ -379,7 +452,8 @@ final class CtaCteProveedorRepo
         $out = [];
         foreach ($comprobantes as $c) {
             $total = (float)($c['imp_total'] ?? 0);
-            $asignado = $opRepo->totalAsignadoCompra((int)$c['id']) / 100;
+            $asignadoCents = $opRepo->totalAsignadoCompra((int)$c['id']);
+            $asignado = $asignadoCents / 100;
             $pendiente = round($total - $asignado, 2);
             if ($pendiente <= 0) {
                 $estado = 'Pagada';
@@ -391,6 +465,7 @@ final class CtaCteProveedorRepo
             }
             $cronograma = Plazo::cronograma($c);
             $ultima = end($cronograma);
+            $vencidoCents = $this->vencidoPorCronograma($cronograma, min((int)round($total * 100), max(0, $asignadoCents)), date('Y-m-d'));
             $out[] = [
                 'id' => (int)$c['id'],
                 'tipo' => (string)($c['tipo'] ?? ''),
@@ -402,6 +477,8 @@ final class CtaCteProveedorRepo
                 'vencimiento' => ($ultima['fecha'] ?? null) ?: null,
                 'estado' => $estado,
                 'pendiente' => $pendiente,
+                'vencido_cents' => $vencidoCents,
+                'vencido' => $vencidoCents / 100,
             ];
         }
         return $out;

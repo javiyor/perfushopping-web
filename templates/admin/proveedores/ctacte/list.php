@@ -44,6 +44,9 @@ $saldoTotal = (int)($saldoTotal ?? 0);
                     <th>Proveedor</th>
                     <th class="text-end">Débitos</th>
                     <th class="text-end">Créditos</th>
+                    <th class="text-end">Vencido bruto</th>
+                    <th class="text-end">Crédito pendiente</th>
+                    <th class="text-end">Vencido neto</th>
                     <th class="text-end">Saldo</th>
                     <th>Último movimiento</th>
                     <th style="width:50px"></th>
@@ -51,13 +54,16 @@ $saldoTotal = (int)($saldoTotal ?? 0);
             </thead>
             <tbody>
                 <?php if (!$list): ?>
-                    <tr><td colspan="6" class="text-muted text-center">Sin saldos pendientes.</td></tr>
+                    <tr><td colspan="9" class="text-muted text-center">Sin saldos pendientes.</td></tr>
                 <?php else: ?>
                     <?php foreach ($list as $item): ?>
                         <tr>
                             <td><strong><?= htmlspecialchars((string)($item['proveedor_nombre'] ?? '-')) ?></strong></td>
                             <td class="text-end"><?= Format::moneyFromCents((int)($item['debitos'] ?? 0)) ?></td>
                             <td class="text-end"><?= Format::moneyFromCents((int)($item['creditos'] ?? 0)) ?></td>
+                            <td class="text-end <?= (int)($item['vencido_cents'] ?? 0) > 0 ? 'text-danger' : '' ?>"><?= Format::moneyFromCents((int)($item['vencido_cents'] ?? 0)) ?></td>
+                            <td class="text-end text-success"><?= Format::moneyFromCents((int)($item['credito_pendiente_cents'] ?? 0)) ?></td>
+                            <td class="text-end fw-bold <?= (int)($item['vencido_neto_cents'] ?? 0) > 0 ? 'text-danger' : 'text-success' ?>"><?= Format::moneyFromCents((int)($item['vencido_neto_cents'] ?? 0)) ?></td>
                             <td class="text-end fw-bold <?= (int)($item['saldo_cents'] ?? 0) > 0 ? 'text-danger' : 'text-success' ?>">
                                 <?= Format::moneyFromCents((int)($item['saldo_cents'] ?? 0)) ?>
                             </td>
@@ -83,6 +89,9 @@ $saldoTotal = (int)($saldoTotal ?? 0);
                     <td>Total</td>
                     <td class="text-end"><?= Format::moneyFromCents(array_sum(array_column($list, 'debitos'))) ?></td>
                     <td class="text-end"><?= Format::moneyFromCents(array_sum(array_column($list, 'creditos'))) ?></td>
+                    <td class="text-end"><?= Format::moneyFromCents(array_sum(array_column($list, 'vencido_cents'))) ?></td>
+                    <td class="text-end"><?= Format::moneyFromCents(array_sum(array_column($list, 'credito_pendiente_cents'))) ?></td>
+                    <td class="text-end"><?= Format::moneyFromCents(array_sum(array_column($list, 'vencido_neto_cents'))) ?></td>
                     <td class="text-end <?= $saldoTotal > 0 ? 'text-danger' : 'text-success' ?>"><?= Format::moneyFromCents($saldoTotal) ?></td>
                     <td colspan="2"></td>
                 </tr>

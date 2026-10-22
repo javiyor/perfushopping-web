@@ -17,11 +17,23 @@ final class ProveedorCtaCteController
         $adminUser = $auth->requirePermiso('compras');
 
         $q = trim((string)($_GET['q'] ?? ''));
-        $list = (new CtaCteProveedorRepo())->listarConSaldo($q);
-        $saldoTotal = 0;
-        foreach ($list as $item) {
-            $saldoTotal += (int)($item['saldo_cents'] ?? 0);
+        $repo = new CtaCteProveedorRepo();
+        try {
+            $repo->sincronizarAsignaciones();
+        } catch (\Throwable $e) {
+            error_log('ctacte proveedor asignaciones: ' . $e->getMessage());
         }
+        $list = $repo->listarConSaldo($q);
+        $vencidos = $repo->resumenVencidoPorProveedor(array_map('intval', array_column($list, 'proveedor_id')));
+        $saldoTotal = 0;
+        foreach ($list as &$item) {
+            $saldoTotal += (int)($item['saldo_cents'] ?? 0);
+            $vencido = $vencidos[(int)($item['proveedor_id'] ?? 0)] ?? [];
+            $item['vencido_cents'] = (int)($vencido['vencido_cents'] ?? 0);
+            $item['credito_pendiente_cents'] = (int)($vencido['credito_pendiente_cents'] ?? 0);
+            $item['vencido_neto_cents'] = (int)($vencido['vencido_neto_cents'] ?? 0);
+        }
+        unset($item);
 
         echo View::adminPage('admin/proveedores/ctacte/list.php', [
             'adminUser' => $adminUser,
@@ -67,6 +79,10 @@ final class ProveedorCtaCteController
         $movimientos = $repo->movimientos($proveedorId, $q);
         $saldo = $repo->saldoActual($proveedorId);
         $comprobantes = $proveedorId !== null ? $repo->comprobantesConPlazo($proveedorId) : [];
+        $vencidoBrutoCents = array_sum(array_column($comprobantes, 'vencido_cents'));
+        $resumenVencido = $proveedorId !== null ? ($repo->resumenVencidoPorProveedor([$proveedorId])[$proveedorId] ?? []) : [];
+        $creditoPendienteCents = (int)($resumenVencido['credito_pendiente_cents'] ?? 0);
+        $vencidoNetoCents = max(0, $vencidoBrutoCents - $creditoPendienteCents);
         // Predeterminado: solo pendientes (oculta las pagadas/imputadas); ?filtro=todos las muestra.
         if ($filtro === 'pendientes') {
             $comprobantes = array_values(array_filter($comprobantes, static fn (array $c): bool => ($c['estado'] ?? '') !== 'Pagada'));
@@ -81,6 +97,9 @@ final class ProveedorCtaCteController
             'adminUser' => $adminUser,
             'movimientos' => $movimientos,
             'comprobantes' => $comprobantes,
+            'vencidoBrutoCents' => $vencidoBrutoCents,
+            'creditoPendienteCents' => $creditoPendienteCents,
+            'vencidoNetoCents' => $vencidoNetoCents,
             'proveedorId' => $proveedorId,
             'proveedorNombre' => $proveedorNombre,
             'saldo' => $saldo,

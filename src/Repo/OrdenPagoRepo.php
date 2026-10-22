@@ -117,7 +117,11 @@ final class OrdenPagoRepo
     /** Total asignado a una factura de compra (centavos). */
     public function totalAsignadoCompra(int $facturaCompraId): int
     {
-        $st = Db::pdo()->prepare('SELECT COALESCE(SUM(monto_cents), 0) FROM orden_pago_compras WHERE factura_compra_id = :c');
+        $st = Db::pdo()->prepare("SELECT COALESCE(SUM(opc.monto_cents), 0)
+            FROM orden_pago_compras opc
+            INNER JOIN ordenes_pago o ON o.id = opc.orden_pago_id AND o.estado = 'pagada'
+            INNER JOIN factura_compra fc ON fc.id = opc.factura_compra_id AND COALESCE(fc.estado, '') <> 'anulada'
+            WHERE opc.factura_compra_id = :c");
         $st->execute([':c' => $facturaCompraId]);
         return (int)$st->fetchColumn();
     }
