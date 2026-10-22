@@ -58,6 +58,45 @@ final class ProveedorCtaCteController
         Response::redirect('/admin/proveedores/ctacte');
     }
 
+    public function guardarAjuste(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requirePermiso('compras');
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $proveedorId = (int)($_POST['proveedor_id'] ?? 0);
+        $tipo = trim((string)($_POST['tipo'] ?? ''));
+        $concepto = trim((string)($_POST['concepto'] ?? ''));
+        $rawMonto = trim((string)($_POST['monto'] ?? '0'));
+        if (str_contains($rawMonto, ',') && str_contains($rawMonto, '.')) {
+            $rawMonto = strrpos($rawMonto, ',') > strrpos($rawMonto, '.')
+                ? str_replace(',', '.', str_replace('.', '', $rawMonto))
+                : str_replace(',', '', $rawMonto);
+        } else {
+            $rawMonto = str_replace(',', '.', $rawMonto);
+        }
+        $montoCents = is_numeric($rawMonto) ? (int)round((float)$rawMonto * 100) : 0;
+        $proveedor = $proveedorId > 0 ? (new \Perfushopping\Web\Repo\ProveedorRepo())->findById($proveedorId) : null;
+
+        if (!$proveedor || !in_array($tipo, ['debito', 'credito'], true) || $montoCents <= 0 || $concepto === '') {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Completá tipo, importe y concepto del ajuste.'];
+            Response::redirect('/admin/proveedores/ctacte/' . max(1, $proveedorId));
+        }
+
+        (new CtaCteProveedorRepo())->agregarMovimiento(
+            $tipo,
+            'ajuste',
+            null,
+            $proveedorId,
+            (string)($proveedor['razon'] ?? ''),
+            $montoCents,
+            $concepto,
+            (int)$adminUser['id']
+        );
+        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Ajuste registrado en la cuenta corriente.'];
+        Response::redirect('/admin/proveedores/ctacte/' . $proveedorId);
+    }
+
     public function movimientos(array $params): void
     {
         $auth = new AdminAuthService();

@@ -47,6 +47,33 @@ $filtroQs = $q !== '' ? '&q=' . urlencode($q) : '';
     </div>
 </div>
 
+<div class="card shadow-sm mb-2">
+    <div class="card-body py-2">
+        <form method="post" action="/admin/proveedores/ctacte/ajuste/guardar" class="row g-2 align-items-end">
+            <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>" />
+            <input type="hidden" name="proveedor_id" value="<?= (int)$proveedorId ?>" />
+            <div class="col-auto">
+                <label class="form-label small mb-1">Ajuste</label>
+                <select class="form-select form-select-sm" name="tipo" required>
+                    <option value="debito">Débito (+ deuda)</option>
+                    <option value="credito">Crédito (− deuda)</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <label class="form-label small mb-1">Importe</label>
+                <input class="form-control form-control-sm" type="number" name="monto" min="0.01" step="0.01" inputmode="decimal" placeholder="0,00" required />
+            </div>
+            <div class="col">
+                <label class="form-label small mb-1">Concepto / motivo</label>
+                <input class="form-control form-control-sm" type="text" name="concepto" maxlength="255" required />
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-sliders"></i> Aplicar ajuste</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div class="card shadow-sm mb-3">
     <div class="card-body">
         <form method="get" action="/admin/proveedores/ctacte/<?= $proveedorId ?>" class="row g-2">
