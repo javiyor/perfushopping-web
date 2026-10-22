@@ -190,6 +190,7 @@ $idcta1Sel = (int)($compra['idcta1'] ?? 0);
                         <div class="col-6">
                             <label class="form-label small">IVA</label>
                             <input class="form-control form-control-sm importe-input" name="imp_iva" id="imp_iva" value="<?= htmlspecialchars((string)($compra['imp_iva'] ?? '0')) ?>" />
+                            <div class="form-text">Se calcula automáticamente al cambiar el neto gravado (21%). Podés modificarlo manualmente.</div>
                         </div>
                         <div class="col-6">
                             <label class="form-label small">Ret. Ing. Brutos</label>
@@ -655,8 +656,20 @@ function calcTotalCompra() {
     if (typeof previewPlazo === 'function') previewPlazo();
 }
 document.querySelectorAll('.importe-input').forEach(function(el) {
-    if (el.name !== 'imp_total') el.addEventListener('input', calcTotalCompra);
+    if (el.name !== 'imp_total' && el.id !== 'imp_neto_gravado' && el.id !== 'imp_iva') el.addEventListener('input', calcTotalCompra);
 });
+var netoGravadoInput = document.getElementById('imp_neto_gravado');
+var ivaInput = document.getElementById('imp_iva');
+if (netoGravadoInput && ivaInput) {
+    netoGravadoInput.addEventListener('input', function() {
+        var neto = parseImporte(this.value);
+        ivaInput.value = (Math.round((neto * 0.21 + Number.EPSILON) * 100) / 100).toFixed(2);
+        calcTotalCompra();
+    });
+    ivaInput.addEventListener('input', function() {
+        calcTotalCompra();
+    });
+}
 
 // % del flete sobre el neto gravado (solo informativo: el flete no suma al total).
 function calcFletePct() {
