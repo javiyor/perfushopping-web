@@ -154,10 +154,12 @@ function mailPost(action, data) {
     csrf.type = 'hidden'; csrf.name = '_csrf'; csrf.value = <?= json_encode($csrf) ?>;
     f.appendChild(csrf);
     Object.keys(data).forEach(function(k) {
-        var vals = Array.isArray(data[k]) ? data[k] : [data[k]];
+        var isArray = Array.isArray(data[k]);
+        var vals = isArray ? data[k] : [data[k]];
+        var fieldName = isArray && !/\[\]$/.test(k) ? k + '[]' : k;
         vals.forEach(function(v) {
             var inp = document.createElement('input');
-            inp.type = 'hidden'; inp.name = k; inp.value = v;
+            inp.type = 'hidden'; inp.name = fieldName; inp.value = v;
             f.appendChild(inp);
         });
     });
@@ -171,12 +173,12 @@ function moverSeleccionados() {
     if (sel.length === 0) { alert('Seleccioná al menos un mensaje.'); return; }
     var fid = document.getElementById('bulkFolder').value;
     if (!fid || fid === '0') { alert('Elegí la carpeta destino.'); return; }
-    mailPost('/admin/email/mover-grupo', {'message_ids[]': sel, 'folder_id': fid});
+    mailPost('/admin/email/mover-grupo', {'message_ids': sel, 'folder_id': fid});
 }
 function eliminarSeleccionados() {
     var sel = checkedMails().map(function(c) { return c.getAttribute('data-msgno'); }).filter(function(v) { return v && v !== '0'; });
     if (sel.length === 0) { alert('Seleccioná al menos un mensaje.'); return; }
     if (!confirm('¿Eliminar ' + sel.length + ' mensaje(s) del servidor?')) return;
-    mailPost('/admin/email/eliminar', {'msgnos[]': sel});
+    mailPost('/admin/email/eliminar', {'msgnos': sel});
 }
 </script>
