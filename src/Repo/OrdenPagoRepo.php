@@ -9,7 +9,7 @@ final class OrdenPagoRepo
 {
     private static bool $ctacteAjustesTableReady = false;
 
-    private function ensureCtacteAjustesTable(): void
+    public function ensureCtacteAjustesTable(): void
     {
         if (self::$ctacteAjustesTableReady) return;
         Db::pdo()->exec("CREATE TABLE IF NOT EXISTS orden_pago_ctacte_ajustes (

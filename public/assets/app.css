@@ -826,6 +826,18 @@ body[data-store-template] .pill.promo-link {
   color: var(--c-nav-text) !important;
   border-color: var(--c-nav-border) !important;
 }
+.nav-new-badge {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--c-button-bg, var(--gold));
+  color: var(--c-button-text, #17140f);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.2;
+  vertical-align: middle;
+}
 body[data-store-template] .hero {
   color: var(--c-hero-text) !important;
   background: var(--c-hero-bg) !important;

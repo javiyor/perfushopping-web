@@ -9,6 +9,163 @@ use Perfushopping\Web\Support\Plazo;
 
 final class CtaCteProveedorRepo
 {
+    private static bool $creditApplicationsTableReady = false;
+
+    private function ensureCreditApplicationsTable(): void
+    {
+        if (self::$creditApplicationsTableReady) return;
+        Db::pdo()->exec("CREATE TABLE IF NOT EXISTS ctacte_proveedor_credito_aplicaciones (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            proveedor_id INT UNSIGNED NOT NULL,
+            credito_movimiento_id BIGINT UNSIGNED NOT NULL,
+            debito_movimiento_id BIGINT UNSIGNED NOT NULL,
+            monto_cents BIGINT UNSIGNED NOT NULL,
+            created_by INT UNSIGNED DEFAULT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_cta_prov_credito_app_credito (credito_movimiento_id),
+            KEY idx_cta_prov_credito_app_debito (debito_movimiento_id),
+            KEY idx_cta_prov_credito_app_proveedor (proveedor_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        self::$creditApplicationsTableReady = true;
+    }
+
+    private function movimientoCompraId(int $compraId, int $proveedorId): int
+    {
+        $st = Db::pdo()->prepare("SELECT id FROM ctacte_proveedor_movimientos
+            WHERE origen='compra' AND origen_id=:c AND proveedor_id=:p ORDER BY id DESC LIMIT 1");
+        $st->execute([':c' => $compraId, ':p' => $proveedorId]);
+        return (int)$st->fetchColumn();
+    }
+
+    private function creditosAplicadosDesde(int $movimientoId): int
+    {
+        $this->ensureCreditApplicationsTable();
+        $st = Db::pdo()->prepare('SELECT COALESCE(SUM(monto_cents), 0) FROM ctacte_proveedor_credito_aplicaciones WHERE credito_movimiento_id=:m');
+        $st->execute([':m' => $movimientoId]);
+        return (int)$st->fetchColumn();
+    }
+
+    private function creditosAplicadosAl(int $movimientoId): int
+    {
+        $this->ensureCreditApplicationsTable();
+        $st = Db::pdo()->prepare('SELECT COALESCE(SUM(monto_cents), 0) FROM ctacte_proveedor_credito_aplicaciones WHERE debito_movimiento_id=:m');
+        $st->execute([':m' => $movimientoId]);
+        return (int)$st->fetchColumn();
+    }
+
+    /** Apply selected, unused account credits against selected debit documents. */
+    public function aplicarCreditosPendientes(int $proveedorId, array $creditoIds, array $debitoIds, int $adminId): int
+    {
+        $creditoIds = array_values(array_unique(array_filter(array_map('intval', $creditoIds), static fn(int $id): bool => $id > 0)));
+        $debitoIds = array_values(array_unique(array_filter(array_map('intval', $debitoIds), static fn(int $id): bool => $id > 0)));
+        if ($proveedorId <= 0 || !$creditoIds || !$debitoIds) throw new \RuntimeException('Seleccioná al menos un crédito y un débito pendientes.');
+        $this->ensureCreditApplicationsTable();
+        $orderRepo = new OrdenPagoRepo();
+        $orderRepo->ensureCtacteAjustesTable();
+        $allIds = array_values(array_unique(array_merge($creditoIds, $debitoIds)));
+        $marks = implode(',', array_fill(0, count($allIds), '?'));
+        $pdo = Db::pdo();
+        $pdo->beginTransaction();
+        try {
+            $st = $pdo->prepare("SELECT id, proveedor_id, tipo, origen, origen_id, monto_cents
+                FROM ctacte_proveedor_movimientos
+                WHERE proveedor_id=? AND id IN ({$marks}) FOR UPDATE");
+            $st->execute(array_merge([$proveedorId], $allIds));
+            $movements = [];
+            foreach ($st->fetchAll() ?: [] as $row) $movements[(int)$row['id']] = $row;
+            if (count($movements) !== count($allIds)) throw new \RuntimeException('Algún documento ya no pertenece a este proveedor.');
+
+            $purchaseIds = [];
+            foreach ($movements as $movement) {
+                if ((string)$movement['origen'] === 'compra') $purchaseIds[] = (int)$movement['origen_id'];
+            }
+            $purchaseDocs = [];
+            if ($purchaseIds) {
+                $purchaseIds = array_values(array_unique($purchaseIds));
+                $purchaseMarks = implode(',', array_fill(0, count($purchaseIds), '?'));
+                $docs = $pdo->prepare("SELECT id, idprovee, tipo, estado FROM factura_compra WHERE id IN ({$purchaseMarks})");
+                $docs->execute($purchaseIds);
+                foreach ($docs->fetchAll() ?: [] as $doc) $purchaseDocs[(int)$doc['id']] = $doc;
+            }
+
+            foreach ($creditoIds as $creditId) {
+                $m = $movements[$creditId];
+                if ((string)$m['tipo'] !== 'credito' || !$this->esDocumentoCredito($m, $purchaseDocs, $proveedorId)) {
+                    throw new \RuntimeException('La selección contiene un documento que no es un crédito aplicable.');
+                }
+            }
+            foreach ($debitoIds as $debitId) {
+                $m = $movements[$debitId];
+                if ((string)$m['tipo'] !== 'debito' || !$this->esDocumentoDebito($m, $purchaseDocs, $proveedorId)) {
+                    throw new \RuntimeException('La selección contiene un documento que no es un débito pendiente.');
+                }
+            }
+
+            $creditMarks = implode(',', array_fill(0, count($creditoIds), '?'));
+            $appliedCredits = $pdo->prepare("SELECT credito_movimiento_id, COALESCE(SUM(monto_cents),0) AS total
+                FROM ctacte_proveedor_credito_aplicaciones WHERE credito_movimiento_id IN ({$creditMarks}) GROUP BY credito_movimiento_id");
+            $appliedCredits->execute($creditoIds);
+            $usedCredit = [];
+            foreach ($appliedCredits->fetchAll() ?: [] as $row) $usedCredit[(int)$row['credito_movimiento_id']] = (int)$row['total'];
+
+            $debitMarks = implode(',', array_fill(0, count($debitoIds), '?'));
+            $appliedDebits = $pdo->prepare("SELECT debito_movimiento_id, COALESCE(SUM(monto_cents),0) AS total
+                FROM ctacte_proveedor_credito_aplicaciones WHERE debito_movimiento_id IN ({$debitMarks}) GROUP BY debito_movimiento_id");
+            $appliedDebits->execute($debitoIds);
+            $usedDebit = [];
+            foreach ($appliedDebits->fetchAll() ?: [] as $row) $usedDebit[(int)$row['debito_movimiento_id']] = (int)$row['total'];
+
+            $debitRemaining = [];
+            foreach ($debitoIds as $debitId) {
+                $m = $movements[$debitId];
+                $paymentApplied = (string)$m['origen'] === 'compra'
+                    ? $orderRepo->totalAsignadoCompra((int)$m['origen_id'])
+                    : $orderRepo->totalAsignadoAjuste($debitId);
+                $debitRemaining[$debitId] = max(0, (int)$m['monto_cents'] - $paymentApplied - ($usedDebit[$debitId] ?? 0));
+            }
+
+            $insert = $pdo->prepare('INSERT INTO ctacte_proveedor_credito_aplicaciones (proveedor_id, credito_movimiento_id, debito_movimiento_id, monto_cents, created_by) VALUES (:p,:c,:d,:m,:u)');
+            $totalApplied = 0;
+            foreach ($creditoIds as $creditId) {
+                $creditRemaining = max(0, (int)$movements[$creditId]['monto_cents'] - ($usedCredit[$creditId] ?? 0));
+                foreach ($debitoIds as $debitId) {
+                    if ($creditRemaining <= 0) break;
+                    $amount = min($creditRemaining, $debitRemaining[$debitId] ?? 0);
+                    if ($amount <= 0) continue;
+                    $insert->execute([':p' => $proveedorId, ':c' => $creditId, ':d' => $debitId, ':m' => $amount, ':u' => $adminId]);
+                    $creditRemaining -= $amount;
+                    $debitRemaining[$debitId] -= $amount;
+                    $totalApplied += $amount;
+                }
+            }
+            if ($totalApplied <= 0) throw new \RuntimeException('Los créditos seleccionados no tienen saldo disponible para aplicar.');
+            $pdo->commit();
+            return $totalApplied;
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            throw $e;
+        }
+    }
+
+    private function esDocumentoCredito(array $movement, array $purchaseDocs, int $proveedorId): bool
+    {
+        $origin = (string)($movement['origen'] ?? '');
+        if ($origin === 'ajuste') return true;
+        if ($origin !== 'compra') return false;
+        $doc = $purchaseDocs[(int)($movement['origen_id'] ?? 0)] ?? null;
+        return $doc && (int)$doc['idprovee'] === $proveedorId && (string)($doc['estado'] ?? '') !== 'anulada'
+            && CompraRepo::esNotaCredito((string)($doc['tipo'] ?? ''));
+    }
+
+    private function esDocumentoDebito(array $movement, array $purchaseDocs, int $proveedorId): bool
+    {
+        $origin = (string)($movement['origen'] ?? '');
+        if ($origin === 'ajuste') return true;
+        if ($origin !== 'compra') return false;
+        $doc = $purchaseDocs[(int)($movement['origen_id'] ?? 0)] ?? null;
+        return $doc && (int)$doc['idprovee'] === $proveedorId && (string)($doc['estado'] ?? '') !== 'anulada'
+            && !CompraRepo::esNotaCredito((string)($doc['tipo'] ?? ''));
+    }
     public function listarConSaldo(string $q = ''): array
     {
         $q = trim($q);
@@ -113,13 +270,14 @@ final class CtaCteProveedorRepo
     {
         $ids = array_values(array_unique(array_filter(array_map('intval', $proveedorIds), static fn(int $id): bool => $id > 0)));
         if (!$ids) return [];
+        $this->ensureCreditApplicationsTable();
         $marks = implode(',', array_fill(0, count($ids), '?'));
         $summary = [];
         foreach ($ids as $id) $summary[$id] = ['vencido_cents' => 0, 'credito_pendiente_cents' => 0, 'vencido_neto_cents' => 0];
 
         $sql = "
             SELECT fc.id, fc.idprovee, fc.fecha, fc.imp_total, fc.plazo_cuotas, fc.plazo_dias, fc.tipo,
-                   COALESCE(asig.total, 0) AS asignado_cents
+                   COALESCE(asig.total, 0) + COALESCE(credit_asig.total, 0) AS asignado_cents
             FROM factura_compra fc
             LEFT JOIN (
                 SELECT opc.factura_compra_id, SUM(opc.monto_cents) AS total
@@ -127,6 +285,11 @@ final class CtaCteProveedorRepo
                 INNER JOIN ordenes_pago o ON o.id=opc.orden_pago_id AND o.estado='pagada'
                 GROUP BY opc.factura_compra_id
             ) asig ON asig.factura_compra_id = fc.id
+            LEFT JOIN ctacte_proveedor_movimientos dm ON dm.origen='compra' AND dm.origen_id=fc.id AND dm.proveedor_id=fc.idprovee AND dm.tipo='debito'
+            LEFT JOIN (
+                SELECT debito_movimiento_id, SUM(monto_cents) AS total
+                FROM ctacte_proveedor_credito_aplicaciones GROUP BY debito_movimiento_id
+            ) credit_asig ON credit_asig.debito_movimiento_id = dm.id
             WHERE fc.idprovee IN ({$marks}) AND COALESCE(fc.estado, '') <> 'anulada'
         ";
         $st = Db::pdo()->prepare($sql);
@@ -159,6 +322,16 @@ final class CtaCteProveedorRepo
             if (CompraRepo::esNotaCredito((string)($row['tipo'] ?? ''))) continue;
             $id = (int)$row['proveedor_id'];
             $assignedByProvider[$id] = ($assignedByProvider[$id] ?? 0) + (int)$row['total'];
+        }
+        $creditApplied = Db::pdo()->prepare("SELECT m.proveedor_id, COALESCE(SUM(a.monto_cents),0) AS total
+            FROM ctacte_proveedor_credito_aplicaciones a
+            INNER JOIN ctacte_proveedor_movimientos m ON m.id=a.credito_movimiento_id
+            WHERE m.proveedor_id IN ({$marks})
+            GROUP BY m.proveedor_id");
+        $creditApplied->execute($ids);
+        foreach ($creditApplied->fetchAll() ?: [] as $row) {
+            $providerId = (int)$row['proveedor_id'];
+            $assignedByProvider[$providerId] = ($assignedByProvider[$providerId] ?? 0) + (int)$row['total'];
         }
         foreach ((new OrdenPagoRepo())->ajustesAsignadosPorProveedor($ids) as $id => $amount) {
             $assignedByProvider[$id] = ($assignedByProvider[$id] ?? 0) + $amount;
@@ -479,6 +652,7 @@ final class CtaCteProveedorRepo
      */
     public function comprobantesConPlazo(?int $proveedorId, string $cuit = ''): array
     {
+        $this->ensureCreditApplicationsTable();
         $pdo = Db::pdo();
         $params = [];
         $where = '';
@@ -506,13 +680,18 @@ final class CtaCteProveedorRepo
         foreach ($comprobantes as $c) {
             $esCredito = CompraRepo::esNotaCredito((string)($c['tipo'] ?? ''));
             $total = abs((float)($c['imp_total'] ?? 0));
-            $asignadoCents = $esCredito ? 0 : $opRepo->totalAsignadoCompra((int)$c['id']);
+            $movimientoId = $proveedorId !== null ? $this->movimientoCompraId((int)$c['id'], $proveedorId) : 0;
+            $pagoAsignadoCents = $esCredito ? 0 : $opRepo->totalAsignadoCompra((int)$c['id']);
+            $creditoAplicadoCents = $movimientoId > 0
+                ? ($esCredito ? $this->creditosAplicadosDesde($movimientoId) : $this->creditosAplicadosAl($movimientoId))
+                : 0;
+            $asignadoCents = $pagoAsignadoCents + $creditoAplicadoCents;
             $asignado = $asignadoCents / 100;
             if ($esCredito) {
-                $estado = 'Crédito pendiente';
-                $pendiente = $total;
+                $pendiente = max(0, $total - $creditoAplicadoCents / 100);
+                $estado = $pendiente > 0 ? 'Crédito pendiente' : 'Imputada';
             } else {
-                $pendiente = round($total - $asignado, 2);
+                $pendiente = max(0, round($total - $asignado, 2));
                 if ($pendiente <= 0) {
                     $estado = 'Pagada';
                     $pendiente = 0;
@@ -537,6 +716,7 @@ final class CtaCteProveedorRepo
                 'estado' => $estado,
                 'pendiente' => $pendiente,
                 'es_credito' => $esCredito,
+                'movimiento_id' => $movimientoId,
                 'vencido_cents' => $vencidoCents,
                 'vencido' => $vencidoCents / 100,
             ];
@@ -551,9 +731,11 @@ final class CtaCteProveedorRepo
                 $movementId = (int)$adjustment['id'];
                 $totalCents = max(0, (int)$adjustment['monto_cents']);
                 $isCredit = (string)$adjustment['tipo'] === 'credito';
-                $assignedCents = $isCredit ? 0 : min($totalCents, $opRepo->totalAsignadoAjuste($movementId));
-                $pendingCents = $isCredit ? $totalCents : max(0, $totalCents - $assignedCents);
-                $state = $isCredit ? 'Crédito pendiente' : ($pendingCents <= 0 ? 'Pagada' : ($assignedCents > 0 ? 'Parcial' : 'Pendiente'));
+                $creditApplicationCents = $isCredit ? $this->creditosAplicadosDesde($movementId) : $this->creditosAplicadosAl($movementId);
+                $paymentAssignedCents = $isCredit ? 0 : min($totalCents, $opRepo->totalAsignadoAjuste($movementId));
+                $assignedCents = $paymentAssignedCents + $creditApplicationCents;
+                $pendingCents = max(0, $totalCents - $assignedCents);
+                $state = $isCredit ? ($pendingCents > 0 ? 'Crédito pendiente' : 'Imputada') : ($pendingCents <= 0 ? 'Pagada' : ($assignedCents > 0 ? 'Parcial' : 'Pendiente'));
                 $out[] = [
                     'id' => $movementId,
                     'tipo' => $isCredit ? 'Ajuste crédito' : 'Ajuste débito',
@@ -567,6 +749,7 @@ final class CtaCteProveedorRepo
                     'pendiente' => $pendingCents / 100,
                     'es_credito' => $isCredit,
                     'es_ajuste' => true,
+                    'movimiento_id' => $movementId,
                     'concepto' => (string)($adjustment['concepto'] ?? ''),
                     'vencido_cents' => 0,
                     'vencido' => 0,

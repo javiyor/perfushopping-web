@@ -18,6 +18,17 @@ final class VideoRepo
         return $this->findAll(true);
     }
 
+    public function countRecentActive(int $days = 7): int
+    {
+        $days = max(1, min(30, $days));
+        try {
+            $st = Db::pdo()->query("SELECT COUNT(*) FROM cms_videos WHERE active = 1 AND created_at >= DATE_SUB(NOW(), INTERVAL {$days} DAY)");
+            return (int)$st->fetchColumn();
+        } catch (\Throwable $e) {
+            return 0;
+        }
+    }
+
     public function findById(int $id): ?array
     {
         $st = Db::pdo()->prepare('SELECT * FROM cms_videos WHERE id = :i LIMIT 1');

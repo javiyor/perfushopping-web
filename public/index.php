@@ -383,6 +383,7 @@ $router->post('/admin/proveedores/delete', [AdminProveedorController::class, 'de
 $router->get('/admin/proveedores/ctacte', [AdminProveedorCtaCteController::class, 'index']);
 $router->post('/admin/proveedores/ctacte/sincronizar', [AdminProveedorCtaCteController::class, 'sincronizar']);
 $router->post('/admin/proveedores/ctacte/ajuste/guardar', [AdminProveedorCtaCteController::class, 'guardarAjuste']);
+$router->post('/admin/proveedores/ctacte/aplicar-creditos', [AdminProveedorCtaCteController::class, 'aplicarCreditos']);
 $router->get('/admin/proveedores/ctacte/(?P<id>\d+)', [AdminProveedorCtaCteController::class, 'movimientos']);
 $router->get('/admin/presupuestos', [AdminPresupuestoController::class, 'index']);
 $router->get('/admin/presupuestos/nuevo', [AdminPresupuestoController::class, 'create']);

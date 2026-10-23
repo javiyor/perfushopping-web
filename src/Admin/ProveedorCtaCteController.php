@@ -97,6 +97,26 @@ final class ProveedorCtaCteController
         Response::redirect('/admin/proveedores/ctacte/' . $proveedorId);
     }
 
+    public function aplicarCreditos(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requirePermiso('compras');
+        Csrf::check($_POST['_csrf'] ?? null);
+        $proveedorId = (int)($_POST['proveedor_id'] ?? 0);
+        try {
+            $aplicado = (new CtaCteProveedorRepo())->aplicarCreditosPendientes(
+                $proveedorId,
+                (array)($_POST['credito_movimiento_ids'] ?? []),
+                (array)($_POST['debito_movimiento_ids'] ?? []),
+                (int)$adminUser['id']
+            );
+            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Créditos aplicados por ' . number_format($aplicado / 100, 2, ',', '.') . '.'];
+        } catch (\Throwable $e) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se pudieron aplicar los créditos: ' . $e->getMessage()];
+        }
+        Response::redirect('/admin/proveedores/ctacte/' . max(1, $proveedorId));
+    }
+
     public function movimientos(array $params): void
     {
         $auth = new AdminAuthService();
@@ -126,7 +146,7 @@ final class ProveedorCtaCteController
         $vencidoNetoCents = max(0, $vencidoBrutoCents - $creditoPendienteCents);
         // Predeterminado: solo pendientes (oculta las pagadas/imputadas); ?filtro=todos las muestra.
         if ($filtro === 'pendientes') {
-            $comprobantes = array_values(array_filter($comprobantes, static fn (array $c): bool => !empty($c['es_credito']) || ($c['estado'] ?? '') !== 'Pagada'));
+            $comprobantes = array_values(array_filter($comprobantes, static fn (array $c): bool => !empty($c['es_credito']) ? (float)($c['pendiente'] ?? 0) > 0 : ($c['estado'] ?? '') !== 'Pagada'));
         }
 
         $proveedorNombre = '';

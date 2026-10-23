@@ -95,6 +95,7 @@ $filtroQs = $q !== '' ? '&q=' . urlencode($q) : '';
         <div class="d-flex gap-2 align-items-center">
             <a class="btn btn-sm <?= $filtro === 'pendientes' ? 'btn-accent' : 'btn-outline-secondary' ?>" href="/admin/proveedores/ctacte/<?= (int)$proveedorId ?>?filtro=pendientes<?= $filtroQs ?>">Pendientes</a>
             <a class="btn btn-sm <?= $filtro === 'todos' ? 'btn-accent' : 'btn-outline-secondary' ?>" href="/admin/proveedores/ctacte/<?= (int)$proveedorId ?>?filtro=todos<?= $filtroQs ?>">Todos</a>
+            <button class="btn btn-sm btn-outline-primary" type="button" onclick="aplicarCreditosSeleccionados()" title="Imputar créditos a los débitos seleccionados"><i class="bi bi-arrow-left-right"></i> Aplicar créditos</button>
             <button class="btn btn-sm btn-success" type="button" onclick="cargarPagoComprobantes()" title="Pagar los documentos seleccionados (el monto se puede ajustar en la orden de pago)"><i class="bi bi-cash-stack"></i> Cargar pago</button>
         </div>
     </div>
@@ -119,8 +120,12 @@ $filtroQs = $q !== '' ? '&q=' . urlencode($q) : '';
                 <?php $acumPendiente = 0; foreach ($comprobantes as $c): $esCredito = !empty($c['es_credito']); $acumPendiente += ($esCredito ? -1 : 1) * (float)($c['pendiente'] ?? 0); ?>
                     <tr>
                         <td>
-                            <?php if (!$esCredito && $c['pendiente'] > 0): ?>
-                                <input type="checkbox" name="<?= !empty($c['es_ajuste']) ? 'ajuste_ids[]' : 'compra_ids[]' ?>" value="<?= (int)$c['id'] ?>" data-pendiente="<?= (float)$c['pendiente'] ?>" title="Seleccionar para pagar" />
+                            <?php if ($c['pendiente'] > 0 && (int)($c['movimiento_id'] ?? 0) > 0): ?>
+                                <?php if ($esCredito): ?>
+                                    <input class="ctacte-doc-check" type="checkbox" name="credito_movimiento_ids[]" value="<?= (int)$c['movimiento_id'] ?>" data-movimiento-id="<?= (int)$c['movimiento_id'] ?>" data-es-credito="1" title="Seleccionar crédito para imputar" />
+                                <?php else: ?>
+                                    <input class="ctacte-doc-check" type="checkbox" name="<?= !empty($c['es_ajuste']) ? 'ajuste_ids[]' : 'compra_ids[]' ?>" value="<?= (int)$c['id'] ?>" data-movimiento-id="<?= (int)$c['movimiento_id'] ?>" data-es-credito="0" data-pendiente="<?= (float)$c['pendiente'] ?>" title="Seleccionar débito" />
+                                <?php endif; ?>
                             <?php endif; ?>
                         </td>
                         <td>
@@ -230,6 +235,10 @@ function cargarPagoComprobantes() {
     var n = 0;
     var compraIds = [];
     var ajusteIds = [];
+    if (document.querySelector('input[name="credito_movimiento_ids[]"]:checked')) {
+        alert('Hay créditos seleccionados. Usá “Aplicar créditos” primero; los créditos no son un medio de pago.');
+        return;
+    }
     document.querySelectorAll('input[name="compra_ids[]"]:checked, input[name="ajuste_ids[]"]:checked').forEach(function(cb) {
         n++;
         total += parseFloat(cb.getAttribute('data-pendiente') || '0');
@@ -247,6 +256,38 @@ function cargarPagoComprobantes() {
     if (compraIds.length) params.set('compra_ids', compraIds.join(','));
     if (ajusteIds.length) params.set('ajuste_ids', ajusteIds.join(','));
     window.location.href = '/admin/ordenes-pago/nueva?' + params.toString();
+}
+function aplicarCreditosSeleccionados() {
+    var creditos = [];
+    var debitos = [];
+    document.querySelectorAll('.ctacte-doc-check:checked').forEach(function(cb) {
+        var id = cb.dataset.movimientoId;
+        if (!id) return;
+        if (cb.dataset.esCredito === '1') creditos.push(id);
+        else debitos.push(id);
+    });
+    if (!creditos.length || !debitos.length) {
+        alert('Seleccioná al menos un crédito pendiente y un débito pendiente para imputar.');
+        return;
+    }
+    if (!confirm('¿Aplicar los créditos seleccionados a los débitos seleccionados?')) return;
+    var form = document.createElement('form');
+    form.method = 'post';
+    form.action = '/admin/proveedores/ctacte/aplicar-creditos';
+    var fields = {
+        '_csrf': <?= json_encode($csrf) ?>,
+        'proveedor_id': '<?= (int)$proveedorId ?>'
+    };
+    Object.keys(fields).forEach(function(name) {
+        var input = document.createElement('input'); input.type = 'hidden'; input.name = name; input.value = fields[name]; form.appendChild(input);
+    });
+    creditos.forEach(function(id) {
+        var input = document.createElement('input'); input.type = 'hidden'; input.name = 'credito_movimiento_ids[]'; input.value = id; form.appendChild(input);
+    });
+    debitos.forEach(function(id) {
+        var input = document.createElement('input'); input.type = 'hidden'; input.name = 'debito_movimiento_ids[]'; input.value = id; form.appendChild(input);
+    });
+    document.body.appendChild(form); form.submit();
 }
 </script>
 </div>

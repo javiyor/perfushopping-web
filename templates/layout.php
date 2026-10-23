@@ -5,6 +5,7 @@ use Perfushopping\Web\Support\Format;
 /** @var string $body */
 $appName = Env::get('APP_NAME', 'Perfushopping');
 $empresa = (new \Perfushopping\Web\Repo\EmpresaRepo())->getDefault();
+$consejosNuevos = (new \Perfushopping\Web\Repo\Marketing\VideoRepo())->countRecentActive() > 0;
 $portadaConfigGlobal = (new \Perfushopping\Web\Repo\PortadaRepo())->getConfig();
 $footerText = trim((string)($portadaConfigGlobal['footer_text'] ?? ''));
 $temaTienda = \Perfushopping\Web\Repo\PortadaRepo::tema($portadaConfigGlobal);
@@ -108,7 +109,7 @@ try {
             <span class="pill secondary">Minorista</span>
           <?php endif; ?>
           <a class="pill secondary" href="/cart">Carrito</a>
-          <a class="pill secondary" href="/aprende">Aprendé</a>
+          <a class="pill secondary" href="/aprende">Consejos<?php if ($consejosNuevos): ?> <span class="nav-new-badge">Nuevos consejos</span><?php endif; ?></a>
           <a class="pill secondary" href="/articulos">Artículos</a>
           <a class="pill secondary" href="/eventos/capacitaciones">Capacitaciones</a>
           <a class="pill promo-link" href="/promociones">💳 Promociones</a>
