@@ -7,6 +7,23 @@ use Perfushopping\Web\Infra\Db;
 
 final class OrdenPagoRepo
 {
+    private static bool $ctacteAjustesTableReady = false;
+
+    private function ensureCtacteAjustesTable(): void
+    {
+        if (self::$ctacteAjustesTableReady) return;
+        Db::pdo()->exec("CREATE TABLE IF NOT EXISTS orden_pago_ctacte_ajustes (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            orden_pago_id INT UNSIGNED NOT NULL,
+            movimiento_id INT UNSIGNED NOT NULL,
+            monto_cents BIGINT UNSIGNED NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_op_ctacte_ajuste (orden_pago_id, movimiento_id),
+            KEY idx_op_ctacte_ajuste_mov (movimiento_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        self::$ctacteAjustesTableReady = true;
+    }
+
     private function ensurePagosBanco(): void
     {
         try {
@@ -124,6 +141,50 @@ final class OrdenPagoRepo
             WHERE opc.factura_compra_id = :c AND UPPER(fc.tipo) NOT LIKE '%NOTA%CR%DITO%' AND UPPER(fc.tipo) NOT LIKE 'NC%'");
         $st->execute([':c' => $facturaCompraId]);
         return (int)$st->fetchColumn();
+    }
+
+    /** Total de órdenes de pago vigentes aplicado a un ajuste manual de cta. cte. */
+    public function totalAsignadoAjuste(int $movimientoId): int
+    {
+        $this->ensureCtacteAjustesTable();
+        $st = Db::pdo()->prepare("SELECT COALESCE(SUM(a.monto_cents), 0)
+            FROM orden_pago_ctacte_ajustes a
+            INNER JOIN ordenes_pago o ON o.id=a.orden_pago_id AND o.estado='pagada'
+            WHERE a.movimiento_id=:m");
+        $st->execute([':m' => $movimientoId]);
+        return (int)$st->fetchColumn();
+    }
+
+    /** @param array<int,int> $proveedorIds @return array<int,int> proveedor_id => monto asignado en centavos */
+    public function ajustesAsignadosPorProveedor(array $proveedorIds): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $proveedorIds), static fn(int $id): bool => $id > 0)));
+        if (!$ids) return [];
+        $this->ensureCtacteAjustesTable();
+        $marks = implode(',', array_fill(0, count($ids), '?'));
+        $st = Db::pdo()->prepare("SELECT o.proveedor_id, COALESCE(SUM(a.monto_cents), 0) AS total
+            FROM orden_pago_ctacte_ajustes a
+            INNER JOIN ordenes_pago o ON o.id=a.orden_pago_id AND o.estado='pagada'
+            WHERE o.proveedor_id IN ({$marks})
+            GROUP BY o.proveedor_id");
+        $st->execute($ids);
+        $out = [];
+        foreach ($st->fetchAll() ?: [] as $row) $out[(int)$row['proveedor_id']] = (int)$row['total'];
+        return $out;
+    }
+
+    /** @param array<int,array{movimiento_id:int,monto_cents:int}> $ajustes */
+    public function asignarAjustes(int $ordenPagoId, array $ajustes): void
+    {
+        if (!$ajustes) return;
+        $this->ensureCtacteAjustesTable();
+        $st = Db::pdo()->prepare('INSERT INTO orden_pago_ctacte_ajustes (orden_pago_id, movimiento_id, monto_cents) VALUES (:o, :m, :c)');
+        foreach ($ajustes as $ajuste) {
+            $movimientoId = (int)($ajuste['movimiento_id'] ?? 0);
+            $montoCents = (int)($ajuste['monto_cents'] ?? 0);
+            if ($movimientoId <= 0 || $montoCents <= 0) continue;
+            $st->execute([':o' => $ordenPagoId, ':m' => $movimientoId, ':c' => $montoCents]);
+        }
     }
 
     public function create(array $data, array $pagos, int $createdBy): int

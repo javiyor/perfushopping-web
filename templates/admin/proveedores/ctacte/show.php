@@ -95,7 +95,7 @@ $filtroQs = $q !== '' ? '&q=' . urlencode($q) : '';
         <div class="d-flex gap-2 align-items-center">
             <a class="btn btn-sm <?= $filtro === 'pendientes' ? 'btn-accent' : 'btn-outline-secondary' ?>" href="/admin/proveedores/ctacte/<?= (int)$proveedorId ?>?filtro=pendientes<?= $filtroQs ?>">Pendientes</a>
             <a class="btn btn-sm <?= $filtro === 'todos' ? 'btn-accent' : 'btn-outline-secondary' ?>" href="/admin/proveedores/ctacte/<?= (int)$proveedorId ?>?filtro=todos<?= $filtroQs ?>">Todos</a>
-            <button class="btn btn-sm btn-success" type="button" onclick="cargarPagoComprobantes()" title="Pagar los comprobantes seleccionados (el monto se puede ajustar en la orden de pago)"><i class="bi bi-cash-stack"></i> Cargar pago</button>
+            <button class="btn btn-sm btn-success" type="button" onclick="cargarPagoComprobantes()" title="Pagar los documentos seleccionados (el monto se puede ajustar en la orden de pago)"><i class="bi bi-cash-stack"></i> Cargar pago</button>
         </div>
     </div>
     <div class="table-responsive">
@@ -120,12 +120,17 @@ $filtroQs = $q !== '' ? '&q=' . urlencode($q) : '';
                     <tr>
                         <td>
                             <?php if (!$esCredito && $c['pendiente'] > 0): ?>
-                                <input type="checkbox" name="compra_ids[]" value="<?= (int)$c['id'] ?>" data-pendiente="<?= (float)$c['pendiente'] ?>" title="Seleccionar para pagar" />
+                                <input type="checkbox" name="<?= !empty($c['es_ajuste']) ? 'ajuste_ids[]' : 'compra_ids[]' ?>" value="<?= (int)$c['id'] ?>" data-pendiente="<?= (float)$c['pendiente'] ?>" title="Seleccionar para pagar" />
                             <?php endif; ?>
                         </td>
                         <td>
-                            <strong><?= htmlspecialchars((string)($c['tipo'] ?? '')) ?></strong>
-                            <span class="text-muted"><?= htmlspecialchars((string)($c['punto_venta'] ?? '') . '-' . (string)($c['numero_desde'] ?? '')) ?></span>
+                            <?php if (!empty($c['es_ajuste'])): ?>
+                                <strong>Ajuste manual</strong> <span class="text-muted">#<?= (int)$c['id'] ?></span>
+                                <?php if (trim((string)($c['concepto'] ?? '')) !== ''): ?><div class="small text-muted"><?= htmlspecialchars((string)$c['concepto']) ?></div><?php endif; ?>
+                            <?php else: ?>
+                                <strong><?= htmlspecialchars((string)($c['tipo'] ?? '')) ?></strong>
+                                <span class="text-muted"><?= htmlspecialchars((string)($c['punto_venta'] ?? '') . '-' . (string)($c['numero_desde'] ?? '')) ?></span>
+                            <?php endif; ?>
                             <div class="small text-muted">
                                 <?php if ($c['cronograma']): ?>
                                     <?php foreach ($c['cronograma'] as $cu): ?>
@@ -133,6 +138,8 @@ $filtroQs = $q !== '' ? '&q=' . urlencode($q) : '';
                                     <?php endforeach; ?>
                                 <?php elseif ($esCredito): ?>
                                     Crédito sin imputar
+                                <?php elseif (!empty($c['es_ajuste'])): ?>
+                                    Ajuste sin vencimiento
                                 <?php else: ?>
                                     Sin plazo
                                 <?php endif; ?>
@@ -141,7 +148,7 @@ $filtroQs = $q !== '' ? '&q=' . urlencode($q) : '';
                         <td class="small"><?= $c['fecha'] ? date('d/m/Y', strtotime((string)$c['fecha'])) : '—' ?></td>
                         <td class="small <?= (!empty($c['vencimiento']) && ($c['pendiente'] ?? 0) > 0 && $c['vencimiento'] < date('Y-m-d')) ? 'text-danger fw-bold' : '' ?>"><?= !empty($c['vencimiento']) ? date('d/m/Y', strtotime((string)$c['vencimiento'])) : '—' ?></td>
                         <td class="text-end <?= $esCredito ? 'text-success' : '' ?>"><?= $esCredito ? '−' : '' ?>$<?= $mon($c['imp_total']) ?></td>
-                        <td class="text-center"><?= $esCredito ? '—' : (count($c['cronograma']) ?: 1) ?></td>
+                        <td class="text-center"><?= ($esCredito || !empty($c['es_ajuste'])) ? '—' : (count($c['cronograma']) ?: 1) ?></td>
                         <td>
                             <?php $est = ['Pagada' => 'success', 'Parcial' => 'warning', 'Pendiente' => 'danger', 'Crédito pendiente' => 'info']; ?>
                             <span class="badge bg-<?= $est[$c['estado']] ?? 'secondary' ?>"><?= htmlspecialchars((string)$c['estado']) ?></span>
@@ -151,10 +158,15 @@ $filtroQs = $q !== '' ? '&q=' . urlencode($q) : '';
                         <td class="text-end fw-bold <?= $acumPendiente > 0 ? 'text-danger' : 'text-success' ?>"><?= $acumPendiente < 0 ? '−' : '' ?>$<?= $mon(abs($acumPendiente)) ?></td>
                         <td class="text-end">
                             <?php if (!$esCredito && $c['pendiente'] > 0): ?>
+                                <?php if (!empty($c['es_ajuste'])): ?>
+                                <a class="btn btn-sm btn-outline-success" title="Cargar pago al ajuste"
+                                   href="/admin/ordenes-pago/nueva?proveedor_id=<?= (int)$proveedorId ?>&proveedor_nombre=<?= urlencode($proveedorNombre) ?>&monto=<?= $c['pendiente'] ?>&ajuste_ids=<?= (int)$c['id'] ?>"><i class="bi bi-cash-stack"></i></a>
+                                <?php else: ?>
                                 <a class="btn btn-sm btn-outline-success" title="Cargar pago a cuenta (monto editable)"
                                    href="/admin/ordenes-pago/nueva?proveedor_id=<?= (int)$proveedorId ?>&proveedor_nombre=<?= urlencode($proveedorNombre) ?>&monto=<?= $c['pendiente'] ?>&compra_ids=<?= (int)$c['id'] ?>"><i class="bi bi-cash-stack"></i></a>
+                                <?php endif; ?>
                             <?php endif; ?>
-                            <a class="btn btn-sm btn-outline-secondary" title="Ver factura" href="/admin/compras/<?= (int)$c['id'] ?>"><i class="bi bi-eye"></i></a>
+                            <?php if (empty($c['es_ajuste'])): ?><a class="btn btn-sm btn-outline-secondary" title="Ver comprobante" href="/admin/compras/<?= (int)$c['id'] ?>"><i class="bi bi-eye"></i></a><?php endif; ?>
                         </td>
                     </tr>
                 <?php endforeach; ?>
@@ -216,16 +228,25 @@ $filtroQs = $q !== '' ? '&q=' . urlencode($q) : '';
 function cargarPagoComprobantes() {
     var total = 0;
     var n = 0;
-    document.querySelectorAll('input[name="compra_ids[]"]:checked').forEach(function(cb) {
+    var compraIds = [];
+    var ajusteIds = [];
+    document.querySelectorAll('input[name="compra_ids[]"]:checked, input[name="ajuste_ids[]"]:checked').forEach(function(cb) {
         n++;
         total += parseFloat(cb.getAttribute('data-pendiente') || '0');
+        if (cb.name === 'ajuste_ids[]') ajusteIds.push(cb.value);
+        else compraIds.push(cb.value);
     });
     if (!n) {
         alert('Seleccioná al menos un comprobante para pagar.');
         return;
     }
-    var url = '/admin/ordenes-pago/nueva?proveedor_id=<?= (int)$proveedorId ?>&proveedor_nombre=<?= urlencode($proveedorNombre) ?>&monto=' + total.toFixed(2);
-    window.location.href = url;
+    var params = new URLSearchParams();
+    params.set('proveedor_id', '<?= (int)$proveedorId ?>');
+    params.set('proveedor_nombre', <?= json_encode($proveedorNombre, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>);
+    params.set('monto', total.toFixed(2));
+    if (compraIds.length) params.set('compra_ids', compraIds.join(','));
+    if (ajusteIds.length) params.set('ajuste_ids', ajusteIds.join(','));
+    window.location.href = '/admin/ordenes-pago/nueva?' + params.toString();
 }
 </script>
 </div>

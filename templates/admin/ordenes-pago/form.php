@@ -16,6 +16,7 @@ $formasPago = ['efectivo' => 'Efectivo', 'transferencia' => 'Transferencia', 'ch
 <form method="post" action="/admin/ordenes-pago/guardar" id="opForm">
     <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrfToken) ?>" />
     <input type="hidden" name="compra_ids" value="<?= htmlspecialchars((string)($compraIds ?? ($_GET['compra_ids'] ?? ''))) ?>" />
+    <input type="hidden" name="ajuste_ids" value="<?= htmlspecialchars((string)($ajusteIds ?? ($_GET['ajuste_ids'] ?? ''))) ?>" />
 
     <div class="row g-3">
         <div class="col-lg-7">

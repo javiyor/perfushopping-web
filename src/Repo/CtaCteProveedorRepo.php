@@ -160,6 +160,9 @@ final class CtaCteProveedorRepo
             $id = (int)$row['proveedor_id'];
             $assignedByProvider[$id] = ($assignedByProvider[$id] ?? 0) + (int)$row['total'];
         }
+        foreach ((new OrdenPagoRepo())->ajustesAsignadosPorProveedor($ids) as $id => $amount) {
+            $assignedByProvider[$id] = ($assignedByProvider[$id] ?? 0) + $amount;
+        }
 
         foreach ($summary as $id => &$values) {
             $values['credito_pendiente_cents'] = max(0, ($creditByProvider[$id] ?? 0) - ($assignedByProvider[$id] ?? 0));
@@ -538,6 +541,38 @@ final class CtaCteProveedorRepo
                 'vencido' => $vencidoCents / 100,
             ];
         }
+        if ($proveedorId !== null) {
+            $adjustments = $pdo->prepare("SELECT id, monto_cents, concepto, created_at
+                FROM ctacte_proveedor_movimientos
+                WHERE proveedor_id=:p AND tipo='debito' AND origen='ajuste'
+                ORDER BY created_at ASC, id ASC");
+            $adjustments->execute([':p' => $proveedorId]);
+            foreach ($adjustments->fetchAll() ?: [] as $adjustment) {
+                $movementId = (int)$adjustment['id'];
+                $totalCents = max(0, (int)$adjustment['monto_cents']);
+                $assignedCents = min($totalCents, $opRepo->totalAsignadoAjuste($movementId));
+                $pendingCents = max(0, $totalCents - $assignedCents);
+                $state = $pendingCents <= 0 ? 'Pagada' : ($assignedCents > 0 ? 'Parcial' : 'Pendiente');
+                $out[] = [
+                    'id' => $movementId,
+                    'tipo' => 'Ajuste manual',
+                    'punto_venta' => '',
+                    'numero_desde' => (string)$movementId,
+                    'fecha' => $adjustment['created_at'],
+                    'imp_total' => $totalCents / 100,
+                    'cronograma' => [],
+                    'vencimiento' => null,
+                    'estado' => $state,
+                    'pendiente' => $pendingCents / 100,
+                    'es_credito' => false,
+                    'es_ajuste' => true,
+                    'concepto' => (string)($adjustment['concepto'] ?? ''),
+                    'vencido_cents' => 0,
+                    'vencido' => 0,
+                ];
+            }
+        }
+        usort($out, static fn(array $a, array $b): int => strcmp((string)($a['fecha'] ?? ''), (string)($b['fecha'] ?? '')));
         return $out;
     }
 

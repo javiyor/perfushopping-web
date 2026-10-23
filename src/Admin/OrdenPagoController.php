@@ -59,6 +59,18 @@ final class OrdenPagoController
             }
             $comprobantesLabel = implode(', ', $labels);
         }
+        $ajusteIds = array_values(array_unique(array_filter(array_map('intval', explode(',', trim((string)($_GET['ajuste_ids'] ?? '')))))));
+        if ($proveedorId && $ajusteIds) {
+            $in = implode(',', $ajusteIds);
+            $st = Db::pdo()->prepare("SELECT id, concepto FROM ctacte_proveedor_movimientos
+                WHERE id IN ($in) AND proveedor_id=:p AND tipo='debito' AND origen='ajuste'");
+            $st->execute([':p' => $proveedorId]);
+            $labels = [];
+            foreach ($st->fetchAll() ?: [] as $row) {
+                $labels[] = 'Ajuste #' . (int)$row['id'] . ': ' . (string)($row['concepto'] ?? '');
+            }
+            if ($labels) $comprobantesLabel = trim($comprobantesLabel . ( $comprobantesLabel !== '' ? ' · ' : '') . implode(', ', $labels));
+        }
 
         echo View::adminPage('admin/ordenes-pago/form.php', [
             'adminUser' => $adminUser,
@@ -71,6 +83,7 @@ final class OrdenPagoController
             'monto' => $monto,
             'comprobantesLabel' => $comprobantesLabel,
             'compraIds' => implode(',', $compraIds),
+            'ajusteIds' => implode(',', $ajusteIds),
             'csrf' => Csrf::token(),
             'pageTitle' => 'Nueva orden de pago',
         ]);
@@ -218,15 +231,18 @@ final class OrdenPagoController
 
         // Asignar el pago a las facturas seleccionadas (solo esas se marcan como pagadas)
         $compraIds = array_values(array_filter(array_map('intval', explode(',', trim((string)($_POST['compra_ids'] ?? ''))))));
+        $proveedorId = (int)($_POST['proveedor_id'] ?? 0);
+        $restante = $total;
         if ($compraIds) {
             $in = implode(',', $compraIds);
-            $rows = Db::pdo()->prepare("SELECT id, imp_total FROM factura_compra WHERE id IN ($in)");
-            $rows->execute();
+            $rows = Db::pdo()->prepare("SELECT id, imp_total, tipo FROM factura_compra
+                WHERE id IN ($in) AND idprovee=:p AND COALESCE(estado, '') <> 'anulada'");
+            $rows->execute([':p' => $proveedorId]);
             $facturas = [];
             foreach ($rows as $r) {
+                if (\Perfushopping\Web\Repo\CompraRepo::esNotaCredito((string)($r['tipo'] ?? ''))) continue;
                 $facturas[(int)$r['id']] = (int)round(((float)($r['imp_total'] ?? 0)) * 100);
             }
-            $restante = $total;
             $asignaciones = [];
             foreach ($compraIds as $cid) {
                 if ($restante <= 0 || !isset($facturas[$cid])) {
@@ -242,6 +258,27 @@ final class OrdenPagoController
             if ($asignaciones) {
                 $repo->asignarCompras($id, $asignaciones);
             }
+        }
+
+        $ajusteIds = array_values(array_unique(array_filter(array_map('intval', explode(',', trim((string)($_POST['ajuste_ids'] ?? '')))))));
+        if ($proveedorId > 0 && $ajusteIds && $restante > 0) {
+            $in = implode(',', $ajusteIds);
+            $st = Db::pdo()->prepare("SELECT id, monto_cents FROM ctacte_proveedor_movimientos
+                WHERE id IN ($in) AND proveedor_id=:p AND tipo='debito' AND origen='ajuste'");
+            $st->execute([':p' => $proveedorId]);
+            $ajustes = [];
+            foreach ($st->fetchAll() ?: [] as $row) {
+                $movementId = (int)$row['id'];
+                $pending = max(0, (int)$row['monto_cents'] - $repo->totalAsignadoAjuste($movementId));
+                if ($pending <= 0) continue;
+                $assigned = min($pending, $restante);
+                if ($assigned > 0) {
+                    $ajustes[] = ['movimiento_id' => $movementId, 'monto_cents' => $assigned];
+                    $restante -= $assigned;
+                }
+                if ($restante <= 0) break;
+            }
+            $repo->asignarAjustes($id, $ajustes);
         }
 
         // Register credit in supplier CTACTE
