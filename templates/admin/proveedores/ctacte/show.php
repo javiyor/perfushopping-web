@@ -125,7 +125,7 @@ $filtroQs = $q !== '' ? '&q=' . urlencode($q) : '';
                         </td>
                         <td>
                             <?php if (!empty($c['es_ajuste'])): ?>
-                                <strong>Ajuste manual</strong> <span class="text-muted">#<?= (int)$c['id'] ?></span>
+                                <strong><?= $esCredito ? 'Ajuste crédito' : 'Ajuste débito' ?></strong> <span class="text-muted">#<?= (int)$c['id'] ?></span>
                                 <?php if (trim((string)($c['concepto'] ?? '')) !== ''): ?><div class="small text-muted"><?= htmlspecialchars((string)$c['concepto']) ?></div><?php endif; ?>
                             <?php else: ?>
                                 <strong><?= htmlspecialchars((string)($c['tipo'] ?? '')) ?></strong>

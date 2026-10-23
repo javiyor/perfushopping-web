@@ -146,7 +146,7 @@ final class CtaCteProveedorRepo
             FROM ctacte_proveedor_movimientos m
             LEFT JOIN ordenes_pago o ON o.id=m.origen_id AND m.origen='op'
             WHERE m.tipo='credito' AND m.proveedor_id IN ({$marks})
-              AND ((m.origen='op' AND o.estado='pagada') OR m.origen='compra')
+              AND ((m.origen='op' AND o.estado='pagada') OR m.origen IN ('compra', 'ajuste'))
             GROUP BY m.proveedor_id");
         $credits->execute($ids);
         $creditByProvider = [];
@@ -542,20 +542,21 @@ final class CtaCteProveedorRepo
             ];
         }
         if ($proveedorId !== null) {
-            $adjustments = $pdo->prepare("SELECT id, monto_cents, concepto, created_at
+            $adjustments = $pdo->prepare("SELECT id, monto_cents, concepto, created_at, tipo
                 FROM ctacte_proveedor_movimientos
-                WHERE proveedor_id=:p AND tipo='debito' AND origen='ajuste'
+                WHERE proveedor_id=:p AND tipo IN ('debito', 'credito') AND origen='ajuste'
                 ORDER BY created_at ASC, id ASC");
             $adjustments->execute([':p' => $proveedorId]);
             foreach ($adjustments->fetchAll() ?: [] as $adjustment) {
                 $movementId = (int)$adjustment['id'];
                 $totalCents = max(0, (int)$adjustment['monto_cents']);
-                $assignedCents = min($totalCents, $opRepo->totalAsignadoAjuste($movementId));
-                $pendingCents = max(0, $totalCents - $assignedCents);
-                $state = $pendingCents <= 0 ? 'Pagada' : ($assignedCents > 0 ? 'Parcial' : 'Pendiente');
+                $isCredit = (string)$adjustment['tipo'] === 'credito';
+                $assignedCents = $isCredit ? 0 : min($totalCents, $opRepo->totalAsignadoAjuste($movementId));
+                $pendingCents = $isCredit ? $totalCents : max(0, $totalCents - $assignedCents);
+                $state = $isCredit ? 'Crédito pendiente' : ($pendingCents <= 0 ? 'Pagada' : ($assignedCents > 0 ? 'Parcial' : 'Pendiente'));
                 $out[] = [
                     'id' => $movementId,
-                    'tipo' => 'Ajuste manual',
+                    'tipo' => $isCredit ? 'Ajuste crédito' : 'Ajuste débito',
                     'punto_venta' => '',
                     'numero_desde' => (string)$movementId,
                     'fecha' => $adjustment['created_at'],
@@ -564,7 +565,7 @@ final class CtaCteProveedorRepo
                     'vencimiento' => null,
                     'estado' => $state,
                     'pendiente' => $pendingCents / 100,
-                    'es_credito' => false,
+                    'es_credito' => $isCredit,
                     'es_ajuste' => true,
                     'concepto' => (string)($adjustment['concepto'] ?? ''),
                     'vencido_cents' => 0,
