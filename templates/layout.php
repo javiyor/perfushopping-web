@@ -109,7 +109,7 @@ try {
             <span class="pill secondary">Minorista</span>
           <?php endif; ?>
           <a class="pill secondary" href="/cart">Carrito</a>
-          <a class="pill secondary" href="/aprende">Consejos<?php if ($consejosNuevos): ?> <span class="nav-new-badge">Nuevos consejos</span><?php endif; ?></a>
+          <a class="pill secondary" href="/aprende">Consejos<?php if ($consejosNuevos): ?> <span class="nav-new-dot" title="Nuevos consejos" aria-label="Nuevos consejos"></span><?php endif; ?></a>
           <a class="pill secondary" href="/articulos">Artículos</a>
           <a class="pill secondary" href="/eventos/capacitaciones">Capacitaciones</a>
           <a class="pill promo-link" href="/promociones">💳 Promociones</a>

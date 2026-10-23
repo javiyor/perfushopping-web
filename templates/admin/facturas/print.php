@@ -20,6 +20,11 @@ $discriminaIva = in_array($factura['tipo_comprobante'] ?? '', ['FACT-A', 'FACT-C
 $isTicket = $formato !== 'a4';
 $bodyWidth = $formato === '58mm' ? '58mm' : ($formato === '80mm' ? '80mm' : '210mm');
 $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
+$logo = trim((string)($empresa['logo'] ?? ''));
+$logoUrl = $logo !== '' ? Format::uploadUrl($logo) : '/assets/brand/logo-header.png';
+$transportes = ['propio' => 'Propio', 'delivery' => 'Delivery', 'correo_argentino' => 'Correo Argentino'];
+$estadosEnvio = ['pendiente' => 'Pendiente', 'en_transito' => 'En tránsito', 'entregado' => 'Entregado', 'cancelado' => 'Cancelado'];
+$esEnvio = ($factura['entrega_tipo'] ?? 'local') === 'envio';
 ?>
 <!doctype html>
 <html lang="es">
@@ -59,6 +64,11 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
         .totals .row { display:flex; justify-content:space-between; padding:2px 0; }
         .totals .total { font-size:<?= $formato === '58mm' ? '13px' : '16px' ?>; font-weight:bold; border-top:2px solid #000; padding-top:4px; margin-top:4px; }
         .footer { text-align:center; margin-top:12px; font-size:<?= $isTicket ? '11px' : '10px' ?>; color:<?= $isTicket ? '#000' : '#666' ?>; <?php if ($isTicket): ?>font-weight:600;<?php endif; ?> }
+        .ticket-separator { text-align:center; white-space:nowrap; overflow:hidden; color:#000; font-size:<?= $formato === '58mm' ? '8px' : '10px' ?>; letter-spacing:1px; line-height:1; margin:8px 0; }
+        .shipping-slip { page-break-inside:avoid; text-align:left; font-size:<?= $formato === '58mm' ? '9px' : '11px' ?>; line-height:1.35; margin-top:6px; }
+        .shipping-slip-header { text-align:center; margin-bottom:6px; font-weight:bold; }
+        .shipping-slip-logo { width:<?= $formato === '58mm' ? '58px' : '72px' ?>; height:auto; display:block; margin:0 auto 4px; }
+        .shipping-slip-row { margin:2px 0; overflow-wrap:anywhere; }
         .a4-layout { display:none; }
         <?php if ($formato === 'a4'): ?>
         body { width:210mm; }
@@ -88,8 +98,7 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
     </script>
     <?php endif; ?>
     <div class="header">
-        <?php $logo = $empresa['logo'] ?? ''; ?>
-        <img class="logo" src="<?= $logo ? htmlspecialchars($logo) : '/assets/brand/logo-header.png' ?>" alt="<?= htmlspecialchars($empresa['nomemp'] ?? 'Perfushopping') ?>" onerror="this.style.display='none'" />
+        <img class="logo" src="<?= htmlspecialchars($logoUrl) ?>" alt="<?= htmlspecialchars($empresa['nomemp'] ?? 'Perfushopping') ?>" onerror="this.style.display='none'" />
         <div class="razon"><?= htmlspecialchars($empresa['razon_emp'] ?? 'PERFUSHOPPING S.R.L.') ?></div>
         <?php if ($empresa['cuit'] ?? ''): ?><div class="data">CUIT: <?= htmlspecialchars($empresa['cuit']) ?></div><?php endif; ?>
         <?php if ($empresa['ing_brutos'] ?? ''): ?><div class="data">Ing. Brutos: <?= htmlspecialchars($empresa['ing_brutos']) ?></div><?php endif; ?>
@@ -182,11 +191,11 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
         <?php endif; ?>
         <?php $descuento = (int)($factura['descuento_cents'] ?? 0); ?>
         <?php if ($descuento > 0): ?>
-        <div class="row" style="color:#dc3545"><span>Descuento:</span><span>-<?= htmlspecialchars(Format::moneyRoundedFromCents($descuento)) ?></span></div>
+        <div class="row"><span>Descuento:</span><span>-<?= htmlspecialchars(Format::moneyRoundedFromCents($descuento)) ?></span></div>
         <?php endif; ?>
         <?php $puntosCents = (int)($factura['puntos_cents'] ?? 0); ?>
         <?php if ($puntosCents > 0): ?>
-        <div class="row" style="color:#b8860b"><span>Canje puntos:</span><span>-<?= htmlspecialchars(Format::moneyRoundedFromCents($puntosCents)) ?> (<?= (int)($puntosCents / 100) ?> pts)</span></div>
+        <div class="row"><span>Canje puntos:</span><span>-<?= htmlspecialchars(Format::moneyRoundedFromCents($puntosCents)) ?> (<?= (int)($puntosCents / 100) ?> pts)</span></div>
         <?php endif; ?>
         <div class="row total"><span>TOTAL:</span><span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($factura['total_cents'] ?? 0))) ?></span></div>
     </div>
@@ -205,11 +214,13 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
     </div>
         <?php endif; ?>
 
-        <?php if (($puntosObtenidos ?? 0) > 0): ?>
+        <?php if (($puntosObtenidos ?? 0) > 0 || ($puntosTotales ?? 0) > 0): ?>
         <div class="totals">
-            <div class="row" style="color:#b8860b"><span>Puntos sumados en esta compra:</span><span><?= (int)$puntosObtenidos ?> pts</span></div>
+            <?php if (($puntosObtenidos ?? 0) > 0): ?>
+            <div class="row"><span>Puntos sumados en esta compra:</span><span><?= (int)$puntosObtenidos ?> pts</span></div>
+            <?php endif; ?>
             <?php if (($puntosTotales ?? 0) > 0): ?>
-            <div class="row" style="color:#b8860b"><span>Total de puntos acumulados:</span><span><?= (int)$puntosTotales ?> pts</span></div>
+            <div class="row"><span>Total de puntos acumulados:</span><span><?= (int)$puntosTotales ?> pts</span></div>
             <?php endif; ?>
         </div>
         <?php endif; ?>
@@ -224,6 +235,35 @@ $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
         <p>Gracias por su compra</p>
         <p>www.perfushopping.com.ar</p>
     </div>
+    <?php if ($esEnvio): ?>
+    <div class="ticket-separator" aria-hidden="true">··········································</div>
+    <section class="shipping-slip">
+        <div class="shipping-slip-header">
+            <img class="shipping-slip-logo" src="<?= htmlspecialchars($logoUrl) ?>" alt="Perfushopping" onerror="this.style.display='none'" />
+            <div>DETALLE DEL ENVÍO</div>
+        </div>
+        <div class="shipping-slip-row"><strong>Factura:</strong> <?= htmlspecialchars((string)($factura['codigo'] ?? '')) ?></div>
+        <div class="shipping-slip-row"><strong>Destinatario:</strong> <?= htmlspecialchars((string)($factura['cliente_nombre'] ?? '')) ?></div>
+        <?php if (trim((string)($factura['transporte'] ?? '')) !== ''): ?>
+        <div class="shipping-slip-row"><strong>Transporte:</strong> <?= htmlspecialchars($transportes[(string)$factura['transporte']] ?? (string)$factura['transporte']) ?></div>
+        <?php endif; ?>
+        <?php if (trim((string)($factura['envio_direccion'] ?? '')) !== ''): ?>
+        <div class="shipping-slip-row"><strong>Dirección:</strong> <?= htmlspecialchars((string)$factura['envio_direccion']) ?></div>
+        <?php endif; ?>
+        <?php if (trim((string)($factura['cliente_tele'] ?? '')) !== ''): ?>
+        <div class="shipping-slip-row"><strong>Teléfono:</strong> <?= htmlspecialchars((string)$factura['cliente_tele']) ?></div>
+        <?php endif; ?>
+        <?php if (trim((string)($factura['envio_observacion'] ?? '')) !== ''): ?>
+        <div class="shipping-slip-row"><strong>Observaciones:</strong> <?= nl2br(htmlspecialchars((string)$factura['envio_observacion'])) ?></div>
+        <?php endif; ?>
+        <?php if (trim((string)($factura['envio_numero'] ?? '')) !== ''): ?>
+        <div class="shipping-slip-row"><strong>Seguimiento:</strong> <?= htmlspecialchars((string)$factura['envio_numero']) ?></div>
+        <?php endif; ?>
+        <?php if (trim((string)($factura['envio_estado'] ?? '')) !== ''): ?>
+        <div class="shipping-slip-row"><strong>Estado:</strong> <?= htmlspecialchars($estadosEnvio[(string)$factura['envio_estado']] ?? (string)$factura['envio_estado']) ?></div>
+        <?php endif; ?>
+    </section>
+    <?php endif; ?>
     <?php if ($isTicket): ?><div class="cut-space"></div><?php endif; ?>
 
     <div class="no-print" style="text-align:center;margin-top:20px">
