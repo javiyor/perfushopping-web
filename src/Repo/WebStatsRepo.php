@@ -138,6 +138,30 @@ final class WebStatsRepo
         return $st->fetchAll();
     }
 
+    /** @param array<int,string> $slugs @return array<string,int> slug => page views */
+    public function vistasVideos(array $slugs): array
+    {
+        $slugs = array_values(array_filter(array_map(static fn(string $slug): string => mb_strtolower(trim($slug)), $slugs)));
+        $wanted = array_fill_keys($slugs, true);
+        if (!$wanted || !$this->hasWebVisitasTable()) return [];
+        $st = Db::pdo()->query("SELECT SUBSTRING_INDEX(url, '?', 1) AS page_path, COUNT(*) AS vistas
+            FROM web_visitas
+            WHERE url LIKE '/aprende/videos/%'
+            GROUP BY SUBSTRING_INDEX(url, '?', 1)");
+        $viewsBySlug = [];
+        foreach ($st->fetchAll() ?: [] as $row) {
+            $path = (string)($row['page_path'] ?? '');
+            $urlPath = parse_url($path, PHP_URL_PATH);
+            if (is_string($urlPath) && $urlPath !== '') $path = $urlPath;
+            $path = rtrim($path, '/');
+            $slug = mb_strtolower((string)basename($path));
+            if ($slug !== '' && isset($wanted[$slug])) {
+                $viewsBySlug[$slug] = ($viewsBySlug[$slug] ?? 0) + (int)($row['vistas'] ?? 0);
+            }
+        }
+        return $viewsBySlug;
+    }
+
     private function esBot(): bool
     {
         $ua = (string)($_SERVER['HTTP_USER_AGENT'] ?? '');

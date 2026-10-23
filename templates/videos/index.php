@@ -24,6 +24,7 @@ $title = $title ?? 'Aprendé con Perfushopping';
         <div style="padding:12px">
           <strong><?= htmlspecialchars((string)$v['title']) ?></strong>
           <div class="small text-muted"><?= htmlspecialchars((string)($v['description_short'] ?? '')) ?></div>
+          <div class="small text-muted mt-1"><i class="bi bi-eye"></i> <?= number_format((int)($v['vistas'] ?? 0), 0, ',', '.') ?> ingresos</div>
         </div>
       </div>
     </a>
