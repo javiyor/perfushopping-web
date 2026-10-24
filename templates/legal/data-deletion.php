@@ -1,11 +1,6 @@
 <article class="page" style="max-width:900px;margin:18px auto 0;line-height:1.65">
   <h1 style="margin:0 0 8px;font-size:clamp(1.6rem,3vw,2.1rem)">Eliminación de datos personales</h1>
-  <p class="text-muted small">Última revisión del borrador: 23 de octubre de 2026</p>
-
-  <div class="notice" role="status" style="margin-bottom:20px">
-    <strong>Borrador pendiente de validación antes de publicar.</strong>
-    El proceso interno para atender y documentar solicitudes y los plazos legales de conservación de pedidos/facturas deben confirmarse antes de retirar este aviso.
-  </div>
+  <p class="text-muted small">Última revisión: 23 de octubre de 2026</p>
 
   <p>Podés solicitar acceso, rectificación, actualización o supresión de los datos personales asociados a tu cuenta, compra o consulta, de acuerdo con la Ley 25.326 y las demás normas aplicables.</p>
 
@@ -37,7 +32,7 @@
   <p>Si tu solicitud se refiere a mensajes recibidos por WhatsApp, Instagram o Facebook, indicá el canal y el número, perfil o identificador con el que te comunicaste. Para la información que Meta trate directamente en sus propios servicios, también podés utilizar los controles de privacidad que Meta pone a disposición de sus usuarios.</p>
 
   <h2 class="h4 mt-4">Conservación de conversaciones comerciales</h2>
-  <p>El borrador interno propone conservar las conversaciones registradas en sistemaPS hasta 12 meses desde la última interacción del cliente, sujeto a validación legal y técnica e implementación efectiva. El sistema todavía no automatiza esa depuración. El plazo no se aplica automáticamente a pedidos, facturas, comprobantes, reclamos, relaciones vigentes ni datos sujetos a obligaciones legales o a una causa legítima de conservación.</p>
+  <p>Perfushopping propone conservar las conversaciones registradas en sistemaPS hasta 12 meses desde la última interacción del cliente, sujeto a validación legal y técnica e implementación efectiva antes de presentarse como criterio operativo vigente. El sistema todavía no automatiza esa depuración. El plazo no se aplica automáticamente a pedidos, facturas, comprobantes, reclamos, relaciones vigentes ni datos sujetos a obligaciones legales o a una causa legítima de conservación.</p>
 
   <p>Consultá también nuestra <a href="/politica-de-privacidad">Política de privacidad</a> o la información sobre derechos publicada por la <a href="https://www.argentina.gob.ar/aaip/datospersonales/derechos" target="_blank" rel="noopener noreferrer">AAIP</a>.</p>
 </article>

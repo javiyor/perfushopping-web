@@ -1,11 +1,6 @@
 <article class="page" style="max-width:900px;margin:18px auto 0;line-height:1.65">
   <h1 style="margin:0 0 8px;font-size:clamp(1.6rem,3vw,2.1rem)">Política de privacidad</h1>
-  <p class="text-muted small">Última revisión del borrador: 23 de octubre de 2026</p>
-
-  <div class="notice" role="status" style="margin-bottom:20px">
-    <strong>Borrador pendiente de validación antes de publicar.</strong>
-    Se deben confirmar los proveedores/destinos, preferencias del Pixel y plazos legales de documentos contables antes de retirar este aviso.
-  </div>
+  <p class="text-muted small">Última revisión: 23 de octubre de 2026</p>
 
   <p>Esta política explica qué información puede tratar Perfushopping cuando visitás el sitio, realizás una compra o te comunicás con nosotros. El uso de canales de mensajería depende de que cada integración se encuentre habilitada.</p>
 
@@ -41,7 +36,7 @@
 
   <h2 class="h4 mt-4">4. Cookies y tecnologías similares</h2>
   <p>El sitio utiliza una cookie de sesión para mantener la sesión web. Si ingresás con un código de referido, se guarda el código en una cookie por hasta 30 días para atribuir el referido. También usamos un identificador de sesión del navegador para asociar eventos de navegación; se guarda en el almacenamiento local del navegador y en una cookie. El almacenamiento local permanece hasta que lo borres desde el navegador.</p>
-  <p>En las páginas públicas se carga el píxel de Meta, que registra eventos de navegación como una visita de página y los comunica a Meta. Las páginas que incorporan mapas o videos pueden hacer que el navegador se conecte a Google Maps o YouTube; se usan iconos servidos desde jsDelivr. Estos servicios pueden recibir datos técnicos de la conexión y de la página solicitada. La configuración de consentimiento y preferencias debe revisarse antes de publicar esta política.</p>
+  <p>En las páginas públicas se carga el píxel de Meta, que registra eventos de navegación como una visita de página y los comunica a Meta. En el sitio no se identificó un panel de consentimiento o preferencias para este píxel. Las páginas que incorporan mapas o videos pueden hacer que el navegador se conecte a Google Maps o YouTube; se usan iconos servidos desde jsDelivr. Estos servicios pueden recibir datos técnicos de la conexión y de la página solicitada.</p>
 
   <h2 class="h4 mt-4">5. Mensajería y consultas</h2>
   <p>Cuando las integraciones correspondientes están habilitadas, las consultas recibidas por WhatsApp, Instagram Direct o Facebook Messenger pueden ser gestionadas por personal autorizado mediante sistemaPS, la herramienta interna de atención comercial. Para WhatsApp, el personal puede responder desde esa herramienta. Los mensajes pueden incluir identificadores del canal, nombre de perfil, teléfono cuando lo provea el canal, contenido y metadatos de adjuntos. Las consultas por correo electrónico también pueden ser atendidas desde la casilla comercial de Perfushopping.</p>
@@ -54,18 +49,18 @@
     <li>ARCA, para la emisión y validación de comprobantes fiscales cuando corresponda.</li>
     <li>El transporte o servicio de entrega seleccionado, por ejemplo Correo Argentino cuando se use esa modalidad.</li>
     <li>Google Maps, YouTube y jsDelivr cuando una página cargue mapas, videos o recursos de iconos externos.</li>
-    <li>Proveedores de alojamiento, correo electrónico y soporte tecnológico. La identidad legal y ubicación de cada proveedor debe confirmarse antes de publicar.</li>
+    <li>Proveedores de alojamiento, correo electrónico y soporte tecnológico. La documentación técnica menciona Hostinger para alojamiento y para servidores de correo de ejemplo; no se verificaron la entidad contratante, la configuración real del correo ni las ubicaciones y subprocesadores.</li>
   </ul>
   <p>Perfushopping no vende datos personales. Algunos proveedores reciben o procesan datos para prestar servicios necesarios para el funcionamiento del sitio, los pagos, la atención y las entregas, según lo descripto en esta política.</p>
 
   <h2 class="h4 mt-4">7. Transferencias internacionales</h2>
-  <p>Al usar plataformas de mensajería, medición, pagos u otros servicios tecnológicos, cierta información podría procesarse fuera de Argentina. Los proveedores, países de destino y mecanismos de protección aplicables deben confirmarse antes de publicar la versión definitiva.</p>
+  <p>Al usar plataformas de mensajería, medición, pagos u otros servicios tecnológicos, cierta información podría procesarse fuera de Argentina. No se verificaron contractualmente los países de destino ni los mecanismos aplicables para cada proveedor; las plataformas de terceros tratan datos conforme a sus propios servicios, términos y políticas.</p>
 
   <h2 class="h4 mt-4">8. Conservación</h2>
   <p>Perfushopping conservará los datos personales durante el tiempo necesario para cumplir las finalidades para las que fueron recopilados y las obligaciones legales aplicables.</p>
-  <p><strong>Conversaciones comerciales (propuesta interna sujeta a validación):</strong> Perfushopping propone conservar las conversaciones comerciales registradas en sistemaPS durante un período de hasta 12 meses desde la última interacción del cliente, sujeto a su validación legal y técnica y a su implementación efectiva antes de ser presentado como una política operativa vigente. El comportamiento actual del sistema no implementa una depuración general de conversaciones y todavía no permite excluir automáticamente todas las excepciones.</p>
-  <p>Los datos vinculados a facturación, pedidos, obligaciones contables, reclamos y otras situaciones que requieran conservación podrán mantenerse durante períodos diferentes, según la legislación aplicable. Este criterio no aplica automáticamente esos 12 meses a facturas, comprobantes fiscales, pedidos, registros contables, reclamos legales, relaciones comerciales vigentes ni datos que deban conservarse por ley.</p>
-  <p>Cuando los datos dejen de ser necesarios y no exista obligación o causa legítima para conservarlos, Perfushopping adoptará los procedimientos de eliminación o anonimización que correspondan. El tratamiento de los datos dentro de las plataformas de Meta se encuentra sujeto también a las condiciones y políticas aplicables de dichos servicios. Los plazos de logs y copias de respaldo deben confirmarse con los proveedores.</p>
+  <p><strong>Conversaciones comerciales:</strong> Perfushopping propone conservar las conversaciones comerciales registradas en sistemaPS durante un período de hasta 12 meses desde la última interacción del cliente, sujeto a validación legal y técnica y a su implementación efectiva antes de presentarse como criterio operativo vigente. Actualmente el sistema no automatiza la depuración general de conversaciones ni la exclusión de todas las excepciones.</p>
+  <p>Los datos vinculados a facturación, pedidos, obligaciones contables, reclamos y otras situaciones que requieran conservación podrán mantenerse durante períodos diferentes, según la legislación aplicable. El plazo propuesto para conversaciones no se aplica automáticamente a facturas, comprobantes fiscales, pedidos, registros contables, reclamos legales, relaciones comerciales vigentes ni datos que deban conservarse por ley.</p>
+  <p>Cuando los datos dejen de ser necesarios y no exista obligación o causa legítima para conservarlos, Perfushopping adoptará los procedimientos de eliminación o anonimización que correspondan. El tratamiento de los datos dentro de las plataformas de Meta se encuentra sujeto también a las condiciones y políticas aplicables de dichos servicios. Los períodos de conservación de logs y copias de respaldo no están establecidos en esta política.</p>
 
   <h2 class="h4 mt-4">9. Seguridad</h2>
   <p>Perfushopping aplica medidas técnicas y organizativas razonables para limitar el acceso a la información y protegerla frente a pérdida, alteración o acceso no autorizado. Ningún medio de transmisión o almacenamiento puede garantizar seguridad absoluta.</p>

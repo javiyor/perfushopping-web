@@ -9,7 +9,7 @@
 - Se encontró una eliminación automática **limitada**: ubicaciones del personal se purgan por antigüedad de 30 días cuando se registra una nueva ubicación para ese usuario. No se encontró un proceso general de limpieza de cuentas, pedidos, carritos, mensajes, analítica o eventos de webhook.
 - Los pedidos de pago pendientes pueden marcarse como archivados a partir de 48 horas, pero mediante una acción administrativa; archivar no elimina sus datos.
 - El código carga Meta Pixel en páginas públicas. No se encontraron llamadas a Google Analytics, Google Tag Manager ni Meta Conversions API. Sí se encontraron embeds de Google Maps, YouTube y recursos de iconos desde jsDelivr.
-- En una comprobación previa del 23-10-2026 ambas URLs respondieron HTTP 200 con borradores antiguos. Tras subir `9188162` a `origin/master` y `demo/master`, el hook remoto reportó actualizar el servicio, pero la verificación externa posterior devolvió HTTP 404 para ambas rutas y HTTP 403 para `/`. Por tanto, el contenido actualizado no está confirmado públicamente y hay que resolver el destino/vhost/ruteo. No se afirma que Meta haya validado las páginas.
+- En verificaciones externas recientes, `/terms`, `/privacy`, `/politica-de-privacidad` y `/eliminacion-de-datos` respondieron HTTP 200 desde Hostinger HCDN; `/admin` redirigió a `/admin/login` con HTTP 302. El HTML servido coincidía con los borradores locales y contenía avisos de borrador. El titular autorizó publicar esta revisión; esta revisión retira esos avisos, mantiene visible que la depuración de 12 meses es propuesta no implementada y evita inventar países/proveedores no verificados. Resultado del despliegue actual pendiente de comprobación externa.
 - Los borradores locales usan los datos que el titular indicó de `empre` (Natalia Gabriela Feresin, 9 de Julio 1610, clientes@perfushopping.com.ar) y el canal de privacidad aprobado `perfushoppingbv@gmail.com`. Perfushopping seleccionó como **propuesta** conservar conversaciones comerciales de sistemaPS hasta 12 meses desde la última interacción del cliente, sujeta a validación legal/técnica e implementación efectiva. El código todavía no la cumple; no se habilitó ni ejecutó ninguna depuración.
 
 ## Decisiones y datos confirmados / pendientes
@@ -125,12 +125,12 @@ Se preparó un esquema vacío de registro en `docs/plantilla-registro-solicitude
 
 Actualmente hay eliminaciones administrativas puntuales, pero no un flujo centralizado: `WebUserController` puede borrar un usuario web y avisa si hay registros relacionados; `CustomerController` bloquea la eliminación de clientes con movimientos; las tablas de pedidos/facturas y snapshots/social tienen información relacionada que no es eliminada automáticamente junto con una cuenta.
 
-## 5. Pendientes operativos y de validación antes de publicar la versión final
+## 5. Pendientes operativos y de validación continuos
 
-1. Definir responsable, inventario de sistemas y proceso manual/automatizado para cumplir el plazo aprobado de 12 meses; no hacer borrados retrospectivos sin revisión de obligaciones, reclamos y relaciones activas.
+1. Definir responsable, inventario de sistemas y proceso manual/automatizado para implementar la propuesta de 12 meses; no hacer borrados retrospectivos sin revisión de obligaciones, reclamos y relaciones activas.
 2. Confirmar proveedor legal/país de hosting, correo, Meta, pagos y envíos según contratos y entorno productivo.
 3. Decidir preferencias/consentimiento y finalidad del Meta Pixel que hoy se carga globalmente.
 4. Confirmar canales Meta realmente activos y comprobar la clave de firma del webhook.
 5. Nombrar responsable y equipo de respuesta de solicitudes; aprobar el procedimiento propuesto y definir el módulo administrativo.
-6. Validar legalmente los textos y las bases jurídicas antes de cambiar el estado de borrador.
+6. Validar legalmente los textos y las bases jurídicas; la autorización empresarial para hacer públicas las páginas no equivale a asesoramiento legal.
 7. Revisar `privacy_v2` en aceptación de nuevos registros y decidir si corresponde informar/recabar aceptación de cuentas existentes.

@@ -2,7 +2,7 @@
 
 ## Estado
 
-Las rutas respondieron HTTP 200 en una comprobación inicial del 23-10-2026, pero tras el push de `9188162` el hook de `demo` reportó actualización y una verificación posterior devolvió HTTP 404 en ambas rutas y HTTP 403 en `/`. **El contenido actualizado no está confirmado públicamente.** Además, quedan datos de proveedores, preferencias del Pixel, proceso operativo y revisión legal por confirmar.
+El titular autorizó hacer públicas estas páginas. Las rutas respondían HTTP 200 y el contenido servido coincidía con la versión local con avisos de borrador. Se retiraron esos avisos, pero se conservan divulgaciones explícitas sobre datos que no se pudieron verificar y sobre la propuesta de retención que todavía no está implementada. Tras el despliegue se debe confirmar el HTML servido desde fuera.
 
 ## Comprobaciones del proyecto
 
@@ -23,23 +23,22 @@ Las rutas respondieron HTTP 200 en una comprobación inicial del 23-10-2026, per
 - No se encontró una política general de borrado automático para pedidos, comunicaciones, carritos abandonados o analítica. No publicar períodos de retención inventados.
 - **Pendiente de seguridad:** `MetaWebhookController::isSignatureValid()` acepta el evento si `META_APP_SECRET` está vacío. Confirmar en el entorno de producción que el secreto está configurado; valorar hacer que el webhook falle cerrado cuando la integración esté activa.
 
-## Datos que el titular debe confirmar antes de publicar
+## Límites y tareas que siguen abiertos tras la autorización de publicación
 
-El titular confirmó los datos legales de `empre`: `razon_emp = Natalia Gabriela Feresin`, `dire_emp = 9 de Julio 1610` y `mail = clientes@perfushopping.com.ar`. También aprobó `perfushoppingbv@gmail.com` como correo específico de privacidad y las declaraciones de no venta de datos y medidas razonables de seguridad. El plazo de hasta 12 meses para conversaciones de sistemaPS se seleccionó como **propuesta**; permanece sujeto a validación legal/técnica y a implementación efectiva.
+El titular confirmó los datos legales de `empre`: `razon_emp = Natalia Gabriela Feresin`, `dire_emp = 9 de Julio 1610` y `mail = clientes@perfushopping.com.ar`. También aprobó `perfushoppingbv@gmail.com` como correo específico de privacidad y las declaraciones de no venta de datos y medidas razonables de seguridad. El plazo de hasta 12 meses para conversaciones de sistemaPS se publica como **propuesta no operativa**, sujeto a validación legal/técnica e implementación efectiva.
 
-1. Confirmar los proveedores tecnológicos contratados, nombres legales y países donde procesan/almacenan datos; verificar configuración de Meta, pagos, hosting/correo y logística.
-2. Resolver consentimiento/preferencias frente al Meta Pixel, que actualmente se carga desde el layout público sin un gestor localizado.
-3. Definir responsable y procedimiento para solicitudes; comprobar que la casilla `perfushoppingbv@gmail.com` está activa y monitorizada. No existe autoservicio público de borrado.
-4. Diseñar y asignar la aplicación operativa de la propuesta de hasta 12 meses, incluidas excepciones por relaciones/casos activos, reclamos y obligaciones legales. Los registros existentes requieren revisión; no ejecutar borrados retroactivos sin esa revisión.
-5. Obtener de administración/contabilidad los plazos legales aplicables a pedidos, comprobantes y facturas; confirmar plazos de logs y backups con el proveedor.
-6. Revisar con asesoría legal las bases jurídicas, el deber de información, la situación de registro de bases de datos ante AAIP, las transferencias internacionales y el texto final. Plazos de referencia: acceso, 10 días corridos; rectificación/actualización/supresión, 5 días hábiles, sujeto a excepciones legales.
-7. Verificar en entorno seguro el secreto productivo del webhook Meta y corregir el comportamiento fail-open si corresponde; revisar `privacy_v2` y si corresponde informar/recabar aceptación a cuentas existentes.
-8. Confirmar si hay comunicaciones promocionales adicionales a los flujos observados en el código.
-9. Resolver antes del job los hallazgos de `docs/social-conversation-retention-12m.md`: `last_message_at` no es la última interacción del cliente; los timestamps UTC/local se mezclan; reaperturas manuales y webhooks duplicados alteran estados; los payloads crudos de webhook no están ligados a conversaciones y pueden conservar copias.
+1. Confirmar proveedor legal, regiones y subprocesadores según contratos y entorno; la política no atribuye países ni configuraciones no verificadas.
+2. Decidir/implementar preferencias de consentimiento del Pixel; la política informa que no se encontró un panel para este píxel.
+3. Confirmar que la casilla `perfushoppingbv@gmail.com` está activa/monitorizada y nombrar responsables. El procesamiento de solicitudes es manual y sin autoservicio público.
+4. Implementar y validar la propuesta de 12 meses antes de presentarla como criterio operativo. No ejecutar borrados retroactivos sin revisar casos, pedidos, reclamos y obligaciones legales.
+5. Obtener plazos fiscales/contables y el ciclo real de logs/backups; la política no inventa duraciones.
+6. Someter bases jurídicas, transferencias, AAIP y plazos de respuesta a revisión legal local.
+7. Verificar el secreto productivo del webhook Meta y evaluar el comportamiento fail-open; revisar `privacy_v2` para nuevas aceptaciones.
+8. Resolver los hallazgos técnicos de `docs/social-conversation-retention-12m.md`: timestamp entrante normalizado, deduplicación antes de reabrir, holds, payloads webhook, adjuntos, bitácora y backups. No habilitar cron hasta aprobación expresa.
 
 ## Verificación después de completar los datos
 
-1. Resolver los pendientes, actualizar los textos finales de `templates/legal/privacy-policy.php` y `templates/legal/data-deletion.php`, y retirar las bandas de borrador sólo cuando la información publicada describa el proceso real.
+1. Mantener el texto explícito sobre lo no implementado; no presentar la propuesta de 12 meses como depuración activa hasta completar el proceso y validarlo.
 2. Ejecutar `php -l` para archivos PHP modificados y `git diff --check`.
 3. Publicar los cambios aprobados a `origin/master` y después a `demo/master` según el flujo acordado.
 4. Desde un cliente externo, comprobar con `curl -sS -L -D -` que estas URLs responden HTTP 200 y no redirigen a `/login`:
@@ -50,4 +49,4 @@ El titular confirmó los datos legales de `empre`: `razon_emp = Natalia Gabriela
 
 ## Estado público observado en esta revisión
 
-Estado posterior al push de `9188162`: ambas URLs devolvieron HTTP 404 y `/` devolvió HTTP 403, aunque el hook remoto informó que actualizó el servicio. No fue posible verificar los cambios en el dominio público; investigar el virtual host/destino del remoto y repetir la comprobación externa antes de considerar el despliegue confirmado.
+La última verificación previa a esta publicación encontró `/terms`, ambas páginas legales y `/privacy` con HTTP 200 en `Server: hcdn`; `/admin` redirigía a `/admin/login` con HTTP 302. Se volverá a comprobar después del despliegue de esta revisión.
