@@ -4,7 +4,7 @@
 
   <div class="notice" role="status" style="margin-bottom:20px">
     <strong>Borrador pendiente de validación antes de publicar.</strong>
-    Se deben confirmar los plazos concretos de conservación, los proveedores y destinos de datos efectivamente utilizados y las medidas de consentimiento/preferencias aplicables.
+    Se deben confirmar los proveedores/destinos, preferencias del Pixel y plazos legales de documentos contables antes de retirar este aviso.
   </div>
 
   <p>Esta política explica qué información puede tratar Perfushopping cuando visitás el sitio, realizás una compra o te comunicás con nosotros. El uso de canales de mensajería depende de que cada integración se encuentre habilitada.</p>
@@ -14,7 +14,7 @@
   <ul>
     <li>Nombre / razón social: <strong>Natalia Gabriela Feresin</strong>.</li>
     <li>Domicilio: <strong>9 de Julio 1610</strong>.</li>
-    <li>Correo para consultas y solicitudes de privacidad: <a href="mailto:clientes@perfushopping.com.ar">clientes@perfushopping.com.ar</a>.</li>
+    <li>Correo para consultas de privacidad: <a href="mailto:perfushoppingbv@gmail.com">perfushoppingbv@gmail.com</a>.</li>
   </ul>
 
   <h2 class="h4 mt-4">2. Datos que podemos tratar</h2>
@@ -56,20 +56,23 @@
     <li>Google Maps, YouTube y jsDelivr cuando una página cargue mapas, videos o recursos de iconos externos.</li>
     <li>Proveedores de alojamiento, correo electrónico y soporte tecnológico. La identidad legal y ubicación de cada proveedor debe confirmarse antes de publicar.</li>
   </ul>
-  <p>No vendemos datos personales. Los proveedores deben tratarlos sólo para prestar el servicio correspondiente y conforme a las condiciones aplicables.</p>
+  <p>Perfushopping no vende datos personales. Algunos proveedores reciben o procesan datos para prestar servicios necesarios para el funcionamiento del sitio, los pagos, la atención y las entregas, según lo descripto en esta política.</p>
 
   <h2 class="h4 mt-4">7. Transferencias internacionales</h2>
   <p>Al usar plataformas de mensajería, medición, pagos u otros servicios tecnológicos, cierta información podría procesarse fuera de Argentina. Los proveedores, países de destino y mecanismos de protección aplicables deben confirmarse antes de publicar la versión definitiva.</p>
 
   <h2 class="h4 mt-4">8. Conservación</h2>
-  <p>Conservamos los datos durante el tiempo necesario para las finalidades informadas y para cumplir obligaciones legales o atender reclamos. No se verificó un plazo único de eliminación automática para las distintas categorías de datos. Los períodos concretos para cuentas, operaciones y comprobantes, conversaciones, carritos y registros técnicos deben definirse y confirmarse antes de publicar.</p>
+  <p>Perfushopping conservará los datos personales durante el tiempo necesario para cumplir las finalidades para las que fueron recopilados y las obligaciones legales aplicables.</p>
+  <p><strong>Conversaciones comerciales (propuesta interna sujeta a validación):</strong> Perfushopping propone conservar las conversaciones comerciales registradas en sistemaPS durante un período de hasta 12 meses desde la última interacción del cliente, sujeto a su validación legal y técnica y a su implementación efectiva antes de ser presentado como una política operativa vigente. El comportamiento actual del sistema no implementa una depuración general de conversaciones y todavía no permite excluir automáticamente todas las excepciones.</p>
+  <p>Los datos vinculados a facturación, pedidos, obligaciones contables, reclamos y otras situaciones que requieran conservación podrán mantenerse durante períodos diferentes, según la legislación aplicable. Este criterio no aplica automáticamente esos 12 meses a facturas, comprobantes fiscales, pedidos, registros contables, reclamos legales, relaciones comerciales vigentes ni datos que deban conservarse por ley.</p>
+  <p>Cuando los datos dejen de ser necesarios y no exista obligación o causa legítima para conservarlos, Perfushopping adoptará los procedimientos de eliminación o anonimización que correspondan. El tratamiento de los datos dentro de las plataformas de Meta se encuentra sujeto también a las condiciones y políticas aplicables de dichos servicios. Los plazos de logs y copias de respaldo deben confirmarse con los proveedores.</p>
 
   <h2 class="h4 mt-4">9. Seguridad</h2>
-  <p>Se aplican medidas técnicas y organizativas razonables para limitar el acceso a la información y protegerla frente a pérdida, alteración o acceso no autorizado. Ningún medio de transmisión o almacenamiento puede garantizar seguridad absoluta.</p>
+  <p>Perfushopping aplica medidas técnicas y organizativas razonables para limitar el acceso a la información y protegerla frente a pérdida, alteración o acceso no autorizado. Ningún medio de transmisión o almacenamiento puede garantizar seguridad absoluta.</p>
 
   <h2 class="h4 mt-4">10. Tus derechos</h2>
   <p>Podés solicitar acceso a tus datos personales y, cuando corresponda, su rectificación, actualización o supresión. Conforme a la Ley 25.326, el pedido de acceso debe responderse dentro de los 10 días corridos; la rectificación, actualización o supresión debe realizarse dentro de los 5 días hábiles, sujeto a las excepciones legales.</p>
-  <p>Para ejercer estos derechos, escribí a <a href="mailto:clientes@perfushopping.com.ar">clientes@perfushopping.com.ar</a>. Podemos solicitar información razonable para verificar tu identidad antes de actuar. Si una norma exige conservar ciertos registros, se conservarán durante el plazo que corresponda y se limitará su uso según la ley.</p>
+  <p>Para ejercer estos derechos, escribí a <a href="mailto:perfushoppingbv@gmail.com">perfushoppingbv@gmail.com</a>. Para consultas generales también está disponible <a href="mailto:clientes@perfushopping.com.ar">clientes@perfushopping.com.ar</a>. Podemos solicitar información razonable para verificar tu identidad antes de actuar. Si una norma exige conservar ciertos registros, se conservarán durante el plazo que corresponda y se limitará su uso según la ley.</p>
   <p>La autoridad de control es la <a href="https://www.argentina.gob.ar/aaip" target="_blank" rel="noopener noreferrer">Agencia de Acceso a la Información Pública (AAIP)</a>. Podés consultar sus <a href="https://www.argentina.gob.ar/aaip/datospersonales/derechos" target="_blank" rel="noopener noreferrer">derechos de protección de datos</a>.</p>
 
   <h2 class="h4 mt-4">11. Solicitudes de eliminación</h2>
