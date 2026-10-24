@@ -2,7 +2,7 @@
 
 ## Estado
 
-Las rutas públicas existen y respondieron HTTP 200 en la verificación del 23-10-2026. La versión actualmente servida tiene aviso de borrador y no incluye los cambios locales más recientes. **No publicar la revisión local todavía**: quedan datos de proveedores, preferencias del Pixel, proceso operativo y revisión legal por confirmar.
+Las rutas respondieron HTTP 200 en una comprobación inicial del 23-10-2026, pero tras el push de `9188162` el hook de `demo` reportó actualización y una verificación posterior devolvió HTTP 404 en ambas rutas y HTTP 403 en `/`. **El contenido actualizado no está confirmado públicamente.** Además, quedan datos de proveedores, preferencias del Pixel, proceso operativo y revisión legal por confirmar.
 
 ## Comprobaciones del proyecto
 
@@ -50,4 +50,4 @@ El titular confirmó los datos legales de `empre`: `razon_emp = Natalia Gabriela
 
 ## Estado público observado en esta revisión
 
-Ambas URLs responden HTTP 200 y muestran los encabezados y avisos de borrador. El contenido servido incluye el correo general `clientes@perfushopping.com.ar`, pero no el canal aprobado `perfushoppingbv@gmail.com` ni las modificaciones locales actuales. La modificación local aún no se ha desplegado; verificar la versión nuevamente después de autorizar su publicación.
+Estado posterior al push de `9188162`: ambas URLs devolvieron HTTP 404 y `/` devolvió HTTP 403, aunque el hook remoto informó que actualizó el servicio. No fue posible verificar los cambios en el dominio público; investigar el virtual host/destino del remoto y repetir la comprobación externa antes de considerar el despliegue confirmado.
