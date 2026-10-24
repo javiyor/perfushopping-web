@@ -2,7 +2,7 @@
 
 ## Estado
 
-El titular autorizó hacer públicas estas páginas. Las rutas respondían HTTP 200 y el contenido servido coincidía con la versión local con avisos de borrador. Se retiraron esos avisos, pero se conservan divulgaciones explícitas sobre datos que no se pudieron verificar y sobre la propuesta de retención que todavía no está implementada. Tras el despliegue se debe confirmar el HTML servido desde fuera.
+El titular autorizó hacer públicas estas páginas. El commit `e3feeff` se publicó en `origin/master` y `demo/master`; el hook reportó actualizar `organizing-web-php`. Se verificó desde Internet que las dos rutas legales sirven el contenido actualizado sin avisos de borrador. Se conservan divulgaciones explícitas sobre proveedores/regiones que no se pudieron verificar y sobre la propuesta de retención que todavía no está implementada.
 
 ## Comprobaciones del proyecto
 
@@ -49,4 +49,4 @@ El titular confirmó los datos legales de `empre`: `razon_emp = Natalia Gabriela
 
 ## Estado público observado en esta revisión
 
-La última verificación previa a esta publicación encontró `/terms`, ambas páginas legales y `/privacy` con HTTP 200 en `Server: hcdn`; `/admin` redirigía a `/admin/login` con HTTP 302. Se volverá a comprobar después del despliegue de esta revisión.
+Verificación GET posterior al despliegue, desde Internet: `/politica-de-privacidad` 200, `/eliminacion-de-datos` 200, `/privacy` 200 (alias de la política; el pie apunta a la canónica), `/terms` 200 y `/admin` 302 a `/admin/login`. El servidor de borde reporta `hcdn`. Los dos HTML legales contienen `perfushoppingbv@gmail.com`, no incluyen el aviso de borrador y aclaran que la depuración de 12 meses aún no está automatizada.
