@@ -146,6 +146,9 @@ $router->post('/encontra-tu-rutina/(?P<slug>[a-z0-9-]+)/resultado', [PublicQuizC
 
 // Legal
 $router->get('/terms', [LegalController::class, 'terms']);
+$router->get('/politica-de-privacidad', [LegalController::class, 'privacy']);
+$router->get('/eliminacion-de-datos', [LegalController::class, 'dataDeletion']);
+// Backwards-compatible alias to the current privacy policy.
 $router->get('/privacy', [LegalController::class, 'privacy']);
 $router->get('/terms/affiliate', [LegalController::class, 'affiliateTerms']);
 

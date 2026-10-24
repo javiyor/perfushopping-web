@@ -143,7 +143,8 @@ try {
       <?php endif; ?>
       <div class="store-footer-links">
         <a href="/terms" style="text-decoration:underline">Terminos</a>
-        <a href="/privacy" style="text-decoration:underline">Privacidad y cookies</a>
+        <a href="/politica-de-privacidad" style="text-decoration:underline">Privacidad y cookies</a>
+        <a href="/eliminacion-de-datos" style="text-decoration:underline">Eliminación de datos</a>
         <a href="/terms/affiliate" style="text-decoration:underline">Programa de referidos</a>
       </div>
     </div>

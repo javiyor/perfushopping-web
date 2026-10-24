@@ -19,7 +19,7 @@ use Perfushopping\Web\Support\Csrf;
         <input type="checkbox" name="accept_terms" value="1" />
         <span>
           Acepto los <a href="/terms" target="_blank" rel="noopener" style="text-decoration:underline">Terminos del sitio</a>, la
-          <a href="/privacy" target="_blank" rel="noopener" style="text-decoration:underline">Politica de privacidad y cookies</a> y los
+          <a href="/politica-de-privacidad" target="_blank" rel="noopener" style="text-decoration:underline">Politica de privacidad y cookies</a> y los
           <a href="/terms/affiliate" target="_blank" rel="noopener" style="text-decoration:underline">Terminos del programa de referidos</a>.
         </span>
       </label>

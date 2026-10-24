@@ -105,7 +105,7 @@ final class AuthController
         $ua = $_SERVER['HTTP_USER_AGENT'] ?? null;
         $terms = new TermsRepo();
         $terms->accept($id, 'site_v1', is_string($ip) ? $ip : null, is_string($ua) ? $ua : null);
-        $terms->accept($id, 'privacy_v1', is_string($ip) ? $ip : null, is_string($ua) ? $ua : null);
+        $terms->accept($id, 'privacy_v2', is_string($ip) ? $ip : null, is_string($ua) ? $ua : null);
         $terms->accept($id, 'affiliate_v1', is_string($ip) ? $ip : null, is_string($ua) ? $ua : null);
 
         $this->sendActivationEmail($id, $email, $name);
