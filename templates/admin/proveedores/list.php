@@ -160,4 +160,13 @@ function editProv(p) {
     document.getElementById('provCodpost').value = p.codpost || '';
     document.getElementById('provActivo').checked = p.activo == 1;
 }
+<?php if (!empty($openNew)): ?>
+document.addEventListener('DOMContentLoaded', function(){
+    resetProvForm();
+    const modalEl = document.getElementById('provModal');
+    if (modalEl && window.bootstrap && bootstrap.Modal){
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+});
+<?php endif; ?>
 </script>

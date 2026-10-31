@@ -134,7 +134,12 @@ $idcta1Sel = (int)($compra['idcta1'] ?? 0);
             </div>
 
             <div class="card shadow-sm mb-3">
-                <div class="card-header bg-white fw-semibold">Proveedor</div>
+                <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+                    <span>Proveedor</span>
+                    <a class="btn btn-outline-primary btn-sm" href="/admin/proveedores?nuevo=1" target="_blank" rel="noopener">
+                        <i class="bi bi-person-plus"></i> Nuevo proveedor
+                    </a>
+                </div>
                 <div class="card-body">
                     <div class="row g-2">
                         <div class="col-12 position-relative">

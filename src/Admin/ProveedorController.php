@@ -22,6 +22,7 @@ final class ProveedorController
             'adminUser' => $adminUser,
             'list' => $list,
             'q' => trim((string)($_GET['q'] ?? '')),
+            'openNew' => (string)($_GET['nuevo'] ?? '') === '1',
             'csrf' => Csrf::token(),
             'flash' => $_SESSION['admin_flash'] ?? null,
             'pageTitle' => 'Proveedores',
