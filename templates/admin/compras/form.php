@@ -828,17 +828,33 @@ function startScanner(){
 
     loadHtml5QrLib(function(){
         if (_html5QrCode){ try{ _html5QrCode.clear(); }catch(x){} _html5QrCode = null; }
-        // Prefer the rear camera. Ideal (not exact) allows fallback on laptop/cam-less devices.
-        startWithConfig({ facingMode: { ideal: 'environment' } })
-            .catch(function(){
+        const mobileOrTablet = isMobileOrTablet();
+        const configs = mobileOrTablet
+            ? [{ facingMode: { exact: 'environment' } }, { facingMode: { ideal: 'environment' } }]
+            : [{ facingMode: { ideal: 'user' } }, { facingMode: 'user' }];
+
+        function tryConfig(index, lastError){
+            if (index >= configs.length){
+                const cameraName = mobileOrTablet ? 'trasera' : 'del equipo';
+                showScanError('No se pudo iniciar la cámara ' + cameraName + ': ' + (lastError && lastError.message ? lastError.message : lastError));
+                return;
+            }
+            startWithConfig(configs[index]).catch(function(e){
                 if (_html5QrCode){ try{ _html5QrCode.clear(); }catch(x){} _html5QrCode = null; }
-                // Fallback to the front camera.
-                return startWithConfig({ facingMode: 'user' });
-            })
-            .catch(function(e){
-                showScanError('No se pudo iniciar la cámara: ' + (e && e.message ? e.message : e));
+                tryConfig(index + 1, e);
             });
+        }
+
+        tryConfig(0, null);
     });
+}
+
+function isMobileOrTablet(){
+    if (navigator.userAgentData && navigator.userAgentData.mobile){ return true; }
+    const ua = navigator.userAgent || '';
+    const mobileUa = /Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(ua);
+    const ipadOs = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+    return mobileUa || ipadOs;
 }
 
 document.addEventListener('DOMContentLoaded', function(){
