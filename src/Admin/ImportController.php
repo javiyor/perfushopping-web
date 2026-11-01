@@ -78,10 +78,10 @@ final class ImportController
         $soloCosto = $modo === 'costo';
         if (!$rows) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => $soloCosto
-                ? 'No se pudieron leer filas del CSV. Verifica que tenga las columnas: codscan, costo_sin_iva. Si es un Excel (.xlsx), guardalo como CSV primero.'
+                ? 'No se pudieron leer filas del CSV. Verifica que tenga codscan o codprodup y la columna costo_sin_iva. Para buscar por codprodup, selecciona el proveedor.'
                 : ($conIva
-                    ? 'No se pudieron leer filas del CSV. Verifica que tenga las columnas: codscan, precio_con_iva (opcional: costo_con_iva, stock). Si es un Excel (.xlsx), guardalo como CSV primero.'
-                    : 'No se pudieron leer filas del CSV. Verifica que tenga las columnas: codprodup, codscan, precio_sin_iva, costo_sin_iva, stock. Si es un Excel (.xlsx), guardalo como CSV primero.')];
+                    ? 'No se pudieron leer filas del CSV. Verifica que tenga codscan o codprodup y la columna precio_con_iva (costo_con_iva es opcional). Si es un Excel (.xlsx), guardalo como CSV primero.'
+                    : 'No se pudieron leer filas del CSV. Verifica que tenga codprodup o codscan y las columnas de precios correspondientes. Si es un Excel (.xlsx), guardalo como CSV primero.')];
             Response::redirect('/admin/productos/importar');
         }
 
@@ -106,10 +106,9 @@ final class ImportController
         foreach ($rows as $idx => $row) {
             $codprodup = trim((string)($row['codprodup'] ?? ''));
             $codscan = trim((string)($row['codscan'] ?? ''));
-            $stockNew = $soloCosto ? null : $this->parseInt((string)($row['stock'] ?? ''));
             if ($soloCosto) {
-                // Modo costo sin IVA: se busca por código de barra y los precios
-                // minorista/mayorista se calculan con los márgenes existentes.
+                // Prioriza codscan; codprodup solo se usa como respaldo con proveedor seleccionado.
+                // Minorista/mayorista se calculan con los márgenes existentes.
                 $precioConIvaNew = null;
                 $costoConIvaNew = null;
                 $precioNew = null;
@@ -121,7 +120,7 @@ final class ImportController
                 if ($codscan !== '') {
                     $match = $this->repo->findByCodscan($codscan, $idprovee);
                 }
-                if ($match === null && $codprodup !== '') {
+                if ($match === null && $codprodup !== '' && $idprovee > 0) {
                     $match = $this->repo->findByCodprodup($codprodup, $idprovee);
                     if ($match) {
                         $match['_match_type'] = 'codprodup';
@@ -164,7 +163,6 @@ final class ImportController
                 'codscan' => $codscan,
                 'precio_new' => $precioNew,
                 'costo_new' => $costoNew,
-                'stock_new' => $stockNew,
                 'ganan1_new' => $ganan1New,
                 'ganan2_new' => $ganan2New,
                 'precio1_new' => $precio1New,
@@ -188,7 +186,6 @@ final class ImportController
                 $precioOld = (float)($match['precio'] ?? 0);
                 $precio1Old = (float)($match['precio1'] ?? 0);
                 $costoOld = (float)($match['precomp'] ?? 0);
-                $stockOld = (int)($match['_stockact'] ?? 0);
                 $ganan1Old = (float)($match['ganan1'] ?? 0);
                 $ganan2Old = (float)($match['ganan2'] ?? 0);
 
@@ -199,7 +196,6 @@ final class ImportController
                 $item['precio1_old_gross'] = $precio1Old * (1 + $ivaRate / 100);
                 $item['precio1_new_gross'] = $precio1New !== null ? $precio1New * (1 + $ivaRate / 100) : null;
                 $item['costo_old'] = $costoOld;
-                $item['stock_old'] = $stockOld;
                 $item['ganan1_old'] = $ganan1Old;
                 $item['ganan2_old'] = $ganan2Old;
                 $item['iva_rate'] = $ivaRate;
@@ -240,15 +236,35 @@ final class ImportController
                 }
 
                 $item['precio_diff'] = $precioNew !== null ? round($precioNew - $precioOld, 2) : null;
+                $precioVariacionPct = $precioOld > 0 && $precioNew !== null
+                    ? round((($precioNew - $precioOld) / $precioOld) * 100, 1)
+                    : null;
+                $revisionPrecioDetalles = [];
+                $revisarVariacionPrecio = static function (string $etiqueta, float $anterior, ?float $nuevo) use (&$revisionPrecioDetalles): void {
+                    if ($nuevo === null) return;
+                    if ($anterior > 0) {
+                        $porcentaje = (($nuevo - $anterior) / $anterior) * 100;
+                        if (abs($porcentaje) > 15) {
+                            $revisionPrecioDetalles[] = $etiqueta . ' ' . ($porcentaje > 0 ? '+' : '') . number_format($porcentaje, 1, ',', '.') . '%';
+                        }
+                    } elseif ($nuevo > 0) {
+                        $revisionPrecioDetalles[] = $etiqueta . ' sin valor anterior';
+                    }
+                };
+                $revisarVariacionPrecio('Minorista', $precioOld, $precioNew);
+                $revisarVariacionPrecio('Mayorista', $precio1Old, $precio1New);
+                $revisarVariacionPrecio('Costo', $costoOld, $costoNew);
+                $requiereRevisionPrecio = !empty($revisionPrecioDetalles);
+                $item['precio_variacion_pct'] = $precioVariacionPct;
+                $item['requiere_revision_precio'] = $requiereRevisionPrecio;
+                $item['revision_precio_detalle'] = implode(' · ', $revisionPrecioDetalles);
                 $item['costo_diff'] = $costoNew !== null ? round($costoNew - $costoOld, 2) : null;
-                $item['stock_diff'] = $stockNew !== null ? $stockNew - $stockOld : null;
                 $item['ganan1_diff'] = $ganan1New !== null ? round($ganan1New - $ganan1Old, 2) : null;
                 $item['ganan2_diff'] = $ganan2New !== null ? round($ganan2New - $ganan2Old, 2) : null;
 
                 $item['has_changes'] = false;
                 if ($precioNew !== null && abs($precioNew - $precioOld) > 0.001) $item['has_changes'] = true;
                 if ($costoNew !== null && abs($costoNew - $costoOld) > 0.001) $item['has_changes'] = true;
-                if ($stockNew !== null && $stockNew !== $stockOld) $item['has_changes'] = true;
                 if ($ganan1New !== null && abs($ganan1New - $ganan1Old) > 0.001) $item['has_changes'] = true;
                 if ($ganan2New !== null && abs($ganan2New - $ganan2Old) > 0.001) $item['has_changes'] = true;
                 if ($precio1New !== null && abs($precio1New - $precio1Old) > 0.001) $item['has_changes'] = true;
@@ -268,6 +284,7 @@ final class ImportController
             'proveedor' => $proveedorNombre,
             'precios_con_iva' => $conIva,
             'modo_precio' => $modo,
+            'version' => 2,
         ];
 
         Response::redirect('/admin/productos/importar');
@@ -283,13 +300,20 @@ final class ImportController
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No hay datos de importacion. Subi el CSV primero.'];
             Response::redirect('/admin/productos/importar');
         }
+        if ((int)($preview['version'] ?? 0) !== 2) {
+            unset($_SESSION['import_preview']);
+            $_SESSION['admin_flash'] = ['type' => 'warning', 'text' => 'La vista previa fue generada con una versión anterior. Volvé a cargar el CSV para revisar los cambios antes de aplicarlos.'];
+            Response::redirect('/admin/productos/importar');
+        }
 
         $selected = $_POST['selected'] ?? [];
         if (!is_array($selected)) {
             $selected = [];
         }
-        $soloCosto = (string)($preview['modo_precio'] ?? '') === 'costo';
-
+        if (!$selected) {
+            $_SESSION['admin_flash'] = ['type' => 'warning', 'text' => 'No seleccionaste productos para actualizar.'];
+            Response::redirect('/admin/productos/importar');
+        }
         $updated = 0;
         $errors = 0;
 
@@ -298,7 +322,7 @@ final class ImportController
                 continue;
             }
             $idx = 'row_' . $item['row'];
-            if (!in_array($idx, $selected, true) && !empty($selected)) {
+            if (!in_array($idx, $selected, true)) {
                 continue;
             }
 
@@ -306,24 +330,18 @@ final class ImportController
                 $idprodu = (int)$item['idprodu'];
                 $precioVal = $item['precio_new'] ?? $item['precio_old'] ?? null;
                 $costoVal = $item['costo_new'] ?? $item['costo_old'] ?? null;
-                $stockVal = $item['stock_new'];
                 $ganan1Val = $item['ganan1_new'] ?? null;
                 $ganan2Val = $item['ganan2_new'] ?? null;
                 $precio1Val = $item['precio1_new'] ?? $item['precio1_old'] ?? null;
-                $idcodgusto = (int)$item['idcodgusto'];
 
                 $hasPriceChange = $item['precio_diff'] !== null && abs((float)$item['precio_diff']) > 0.001;
                 $hasCostChange = $item['costo_diff'] !== null && abs((float)$item['costo_diff']) > 0.001;
-                $hasStockChange = !$soloCosto && $item['stock_diff'] !== null && (int)$item['stock_diff'] !== 0;
                 $hasGanan1Change = $item['ganan1_diff'] !== null && abs((float)$item['ganan1_diff']) > 0.001;
                 $hasGanan2Change = $item['ganan2_diff'] !== null && abs((float)$item['ganan2_diff']) > 0.001;
                 $hasPrecio1Change = ($item['precio1_diff'] ?? null) !== null && abs((float)$item['precio1_diff']) > 0.001;
 
                 if ($hasPriceChange || $hasCostChange || $hasGanan1Change || $hasGanan2Change || $hasPrecio1Change) {
                     $this->repo->updatePrecios($idprodu, (float)($precioVal ?? 0), (float)($costoVal ?? 0), $ganan1Val, $ganan2Val, $precio1Val);
-                }
-                if ($hasStockChange && $idcodgusto > 0) {
-                    $this->repo->updateStock($idcodgusto, (int)$stockVal);
                 }
                 $updated++;
             } catch (\Throwable $e) {

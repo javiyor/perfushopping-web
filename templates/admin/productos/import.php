@@ -10,7 +10,7 @@ $total = (int)($preview['total'] ?? 0);
 $found = (int)($preview['found'] ?? 0);
 $notFound = (int)($preview['notFound'] ?? 0);
 $modoPreview = (string)($preview['modo_precio'] ?? (!empty($preview['precios_con_iva']) ? 'con_iva' : 'neto'));
-$soloCostoPreview = $modoPreview === 'costo';
+$revisionPrecioCount = count(array_filter($results, static fn(array $item): bool => !empty($item['requiere_revision_precio'])));
 
 $updated = (int)($stats['updated'] ?? 0);
 $errors = (int)($stats['errors'] ?? 0);
@@ -19,7 +19,7 @@ $errors = (int)($stats['errors'] ?? 0);
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
         <h4 class="fw-bold mb-1">Importar productos</h4>
-        <p class="text-muted small">Subí un CSV para actualizar precios, costos y/o stock según el modo elegido, por código de proveedor o código de barra.</p>
+        <p class="text-muted small">Subí un CSV para actualizar precios y costos por código de proveedor o código de barra. El stock no se modifica en ningún modo.</p>
     </div>
     <a class="btn btn-outline-secondary btn-sm" href="/admin/productos">Volver a productos</a>
 </div>
@@ -38,7 +38,7 @@ $errors = (int)($stats['errors'] ?? 0);
     <div class="card-body">
         <div class="alert alert-info small">
             <strong>Formato del CSV:</strong> La primera fila debe contener los encabezados.
-            Columnas: <code>codprodup</code>, <code>codscan</code>, <code>precio_sin_iva</code>, <code>costo_sin_iva</code>, <code>stock</code>, <code>ganan1</code>, <code>ganan2</code>, <code>precio1_sin_iva</code>
+            Columnas: <code>codprodup</code>, <code>codscan</code>, <code>precio_sin_iva</code>, <code>costo_sin_iva</code>, <code>ganan1</code>, <code>ganan2</code>, <code>precio1_sin_iva</code>
             <br>
             <strong>Matching:</strong> Busca primero por <code>codprodup</code> (código de proveedor), y si no encuentra, por <code>codscan</code> (código de barra).
             <br>
@@ -48,7 +48,7 @@ $errors = (int)($stats['errors'] ?? 0);
             <strong>Márgenes:</strong> Si incluís <code>ganan1</code> y <code>ganan2</code> (porcentajes), se actualizan los márgenes del producto.
             <hr class="my-2">
             <strong>Modo "Precios con IVA incluido":</strong>
-            Columnas: <code>codscan</code>, <code>precio_con_iva</code>, <code>costo_con_iva</code> (opcional), <code>stock</code> (opcional).
+            Columnas: <code>codscan</code>, <code>precio_con_iva</code>, <code>costo_con_iva</code> (opcional). El stock no se modifica.
             <br>
             <strong>Matching:</strong> Busca por <code>codscan</code> (código de barra de la variante).
             <br>
@@ -57,9 +57,9 @@ $errors = (int)($stats['errors'] ?? 0);
             <strong>Precios:</strong> <code>precio_con_iva</code> debe ser monto <strong>con IVA</strong> (retail). Usá punto (<code>.</code>) como separador decimal.
             <hr class="my-2">
             <strong>Modo "Costo sin IVA":</strong>
-            Columnas: <code>codscan</code>, <code>costo_sin_iva</code>. En este modo no se actualiza el stock.
+            Columnas: <code>codscan</code> o <code>codprodup</code>, y <code>costo_sin_iva</code>. El stock no se modifica.
             <br>
-            <strong>Matching:</strong> Busca por <code>codscan</code> (código de barra de la variante).
+            <strong>Matching:</strong> Busca primero por <code>codscan</code>; si no encuentra el artículo, usa <code>codprodup</code> cuando seleccionás el proveedor correspondiente.
             <br>
             <strong>Cálculo automático:</strong> <code>costo_sin_iva</code> → calcula <code>precio</code> (minorista) con margen <code>ganan1</code> existente y <code>precio1</code> (mayorista) con margen <code>ganan2</code> existente. Los márgenes no se modifican.
 
@@ -108,6 +108,11 @@ $errors = (int)($stats['errors'] ?? 0);
         <span><i class="bi bi-table"></i> Vista previa<?php if ($previewProveedor !== ''): ?> · Proveedor: <strong><?= htmlspecialchars($previewProveedor) ?></strong><?php endif; ?></span>
         <div class="d-flex gap-2 align-items-center">
             <span class="badge bg-success"><?= $found ?> encontrados</span>
+            <?php if ($revisionPrecioCount > 0): ?>
+                <button class="btn btn-outline-warning btn-sm" type="button" id="btnFiltroCambiosPrecio" onclick="return toggleCambiosPrecio()">
+                    Revisar variaciones &gt;15% (<?= $revisionPrecioCount ?>)
+                </button>
+            <?php endif; ?>
             <?php if ($modoPreview === 'con_iva'): ?>
                 <span class="badge bg-info text-dark">Precios con IVA</span>
             <?php elseif ($modoPreview === 'costo'): ?>
@@ -120,17 +125,22 @@ $errors = (int)($stats['errors'] ?? 0);
             <span class="badge bg-secondary"><?= $total ?> filas</span>
         </div>
     </div>
+    <?php if ($revisionPrecioCount > 0): ?>
+        <div class="alert alert-warning small mb-0 rounded-0 border-0 border-top">
+            <strong><?= $revisionPrecioCount ?> producto(s)</strong> tienen una variación superior al 15% en precio minorista, mayorista o costo. Quedan desmarcados y requieren selección individual después de revisarlos.
+        </div>
+    <?php endif; ?>
     <div class="card-body p-0">
         <form method="post" action="/admin/productos/importar/confirm" id="importConfirmForm">
             <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
 
             <div class="table-responsive">
-                <table class="table table-sm table-admin mb-0">
+                <table class="table table-sm table-admin mb-0" id="importPreviewTable">
                     <thead>
                         <tr>
                             <?php if ($found > 0): ?>
                                 <th style="width:36px">
-                                    <input class="form-check-input" type="checkbox" id="selectAll" checked onchange="toggleAll(this)" />
+                                    <input class="form-check-input" type="checkbox" id="selectAll" onchange="toggleAll(this)" />
                                 </th>
                             <?php endif; ?>
                             <th>#</th>
@@ -141,6 +151,7 @@ $errors = (int)($stats['errors'] ?? 0);
                             <th>Precio ant.</th>
                             <th>Precio nuevo</th>
                             <th>Diff</th>
+                            <th>Variación de precio</th>
                             <th>Precio1 ant.</th>
                             <th>Precio1 nuevo</th>
                             <th>Costo ant.</th>
@@ -150,11 +161,6 @@ $errors = (int)($stats['errors'] ?? 0);
                             <th>G1 nuevo</th>
                             <th>G2 ant.</th>
                             <th>G2 nuevo</th>
-                            <?php if (!$soloCostoPreview): ?>
-                                <th>Stock ant.</th>
-                                <th>Stock nuevo</th>
-                                <th>Diff</th>
-                            <?php endif; ?>
                             <th>Estado</th>
                         </tr>
                     </thead>
@@ -163,15 +169,16 @@ $errors = (int)($stats['errors'] ?? 0);
                             <?php
                                 $matched = $item['matched'] ?? false;
                                 $hasChanges = $item['has_changes'] ?? false;
+                                $requiereRevisionPrecio = !empty($item['requiere_revision_precio']);
                                 $rowIdx = 'row_' . ($item['row'] ?? 0);
                                 $precioDiff = $item['precio_diff'] ?? null;
                                 $costoDiff = $item['costo_diff'] ?? null;
-                                $stockDiff = $item['stock_diff'] ?? null;
+                                $rowClass = !$matched ? 'table-warning row-sin-match' : ($requiereRevisionPrecio ? 'table-warning row-revision-precio' : ($hasChanges ? '' : 'table-light'));
                             ?>
-                            <tr class="<?= !$matched ? 'table-warning row-sin-match' : ($hasChanges ? '' : 'table-light') ?>"<?= !$matched ? ' style="display:none"' : '' ?>>
+                            <tr class="<?= $rowClass ?>" data-revision-precio="<?= $requiereRevisionPrecio ? '1' : '0' ?>"<?= !$matched ? ' style="display:none"' : '' ?>>
                                 <?php if ($found > 0): ?>
                                     <td>
-                                        <?php if ($matched && $hasChanges): ?>
+                                        <?php if ($matched && $hasChanges && !$requiereRevisionPrecio): ?>
                                             <input class="form-check-input row-select" type="checkbox" name="selected[]" value="<?= htmlspecialchars($rowIdx) ?>" checked />
                                         <?php elseif ($matched): ?>
                                             <input class="form-check-input row-select" type="checkbox" name="selected[]" value="<?= htmlspecialchars($rowIdx) ?>" />
@@ -203,6 +210,16 @@ $errors = (int)($stats['errors'] ?? 0);
                                         <span class="<?= $precioDiff > 0 ? 'text-success' : 'text-danger' ?> fw-bold">
                                             <?= ($precioDiff > 0 ? '+' : '') . number_format($precioDiff, 2, ',', '.') ?>
                                         </span>
+                                    <?php else: ?>
+                                        <span class="text-muted">—</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="text-end">
+                                    <?php if ($requiereRevisionPrecio): ?>
+                                        <span class="badge bg-warning text-dark">Revisión</span>
+                                        <div class="small"><?= htmlspecialchars((string)($item['revision_precio_detalle'] ?? '')) ?></div>
+                                    <?php elseif (($item['precio_variacion_pct'] ?? null) !== null): ?>
+                                        <span class="small text-muted"><?= ($item['precio_variacion_pct'] > 0 ? '+' : '') . number_format((float)$item['precio_variacion_pct'], 1, ',', '.') ?>%</span>
                                     <?php else: ?>
                                         <span class="text-muted">—</span>
                                     <?php endif; ?>
@@ -248,25 +265,6 @@ $errors = (int)($stats['errors'] ?? 0);
                                         <span class="text-muted">=</span>
                                     <?php endif; ?>
                                 </td>
-                                <?php if (!$soloCostoPreview): ?>
-                                    <td class="text-end"><?= $matched ? (int)($item['stock_old'] ?? 0) : '-' ?></td>
-                                    <td class="text-end">
-                                        <?php if ($matched && $item['stock_new'] !== null): ?>
-                                            <strong><?= (int)$item['stock_new'] ?></strong>
-                                        <?php else: ?>
-                                            <span class="text-muted">=</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td class="text-end">
-                                        <?php if ($stockDiff !== null && $stockDiff !== 0): ?>
-                                            <span class="<?= $stockDiff > 0 ? 'text-success' : 'text-danger' ?> fw-bold">
-                                                <?= ($stockDiff > 0 ? '+' : '') . $stockDiff ?>
-                                            </span>
-                                        <?php else: ?>
-                                            <span class="text-muted">—</span>
-                                        <?php endif; ?>
-                                    </td>
-                                <?php endif; ?>
                                 <td>
                                     <?php if ($matched): ?>
                                         <span class="badge bg-success">OK</span>
@@ -299,34 +297,64 @@ $errors = (int)($stats['errors'] ?? 0);
 <?php endif; ?>
 
 <script>
+let soloCambiosPrecioGrandes = false;
+let mostrarFilasSinMatch = false;
+
 function toggleAll(master) {
-    document.querySelectorAll('.row-select').forEach(cb => cb.checked = master.checked);
+    document.querySelectorAll('#importPreviewTable .row-select').forEach(cb => {
+        const row = cb.closest('tr');
+        if (row && row.style.display !== 'none' && row.dataset.revisionPrecio !== '1') cb.checked = master.checked;
+    });
     updateSelectedCount();
 }
 function toggleSinMatch() {
-    const rows = document.querySelectorAll('.row-sin-match');
+    mostrarFilasSinMatch = !mostrarFilasSinMatch;
     const btn = document.getElementById('toggleSinMatch');
-    const show = rows.length > 0 && rows[0].style.display === 'none';
-    rows.forEach(tr => tr.style.display = show ? '' : 'none');
-    if (btn) btn.textContent = show ? 'Ocultar sin match' : 'Mostrar sin match';
+    if (btn) btn.textContent = mostrarFilasSinMatch ? 'Ocultar sin match' : 'Mostrar sin match';
+    aplicarFiltrosPreview();
     return false;
+}
+function toggleCambiosPrecio() {
+    soloCambiosPrecioGrandes = !soloCambiosPrecioGrandes;
+    const btn = document.getElementById('btnFiltroCambiosPrecio');
+    if (btn) btn.textContent = soloCambiosPrecioGrandes ? 'Mostrar todas las filas' : 'Revisar variaciones >15% (<?= $revisionPrecioCount ?>)';
+    aplicarFiltrosPreview();
+    return false;
+}
+function aplicarFiltrosPreview() {
+    document.querySelectorAll('#importPreviewTable tbody tr').forEach(tr => {
+        const esSinMatch = tr.classList.contains('row-sin-match');
+        const esVariacionGrande = tr.dataset.revisionPrecio === '1';
+        tr.style.display = (mostrarFilasSinMatch || !esSinMatch) && (!soloCambiosPrecioGrandes || esVariacionGrande) ? '' : 'none';
+    });
+    updateSelectedCount();
 }
 function updateSelectedCount() {
     const el = document.getElementById('selectedCount');
-    if (!el) return;
-    const n = document.querySelectorAll('.row-select:checked').length;
-    el.textContent = n + ' fila' + (n !== 1 ? 's' : '') + ' seleccionada' + (n !== 1 ? 's' : '');
+    const master = document.getElementById('selectAll');
+    const checks = Array.from(document.querySelectorAll('#importPreviewTable .row-select'));
+    const checked = checks.filter(cb => cb.checked).length;
+    if (el) el.textContent = checked + ' fila' + (checked !== 1 ? 's' : '') + ' seleccionada' + (checked !== 1 ? 's' : '');
+    if (master) {
+        const visible = checks.filter(cb => cb.closest('tr')?.style.display !== 'none');
+        const visibleChecked = visible.filter(cb => cb.checked).length;
+        const allRequireReview = visible.length > 0 && visible.every(cb => cb.closest('tr')?.dataset.revisionPrecio === '1');
+        master.disabled = allRequireReview;
+        master.checked = !master.disabled && visible.length > 0 && visibleChecked === visible.length;
+        master.indeterminate = !master.disabled && visibleChecked > 0 && visibleChecked < visible.length;
+    }
 }
 document.querySelectorAll('.row-select').forEach(cb => cb.addEventListener('change', updateSelectedCount));
+aplicarFiltrosPreview();
 
 function downloadSampleCsv() {
     const bom = '\uFEFF';
-    const headers = 'codprodup;codscan;precio_sin_iva;costo_sin_iva;stock;ganan1;ganan2;precio1_sin_iva';
+    const headers = 'codprodup;codscan;precio_sin_iva;costo_sin_iva;ganan1;ganan2;precio1_sin_iva';
     const rows = [
-        'PROV001;7791234567890;15000.00;8500.00;25;40;20;12000.00',
-        'PROV002;;22000.00;12000.00;10;35;15;18000.00',
-        ';7790987654321;8500.00;4200.00;50;;;',
-        'PROV003;7791112223334;30000.00;18000.00;5;50;25;25000.00',
+        'PROV001;7791234567890;15000.00;8500.00;40;20;12000.00',
+        'PROV002;;22000.00;12000.00;35;15;18000.00',
+        ';7790987654321;8500.00;4200.00;;;',
+        'PROV003;7791112223334;30000.00;18000.00;50;25;25000.00',
     ];
     const csv = bom + headers + '\n' + rows.join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -339,11 +367,11 @@ function downloadSampleCsv() {
 
 function downloadSampleCsvIva() {
     const bom = '\uFEFF';
-    const headers = 'codscan;precio_con_iva;costo_con_iva;stock';
+    const headers = 'codscan;precio_con_iva;costo_con_iva';
     const rows = [
-        '7791234567890;18150.00;;25',
-        '7790987654321;10285.00;;50',
-        '7791112223334;36300.00;21780.00;5',
+        '7791234567890;18150.00;',
+        '7790987654321;10285.00;',
+        '7791112223334;36300.00;21780.00',
     ];
     const csv = bom + headers + '\n' + rows.join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -356,11 +384,11 @@ function downloadSampleCsvIva() {
 
 function downloadSampleCsvCosto() {
     const bom = '\uFEFF';
-    const headers = 'codscan;costo_sin_iva';
+    const headers = 'codscan;codprodup;costo_sin_iva';
     const rows = [
-        '7791234567890;10714.29',
-        '7790987654321;5000.00',
-        '7791112223334;18000.00',
+        '7791234567890;PROV001;10714.29',
+        ';PROV002;5000.00',
+        '7791112223334;PROV003;18000.00',
     ];
     const csv = bom + headers + '\n' + rows.join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
