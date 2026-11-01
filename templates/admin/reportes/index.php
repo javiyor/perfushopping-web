@@ -493,8 +493,8 @@ function cargarReportes() {
                 : (inventario.error || 'No se pudo registrar una captura mensual.');
             const inventarioAviso = document.getElementById('inventarioSnapshotAviso');
             if (inventarioAviso) {
-                const sinCosto = parseInt(snapshot?.variantes_sin_costo || 0);
-                inventarioAviso.textContent = sinCosto > 0 ? sinCosto + ' variante(s) con stock no tienen costo precomp válido y aportan $0 a la valoración.' : '';
+                const sinCosto = parseInt(snapshot?.productos_sin_costo || 0);
+                inventarioAviso.textContent = sinCosto > 0 ? sinCosto + ' producto(s) con stock no tienen costo precomp válido y aportan $0 a la valoración.' : '';
                 inventarioAviso.style.display = sinCosto > 0 ? '' : 'none';
             }
             const inventarioHistory = inventario.historial || [];
@@ -900,11 +900,11 @@ function exportarCSV() {
             csv += 'Inventario capturado,' + (invSnapshotCsv.fecha_captura || 'Sin captura') + ',' + (parseInt(invSnapshotCsv.valor_cents ?? 0) / 100).toFixed(2) + '\n\n';
 
             csv += 'Historial mensual del valor de inventario\n';
-            csv += 'Período,Fecha captura,Valor,Variantes con stock,Variantes sin costo\n';
+            csv += 'Período,Fecha captura,Valor,Productos con stock,Productos sin costo\n';
             (invCsv.historial || []).forEach(s => {
                 csv += (s.periodo_mes || '') + ',' + (s.fecha_captura || '') + ','
                     + (parseInt(s.valor_cents || 0) / 100).toFixed(2) + ','
-                    + (s.variantes_con_stock ?? 0) + ',' + (s.variantes_sin_costo ?? 0) + '\n';
+                    + (s.productos_con_stock ?? 0) + ',' + (s.productos_sin_costo ?? 0) + '\n';
             });
 
             csv += 'Ventas Diarias\n';

@@ -19,8 +19,8 @@ final class ReporteInventarioRepo
             fecha_captura DATE NOT NULL,
             valor_cents BIGINT NOT NULL DEFAULT 0,
             unidades DECIMAL(18,3) NOT NULL DEFAULT 0,
-            variantes_con_stock INT UNSIGNED NOT NULL DEFAULT 0,
-            variantes_sin_costo INT UNSIGNED NOT NULL DEFAULT 0,
+            productos_con_stock INT UNSIGNED NOT NULL DEFAULT 0,
+            productos_sin_costo INT UNSIGNED NOT NULL DEFAULT 0,
             capturado_por INT UNSIGNED DEFAULT NULL,
             created_at DATETIME NOT NULL,
             KEY idx_reportes_inventario_fecha (fecha_captura)
@@ -86,15 +86,15 @@ final class ReporteInventarioRepo
         $pdo->beginTransaction();
         try {
             $insert = $pdo->prepare('INSERT IGNORE INTO reportes_inventario_mensual
-                (periodo_mes, fecha_captura, valor_cents, unidades, variantes_con_stock, variantes_sin_costo, capturado_por, created_at)
-                VALUES (:periodo, :fecha, :valor, :unidades, :variantes, :sin_costo, :admin, NOW())');
+                (periodo_mes, fecha_captura, valor_cents, unidades, productos_con_stock, productos_sin_costo, capturado_por, created_at)
+                VALUES (:periodo, :fecha, :valor, :unidades, :productos, :sin_costo, :admin, NOW())');
             $insert->execute([
                 ':periodo' => $periodo,
                 ':fecha' => $fechaCaptura,
                 ':valor' => $valor['valor_cents'],
                 ':unidades' => $valor['unidades'],
-                ':variantes' => $valor['variantes_con_stock'],
-                ':sin_costo' => $valor['variantes_sin_costo'],
+                ':productos' => $valor['productos_con_stock'],
+                ':sin_costo' => $valor['productos_sin_costo'],
                 ':admin' => $adminId > 0 ? $adminId : null,
             ]);
             if ($insert->rowCount() > 0 && $productosSinCosto) {
@@ -133,47 +133,37 @@ final class ReporteInventarioRepo
         $this->ensureTable();
         $limit = max(1, min(60, $limit));
         $rows = Db::pdo()->query("SELECT periodo_mes, fecha_captura, valor_cents, unidades,
-                variantes_con_stock, variantes_sin_costo
+                productos_con_stock, productos_sin_costo
             FROM reportes_inventario_mensual
             ORDER BY periodo_mes DESC LIMIT {$limit}")->fetchAll();
         return array_reverse($rows ?: []);
     }
 
-    /** @return array{valor_cents:int,unidades:float,variantes_con_stock:int,variantes_sin_costo:int} */
+    /** @return array{valor_cents:int,unidades:float,productos_con_stock:int,productos_sin_costo:int} */
     private function calcularValorActual(): array
     {
         $sql = "
             SELECT
                 COALESCE(ROUND(SUM(CASE WHEN p.precomp > 0 THEN inv.stock * p.precomp * 100 ELSE 0 END)), 0) AS valor_cents,
                 COALESCE(SUM(inv.stock), 0) AS unidades,
-                COUNT(DISTINCT inv.idcodgusto) AS variantes_con_stock,
-                COUNT(DISTINCT CASE WHEN p.precomp IS NULL OR p.precomp <= 0 THEN inv.idcodgusto END) AS variantes_sin_costo
+                COUNT(DISTINCT inv.idprodu) AS productos_con_stock,
+                COUNT(DISTINCT CASE WHEN p.precomp IS NULL OR p.precomp <= 0 THEN inv.idprodu END) AS productos_sin_costo
             FROM (
-                SELECT mov.idcodgusto, mov.iddepo, SUM(mov.cantidad) AS stock
-                FROM (
-                    SELECT sd.idcodgusto, sc.iddepoh AS iddepo, sd.canti AS cantidad
-                    FROM stockdet sd
-                    INNER JOIN stockcab sc ON sc.idcabstock = sd.idstockcab
-                    WHERE sc.iddepoh IS NOT NULL AND sd.idcodgusto > 0
-                    UNION ALL
-                    SELECT sd.idcodgusto, sc.iddepod AS iddepo, -sd.canti AS cantidad
-                    FROM stockdet sd
-                    INNER JOIN stockcab sc ON sc.idcabstock = sd.idstockcab
-                    WHERE sc.iddepod IS NOT NULL AND sd.idcodgusto > 0
-                ) mov
-                INNER JOIN deposito d ON d.iddepo = mov.iddepo AND d.marca = 2
-                GROUP BY mov.idcodgusto, mov.iddepo
-                HAVING SUM(mov.cantidad) > 0
+                SELECT s.idprodu, SUM(s.stock) AS stock
+                FROM stock s
+                INNER JOIN deposito d ON d.iddepo = s.iddepo AND d.marca = 2
+                WHERE s.stock > 0
+                GROUP BY s.idprodu
+                HAVING SUM(s.stock) > 0
             ) inv
-            INNER JOIN gustos g ON g.idcodgusto = inv.idcodgusto
-            INNER JOIN producto p ON p.idprodu = g.idprodu
+            INNER JOIN producto p ON p.idprodu = inv.idprodu
         ";
         $row = Db::pdo()->query($sql)->fetch() ?: [];
         return [
             'valor_cents' => (int)($row['valor_cents'] ?? 0),
             'unidades' => (float)($row['unidades'] ?? 0),
-            'variantes_con_stock' => (int)($row['variantes_con_stock'] ?? 0),
-            'variantes_sin_costo' => (int)($row['variantes_sin_costo'] ?? 0),
+            'productos_con_stock' => (int)($row['productos_con_stock'] ?? 0),
+            'productos_sin_costo' => (int)($row['productos_sin_costo'] ?? 0),
         ];
     }
 
@@ -184,29 +174,14 @@ final class ReporteInventarioRepo
             SELECT p.idprodu, p.codprodup, p.produ AS producto,
                    GROUP_CONCAT(DISTINCT NULLIF(TRIM(g.codscan), '') ORDER BY g.codscan SEPARATOR ', ') AS codscan,
                    p.precomp, p.precio, COALESCE(MAX(i.tiva), 0) AS tiva,
-                   SUM(inv.stock) AS stock_unidades,
-                   COUNT(DISTINCT inv.idcodgusto) AS variantes
-            FROM (
-                SELECT mov.idcodgusto, mov.iddepo, SUM(mov.cantidad) AS stock
-                FROM (
-                    SELECT sd.idcodgusto, sc.iddepoh AS iddepo, sd.canti AS cantidad
-                    FROM stockdet sd
-                    INNER JOIN stockcab sc ON sc.idcabstock = sd.idstockcab
-                    WHERE sc.iddepoh IS NOT NULL AND sd.idcodgusto > 0
-                    UNION ALL
-                    SELECT sd.idcodgusto, sc.iddepod AS iddepo, -sd.canti AS cantidad
-                    FROM stockdet sd
-                    INNER JOIN stockcab sc ON sc.idcabstock = sd.idstockcab
-                    WHERE sc.iddepod IS NOT NULL AND sd.idcodgusto > 0
-                ) mov
-                INNER JOIN deposito d ON d.iddepo = mov.iddepo AND d.marca = 2
-                GROUP BY mov.idcodgusto, mov.iddepo
-                HAVING SUM(mov.cantidad) > 0
-            ) inv
-            INNER JOIN gustos g ON g.idcodgusto = inv.idcodgusto
-            INNER JOIN producto p ON p.idprodu = g.idprodu
+                   SUM(s.stock) AS stock_unidades,
+                   COUNT(DISTINCT s.idcodgusto) AS variantes
+            FROM stock s
+            INNER JOIN deposito d ON d.iddepo = s.iddepo AND d.marca = 2
+            INNER JOIN producto p ON p.idprodu = s.idprodu
+            LEFT JOIN gustos g ON g.idcodgusto = s.idcodgusto
             LEFT JOIN ivaprodu i ON i.codivaprodu = p.iva
-            WHERE p.precomp IS NULL OR p.precomp <= 0
+            WHERE s.stock > 0 AND (p.precomp IS NULL OR p.precomp <= 0)
             GROUP BY p.idprodu, p.codprodup, p.produ, p.precomp, p.precio
             ORDER BY p.produ ASC
         ";
@@ -225,7 +200,7 @@ final class ReporteInventarioRepo
         $st->execute([':periodo' => $snapshot['periodo_mes']]);
         $productos = $st->fetchAll() ?: [];
         $snapshot['productos_sin_costo'] = $productos;
-        $snapshot['detalle_sin_costo_disponible'] = count($productos) > 0 || (int)($snapshot['variantes_sin_costo'] ?? 0) === 0;
+        $snapshot['detalle_sin_costo_disponible'] = count($productos) > 0 || (int)($snapshot['productos_sin_costo'] ?? 0) === 0;
         if (!$snapshot['detalle_sin_costo_disponible']) {
             $snapshot['productos_sin_costo_actual'] = $this->productosSinCostoActual();
         }
