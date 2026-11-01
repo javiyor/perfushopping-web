@@ -125,8 +125,7 @@ final class ReporteRepo
         $total = $this->montoSignado('fi.total_cents');
         $st = Db::pdo()->prepare("
             SELECT
-                COALESCE(NULLIF(d.nomdepar, ''), 'Sin dep.') AS departamento,
-                d.codactiv,
+                COALESCE(NULLIF(TRIM(CAST(d.codactiv AS CHAR)), ''), '0') AS codactiv,
                 SUM({$qty}) AS qty_total,
                 SUM({$total}) AS total_cents
             FROM factura_items fi
@@ -136,11 +135,88 @@ final class ReporteRepo
             WHERE f.estado = 'emitida'{$aut}
               AND f.fecha BETWEEN :desde AND :hasta
               $pvWhere
-            GROUP BY d.codepar, d.codactiv
+            GROUP BY COALESCE(NULLIF(TRIM(CAST(d.codactiv AS CHAR)), ''), '0')
             ORDER BY total_cents DESC
         ");
         $st->execute($params);
-        return $st->fetchAll();
+        $labels = [
+            '1' => 'Perfumería',
+            '2' => 'Marroquinería',
+            '3' => 'Indumentaria',
+            '4' => 'Art. de Limpieza',
+            '5' => 'Regalería',
+            '6' => 'Bijouterie',
+        ];
+        $rows = $st->fetchAll();
+        foreach ($rows as &$row) {
+            $code = (string)($row['codactiv'] ?? '0');
+            $row['departamento'] = $labels[$code] ?? ($code === '0' ? 'Sin actividad' : 'Actividad ' . $code);
+        }
+        unset($row);
+        return $rows;
+    }
+
+    /** Ventas netas, ganancia neta y compras más gastos para el período elegido. */
+    public function comprasYGastos(string $desde, string $hasta): array
+    {
+        $comprasCents = 0;
+        try {
+            $st = Db::pdo()->prepare("SELECT imp_total, tipo, moneda, tipo_cambio
+                FROM factura_compra
+                WHERE fecha BETWEEN :desde AND :hasta AND COALESCE(estado, '') <> 'anulada'");
+            $st->execute([':desde' => $desde, ':hasta' => $hasta]);
+            foreach ($st->fetchAll() as $row) {
+                $amount = abs((float)($row['imp_total'] ?? 0));
+                $currency = strtoupper(trim((string)($row['moneda'] ?? 'PES')));
+                if ($currency !== '' && !in_array($currency, ['PES', 'ARS'], true)) {
+                    $rate = (float)($row['tipo_cambio'] ?? 1);
+                    $amount *= $rate > 0 ? $rate : 1;
+                }
+                $cents = (int)round($amount * 100);
+                $comprasCents += CompraRepo::esNotaCredito((string)($row['tipo'] ?? '')) ? -$cents : $cents;
+            }
+        } catch (\Throwable $e) {
+            error_log('ReporteRepo::comprasYGastos compras error: ' . $e->getMessage());
+        }
+
+        $gastosCents = (new GastoRepo())->totalCentsPeriodo($desde, $hasta);
+        return [
+            'compras_cents' => $comprasCents,
+            'gastos_cents' => $gastosCents,
+            'total_cents' => $comprasCents + $gastosCents,
+        ];
+    }
+
+    /**
+     * Indica si hubo actividad reportable durante el intervalo: ventas, recibos,
+     * comprobantes de compra no anulados o gastos.
+     */
+    public function periodoTieneMovimientos(string $desde, string $hasta, int $puntoVenta = 0): bool
+    {
+        try {
+            if ((int)($this->resumenVentas($desde, $hasta, $puntoVenta)['cantidad'] ?? 0) > 0
+                || (int)($this->resumenRecibos($desde, $hasta, $puntoVenta)['cantidad'] ?? 0) > 0) {
+                return true;
+            }
+        } catch (\Throwable $e) {
+            // Continuar con las otras fuentes si una tabla opcional no existe.
+        }
+        try {
+            $st = Db::pdo()->prepare("SELECT 1 FROM factura_compra
+                WHERE fecha BETWEEN :desde AND :hasta AND COALESCE(estado, '') <> 'anulada' LIMIT 1");
+            $st->execute([':desde' => $desde, ':hasta' => $hasta]);
+            if ($st->fetchColumn()) return true;
+        } catch (\Throwable $e) {
+            // Algunas instalaciones antiguas pueden no tener todavía compras web.
+        }
+        try {
+            $st = Db::pdo()->prepare('SELECT 1 FROM gastos WHERE fecha BETWEEN :desde AND :hasta LIMIT 1');
+            $st->execute([':desde' => $desde, ':hasta' => $hasta]);
+            if ($st->fetchColumn()) return true;
+        } catch (\Throwable $e) {
+            // Las instalaciones sin tabla de gastos conservan el resto de reportes.
+        }
+        return false;
     }
 
     public function ventasPorFormaPago(string $desde, string $hasta, int $puntoVenta = 0): array

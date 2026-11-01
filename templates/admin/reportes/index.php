@@ -39,6 +39,13 @@ $puntosVenta = $puntosVenta ?? [];
             <div class="col-lg-3 d-flex align-items-end">
                 <button class="btn btn-outline-secondary btn-sm w-100" type="button" id="btnExportar"><i class="bi bi-download"></i> Exportar CSV</button>
             </div>
+            <div class="col-12 d-flex flex-wrap align-items-center gap-2 mt-1">
+                <span class="small text-muted">Rangos rápidos:</span>
+                <button class="btn btn-outline-secondary btn-sm" type="button" data-reporte-rango="hoy">Hoy</button>
+                <button class="btn btn-outline-secondary btn-sm" type="button" data-reporte-rango="mes-actual">Mes actual</button>
+                <button class="btn btn-outline-secondary btn-sm" type="button" data-reporte-rango="mes-anterior">Mes anterior</button>
+                <button class="btn btn-outline-secondary btn-sm" type="button" data-reporte-rango="anio-actual">Año actual</button>
+            </div>
         </form>
     </div>
 </div>
@@ -115,6 +122,67 @@ $puntosVenta = $puntosVenta ?? [];
             <div class="card-dashboard text-center">
                 <div class="h3 fw-bold mb-0" id="kpiPromDiario">-</div>
                 <div class="small text-muted">Promedio diario (<span id="kpiPromDiarioDias">-</span> días)</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white fw-semibold">Comparativa del período</div>
+                <div class="card-body">
+                    <canvas id="comparativaPeriodoChart" height="110"></canvas>
+                    <div class="small text-muted mt-2" id="comparativaPeriodoDetalle"></div>
+                    <div class="small text-muted">Las ventas y la ganancia respetan el punto de venta seleccionado. Compras y gastos son globales y se filtran por fecha; las compras incluyen comprobantes no anulados, las notas de crédito restan y las monedas extranjeras usan su tipo de cambio.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-lg-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white fw-semibold">Valor de mercadería en existencia</div>
+                <div class="card-body">
+                    <div class="h3 fw-bold mb-1" id="inventarioSnapshotValor">—</div>
+                    <div class="small text-muted" id="inventarioSnapshotFecha">Esperando primera captura mensual.</div>
+                    <div class="small text-warning mt-2" id="inventarioSnapshotAviso" style="display:none"></div>
+                    <div class="small text-muted mt-2">Foto global del stock de depósitos operativos, valorado al costo unitario vigente (precomp), independiente del punto de venta seleccionado. Se guarda en la primera consulta de reportes del mes.</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-8">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white fw-semibold">Comparativa mensual del valor de inventario</div>
+                <div class="card-body">
+                    <canvas id="inventarioChart" height="150"></canvas>
+                    <div class="small text-muted mt-2" id="inventarioSinHistorial" style="display:none">Todavía no hay capturas de meses anteriores. Se irán agregando en la primera consulta de cada mes.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white fw-semibold d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <span>Productos con stock sin costo válido — no modificados</span>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-warning text-dark" id="inventarioSinCostoCount">0</span>
+                        <button class="btn btn-outline-secondary btn-sm" type="button" id="btnImprimirSinCosto" onclick="imprimirProductosSinCosto()" disabled>
+                            <i class="bi bi-printer"></i> Imprimir listado
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body pb-2">
+                    <div class="small text-muted" id="inventarioSinCostoEstado">Se listan productos con existencia y precomp ausente o igual a cero. El reporte no modifica la tabla producto.</div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-admin table-sm mb-0">
+                        <thead><tr><th>ID producto</th><th>Descripción</th><th>Códigos de barra</th><th class="text-end">Precomp</th><th class="text-end">Precio</th><th class="text-end">Precio con IVA</th><th class="text-end">Stock</th></tr></thead>
+                        <tbody id="inventarioSinCostoBody"><tr><td colspan="7" class="text-muted text-center">Cargando…</td></tr></tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -276,7 +344,10 @@ $puntosVenta = $puntosVenta ?? [];
         <!-- Por departamento -->
         <div class="col-lg-6">
             <div class="card shadow-sm">
-                <div class="card-header bg-white fw-semibold">Ventas por departamento</div>
+                <div class="card-header bg-white fw-semibold">Ventas por actividad/departamento (departa.codactiv)</div>
+                <div class="card-body">
+                    <canvas id="departamentoChart" height="150"></canvas>
+                </div>
                 <div class="table-responsive">
                     <table class="table table-admin mb-0">
                         <thead><tr><th>Departamento</th><th>Actividad</th><th class="text-end">Cant.</th><th class="text-end">Total</th><th style="width:35%"></th></tr></thead>
@@ -309,6 +380,12 @@ let ventasChartInstance = null;
 let mensualChartInstance = null;
 let sucursalChartInstance = null;
 let formasChartInstance = null;
+let comparativaPeriodoChartInstance = null;
+let inventarioChartInstance = null;
+let departamentoChartInstance = null;
+let productosSinCostoParaImprimir = [];
+let detalleSinCostoEsSnapshot = false;
+let fechaDetalleSinCosto = '';
 
 function fmtPct(actual, previo) {
     previo = parseInt(previo || 0);
@@ -376,6 +453,103 @@ function cargarReportes() {
             const dias = Math.max(1, parseInt(d.dias ?? 1));
             document.getElementById('kpiTotal').textContent = fmtCents(totAll);
             document.getElementById('kpiTicket').textContent = cantAll > 0 ? fmtCents(Math.round(totAll / cantAll)) : '—';
+
+            // Comparativa financiera del período. Compras y gastos no se asignan a un PV.
+            const cg = d.comprasYGastos || {};
+            const comprasCents = parseInt(cg.compras_cents || 0);
+            const gastosCents = parseInt(cg.gastos_cents || 0);
+            const cgTotal = parseInt(cg.total_cents || 0);
+            const comparativaDetalle = document.getElementById('comparativaPeriodoDetalle');
+            if (comparativaDetalle) {
+                comparativaDetalle.textContent = 'Compras: ' + fmtCents(comprasCents) + ' · Gastos: ' + fmtCents(gastosCents) + ' · Compras + gastos: ' + fmtCents(cgTotal);
+            }
+            if (comparativaPeriodoChartInstance) comparativaPeriodoChartInstance.destroy();
+            comparativaPeriodoChartInstance = new Chart(document.getElementById('comparativaPeriodoChart').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: ['Ventas totales', 'Ganancia neta', 'Compras + gastos'],
+                    datasets: [{
+                        label: 'Monto ($)',
+                        data: [totAll / 100, ganancia / 100, cgTotal / 100],
+                        backgroundColor: ['rgba(216,178,90,0.75)', 'rgba(25,135,84,0.7)', 'rgba(220,53,69,0.65)'],
+                        borderColor: ['rgb(216,178,90)', 'rgb(25,135,84)', 'rgb(220,53,69)'],
+                        borderWidth: 1,
+                    }],
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    plugins: {legend: {display: false}, tooltip: {callbacks: {label: ctx => fmtCents(Math.round(ctx.parsed.x * 100))}}},
+                    scales: {x: {beginAtZero: true, ticks: {callback: value => '$' + Number(value).toLocaleString('es-AR')}}},
+                },
+            });
+
+            // Valor de inventario capturado una sola vez por mes, sin reconstruir meses anteriores.
+            const inventario = d.inventario || {};
+            const snapshot = inventario.snapshot || null;
+            document.getElementById('inventarioSnapshotValor').textContent = snapshot ? fmtCents(parseInt(snapshot.valor_cents || 0)) : '—';
+            document.getElementById('inventarioSnapshotFecha').textContent = snapshot
+                ? 'Capturado ' + (snapshot.fecha_captura || '') + ' · Período ' + String(snapshot.periodo_mes || '').slice(0, 7)
+                : (inventario.error || 'No se pudo registrar una captura mensual.');
+            const inventarioAviso = document.getElementById('inventarioSnapshotAviso');
+            if (inventarioAviso) {
+                const sinCosto = parseInt(snapshot?.variantes_sin_costo || 0);
+                inventarioAviso.textContent = sinCosto > 0 ? sinCosto + ' variante(s) con stock no tienen costo precomp válido y aportan $0 a la valoración.' : '';
+                inventarioAviso.style.display = sinCosto > 0 ? '' : 'none';
+            }
+            const inventarioHistory = inventario.historial || [];
+            const inventarioSinHistorial = document.getElementById('inventarioSinHistorial');
+            if (inventarioSinHistorial) inventarioSinHistorial.style.display = inventarioHistory.length <= 1 ? '' : 'none';
+            if (inventarioChartInstance) inventarioChartInstance.destroy();
+            inventarioChartInstance = new Chart(document.getElementById('inventarioChart').getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: inventarioHistory.map(x => String(x.periodo_mes || '').slice(0, 7)),
+                    datasets: [{
+                        label: 'Valor de inventario ($)',
+                        data: inventarioHistory.map(x => parseInt(x.valor_cents || 0) / 100),
+                        borderColor: 'rgb(13,110,253)',
+                        backgroundColor: 'rgba(13,110,253,0.15)',
+                        fill: true,
+                        tension: 0.2,
+                    }],
+                },
+                options: {responsive: true, plugins: {tooltip: {callbacks: {label: ctx => fmtCents(Math.round(ctx.parsed.y * 100))}}}, scales: {y: {beginAtZero: true}}},
+            });
+
+            const detalleSnapshotDisponible = !!snapshot && !!snapshot.detalle_sin_costo_disponible;
+            const productosSinCosto = detalleSnapshotDisponible
+                ? (snapshot.productos_sin_costo || [])
+                : (snapshot?.productos_sin_costo_actual || []);
+            productosSinCostoParaImprimir = productosSinCosto;
+            detalleSinCostoEsSnapshot = detalleSnapshotDisponible;
+            fechaDetalleSinCosto = (snapshot?.fecha_captura || '');
+            const sinCostoBody = document.getElementById('inventarioSinCostoBody');
+            const sinCostoCount = document.getElementById('inventarioSinCostoCount');
+            const sinCostoEstado = document.getElementById('inventarioSinCostoEstado');
+            const imprimirSinCostoBtn = document.getElementById('btnImprimirSinCosto');
+            if (sinCostoCount) sinCostoCount.textContent = productosSinCosto.length;
+            if (imprimirSinCostoBtn) imprimirSinCostoBtn.disabled = productosSinCosto.length === 0;
+            if (sinCostoEstado) {
+                sinCostoEstado.textContent = !snapshot
+                    ? (inventario.error || 'No hay una captura mensual disponible.')
+                    : (detalleSnapshotDisponible
+                        ? 'Detalle guardado con la captura del ' + (snapshot.fecha_captura || '') + '. Los productos con precomp cero o ausente aportan $0 a la valuación y no se modifica producto.'
+                        : 'El snapshot de este mes no guardó el detalle por producto. Se muestra la lista actual; no implica una actualización ni reconstruye el estado histórico.');
+            }
+            if (sinCostoBody) {
+                sinCostoBody.innerHTML = productosSinCosto.length
+                    ? productosSinCosto.map(p => '<tr>'
+                        + '<td>' + parseInt(p.idprodu || 0) + '</td>'
+                        + '<td>' + escHtml(p.producto || '') + '</td>'
+                        + '<td class="small"><code>' + escHtml(p.codscan || '') + '</code></td>'
+                        + '<td class="text-end">' + (p.precomp === null ? '—' : fmtCents(Math.round(parseFloat(p.precomp || 0) * 100))) + '</td>'
+                        + '<td class="text-end">' + fmtCents(Math.round(parseFloat(p.precio || 0) * 100)) + '</td>'
+                        + '<td class="text-end">' + fmtCents(Math.round(parseFloat(p.precio_iva || 0) * 100)) + '</td>'
+                        + '<td class="text-end">' + Number(p.stock_unidades || 0).toLocaleString('es-AR', {maximumFractionDigits: 3}) + '</td>'
+                        + '</tr>').join('')
+                    : '<tr><td colspan="7" class="text-muted text-center">No hay productos con stock y costo precomp ausente o igual a cero.</td></tr>';
+            }
             document.getElementById('kpiAutorizadas').textContent = fmtCents(parseInt(aut.total_cents ?? 0));
             document.getElementById('kpiAutorizadasCant').textContent = parseInt(aut.cantidad ?? 0);
             document.getElementById('kpiNoAutorizadas').textContent = fmtCents(parseInt(noaut.total_cents ?? 0));
@@ -584,6 +758,25 @@ function cargarReportes() {
             const deptoBody = document.getElementById('deptoBody');
             deptoBody.innerHTML = '';
             const deptos = d.porDepartamento || [];
+            if (departamentoChartInstance) departamentoChartInstance.destroy();
+            departamentoChartInstance = new Chart(document.getElementById('departamentoChart').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: deptos.map(x => String(x.codactiv || '0') + ' · ' + (x.departamento || 'Sin actividad')),
+                    datasets: [{
+                        label: 'Ventas por actividad ($)',
+                        data: deptos.map(x => parseInt(x.total_cents || 0) / 100),
+                        backgroundColor: chartColors(deptos.length),
+                        borderWidth: 1,
+                    }],
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    plugins: {legend: {display: false}, tooltip: {callbacks: {label: ctx => fmtCents(Math.round(ctx.parsed.x * 100))}}},
+                    scales: {x: {beginAtZero: true, ticks: {callback: value => '$' + Number(value).toLocaleString('es-AR')}}},
+                },
+            });
             if (!deptos.length) {
                 deptoBody.innerHTML = '<tr><td colspan="5" class="text-muted text-center">Sin datos</td></tr>';
             } else {
@@ -638,6 +831,33 @@ function escHtml(s) {
     return d.innerHTML;
 }
 
+function imprimirProductosSinCosto() {
+    if (!productosSinCostoParaImprimir.length) return;
+    const popup = window.open('', '_blank', 'width=1000,height=750');
+    if (!popup) {
+        alert('Permití las ventanas emergentes para imprimir el listado.');
+        return;
+    }
+    const rows = productosSinCostoParaImprimir.map(p => '<tr>'
+        + '<td>' + parseInt(p.idprodu || 0) + '</td>'
+        + '<td>' + escHtml(p.producto || '') + '</td>'
+        + '<td>' + escHtml(p.codscan || '') + '</td>'
+        + '<td class="num">' + (p.precomp === null ? '—' : fmtCents(Math.round(parseFloat(p.precomp || 0) * 100))) + '</td>'
+        + '<td class="num">' + fmtCents(Math.round(parseFloat(p.precio || 0) * 100)) + '</td>'
+        + '<td class="num">' + fmtCents(Math.round(parseFloat(p.precio_iva || 0) * 100)) + '</td>'
+        + '</tr>').join('');
+    const alcance = detalleSinCostoEsSnapshot
+        ? 'Detalle del snapshot mensual capturado el ' + fechaDetalleSinCosto + '.'
+        : 'Estado actual: el detalle de productos no se guardó en el snapshot mensual.';
+    popup.document.write('<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Productos sin costo válido</title>'
+        + '<style>body{font:14px Arial,sans-serif;padding:24px}h1{font-size:20px}p{color:#555}table{border-collapse:collapse;width:100%}th,td{border:1px solid #bbb;padding:6px;text-align:left}.num{text-align:right}@media print{button{display:none}}</style>'
+        + '</head><body><h1>Productos con stock sin costo válido</h1><p>' + escHtml(alcance) + ' Listado informativo de precomp ausente o igual a cero. No se modificó la tabla producto.</p>'
+        + '<table><thead><tr><th>ID producto</th><th>Descripción</th><th>Codscan</th><th>Precomp</th><th>Precio</th><th>Precio con IVA</th></tr></thead><tbody>' + rows + '</tbody></table></body></html>');
+    popup.document.close();
+    popup.focus();
+    popup.print();
+}
+
 function exportarCSV() {
     const form = document.getElementById('reporteForm');
     const fd = new FormData(form);
@@ -667,6 +887,25 @@ function exportarCSV() {
             csv += 'No autorizadas total,' + (parseInt(noautCsv.total_cents ?? 0) / 100).toFixed(2) + '\n';
             csv += 'Dias periodo,' + diasCsv + '\n';
             csv += 'Promedio diario,' + (totCsv / diasCsv / 100).toFixed(2) + '\n\n';
+
+            const gananciasCsv = d.ganancia || {};
+            const comprasGastosCsv = d.comprasYGastos || {};
+            const invCsv = d.inventario || {};
+            const invSnapshotCsv = invCsv.snapshot || {};
+            csv += 'Comparativa financiera del período\n';
+            csv += 'Ganancia neta,' + (parseInt(gananciasCsv.ganancia_cents ?? 0) / 100).toFixed(2) + '\n';
+            csv += 'Compras,' + (parseInt(comprasGastosCsv.compras_cents ?? 0) / 100).toFixed(2) + '\n';
+            csv += 'Gastos,' + (parseInt(comprasGastosCsv.gastos_cents ?? 0) / 100).toFixed(2) + '\n';
+            csv += 'Compras + gastos,' + (parseInt(comprasGastosCsv.total_cents ?? 0) / 100).toFixed(2) + '\n';
+            csv += 'Inventario capturado,' + (invSnapshotCsv.fecha_captura || 'Sin captura') + ',' + (parseInt(invSnapshotCsv.valor_cents ?? 0) / 100).toFixed(2) + '\n\n';
+
+            csv += 'Historial mensual del valor de inventario\n';
+            csv += 'Período,Fecha captura,Valor,Variantes con stock,Variantes sin costo\n';
+            (invCsv.historial || []).forEach(s => {
+                csv += (s.periodo_mes || '') + ',' + (s.fecha_captura || '') + ','
+                    + (parseInt(s.valor_cents || 0) / 100).toFixed(2) + ','
+                    + (s.variantes_con_stock ?? 0) + ',' + (s.variantes_sin_costo ?? 0) + '\n';
+            });
 
             csv += 'Ventas Diarias\n';
             csv += 'Fecha,Cantidad,Total\n';
@@ -767,12 +1006,37 @@ function exportarCSV() {
         });
 }
 
+function fechaLocalISO(fecha) {
+    return fecha.getFullYear() + '-' + String(fecha.getMonth() + 1).padStart(2, '0') + '-' + String(fecha.getDate()).padStart(2, '0');
+}
+
+function aplicarRangoReporte(tipo) {
+    const hoy = new Date();
+    const hoyIso = fechaLocalISO(hoy);
+    let desde = hoyIso;
+    let hasta = hoyIso;
+    if (tipo === 'mes-actual') {
+        desde = fechaLocalISO(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
+    } else if (tipo === 'mes-anterior') {
+        desde = fechaLocalISO(new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1));
+        hasta = fechaLocalISO(new Date(hoy.getFullYear(), hoy.getMonth(), 0));
+    } else if (tipo === 'anio-actual') {
+        desde = hoy.getFullYear() + '-01-01';
+    }
+    document.querySelector('#reporteForm [name="desde"]').value = desde;
+    document.querySelector('#reporteForm [name="hasta"]').value = hasta;
+    cargarReportes();
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('reporteForm').addEventListener('submit', function(e) {
         e.preventDefault();
         cargarReportes();
     });
     document.getElementById('btnExportar').addEventListener('click', exportarCSV);
+    document.querySelectorAll('[data-reporte-rango]').forEach(function(btn) {
+        btn.addEventListener('click', function() { aplicarRangoReporte(btn.dataset.reporteRango); });
+    });
     cargarReportes();
 });
 </script>

@@ -20,6 +20,16 @@ final class ReporteController
         $hasta = (string)($_GET['hasta'] ?? date('Y-m-d'));
         $puntoVenta = (int)($_GET['punto_venta'] ?? 0);
 
+        if (!isset($_GET['desde']) && !isset($_GET['hasta'])) {
+            $inicioMes = date('Y-m-01');
+            $hoy = date('Y-m-d');
+            if (!(new ReporteRepo())->periodoTieneMovimientos($inicioMes, $hoy, $puntoVenta)) {
+                $primerDiaMesAnterior = date('Y-m-01', strtotime('first day of last month'));
+                $desde = $primerDiaMesAnterior;
+                $hasta = date('Y-m-t', strtotime($primerDiaMesAnterior));
+            }
+        }
+
         echo View::adminPage('admin/reportes/index.php', [
             'adminUser' => $adminUser,
             'desde' => $desde,
@@ -52,6 +62,17 @@ final class ReporteController
         $puntoVenta = (int)($_GET['punto_venta'] ?? 0);
 
         $repo = new ReporteRepo();
+        // La primera consulta de reportes del mes guarda una foto del inventario total,
+        // incluso si otro cálculo de reportes falla después.
+        $inventario = ['snapshot' => null, 'historial' => []];
+        try {
+            $inventarioRepo = new \Perfushopping\Web\Repo\ReporteInventarioRepo();
+            $inventario['snapshot'] = $inventarioRepo->capturarMesActual((int)$adminUser['id']);
+            $inventario['historial'] = $inventarioRepo->historial(24);
+        } catch (\Throwable $e) {
+            error_log('ReporteController::data inventario error: ' . $e->getMessage());
+            $inventario['error'] = 'No se pudo guardar o consultar la captura mensual de inventario.';
+        }
 
         // Días naturales del período (inclusive) para promedios diarios.
         $dias = 1;
@@ -131,6 +152,9 @@ final class ReporteController
         $step = 'margenDepto';
         $margenDepto = $repo->margenPorDepartamento($desde, $hasta, $puntoVenta);
 
+        $step = 'comprasYGastos';
+        $comprasYGastos = $repo->comprasYGastos($desde, $hasta);
+
         $step = 'total';
         $ticket = ((int)($resumen['cantidad'] ?? 0) > 0)
             ? (int)round((int)($resumen['total_cents'] ?? 0) / (int)$resumen['cantidad'])
@@ -155,6 +179,8 @@ final class ReporteController
             'ganancia' => $ganancia,
             'topGanancia' => $topGanancia,
             'margenDepto' => $margenDepto,
+            'comprasYGastos' => $comprasYGastos,
+            'inventario' => $inventario,
             'ticket' => $ticket,
             'formasPagoLabels' => self::formasPagoLabels(),
         ]);

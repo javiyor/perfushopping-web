@@ -287,6 +287,23 @@ final class GastoRepo
         }
     }
 
+    /** Totaliza los gastos del período en centavos. */
+    public function totalCentsPeriodo(string $desde, string $hasta): int
+    {
+        $importe = $this->importeColumn();
+        if (!$this->hasGastosColumn($importe) || !$this->hasGastosColumn('fecha')) {
+            return 0;
+        }
+        try {
+            $st = Db::pdo()->prepare("SELECT COALESCE(SUM(`{$importe}`), 0) FROM gastos WHERE fecha BETWEEN :desde AND :hasta");
+            $st->execute([':desde' => $desde, ':hasta' => $hasta]);
+            return (int)$st->fetchColumn();
+        } catch (\Throwable $e) {
+            error_log('GastoRepo::totalCentsPeriodo error: ' . $e->getMessage());
+            return 0;
+        }
+    }
+
     public function crearSubcuenta(string $nomcta1, int $idcta): int
     {
         $st = Db::pdo()->prepare('INSERT INTO contable1 (nomcta1, idcta) VALUES (:n, :c)');
