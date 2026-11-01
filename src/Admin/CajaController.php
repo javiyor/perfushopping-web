@@ -312,6 +312,7 @@ $sucursalId = $auth->getSucursalId();
         $movimientos = $repo->movimientosGenerales($tipo ?: null, $desde ?: null, $hasta ?: null, $q);
         $totales = $repo->totalMovimientosGenerales($desde ?: null, $hasta ?: null);
         $totalesControl = $repo->totalesGeneralesControl($desde ?: null, $hasta ?: null);
+        $pasajeNoControlado = $repo->totalPasajeGeneralNoControlado($desde ?: null, $hasta ?: null);
         $saldo = $repo->saldoGeneral();
 
         // Resumen de cajas: cierres con ingresos por forma de pago + control
@@ -336,6 +337,7 @@ $sucursalId = $auth->getSucursalId();
             'movimientos' => $movimientos,
             'totales' => $totales,
             'totalesControl' => $totalesControl,
+            'pasajeNoControlado' => $pasajeNoControlado,
             'cierres' => $cierres,
             'gastosPorForma' => $gastosPorForma,
             'bancos' => $bancos,

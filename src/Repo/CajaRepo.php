@@ -702,6 +702,48 @@ final class CajaRepo
         return $rows;
     }
 
+    /** Total retirado a Caja General en cierres que todavía no se controlaron. */
+    public function totalPasajeGeneralNoControlado(?string $desde = null, ?string $hasta = null): int
+    {
+        $this->ensureCajaColumnas();
+        $this->ensureCierreControles();
+        $this->ensureGeneralMovimientos();
+        try {
+            $sql = "
+                SELECT COALESCE(SUM(GREATEST(
+                    COALESCE(ca.monto_retirado_cents, 0),
+                    COALESCE(cgm.retiro_cents, 0)
+                )), 0)
+                FROM caja_aperturas ca
+                LEFT JOIN caja_cierre_controles cc ON cc.caja_id = ca.id
+                LEFT JOIN (
+                    SELECT origen_id, SUM(monto_cents) AS retiro_cents
+                    FROM caja_general_movimientos
+                    WHERE origen = 'cierre_caja' AND origen_id IS NOT NULL
+                    GROUP BY origen_id
+                ) cgm ON cgm.origen_id = ca.id
+                WHERE ca.estado = 'cerrada'
+                  AND cc.controlado_por IS NULL
+                  AND GREATEST(COALESCE(ca.monto_retirado_cents, 0), COALESCE(cgm.retiro_cents, 0)) > 0
+            ";
+            $params = [];
+            if ($desde !== null && $desde !== '') {
+                $sql .= ' AND ca.fecha >= :desde';
+                $params[':desde'] = $desde;
+            }
+            if ($hasta !== null && $hasta !== '') {
+                $sql .= ' AND ca.fecha <= :hasta';
+                $params[':hasta'] = $hasta;
+            }
+            $st = Db::pdo()->prepare($sql);
+            $st->execute($params);
+            return (int)$st->fetchColumn();
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::totalPasajeGeneralNoControlado error: ' . $e->getMessage());
+            return 0;
+        }
+    }
+
     /** Desglose de efectivo de una apertura/cierre. */
     public function efectivoCierre(array $ap, int $puntoVenta): array
     {

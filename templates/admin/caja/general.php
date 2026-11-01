@@ -3,6 +3,7 @@ use Perfushopping\Web\Support\Format;
 $movimientos = $movimientos ?? [];
 $totales = $totales ?? ['total_ingresos' => 0, 'total_egresos' => 0];
 $totalesControl = $totalesControl ?? ['ing_controlado' => 0, 'ing_no_controlado' => 0, 'egr_controlado' => 0, 'egr_no_controlado' => 0];
+$pasajeNoControlado = (int)($pasajeNoControlado ?? 0);
 $cierres = $cierres ?? [];
 $gastosPorForma = $gastosPorForma ?? [];
 $saldo = (int)($saldo ?? 0);
@@ -23,22 +24,28 @@ $q = (string)($q ?? '');
 </div>
 
 <div class="row g-3 mb-3">
-    <div class="col-4">
+    <div class="col-6 col-md-3">
         <div class="card-dashboard text-center p-3">
             <div class="h5 fw-bold mb-0 text-success"><?= Format::moneyFromCents((int)$totales['total_ingresos']) ?></div>
             <div class="small text-muted">Total ingresos</div>
         </div>
     </div>
-    <div class="col-4">
+    <div class="col-6 col-md-3">
         <div class="card-dashboard text-center p-3">
             <div class="h5 fw-bold mb-0 text-danger"><?= Format::moneyFromCents((int)$totales['total_egresos']) ?></div>
             <div class="small text-muted">Total egresos (efectivo)</div>
         </div>
     </div>
-    <div class="col-4">
+    <div class="col-6 col-md-3">
         <div class="card-dashboard text-center p-3">
             <div class="h5 fw-bold mb-0 <?= $saldo < 0 ? 'text-danger' : 'text-primary' ?>"><?= Format::moneyFromCents($saldo) ?></div>
             <div class="small text-muted">Saldo actual</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card-dashboard text-center p-3">
+            <div class="h5 fw-bold mb-0 <?= $pasajeNoControlado > 0 ? 'text-warning' : 'text-muted' ?>"><?= Format::moneyFromCents($pasajeNoControlado) ?></div>
+            <div class="small text-muted">Pasaje a Caja General no controlado</div>
         </div>
     </div>
 </div>
