@@ -14,6 +14,7 @@ $editarFactura = is_array($editarFactura ?? null) ? $editarFactura : null;
 $editarItems = is_array($editarItems ?? null) ? $editarItems : [];
 $editarPagos = is_array($editarPagos ?? null) ? $editarPagos : [];
 $editarAsociada = is_array($editarAsociada ?? null) ? $editarAsociada : null;
+$edicionPendiente = is_array($edicionPendiente ?? null) ? $edicionPendiente : null;
 $ncDeId = (int)($ncDeId ?? 0);
 $ncDe = is_array($ncDe ?? null) ? $ncDe : null;
 $pedidoId = (int)($pedidoId ?? 0);
@@ -208,10 +209,20 @@ $pedidoDescPct = $pedidoDescPct ?? 0;
     </div>
     <?php endif; ?>
 
-    <?php if ($editarId > 0): ?>
-    <span class="badge bg-warning text-dark fs-6"><i class="bi bi-pencil"></i> Editando <?= htmlspecialchars((string)($editarFactura['codigo'] ?? '')) ?></span>
+<?php if ($editarId > 0): ?>
+<span class="badge bg-warning text-dark fs-6"><i class="bi bi-pencil"></i> Editando <?= htmlspecialchars((string)($editarFactura['codigo'] ?? '')) ?></span>
+<?php endif; ?>
+</div>
+
+<?php if ($editarId > 0): ?>
+<div class="alert alert-warning small py-2">
+    <?php if ($edicionPendiente): ?>
+        Esta factura ya tiene la solicitud #<?= (int)$edicionPendiente['id'] ?> en estado <strong><?= htmlspecialchars((string)$edicionPendiente['status']) ?></strong>. No se puede enviar otra edición hasta resolverla.
+    <?php else: ?>
+        Al guardar, la edición quedará pendiente hasta que otro administrador la apruebe. La factura no cambiará mientras tanto.
     <?php endif; ?>
 </div>
+<?php endif; ?>
 
 <div class="pos-cliente mb-2" id="clienteSection">
     <span class="text-muted small">Cliente:</span>
@@ -420,6 +431,15 @@ $pedidoDescPct = $pedidoDescPct ?? 0;
             </div>
         </div>
 
+        <?php if ($editarId > 0): ?>
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-white fw-semibold">Motivo de la autorización</div>
+            <div class="card-body">
+                <textarea class="form-control form-control-sm" id="motivoAutorizacionEdicion" rows="2" maxlength="500" required placeholder="Explicá por qué se solicita modificar esta factura"></textarea>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <div class="card shadow-sm mb-3">
             <div class="card-header bg-white fw-semibold">Notas</div>
             <div class="card-body">
@@ -429,7 +449,7 @@ $pedidoDescPct = $pedidoDescPct ?? 0;
 
         <input type="hidden" id="csrfToken" value="<?= htmlspecialchars($csrfToken) ?>" />
 
-        <button class="btn btn-accent w-100 py-3 fw-bold fs-5" id="btnFacturar" onclick="submitFactura()">
+        <button class="btn btn-accent w-100 py-3 fw-bold fs-5" id="btnFacturar" onclick="submitFactura()" <?= $edicionPendiente ? 'disabled' : '' ?>>
             <i class="bi bi-<?= $editarId > 0 ? 'pencil' : 'receipt' ?>"></i> <?= $editarId > 0 ? 'GUARDAR CAMBIOS' : 'FACTURAR' ?>
         </button>
     </div>
@@ -1848,27 +1868,19 @@ function submitFactura() {
     const presupuestoId = parseInt(document.getElementById('presupuestoId').value) || 0;
     const vendedorEl = document.getElementById('vendedorId');
     const entregaTipo = document.querySelector('input[name="entrega_tipo"]:checked')?.value || 'local';
-    let adminAuthUser = '';
-    let adminAuthPass = '';
-    if (EDITAR_ID > 0) {
-        adminAuthUser = prompt('Usuario de admin que autoriza la modificación:') || '';
-        if (!adminAuthUser) {
-            btn.disabled = false;
-            btn.innerHTML = BTN_LABEL;
-            return;
-        }
-        adminAuthPass = prompt('Contraseña del admin autorizante:') || '';
-        if (!adminAuthPass) {
-            btn.disabled = false;
-            btn.innerHTML = BTN_LABEL;
-            return;
-        }
+    const motivoAutorizacionEdicion = EDITAR_ID > 0
+        ? (document.getElementById('motivoAutorizacionEdicion')?.value || '').trim()
+        : '';
+    if (EDITAR_ID > 0 && !motivoAutorizacionEdicion) {
+        alert('Indicá el motivo de la solicitud de autorización.');
+        btn.disabled = false;
+        btn.innerHTML = BTN_LABEL;
+        return;
     }
     const payload = {
         _csrf: document.getElementById('csrfToken').value,
         editar_id: EDITAR_ID,
-        admin_auth_user: adminAuthUser,
-        admin_auth_pass: adminAuthPass,
+        motivo_autorizacion: motivoAutorizacionEdicion,
         tipo_comprobante: tipo,
         comprobante_asociado_id: asociadaId > 0 ? asociadaId : null,
         forma_pago: pagos[0].forma_pago,
@@ -1915,6 +1927,11 @@ function submitFactura() {
         try {
             const res = JSON.parse(text);
             if (res.ok) {
+                if (res.pending) {
+                    alert('Solicitud de edición #' + res.request_id + ' enviada. La factura queda sin cambios hasta que otro administrador la apruebe.');
+                    window.location.href = '/admin/facturas/' + res.id;
+                    return;
+                }
                 if (res.arca && res.arca.cae) {
                     var fmt = localStorage.getItem('perfushopping_print_format') || '80mm';
                     window.location.href = '/admin/facturas/imprimir/' + res.id + '?auto=1&formato=' + fmt;

@@ -417,6 +417,8 @@ $router->get('/admin/facturas/pagos/editar/(?P<id>\d+)', [AdminFacturaController
 $router->post('/admin/facturas/pagos/actualizar', [AdminFacturaController::class, 'actualizarPagos']);
 $router->post('/admin/facturas/pagos/aprobar', [AdminFacturaController::class, 'aprobarSolicitudPagos']);
 $router->post('/admin/facturas/pagos/rechazar', [AdminFacturaController::class, 'rechazarSolicitudPagos']);
+$router->get('/admin/facturas/ediciones-pendientes', [AdminFacturaController::class, 'edicionesPendientes']);
+$router->post('/admin/facturas/ediciones/rechazar', [AdminFacturaController::class, 'rechazarEdicionFactura']);
 $router->get('/admin/facturas/editar/(?P<id>\d+)', [AdminFacturaController::class, 'editar']);
 $router->post('/admin/facturas/actualizar', [AdminFacturaController::class, 'actualizar']);
 $router->get('/admin/facturas/(?P<id>\d+)', [AdminFacturaController::class, 'show']);

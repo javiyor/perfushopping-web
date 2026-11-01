@@ -5,6 +5,7 @@ $factura = $factura ?? null;
 $items = $items ?? [];
 $pagos = $pagos ?? [];
 $arcaComprobante = $arcaComprobante ?? null;
+$edicionPendiente = is_array($edicionPendiente ?? null) ? $edicionPendiente : null;
 if (!$factura):
 ?>
     <div class="alert alert-warning">Factura no encontrada.</div>
@@ -44,6 +45,12 @@ $discriminaIva = in_array($factura['tipo_comprobante'] ?? '', ['FACT-A']);
         <span class="badge bg-dark fs-6">Retiro en local</span>
     <?php endif; ?>
 </div>
+
+<?php if ($edicionPendiente): ?>
+<div class="alert alert-warning py-2">
+    Edición de esta factura pendiente de autorización (#<?= (int)$edicionPendiente['id'] ?>, estado <?= htmlspecialchars((string)$edicionPendiente['status']) ?>). La factura sigue mostrando los datos vigentes hasta que otro administrador la apruebe.
+</div>
+<?php endif; ?>
 
 <div class="row g-3">
     <div class="col-lg-8">

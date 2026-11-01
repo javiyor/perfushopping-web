@@ -651,7 +651,7 @@ final class FacturaController
      * reutiliza ese cheque en cartera en lugar de crear uno nuevo.
      * @throws \InvalidArgumentException cuando un pago en moneda extranjera está incompleto.
      */
-    private function normalizarPagos(array $pagosRaw, array $input, int $adminUserId, string $clienteNombre, int $fallbackMonto): array
+    private function normalizarPagos(array $pagosRaw, array $input, int $adminUserId, string $clienteNombre, int $fallbackMonto, bool $persistirCheques = true): array
     {
         $pagos = [];
         $bancoNombres = [];
@@ -711,16 +711,18 @@ final class FacturaController
                             }
                         }
                         $upd[] = 'updated_at = NOW()';
-                        \Perfushopping\Web\Infra\Db::pdo()
-                            ->prepare('UPDATE cheques SET ' . implode(', ', $upd) . ' WHERE id = :i LIMIT 1')
-                            ->execute($updPrm);
+                        if ($persistirCheques) {
+                            \Perfushopping\Web\Infra\Db::pdo()
+                                ->prepare('UPDATE cheques SET ' . implode(', ', $upd) . ' WHERE id = :i LIMIT 1')
+                                ->execute($updPrm);
+                        }
                         $chequeId = $chequeIdReusar;
                         $bancoId = (int)($chequeRow['banco_id'] ?? $bancoId ?? 0) ?: $bancoId;
                     } else {
                         $chequeIdReusar = null;
                     }
                 }
-                if (!$chequeIdReusar) {
+                if (!$chequeIdReusar && $persistirCheques) {
                     $chequeId = $chequeRepo->create([
                         'tipo' => 'tercero',
                         'estado' => 'en_cartera',
@@ -946,14 +948,75 @@ final class FacturaController
             return;
         }
 
+        $edicionPendiente = null;
+        try {
+            $edicionPendiente = (new \Perfushopping\Web\Repo\FacturaEdicionAutorizacionRepo())->pendientePorFactura($id);
+        } catch (\Throwable $e) {
+            error_log('FacturaController::editar pending authorization lookup: ' . $e->getMessage());
+        }
+
         echo View::adminPage('admin/facturas/pos.php', $this->posCommon($auth) + [
             'editarId' => $id,
             'editarFactura' => $factura,
             'editarItems' => $repo->items($id),
             'editarPagos' => $repo->pagos($id),
             'editarAsociada' => $this->resumenAsociada($repo, (int)($factura['comprobante_asociado_id'] ?? 0)),
+            'edicionPendiente' => $edicionPendiente,
             'pageTitle' => 'Editar factura ' . ($factura['codigo'] ?? ''),
         ]);
+    }
+
+    public function edicionesPendientes(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requireLogin();
+        if (!AdminAuthService::adminPuedeAutorizar($adminUser)) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No tenés permisos para autorizar ediciones de facturas.'];
+            Response::redirect('/admin/facturas');
+        }
+
+        $solicitudes = (new \Perfushopping\Web\Repo\FacturaEdicionAutorizacionRepo())->pendientesPara((int)$adminUser['id']);
+        foreach ($solicitudes as &$solicitud) {
+            $solicitud['propuesta'] = json_decode((string)($solicitud['propuesta_json'] ?? ''), true) ?: [];
+            $solicitud['original'] = json_decode((string)($solicitud['original_json'] ?? ''), true) ?: [];
+        }
+        unset($solicitud);
+
+        echo View::adminPage('admin/facturas/ediciones-pendientes.php', [
+            'adminUser' => $adminUser,
+            'solicitudes' => $solicitudes,
+            'csrf' => Csrf::token(),
+            'flash' => $_SESSION['admin_flash'] ?? null,
+            'pageTitle' => 'Autorizaciones de facturas',
+        ]);
+        unset($_SESSION['admin_flash']);
+    }
+
+    public function rechazarEdicionFactura(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requireLogin();
+        if (!AdminAuthService::adminPuedeAutorizar($adminUser)) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No tenés permisos para rechazar ediciones de facturas.'];
+            Response::redirect('/admin/facturas/ediciones-pendientes');
+        }
+        Csrf::check($_POST['_csrf'] ?? null);
+        $solicitudId = (int)($_POST['solicitud_id'] ?? 0);
+        try {
+            if ($solicitudId <= 0) {
+                throw new \RuntimeException('Solicitud inválida.');
+            }
+            (new \Perfushopping\Web\Repo\FacturaEdicionAutorizacionRepo())->rechazar(
+                $solicitudId,
+                (int)$adminUser['id'],
+                (string)($adminUser['nombre'] ?? ''),
+                (string)($_POST['decision_note'] ?? '')
+            );
+            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Solicitud de edición rechazada. La factura no fue modificada.'];
+        } catch (\Throwable $e) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se pudo rechazar la solicitud: ' . $e->getMessage()];
+        }
+        Response::redirect('/admin/facturas/ediciones-pendientes');
     }
 
     /** Resumen para mostrar la asociada en el POS (o null). */
@@ -979,10 +1042,38 @@ final class FacturaController
     public function actualizar(array $params): void
     {
         $auth = new AdminAuthService();
-        $adminUser = $auth->requirePermiso('facturacion');
+        $envelope = json_decode(file_get_contents('php://input'), true);
+        if (!is_array($envelope)) {
+            Response::json(['ok' => false, 'error' => 'Datos inválidos.'], 422);
+            return;
+        }
+        Csrf::check($envelope['_csrf'] ?? null);
 
-        $input = json_decode(file_get_contents('php://input'), true);
-        Csrf::check($input['_csrf'] ?? null);
+        $approvalRequestId = (int)($envelope['aprobacion_solicitud_id'] ?? 0);
+        $approvalRepo = null;
+        $approvalRequest = null;
+        if ($approvalRequestId > 0) {
+            $adminUser = $auth->requireLogin();
+            if (!AdminAuthService::adminPuedeAutorizar($adminUser)) {
+                Response::json(['ok' => false, 'error' => 'Tu usuario no puede aprobar ediciones de facturas.'], 403);
+                return;
+            }
+            $approvalRepo = new \Perfushopping\Web\Repo\FacturaEdicionAutorizacionRepo();
+            $approvalRequest = $approvalRepo->findPending($approvalRequestId, (int)$adminUser['id']);
+            if (!$approvalRequest) {
+                Response::json(['ok' => false, 'error' => 'La solicitud ya no está pendiente o no podés aprobar tu propia solicitud.'], 409);
+                return;
+            }
+            $input = json_decode((string)$approvalRequest['propuesta_json'], true);
+            if (!is_array($input)) {
+                $approvalRepo->marcarObsoletaPendiente($approvalRequestId, (int)$adminUser['id'], (string)($adminUser['nombre'] ?? ''), 'La propuesta guardada no se pudo leer.');
+                Response::json(['ok' => false, 'error' => 'La propuesta guardada no se pudo leer.'], 409);
+                return;
+            }
+        } else {
+            $adminUser = $auth->requirePermiso('facturacion');
+            $input = $envelope;
+        }
 
         $editarId = (int)($input['editar_id'] ?? 0);
         if ($editarId <= 0 || !$input || !isset($input['items']) || !is_array($input['items']) || count($input['items']) < 1) {
@@ -994,16 +1085,20 @@ final class FacturaController
         $old = $repo->findById($editarId);
         $motivo = $this->motivoNoEditable($old, $editarId);
         if ($motivo) {
+            if ($approvalRequestId > 0 && $approvalRepo) {
+                $approvalRepo->marcarObsoletaPendiente($approvalRequestId, (int)$adminUser['id'], (string)($adminUser['nombre'] ?? ''), $motivo);
+                Response::json(['ok' => false, 'error' => $motivo . ' La solicitud quedó obsoleta.'], 409);
+                return;
+            }
             Response::json(['ok' => false, 'error' => $motivo], 422);
             return;
         }
-
-        $adminAutoriza = $auth->verificarCredenciales(
-            (string)($input['admin_auth_user'] ?? ''),
-            (string)($input['admin_auth_pass'] ?? '')
-        );
-        if (!$adminAutoriza || !AdminAuthService::adminPuedeAutorizar($adminAutoriza)) {
-            Response::json(['ok' => false, 'error' => 'Autorización rechazada: ingresá las credenciales de un admin autorizado para corregir cobranzas.'], 403);
+        try {
+            $originalSnapshotHash = $approvalRequestId > 0
+                ? (string)($approvalRequest['original_hash'] ?? '')
+                : $repo->fingerprintEdicion($editarId);
+        } catch (\Throwable $e) {
+            Response::json(['ok' => false, 'error' => 'No se pudo verificar el estado actual de la factura.'], 500);
             return;
         }
 
@@ -1034,7 +1129,14 @@ final class FacturaController
             $items = $itemsData['items'];
             $subtotal = $itemsData['subtotal'];
             $ivaTotal = $itemsData['iva'];
-            $pagos = $this->normalizarPagos($input['pagos'] ?? [], $input, (int)$adminUser['id'], $clienteNombre, $subtotal + $ivaTotal);
+            $pagos = $this->normalizarPagos(
+                $input['pagos'] ?? [],
+                $input,
+                (int)$adminUser['id'],
+                $clienteNombre,
+                $subtotal + $ivaTotal,
+                false
+            );
         } catch (\InvalidArgumentException $e) {
             Response::json(['ok' => false, 'error' => $e->getMessage()], 422);
             return;
@@ -1134,6 +1236,71 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
             return;
         }
 
+        $expectedSnapshotHash = null;
+        if ($approvalRequestId > 0 && $approvalRepo) {
+            try {
+                $processingRequest = $approvalRepo->tomarParaAprobar(
+                    $approvalRequestId,
+                    (int)$adminUser['id'],
+                    (string)($adminUser['nombre'] ?? ''),
+                    $repo
+                );
+                $expectedSnapshotHash = (string)$processingRequest['factura_hash'];
+            } catch (\Throwable $e) {
+                Response::json(['ok' => false, 'error' => $e->getMessage()], 409);
+                return;
+            }
+        } else {
+            $reason = trim((string)($input['motivo_autorizacion'] ?? ''));
+            if ($reason === '') {
+                Response::json(['ok' => false, 'error' => 'Indicá el motivo para solicitar la autorización de esta edición.'], 422);
+                return;
+            }
+            $propuesta = $input;
+            unset($propuesta['_csrf'], $propuesta['admin_auth_user'], $propuesta['admin_auth_pass'], $propuesta['aprobacion_solicitud_id']);
+            $propuesta['_autorizacion_contexto'] = [
+                'sucursal_id' => $auth->getSucursalId(),
+                'deposito_id' => $auth->getDepositoId(),
+                'punto_venta' => $auth->getPuntoVenta(),
+            ];
+            try {
+                $requestId = (new \Perfushopping\Web\Repo\FacturaEdicionAutorizacionRepo())->crear(
+                    $editarId,
+                    (string)($old['codigo'] ?? ''),
+                    (int)$adminUser['id'],
+                    (string)($adminUser['nombre'] ?? ''),
+                    $reason,
+                    $originalSnapshotHash,
+                    $propuesta,
+                    $repo
+                );
+            } catch (\Throwable $e) {
+                Response::json(['ok' => false, 'error' => 'No se pudo enviar la solicitud de autorización: ' . $e->getMessage()], 409);
+                return;
+            }
+            Response::json([
+                'ok' => true,
+                'pending' => true,
+                'request_id' => $requestId,
+                'id' => $editarId,
+                'codigo' => (string)($old['codigo'] ?? ''),
+            ]);
+            return;
+        }
+
+        try {
+        if ($approvalRequestId > 0) {
+            // La prevalidación no toca cheques; sus cambios se aplican solo tras reclamar la solicitud.
+            $pagos = $this->normalizarPagos(
+                $input['pagos'] ?? [],
+                $input,
+                (int)$adminUser['id'],
+                $clienteNombre,
+                $subtotal + $ivaTotal,
+                true
+            );
+            $formaPago = $pagos[0]['forma_pago'] ?? $formaPago;
+        }
         $repo->actualizar($editarId, [
             'tipo_comprobante' => $tipo,
             'comprobante_asociado_id' => ($tipo === 'NC' || $tipo === 'ND') && $comprobanteAsociadoId > 0 ? $comprobanteAsociadoId : null,
@@ -1159,7 +1326,7 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
             'envio_observacion' => $envioObs,
             'notas' => $notas,
             'vendedor_id' => $vendedorId,
-        ], $items, $pagos);
+        ], $items, $pagos, $expectedSnapshotHash);
 
         $codigo = (string)($old['codigo'] ?? '');
         $pdo = \Perfushopping\Web\Infra\Db::pdo();
@@ -1245,7 +1412,9 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
         // Stock: aplicar solo el delta viejo -> nuevo (un movimiento por sentido).
         // La factura ajusta contra el depósito de sesión; la NC contra el
         // depósito de la sucursal del comprobante asociado.
-        $depoId = $auth->getDepositoId();
+        $depoId = $approvalRequestId > 0
+            ? (int)($input['_autorizacion_contexto']['deposito_id'] ?? 0)
+            : $auth->getDepositoId();
         $depoStock = $tipo === 'NC' ? $this->depositoOrigenNc($comprobanteAsociadoId, $repo) : ($tipo === 'ND' ? 0 : $depoId);
         if ($depoStock > 0) {
             $stockRepo = new StockRepo();
@@ -1328,12 +1497,33 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
             $codigo = $arca['codigo'];
         }
 
+        if ($approvalRequestId > 0 && $approvalRepo) {
+            $approvalRepo->aprobar($approvalRequestId);
+        }
+
         Response::json([
             'ok' => true,
+            'approved' => $approvalRequestId > 0,
             'id' => $editarId,
             'codigo' => $codigo,
             'arca' => !empty($arca['cae']) ? ['cae' => $arca['cae']] : (!empty($arca['error']) ? ['error' => $arca['error']] : null),
         ]);
+        } catch (\Throwable $e) {
+            if ($approvalRequestId > 0 && $approvalRepo) {
+                $stale = str_contains($e->getMessage(), 'cambió desde que se solicitó la edición');
+                if ($stale) {
+                    $approvalRepo->marcarObsoletaProcesando($approvalRequestId, $e->getMessage());
+                } else {
+                    $approvalRepo->marcarError($approvalRequestId, $e->getMessage());
+                }
+                error_log('FacturaController::actualizar edición autorizada #' . $approvalRequestId . ': ' . $e->getMessage());
+                Response::json(['ok' => false, 'error' => $stale
+                    ? 'La factura cambió mientras se aprobaba; la solicitud quedó obsoleta.'
+                    : 'No se pudo completar la edición autorizada. La solicitud quedó marcada para revisión administrativa.'], $stale ? 409 : 500);
+                return;
+            }
+            throw $e;
+        }
     }
 
     private function chequeReferenciado(int $chequeId): bool
@@ -1366,6 +1556,12 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
         }
         $items = $repo->items($id);
         $pagos = $repo->pagos($id);
+        $edicionPendiente = null;
+        try {
+            $edicionPendiente = (new \Perfushopping\Web\Repo\FacturaEdicionAutorizacionRepo())->pendientePorFactura($id);
+        } catch (\Throwable $e) {
+            error_log('FacturaController::show pending authorization lookup: ' . $e->getMessage());
+        }
 
         $arcaComprobante = (new \Perfushopping\Web\Repo\ArcaRepo())->getComprobante($id);
         $qrUrl = null;
@@ -1388,6 +1584,7 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
             'formasPagoLabels' => (new \Perfushopping\Web\Repo\FormaPagoRepo())->labels(),
             'puntosObtenidos' => (new \Perfushopping\Web\Repo\PuntosRepo())->acumulacionFactura($id),
             'puntosTotales' => (new \Perfushopping\Web\Repo\PuntosRepo())->saldo((int)($factura['idclien'] ?? 0)),
+            'edicionPendiente' => $edicionPendiente,
             'csrf' => Csrf::token(),
             'pageTitle' => 'Factura ' . ($factura['codigo'] ?? ''),
         ]);

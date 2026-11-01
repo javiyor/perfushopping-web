@@ -303,6 +303,45 @@ final class FacturaRepo
         }
     }
 
+    /** Snapshot estable de los datos que modifica la edición integral de una factura. */
+    public function snapshotEdicion(int $facturaId): array
+    {
+        $pdo = Db::pdo();
+        $st = $pdo->prepare('SELECT * FROM facturas WHERE id = :f LIMIT 1');
+        $st->execute([':f' => $facturaId]);
+        $factura = $st->fetch();
+        if (!$factura) {
+            throw new \RuntimeException('Factura no encontrada.');
+        }
+        $st = $pdo->prepare('SELECT * FROM factura_items WHERE factura_id = :f ORDER BY id ASC');
+        $st->execute([':f' => $facturaId]);
+        $items = $st->fetchAll();
+        $st = $pdo->prepare('SELECT * FROM factura_pagos WHERE factura_id = :f ORDER BY id ASC');
+        $st->execute([':f' => $facturaId]);
+        $pagos = $st->fetchAll();
+        $chequeIds = array_values(array_unique(array_filter(array_map(static fn(array $p): int => (int)($p['cheque_id'] ?? 0), $pagos))));
+        $cheques = [];
+        if ($chequeIds) {
+            $marks = implode(',', array_fill(0, count($chequeIds), '?'));
+            $st = $pdo->prepare('SELECT id, tipo, estado, banco_emisor, numero_cheque, titular, cuit_titular, monto_cents, fecha_emision, fecha_vencimiento, concepto FROM cheques WHERE id IN (' . $marks . ') ORDER BY id ASC');
+            $st->execute($chequeIds);
+            $cheques = $st->fetchAll();
+        }
+        return ['factura' => $factura, 'items' => $items, 'pagos' => $pagos, 'cheques' => $cheques];
+    }
+
+    public function fingerprintEdicion(int $facturaId): string
+    {
+        return hash('sha256', json_encode($this->snapshotEdicion($facturaId), JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
+    }
+
+    public function fingerprintFacturaEdicion(int $facturaId): string
+    {
+        $snapshot = $this->snapshotEdicion($facturaId);
+        unset($snapshot['cheques']);
+        return hash('sha256', json_encode($snapshot, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
+    }
+
     public function tienePagoCuentaCorriente(int $facturaId): bool
     {
         $st = Db::pdo()->prepare("SELECT COUNT(*) FROM factura_pagos WHERE factura_id = :f AND forma_pago = 'cuenta_corriente'");
@@ -540,13 +579,22 @@ $st = $pdo->prepare('
     }
 
     /** Reemplaza cabecera, items y pagos de una factura existente (sin tocar código ni estado). */
-    public function actualizar(int $id, array $data, array $items, array $pagos): void
+    public function actualizar(int $id, array $data, array $items, array $pagos, ?string $expectedSnapshotHash = null): void
     {
         $this->ensureEntregaColumns();
         $hasAsociada = $this->ensureComprobanteAsociadoColumn();
         $pdo = Db::pdo();
         $pdo->beginTransaction();
         try {
+            $lock = $pdo->prepare('SELECT id FROM facturas WHERE id = :id LIMIT 1 FOR UPDATE');
+            $lock->execute([':id' => $id]);
+            if (!$lock->fetchColumn()) {
+                throw new \RuntimeException('Factura no encontrada.');
+            }
+            if ($expectedSnapshotHash !== null && !hash_equals($expectedSnapshotHash, $this->fingerprintFacturaEdicion($id))) {
+                throw new \RuntimeException('La factura cambió desde que se solicitó la edición.');
+            }
+
             $cols = 'tipo_comprobante = :tipo, cliente_id = :cliente_id, idclien = :idclien, cliente_nombre = :cliente_nombre, '
                 . 'cliente_cuit = :cliente_cuit, cliente_direc = :cliente_direc, cliente_tele = :cliente_tele, '
                 . 'cliente_mail = :cliente_mail, cliente_condicion_iva = :cond, fecha = :fecha, '
