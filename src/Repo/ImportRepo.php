@@ -7,6 +7,32 @@ use Perfushopping\Web\Infra\Db;
 
 final class ImportRepo
 {
+    /** @return array<int,array<string,mixed>> Productos con existencia positiva y sin costo válido. */
+    public function productosConStockSinCosto(): array
+    {
+        $sql = "
+            SELECT p.idprodu, p.produ AS producto,
+                   GROUP_CONCAT(DISTINCT NULLIF(TRIM(g.codscan), '') ORDER BY g.codscan SEPARATOR ', ') AS codscan,
+                   p.precomp, p.precio,
+                   ROUND(p.precio * (1 + COALESCE((SELECT MAX(i.tiva) FROM ivaprodu i WHERE i.codivaprodu = p.iva), 0) / 100), 2) AS precio_iva,
+                   inv.stock_unidades
+            FROM (
+                SELECT s.idprodu, SUM(s.stock) AS stock_unidades
+                FROM stock s
+                INNER JOIN deposito d ON d.iddepo = s.iddepo AND d.marca = 2
+                WHERE s.stock > 0
+                GROUP BY s.idprodu
+                HAVING SUM(s.stock) > 0
+            ) inv
+            INNER JOIN producto p ON p.idprodu = inv.idprodu
+            LEFT JOIN gustos g ON g.idprodu = p.idprodu
+            WHERE p.precomp IS NULL OR p.precomp <= 0
+            GROUP BY p.idprodu, p.produ, p.precomp, p.precio, p.iva, inv.stock_unidades
+            ORDER BY p.produ ASC
+        ";
+        return Db::pdo()->query($sql)->fetchAll() ?: [];
+    }
+
     public function findByCodprodup(string $codprodup, int $idprovee = 0): ?array
     {
         $provWhere = '';

@@ -1461,13 +1461,85 @@ final class StockRepo
         }
     }
 
-    // ── Recalcular stock desde movimientos ──
-    // Todos los movimientos en stockcab son transferencias (ambos iddepoh e iddepod seteados).
-    // iddepoh = origen (envía), iddepod = destino (recibe).
-    // El stock calculado neto de transferencias siempre da 0, así que distribuimos
-    // producto.stocact (valor real del VFP) proporcionalmente según el flujo de entrada
-    // a cada depósito (iddepod). NO se modifica producto.stocact ni gustos.stockact
-    // porque esos los actualiza la sincronización VFP.
+    // Distribuye el stock total sincronizado por producto entre sus variantes y depósitos,
+    // en proporción a las cantidades históricas recibidas en iddepoh (destino).
+    // Los restos se asignan por mayor fracción para que la suma coincida exactamente con
+    // producto.stocact, sin imponer una unidad mínima por cada combinación.
+
+    private function distribuirStockDesdeMovimientos(\PDO $pdo, ?array $ids = null): int
+    {
+        $whereIds = '';
+        if ($ids !== null) {
+            $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn(int $id): bool => $id > 0)));
+            if (!$ids) return 0;
+            $whereIds = ' AND sd.idprodu IN (' . implode(',', $ids) . ')';
+        }
+
+        $rows = $pdo->query("SELECT sc.iddepoh AS iddepo, sd.idprodu,
+                COALESCE(sd.idcodgusto, 0) AS idcodgusto,
+                SUM(sd.canti) AS cantidad_recibida, p.stocact AS stock_total
+            FROM stockcab sc
+            INNER JOIN stockdet sd ON sd.idstockcab = sc.idcabstock
+            INNER JOIN producto p ON p.idprodu = sd.idprodu
+            WHERE sc.iddepoh IS NOT NULL AND p.stocact > 0{$whereIds}
+            GROUP BY sc.iddepoh, sd.idprodu, COALESCE(sd.idcodgusto, 0), p.stocact
+            HAVING SUM(sd.canti) > 0
+            ORDER BY sd.idprodu, sc.iddepoh, COALESCE(sd.idcodgusto, 0)")->fetchAll();
+
+        $porProducto = [];
+        foreach ($rows ?: [] as $row) {
+            $idprodu = (int)$row['idprodu'];
+            $cantidad = (float)$row['cantidad_recibida'];
+            if ($cantidad <= 0) continue;
+            $porProducto[$idprodu]['stock_total'] = (int)$row['stock_total'];
+            $porProducto[$idprodu]['filas'][] = [
+                'iddepo' => (int)$row['iddepo'],
+                'idcodgusto' => (int)$row['idcodgusto'],
+                'cantidad' => $cantidad,
+            ];
+        }
+
+        $insert = $pdo->prepare('INSERT INTO stock (iddepo, idprodu, idcodgusto, stock) VALUES (:iddepo, :idprodu, :idcodgusto, :stock)');
+        $inserted = 0;
+        foreach ($porProducto as $idprodu => $producto) {
+            $stockTotal = max(0, (int)$producto['stock_total']);
+            $filas = $producto['filas'];
+            $cantidadTotal = array_sum(array_column($filas, 'cantidad'));
+            if ($stockTotal <= 0 || $cantidadTotal <= 0) continue;
+
+            $asignado = 0;
+            foreach ($filas as &$fila) {
+                $proporcion = $stockTotal * $fila['cantidad'] / $cantidadTotal;
+                $fila['stock'] = (int)floor($proporcion);
+                $fila['resto'] = $proporcion - $fila['stock'];
+                $asignado += $fila['stock'];
+            }
+            unset($fila);
+
+            usort($filas, static function (array $a, array $b): int {
+                $restoOrder = $b['resto'] <=> $a['resto'];
+                if ($restoOrder !== 0) return $restoOrder;
+                return [$a['iddepo'], $a['idcodgusto']] <=> [$b['iddepo'], $b['idcodgusto']];
+            });
+            $restantes = $stockTotal - $asignado;
+            $countFilas = count($filas);
+            for ($i = 0; $i < $restantes; $i++) {
+                $filas[$i % $countFilas]['stock']++;
+            }
+
+            foreach ($filas as $fila) {
+                if ($fila['stock'] <= 0) continue;
+                $insert->execute([
+                    ':iddepo' => $fila['iddepo'],
+                    ':idprodu' => (int)$idprodu,
+                    ':idcodgusto' => $fila['idcodgusto'] > 0 ? $fila['idcodgusto'] : null,
+                    ':stock' => $fila['stock'],
+                ]);
+                $inserted += $insert->rowCount();
+            }
+        }
+        return $inserted;
+    }
 
     public function recalcular(): string
     {
@@ -1481,30 +1553,7 @@ final class StockRepo
 
             $pdo->exec('DELETE FROM stock');
 
-            // Distribute producto.stocact across deposits by inflow (iddepod = destination)
-            $pdo->exec("
-                INSERT INTO stock (iddepo, idprodu, idcodgusto, stock)
-                SELECT
-                    inflow.iddepo,
-                    inflow.idprodu,
-                    NULLIF(inflow.idcodgusto, 0) AS idcodgusto,
-                    GREATEST(1, ROUND(p.stocact * inflow.qty / prod.total_qty)) AS stock
-                FROM (
-                    SELECT sc.iddepod AS iddepo, sd.idprodu, COALESCE(sd.idcodgusto, 0) AS idcodgusto, SUM(sd.canti) AS qty
-                    FROM stockcab sc
-                    INNER JOIN stockdet sd ON sd.idstockcab = sc.idcabstock
-                    GROUP BY sc.iddepod, sd.idprodu, sd.idcodgusto
-                ) inflow
-                INNER JOIN (
-                    SELECT sd.idprodu, COALESCE(sd.idcodgusto, 0) AS idcodgusto, SUM(sd.canti) AS total_qty
-                    FROM stockcab sc
-                    INNER JOIN stockdet sd ON sd.idstockcab = sc.idcabstock
-                    GROUP BY sd.idprodu, sd.idcodgusto
-                ) prod ON prod.idprodu = inflow.idprodu AND prod.idcodgusto = inflow.idcodgusto
-                INNER JOIN producto p ON p.idprodu = inflow.idprodu
-                WHERE p.stocact > 0
-                HAVING stock > 0
-            ");
+            $this->distribuirStockDesdeMovimientos($pdo);
 
             // Restore stock for products with zero rows after recalculation (no movement data)
             $pdo->exec("
@@ -1512,6 +1561,7 @@ final class StockRepo
                 SELECT b.iddepo, b.idprodu, b.idcodgusto, b.stock
                 FROM stock_backup b
                 WHERE NOT EXISTS (SELECT 1 FROM stock s WHERE s.idprodu = b.idprodu)
+                  AND NOT EXISTS (SELECT 1 FROM stockdet sd WHERE sd.idprodu = b.idprodu)
             ");
 
             $pdo->exec('DROP TEMPORARY TABLE IF EXISTS stock_backup');
@@ -1540,35 +1590,20 @@ final class StockRepo
 
         $pdo->beginTransaction();
         try {
-            // Delete existing stock for these products
-            $pdo->exec("DELETE FROM stock WHERE idprodu IN ({$in})");
+            // Preserve stock for products without movement history.
+            $pdo->exec('CREATE TEMPORARY TABLE stock_backup_productos (iddepo INT, idprodu INT, idcodgusto INT NULL, stock INT) ENGINE=MEMORY');
+            $pdo->exec("INSERT INTO stock_backup_productos (iddepo, idprodu, idcodgusto, stock)
+                SELECT iddepo, idprodu, idcodgusto, stock FROM stock WHERE idprodu IN ({$in})");
 
-            // Distribute stocact by inflow (iddepod = destination)
-            $pdo->exec("
-                INSERT INTO stock (iddepo, idprodu, idcodgusto, stock)
-                SELECT
-                    inflow.iddepo,
-                    inflow.idprodu,
-                    NULLIF(inflow.idcodgusto, 0) AS idcodgusto,
-                    GREATEST(1, ROUND(p.stocact * inflow.qty / prod.total_qty)) AS stock
-                FROM (
-                    SELECT sc.iddepod AS iddepo, sd.idprodu, COALESCE(sd.idcodgusto, 0) AS idcodgusto, SUM(sd.canti) AS qty
-                    FROM stockcab sc
-                    INNER JOIN stockdet sd ON sd.idstockcab = sc.idcabstock
-                    WHERE sd.idprodu IN ({$in})
-                    GROUP BY sc.iddepod, sd.idprodu, sd.idcodgusto
-                ) inflow
-                INNER JOIN (
-                    SELECT sd.idprodu, COALESCE(sd.idcodgusto, 0) AS idcodgusto, SUM(sd.canti) AS total_qty
-                    FROM stockcab sc
-                    INNER JOIN stockdet sd ON sd.idstockcab = sc.idcabstock
-                    WHERE sd.idprodu IN ({$in})
-                    GROUP BY sd.idprodu, sd.idcodgusto
-                ) prod ON prod.idprodu = inflow.idprodu AND prod.idcodgusto = inflow.idcodgusto
-                INNER JOIN producto p ON p.idprodu = inflow.idprodu
-                WHERE p.stocact > 0
-                HAVING stock > 0
-            ");
+            // Delete existing stock for these products.
+            $pdo->exec("DELETE FROM stock WHERE idprodu IN ({$in})");
+            $this->distribuirStockDesdeMovimientos($pdo, $ids);
+
+            $pdo->exec("INSERT INTO stock (iddepo, idprodu, idcodgusto, stock)
+                SELECT b.iddepo, b.idprodu, b.idcodgusto, b.stock FROM stock_backup_productos b
+                WHERE NOT EXISTS (SELECT 1 FROM stock s WHERE s.idprodu = b.idprodu)
+                  AND NOT EXISTS (SELECT 1 FROM stockdet sd WHERE sd.idprodu = b.idprodu)");
+            $pdo->exec('DROP TEMPORARY TABLE IF EXISTS stock_backup_productos');
 
             $pdo->commit();
         } catch (\Throwable $e) {

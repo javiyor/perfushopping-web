@@ -146,7 +146,6 @@ $puntosVenta = $puntosVenta ?? [];
                 <div class="card-body">
                     <div class="h3 fw-bold mb-1" id="inventarioSnapshotValor">—</div>
                     <div class="small text-muted" id="inventarioSnapshotFecha">Esperando primera captura mensual.</div>
-                    <div class="small text-warning mt-2" id="inventarioSnapshotAviso" style="display:none"></div>
                     <div class="small text-muted mt-2">Foto global del stock de depósitos operativos, valorado al costo unitario vigente (precomp), independiente del punto de venta seleccionado. Se guarda en la primera consulta de reportes del mes.</div>
                 </div>
             </div>
@@ -157,31 +156,6 @@ $puntosVenta = $puntosVenta ?? [];
                 <div class="card-body">
                     <canvas id="inventarioChart" height="150"></canvas>
                     <div class="small text-muted mt-2" id="inventarioSinHistorial" style="display:none">Todavía no hay capturas de meses anteriores. Se irán agregando en la primera consulta de cada mes.</div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row g-3 mb-4">
-        <div class="col-12">
-            <div class="card shadow-sm">
-                <div class="card-header bg-white fw-semibold d-flex flex-wrap justify-content-between align-items-center gap-2">
-                    <span>Productos con stock sin costo válido — no modificados</span>
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="badge bg-warning text-dark" id="inventarioSinCostoCount">0</span>
-                        <button class="btn btn-outline-secondary btn-sm" type="button" id="btnImprimirSinCosto" onclick="imprimirProductosSinCosto()" disabled>
-                            <i class="bi bi-printer"></i> Imprimir listado
-                        </button>
-                    </div>
-                </div>
-                <div class="card-body pb-2">
-                    <div class="small text-muted" id="inventarioSinCostoEstado">Se listan productos con existencia y precomp ausente o igual a cero. El reporte no modifica la tabla producto.</div>
-                </div>
-                <div class="table-responsive">
-                    <table class="table table-admin table-sm mb-0">
-                        <thead><tr><th>ID producto</th><th>Descripción</th><th>Códigos de barra</th><th class="text-end">Precomp</th><th class="text-end">Precio</th><th class="text-end">Precio con IVA</th><th class="text-end">Stock</th></tr></thead>
-                        <tbody id="inventarioSinCostoBody"><tr><td colspan="7" class="text-muted text-center">Cargando…</td></tr></tbody>
-                    </table>
                 </div>
             </div>
         </div>
@@ -383,9 +357,6 @@ let formasChartInstance = null;
 let comparativaPeriodoChartInstance = null;
 let inventarioChartInstance = null;
 let departamentoChartInstance = null;
-let productosSinCostoParaImprimir = [];
-let detalleSinCostoEsSnapshot = false;
-let fechaDetalleSinCosto = '';
 
 function fmtPct(actual, previo) {
     previo = parseInt(previo || 0);
@@ -491,12 +462,6 @@ function cargarReportes() {
             document.getElementById('inventarioSnapshotFecha').textContent = snapshot
                 ? 'Capturado ' + (snapshot.fecha_captura || '') + ' · Período ' + String(snapshot.periodo_mes || '').slice(0, 7)
                 : (inventario.error || 'No se pudo registrar una captura mensual.');
-            const inventarioAviso = document.getElementById('inventarioSnapshotAviso');
-            if (inventarioAviso) {
-                const sinCosto = parseInt(snapshot?.productos_sin_costo || 0);
-                inventarioAviso.textContent = sinCosto > 0 ? sinCosto + ' producto(s) con stock no tienen costo precomp válido y aportan $0 a la valoración.' : '';
-                inventarioAviso.style.display = sinCosto > 0 ? '' : 'none';
-            }
             const inventarioHistory = inventario.historial || [];
             const inventarioSinHistorial = document.getElementById('inventarioSinHistorial');
             if (inventarioSinHistorial) inventarioSinHistorial.style.display = inventarioHistory.length <= 1 ? '' : 'none';
@@ -517,39 +482,6 @@ function cargarReportes() {
                 options: {responsive: true, plugins: {tooltip: {callbacks: {label: ctx => fmtCents(Math.round(ctx.parsed.y * 100))}}}, scales: {y: {beginAtZero: true}}},
             });
 
-            const detalleSnapshotDisponible = !!snapshot && !!snapshot.detalle_sin_costo_disponible;
-            const productosSinCosto = detalleSnapshotDisponible
-                ? (snapshot.productos_sin_costo || [])
-                : (snapshot?.productos_sin_costo_actual || []);
-            productosSinCostoParaImprimir = productosSinCosto;
-            detalleSinCostoEsSnapshot = detalleSnapshotDisponible;
-            fechaDetalleSinCosto = (snapshot?.fecha_captura || '');
-            const sinCostoBody = document.getElementById('inventarioSinCostoBody');
-            const sinCostoCount = document.getElementById('inventarioSinCostoCount');
-            const sinCostoEstado = document.getElementById('inventarioSinCostoEstado');
-            const imprimirSinCostoBtn = document.getElementById('btnImprimirSinCosto');
-            if (sinCostoCount) sinCostoCount.textContent = productosSinCosto.length;
-            if (imprimirSinCostoBtn) imprimirSinCostoBtn.disabled = productosSinCosto.length === 0;
-            if (sinCostoEstado) {
-                sinCostoEstado.textContent = !snapshot
-                    ? (inventario.error || 'No hay una captura mensual disponible.')
-                    : (detalleSnapshotDisponible
-                        ? 'Detalle guardado con la captura del ' + (snapshot.fecha_captura || '') + '. Los productos con precomp cero o ausente aportan $0 a la valuación y no se modifica producto.'
-                        : 'El snapshot de este mes no guardó el detalle por producto. Se muestra la lista actual; no implica una actualización ni reconstruye el estado histórico.');
-            }
-            if (sinCostoBody) {
-                sinCostoBody.innerHTML = productosSinCosto.length
-                    ? productosSinCosto.map(p => '<tr>'
-                        + '<td>' + parseInt(p.idprodu || 0) + '</td>'
-                        + '<td>' + escHtml(p.producto || '') + '</td>'
-                        + '<td class="small"><code>' + escHtml(p.codscan || '') + '</code></td>'
-                        + '<td class="text-end">' + (p.precomp === null ? '—' : fmtCents(Math.round(parseFloat(p.precomp || 0) * 100))) + '</td>'
-                        + '<td class="text-end">' + fmtCents(Math.round(parseFloat(p.precio || 0) * 100)) + '</td>'
-                        + '<td class="text-end">' + fmtCents(Math.round(parseFloat(p.precio_iva || 0) * 100)) + '</td>'
-                        + '<td class="text-end">' + Number(p.stock_unidades || 0).toLocaleString('es-AR', {maximumFractionDigits: 3}) + '</td>'
-                        + '</tr>').join('')
-                    : '<tr><td colspan="7" class="text-muted text-center">No hay productos con stock y costo precomp ausente o igual a cero.</td></tr>';
-            }
             document.getElementById('kpiAutorizadas').textContent = fmtCents(parseInt(aut.total_cents ?? 0));
             document.getElementById('kpiAutorizadasCant').textContent = parseInt(aut.cantidad ?? 0);
             document.getElementById('kpiNoAutorizadas').textContent = fmtCents(parseInt(noaut.total_cents ?? 0));
@@ -831,33 +763,6 @@ function escHtml(s) {
     return d.innerHTML;
 }
 
-function imprimirProductosSinCosto() {
-    if (!productosSinCostoParaImprimir.length) return;
-    const popup = window.open('', '_blank', 'width=1000,height=750');
-    if (!popup) {
-        alert('Permití las ventanas emergentes para imprimir el listado.');
-        return;
-    }
-    const rows = productosSinCostoParaImprimir.map(p => '<tr>'
-        + '<td>' + parseInt(p.idprodu || 0) + '</td>'
-        + '<td>' + escHtml(p.producto || '') + '</td>'
-        + '<td>' + escHtml(p.codscan || '') + '</td>'
-        + '<td class="num">' + (p.precomp === null ? '—' : fmtCents(Math.round(parseFloat(p.precomp || 0) * 100))) + '</td>'
-        + '<td class="num">' + fmtCents(Math.round(parseFloat(p.precio || 0) * 100)) + '</td>'
-        + '<td class="num">' + fmtCents(Math.round(parseFloat(p.precio_iva || 0) * 100)) + '</td>'
-        + '</tr>').join('');
-    const alcance = detalleSinCostoEsSnapshot
-        ? 'Detalle del snapshot mensual capturado el ' + fechaDetalleSinCosto + '.'
-        : 'Estado actual: el detalle de productos no se guardó en el snapshot mensual.';
-    popup.document.write('<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Productos sin costo válido</title>'
-        + '<style>body{font:14px Arial,sans-serif;padding:24px}h1{font-size:20px}p{color:#555}table{border-collapse:collapse;width:100%}th,td{border:1px solid #bbb;padding:6px;text-align:left}.num{text-align:right}@media print{button{display:none}}</style>'
-        + '</head><body><h1>Productos con stock sin costo válido</h1><p>' + escHtml(alcance) + ' Listado informativo de precomp ausente o igual a cero. No se modificó la tabla producto.</p>'
-        + '<table><thead><tr><th>ID producto</th><th>Descripción</th><th>Codscan</th><th>Precomp</th><th>Precio</th><th>Precio con IVA</th></tr></thead><tbody>' + rows + '</tbody></table></body></html>');
-    popup.document.close();
-    popup.focus();
-    popup.print();
-}
-
 function exportarCSV() {
     const form = document.getElementById('reporteForm');
     const fd = new FormData(form);
@@ -900,11 +805,11 @@ function exportarCSV() {
             csv += 'Inventario capturado,' + (invSnapshotCsv.fecha_captura || 'Sin captura') + ',' + (parseInt(invSnapshotCsv.valor_cents ?? 0) / 100).toFixed(2) + '\n\n';
 
             csv += 'Historial mensual del valor de inventario\n';
-            csv += 'Período,Fecha captura,Valor,Productos con stock,Productos sin costo\n';
+            csv += 'Período,Fecha captura,Valor,Productos con stock\n';
             (invCsv.historial || []).forEach(s => {
                 csv += (s.periodo_mes || '') + ',' + (s.fecha_captura || '') + ','
                     + (parseInt(s.valor_cents || 0) / 100).toFixed(2) + ','
-                    + (s.productos_con_stock ?? 0) + ',' + (s.productos_sin_costo ?? 0) + '\n';
+                    + (s.productos_con_stock ?? 0) + '\n';
             });
 
             csv += 'Ventas Diarias\n';

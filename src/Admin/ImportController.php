@@ -36,8 +36,13 @@ final class ImportController
         unset($_SESSION['import_stats']);
 
         $proveedores = [];
+        $productosSinCosto = [];
         try {
             $proveedores = (new \Perfushopping\Web\Repo\ProveedorRepo())->findAll();
+        } catch (\Throwable $e) {
+        }
+        try {
+            $productosSinCosto = $this->repo->productosConStockSinCosto();
         } catch (\Throwable $e) {
         }
 
@@ -46,6 +51,7 @@ final class ImportController
             'preview' => $preview,
             'stats' => $stats,
             'proveedores' => $proveedores,
+            'productosSinCosto' => $productosSinCosto,
             'csrf' => Csrf::token(),
             'flash' => $_SESSION['admin_flash'] ?? null,
             'pageTitle' => 'Importar productos',

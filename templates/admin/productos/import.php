@@ -4,6 +4,7 @@ use Perfushopping\Web\Support\Format;
 $preview = $preview ?? null;
 $stats = $stats ?? null;
 $proveedores = $proveedores ?? [];
+$productosSinCosto = is_array($productosSinCosto ?? null) ? $productosSinCosto : [];
 $previewProveedor = is_array($preview) ? (string)($preview['proveedor'] ?? '') : '';
 $results = is_array($preview) ? ($preview['results'] ?? []) : [];
 $total = (int)($preview['total'] ?? 0);
@@ -99,6 +100,43 @@ $errors = (int)($stats['errors'] ?? 0);
             <a href="#" onclick="return downloadSampleCsvIva()">plantilla con IVA</a> o
             <a href="#" onclick="return downloadSampleCsvCosto()">plantilla de costo</a>.
         </p>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-3">
+    <div class="card-header bg-white fw-semibold d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <span>Productos con stock sin costo válido — para actualizar</span>
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-warning text-dark"><?= count($productosSinCosto) ?></span>
+            <?php if ($productosSinCosto): ?>
+                <button class="btn btn-outline-secondary btn-sm" type="button" onclick="imprimirProductosSinCosto()"><i class="bi bi-printer"></i> Imprimir listado</button>
+            <?php endif; ?>
+        </div>
+    </div>
+    <div class="card-body pb-2">
+        <div class="small text-muted">Listado actual de existencias positivas en depósitos operativos con <code>precomp</code> cero o ausente. No modifica precios ni stock; usá el CSV para actualizar los datos.</div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-admin table-sm mb-0" id="productosSinCostoTable">
+            <thead><tr><th>ID producto</th><th>Descripción</th><th>Códigos de barra</th><th class="text-end">Precomp</th><th class="text-end">Precio</th><th class="text-end">Precio con IVA</th><th class="text-end">Stock</th></tr></thead>
+            <tbody>
+                <?php if (!$productosSinCosto): ?>
+                    <tr><td colspan="7" class="text-muted text-center">No hay productos con stock y costo precomp ausente o igual a cero.</td></tr>
+                <?php else: ?>
+                    <?php foreach ($productosSinCosto as $producto): ?>
+                        <tr>
+                            <td><?= (int)$producto['idprodu'] ?></td>
+                            <td><?= htmlspecialchars((string)$producto['producto']) ?></td>
+                            <td class="small"><code><?= htmlspecialchars((string)($producto['codscan'] ?? '')) ?></code></td>
+                            <td class="text-end"><?= $producto['precomp'] === null ? '—' : htmlspecialchars(Format::moneyRoundedFromCents((int)round((float)$producto['precomp'] * 100))) ?></td>
+                            <td class="text-end"><?= htmlspecialchars(Format::moneyRoundedFromCents((int)round((float)$producto['precio'] * 100))) ?></td>
+                            <td class="text-end"><?= htmlspecialchars(Format::moneyRoundedFromCents((int)round((float)$producto['precio_iva'] * 100))) ?></td>
+                            <td class="text-end"><?= number_format((float)$producto['stock_unidades'], 3, ',', '.') ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
     </div>
 </div>
 
@@ -299,6 +337,23 @@ $errors = (int)($stats['errors'] ?? 0);
 <script>
 let soloCambiosPrecioGrandes = false;
 let mostrarFilasSinMatch = false;
+
+function imprimirProductosSinCosto() {
+    const table = document.getElementById('productosSinCostoTable');
+    if (!table) return;
+    const popup = window.open('', '_blank', 'width=1100,height=750');
+    if (!popup) {
+        alert('Permití las ventanas emergentes para imprimir el listado.');
+        return;
+    }
+    popup.document.write('<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Productos para actualizar</title>'
+        + '<style>body{font:14px Arial,sans-serif;padding:24px}h1{font-size:20px}p{color:#555}table{border-collapse:collapse;width:100%}th,td{border:1px solid #bbb;padding:6px;text-align:left}td:nth-child(n+4){text-align:right}</style>'
+        + '</head><body><h1>Productos con stock sin costo válido</h1><p>Listado informativo para actualizar precios/costos. No se modificaron productos.</p>'
+        + table.outerHTML + '</body></html>');
+    popup.document.close();
+    popup.focus();
+    popup.print();
+}
 
 function toggleAll(master) {
     document.querySelectorAll('#importPreviewTable .row-select').forEach(cb => {
