@@ -9,6 +9,8 @@ $results = is_array($preview) ? ($preview['results'] ?? []) : [];
 $total = (int)($preview['total'] ?? 0);
 $found = (int)($preview['found'] ?? 0);
 $notFound = (int)($preview['notFound'] ?? 0);
+$modoPreview = (string)($preview['modo_precio'] ?? (!empty($preview['precios_con_iva']) ? 'con_iva' : 'neto'));
+$soloCostoPreview = $modoPreview === 'costo';
 
 $updated = (int)($stats['updated'] ?? 0);
 $errors = (int)($stats['errors'] ?? 0);
@@ -17,7 +19,7 @@ $errors = (int)($stats['errors'] ?? 0);
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
         <h4 class="fw-bold mb-1">Importar productos</h4>
-        <p class="text-muted small">Subí un CSV para actualizar precios, costos y stock por código de proveedor o código de barra</p>
+        <p class="text-muted small">Subí un CSV para actualizar precios, costos y/o stock según el modo elegido, por código de proveedor o código de barra.</p>
     </div>
     <a class="btn btn-outline-secondary btn-sm" href="/admin/productos">Volver a productos</a>
 </div>
@@ -55,7 +57,7 @@ $errors = (int)($stats['errors'] ?? 0);
             <strong>Precios:</strong> <code>precio_con_iva</code> debe ser monto <strong>con IVA</strong> (retail). Usá punto (<code>.</code>) como separador decimal.
             <hr class="my-2">
             <strong>Modo "Costo sin IVA":</strong>
-            Columnas: <code>codscan</code>, <code>costo_sin_iva</code>, <code>stock</code> (opcional).
+            Columnas: <code>codscan</code>, <code>costo_sin_iva</code>. En este modo no se actualiza el stock.
             <br>
             <strong>Matching:</strong> Busca por <code>codscan</code> (código de barra de la variante).
             <br>
@@ -106,9 +108,7 @@ $errors = (int)($stats['errors'] ?? 0);
         <span><i class="bi bi-table"></i> Vista previa<?php if ($previewProveedor !== ''): ?> · Proveedor: <strong><?= htmlspecialchars($previewProveedor) ?></strong><?php endif; ?></span>
         <div class="d-flex gap-2 align-items-center">
             <span class="badge bg-success"><?= $found ?> encontrados</span>
-            <?php
-            $modoPreview = (string)($preview['modo_precio'] ?? (!empty($preview['precios_con_iva']) ? 'con_iva' : 'neto'));
-            if ($modoPreview === 'con_iva'): ?>
+            <?php if ($modoPreview === 'con_iva'): ?>
                 <span class="badge bg-info text-dark">Precios con IVA</span>
             <?php elseif ($modoPreview === 'costo'): ?>
                 <span class="badge bg-info text-dark">Costo sin IVA</span>
@@ -150,9 +150,11 @@ $errors = (int)($stats['errors'] ?? 0);
                             <th>G1 nuevo</th>
                             <th>G2 ant.</th>
                             <th>G2 nuevo</th>
-                            <th>Stock ant.</th>
-                            <th>Stock nuevo</th>
-                            <th>Diff</th>
+                            <?php if (!$soloCostoPreview): ?>
+                                <th>Stock ant.</th>
+                                <th>Stock nuevo</th>
+                                <th>Diff</th>
+                            <?php endif; ?>
                             <th>Estado</th>
                         </tr>
                     </thead>
@@ -246,23 +248,25 @@ $errors = (int)($stats['errors'] ?? 0);
                                         <span class="text-muted">=</span>
                                     <?php endif; ?>
                                 </td>
-                                <td class="text-end"><?= $matched ? (int)($item['stock_old'] ?? 0) : '-' ?></td>
-                                <td class="text-end">
-                                    <?php if ($matched && $item['stock_new'] !== null): ?>
-                                        <strong><?= (int)$item['stock_new'] ?></strong>
-                                    <?php else: ?>
-                                        <span class="text-muted">=</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td class="text-end">
-                                    <?php if ($stockDiff !== null && $stockDiff !== 0): ?>
-                                        <span class="<?= $stockDiff > 0 ? 'text-success' : 'text-danger' ?> fw-bold">
-                                            <?= ($stockDiff > 0 ? '+' : '') . $stockDiff ?>
-                                        </span>
-                                    <?php else: ?>
-                                        <span class="text-muted">—</span>
-                                    <?php endif; ?>
-                                </td>
+                                <?php if (!$soloCostoPreview): ?>
+                                    <td class="text-end"><?= $matched ? (int)($item['stock_old'] ?? 0) : '-' ?></td>
+                                    <td class="text-end">
+                                        <?php if ($matched && $item['stock_new'] !== null): ?>
+                                            <strong><?= (int)$item['stock_new'] ?></strong>
+                                        <?php else: ?>
+                                            <span class="text-muted">=</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td class="text-end">
+                                        <?php if ($stockDiff !== null && $stockDiff !== 0): ?>
+                                            <span class="<?= $stockDiff > 0 ? 'text-success' : 'text-danger' ?> fw-bold">
+                                                <?= ($stockDiff > 0 ? '+' : '') . $stockDiff ?>
+                                            </span>
+                                        <?php else: ?>
+                                            <span class="text-muted">—</span>
+                                        <?php endif; ?>
+                                    </td>
+                                <?php endif; ?>
                                 <td>
                                     <?php if ($matched): ?>
                                         <span class="badge bg-success">OK</span>
@@ -352,11 +356,11 @@ function downloadSampleCsvIva() {
 
 function downloadSampleCsvCosto() {
     const bom = '\uFEFF';
-    const headers = 'codscan;costo_sin_iva;stock';
+    const headers = 'codscan;costo_sin_iva';
     const rows = [
-        '7791234567890;10714.29;25',
-        '7790987654321;5000.00;50',
-        '7791112223334;18000.00;5',
+        '7791234567890;10714.29',
+        '7790987654321;5000.00',
+        '7791112223334;18000.00',
     ];
     const csv = bom + headers + '\n' + rows.join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });

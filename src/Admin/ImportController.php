@@ -78,7 +78,7 @@ final class ImportController
         $soloCosto = $modo === 'costo';
         if (!$rows) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => $soloCosto
-                ? 'No se pudieron leer filas del CSV. Verifica que tenga las columnas: codscan, costo_sin_iva (opcional: stock). Si es un Excel (.xlsx), guardalo como CSV primero.'
+                ? 'No se pudieron leer filas del CSV. Verifica que tenga las columnas: codscan, costo_sin_iva. Si es un Excel (.xlsx), guardalo como CSV primero.'
                 : ($conIva
                     ? 'No se pudieron leer filas del CSV. Verifica que tenga las columnas: codscan, precio_con_iva (opcional: costo_con_iva, stock). Si es un Excel (.xlsx), guardalo como CSV primero.'
                     : 'No se pudieron leer filas del CSV. Verifica que tenga las columnas: codprodup, codscan, precio_sin_iva, costo_sin_iva, stock. Si es un Excel (.xlsx), guardalo como CSV primero.')];
@@ -106,7 +106,7 @@ final class ImportController
         foreach ($rows as $idx => $row) {
             $codprodup = trim((string)($row['codprodup'] ?? ''));
             $codscan = trim((string)($row['codscan'] ?? ''));
-            $stockNew = $this->parseInt((string)($row['stock'] ?? ''));
+            $stockNew = $soloCosto ? null : $this->parseInt((string)($row['stock'] ?? ''));
             if ($soloCosto) {
                 // Modo costo sin IVA: se busca por código de barra y los precios
                 // minorista/mayorista se calculan con los márgenes existentes.
@@ -288,6 +288,7 @@ final class ImportController
         if (!is_array($selected)) {
             $selected = [];
         }
+        $soloCosto = (string)($preview['modo_precio'] ?? '') === 'costo';
 
         $updated = 0;
         $errors = 0;
@@ -313,7 +314,7 @@ final class ImportController
 
                 $hasPriceChange = $item['precio_diff'] !== null && abs((float)$item['precio_diff']) > 0.001;
                 $hasCostChange = $item['costo_diff'] !== null && abs((float)$item['costo_diff']) > 0.001;
-                $hasStockChange = $item['stock_diff'] !== null && (int)$item['stock_diff'] !== 0;
+                $hasStockChange = !$soloCosto && $item['stock_diff'] !== null && (int)$item['stock_diff'] !== 0;
                 $hasGanan1Change = $item['ganan1_diff'] !== null && abs((float)$item['ganan1_diff']) > 0.001;
                 $hasGanan2Change = $item['ganan2_diff'] !== null && abs((float)$item['ganan2_diff']) > 0.001;
                 $hasPrecio1Change = ($item['precio1_diff'] ?? null) !== null && abs((float)$item['precio1_diff']) > 0.001;
