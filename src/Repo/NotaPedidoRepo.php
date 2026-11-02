@@ -17,6 +17,10 @@ final class NotaPedidoRepo
         if ($st->fetch() === false) {
             $pdo->exec('ALTER TABLE notas_pedido_items ADD COLUMN unit_cost DECIMAL(14,2) NOT NULL DEFAULT 0.00 AFTER codprodup');
         }
+        $st = $pdo->query("SHOW COLUMNS FROM notas_pedido_items LIKE 'unit_cost_captured'");
+        if ($st->fetch() === false) {
+            $pdo->exec('ALTER TABLE notas_pedido_items ADD COLUMN unit_cost_captured TINYINT(1) NOT NULL DEFAULT 0 AFTER unit_cost');
+        }
         self::$unitCostColumnReady = true;
     }
 
@@ -77,8 +81,8 @@ final class NotaPedidoRepo
             $notaId = (int)$pdo->lastInsertId();
 
             $st2 = $pdo->prepare('
-                INSERT INTO notas_pedido_items (nota_id, idprodu, idcodgusto, producto, variedad, codscan, codprodup, unit_cost, qty)
-                VALUES (:nid, :p, :g, :prod, :var, :cs, :cpp, :cost, :q)
+                INSERT INTO notas_pedido_items (nota_id, idprodu, idcodgusto, producto, variedad, codscan, codprodup, unit_cost, unit_cost_captured, qty)
+                VALUES (:nid, :p, :g, :prod, :var, :cs, :cpp, :cost, 1, :q)
             ');
             $costQuery = $pdo->prepare('SELECT COALESCE(precomp, 0) FROM producto WHERE idprodu = :id LIMIT 1');
             foreach ($items as $it) {
@@ -120,8 +124,10 @@ final class NotaPedidoRepo
 
     public function items(int $notaId): array
     {
+        $this->ensureUnitCostColumn();
         $st = Db::pdo()->prepare('
-            SELECT npi.*, g.nomgusto, g.codscan AS g_codscan, p.codprodup AS p_codprodup, p.produ, p.codprodu
+            SELECT npi.*, g.nomgusto, g.codscan AS g_codscan, p.codprodup AS p_codprodup, p.produ, p.codprodu,
+                   CASE WHEN npi.unit_cost_captured = 1 THEN npi.unit_cost ELSE COALESCE(p.precomp, 0) END AS display_unit_cost
             FROM notas_pedido_items npi
             LEFT JOIN gustos g ON g.idcodgusto = npi.idcodgusto
             LEFT JOIN producto p ON p.idprodu = npi.idprodu

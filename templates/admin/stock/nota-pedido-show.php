@@ -77,7 +77,7 @@ $totalGeneral = 0.0;
             </thead>
             <tbody>
                 <?php $idx = 0; foreach ($items as $it): $idx++; ?>
-                <?php $costoUnitario = (float)($it['unit_cost'] ?? 0); $cantidad = (int)($it['qty'] ?? 0); $totalItem = $costoUnitario * $cantidad; $totalGeneral += $totalItem; ?>
+                <?php $costoUnitario = (float)($it['display_unit_cost'] ?? $it['unit_cost'] ?? 0); $cantidad = (int)($it['qty'] ?? 0); $totalItem = $costoUnitario * $cantidad; $totalGeneral += $totalItem; ?>
                 <tr>
                     <td><?= $idx ?></td>
                     <td><?= (int)($it['idprodu'] ?? 0) ?></td>
