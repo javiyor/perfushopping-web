@@ -7,6 +7,19 @@ use Perfushopping\Web\Infra\Db;
 
 final class NotaPedidoRepo
 {
+    private static bool $unitCostColumnReady = false;
+
+    private function ensureUnitCostColumn(): void
+    {
+        if (self::$unitCostColumnReady) return;
+        $pdo = Db::pdo();
+        $st = $pdo->query("SHOW COLUMNS FROM notas_pedido_items LIKE 'unit_cost'");
+        if ($st->fetch() === false) {
+            $pdo->exec('ALTER TABLE notas_pedido_items ADD COLUMN unit_cost DECIMAL(14,2) NOT NULL DEFAULT 0.00 AFTER codprodup');
+        }
+        self::$unitCostColumnReady = true;
+    }
+
     /** @return array<int,array<string,mixed>> */
     public function listRecent(string $q = ''): array
     {
@@ -41,6 +54,7 @@ final class NotaPedidoRepo
 
     public function create(array $data, array $items): int
     {
+        $this->ensureUnitCostColumn();
         $pdo = Db::pdo();
         $pdo->beginTransaction();
         try {
@@ -63,18 +77,23 @@ final class NotaPedidoRepo
             $notaId = (int)$pdo->lastInsertId();
 
             $st2 = $pdo->prepare('
-                INSERT INTO notas_pedido_items (nota_id, idprodu, idcodgusto, producto, variedad, codscan, codprodup, qty)
-                VALUES (:nid, :p, :g, :prod, :var, :cs, :cpp, :q)
+                INSERT INTO notas_pedido_items (nota_id, idprodu, idcodgusto, producto, variedad, codscan, codprodup, unit_cost, qty)
+                VALUES (:nid, :p, :g, :prod, :var, :cs, :cpp, :cost, :q)
             ');
+            $costQuery = $pdo->prepare('SELECT COALESCE(precomp, 0) FROM producto WHERE idprodu = :id LIMIT 1');
             foreach ($items as $it) {
+                $idprodu = (int)($it['idprodu'] ?? 0);
+                $costQuery->execute([':id' => $idprodu]);
+                $unitCost = max(0, (float)$costQuery->fetchColumn());
                 $st2->execute([
                     ':nid' => $notaId,
-                    ':p' => $it['idprodu'] ?? null,
+                    ':p' => $idprodu > 0 ? $idprodu : null,
                     ':g' => $it['idcodgusto'] ?? null,
                     ':prod' => $it['producto'] ?? '',
                     ':var' => $it['variedad'] ?? '',
                     ':cs' => $it['codscan'] ?? '',
                     ':cpp' => $it['codprodup'] ?? '',
+                    ':cost' => $unitCost,
                     ':q' => (int)($it['qty'] ?? 0),
                 ]);
             }

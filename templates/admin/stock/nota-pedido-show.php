@@ -2,9 +2,10 @@
 $nota = $nota ?? null;
 $items = $items ?? [];
 if (!$nota) { echo '<div class="alert alert-warning">Nota no encontrada.</div>'; return; }
+$totalGeneral = 0.0;
 ?>
 <style>
-@media print { .no-print { display:none !important; } body { background:#fff; } }
+@media print { .no-print { display:none !important; } body { background:#fff; } body.np-sin-valores .np-valor { display:none !important; } }
 .np-print-header { text-align:center; margin-bottom:20px; }
 .np-print-header h3 { margin:0; font-weight:800; }
 .np-print-header .codigo { font-size:18px; color:#6c757d; }
@@ -18,7 +19,8 @@ if (!$nota) { echo '<div class="alert alert-warning">Nota no encontrada.</div>';
         <p class="text-muted small">Nota de pedido</p>
     </div>
     <div class="d-flex gap-2">
-        <button class="btn btn-accent btn-sm" onclick="window.print()"><i class="bi bi-printer"></i> Imprimir</button>
+        <button class="btn btn-accent btn-sm" onclick="imprimirNotaPedido(true)"><i class="bi bi-printer"></i> Imprimir con valores</button>
+        <button class="btn btn-outline-primary btn-sm" onclick="imprimirNotaPedido(false)"><i class="bi bi-printer"></i> Imprimir sin valores</button>
         <a class="btn btn-outline-secondary btn-sm" href="/admin/nota-pedido">Listado de notas</a>
         <a class="btn btn-outline-secondary btn-sm" href="/admin/stock">Volver a stock</a>
     </div>
@@ -63,28 +65,40 @@ if (!$nota) { echo '<div class="alert alert-warning">Nota no encontrada.</div>';
             <thead>
                 <tr>
                     <th>#</th>
+                    <th>ID producto</th>
                     <th>Producto</th>
                     <th>Variedad</th>
                     <th>Cód. barra</th>
                     <th>Cód. proveedor</th>
+                    <th class="text-end np-valor">Costo s/IVA</th>
                     <th class="text-center">Cant.</th>
+                    <th class="text-end np-valor">Total</th>
                 </tr>
             </thead>
             <tbody>
                 <?php $idx = 0; foreach ($items as $it): $idx++; ?>
+                <?php $costoUnitario = (float)($it['unit_cost'] ?? 0); $cantidad = (int)($it['qty'] ?? 0); $totalItem = $costoUnitario * $cantidad; $totalGeneral += $totalItem; ?>
                 <tr>
                     <td><?= $idx ?></td>
+                    <td><?= (int)($it['idprodu'] ?? 0) ?></td>
                     <td><?= htmlspecialchars($it['producto'] ?: ($it['produ'] ?? '')) ?></td>
                     <td class="text-muted"><?= htmlspecialchars($it['variedad'] ?: ($it['nomgusto'] ?? '—')) ?></td>
                     <td class="text-muted"><?= htmlspecialchars($it['codscan'] ?: ($it['g_codscan'] ?? '')) ?></td>
                     <td class="text-muted"><?= htmlspecialchars($it['codprodup'] ?: ($it['p_codprodup'] ?? '')) ?></td>
-                    <td class="text-center fw-bold"><?= (int)($it['qty'] ?? 0) ?></td>
+                    <td class="text-end np-valor"><?= htmlspecialchars(\Perfushopping\Web\Support\Format::moneyRoundedFromCents((int)round($costoUnitario * 100))) ?></td>
+                    <td class="text-center fw-bold"><?= $cantidad ?></td>
+                    <td class="text-end fw-semibold np-valor"><?= htmlspecialchars(\Perfushopping\Web\Support\Format::moneyRoundedFromCents((int)round($totalItem * 100))) ?></td>
                 </tr>
                 <?php endforeach; ?>
                 <?php if (!$items): ?>
-                <tr><td colspan="6" class="text-center text-muted">Sin productos</td></tr>
+                <tr><td colspan="9" class="text-center text-muted">Sin productos</td></tr>
                 <?php endif; ?>
             </tbody>
+            <?php if ($items): ?>
+            <tfoot class="np-valor">
+                <tr><td colspan="8" class="text-end fw-bold">Total general (costo sin IVA)</td><td class="text-end fw-bold"><?= htmlspecialchars(\Perfushopping\Web\Support\Format::moneyRoundedFromCents((int)round(($totalGeneral ?? 0) * 100))) ?></td></tr>
+            </tfoot>
+            <?php endif; ?>
         </table>
     </div>
 </div>
@@ -92,3 +106,11 @@ if (!$nota) { echo '<div class="alert alert-warning">Nota no encontrada.</div>';
 <div class="text-muted small mt-3 no-print">
     Generado por: <?= htmlspecialchars($nota['created_by_nombre'] ?? '—') ?>
 </div>
+
+<script>
+function imprimirNotaPedido(conValores) {
+    document.body.classList.toggle('np-sin-valores', !conValores);
+    window.addEventListener('afterprint', () => document.body.classList.remove('np-sin-valores'), {once: true});
+    window.print();
+}
+</script>

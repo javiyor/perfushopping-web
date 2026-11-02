@@ -37,6 +37,9 @@ $qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $
     return http_build_query($p);
 };
 ?>
+<style>
+.stock-located-row { outline:3px solid #0d6efd; outline-offset:-3px; background-color:#cfe2ff !important; }
+</style>
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
         <h4 class="fw-bold mb-1">Stock</h4>
@@ -57,6 +60,17 @@ $qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $
         <?php if ($isSuper): ?>
             <button class="btn btn-outline-danger btn-sm" onclick="eliminarDiscontinuadas()"><i class="bi bi-trash"></i> Eliminar disc.</button>
         <?php endif; ?>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-3">
+    <div class="card-body py-2">
+        <div class="input-group input-group-sm">
+            <input class="form-control" type="search" id="stockLocateInput" placeholder="Ubicar por código de barra o descripción en esta página…" autocomplete="off" />
+            <button class="btn btn-outline-primary" type="button" id="stockLocateButton"><i class="bi bi-crosshair"></i> Ubicar</button>
+        </div>
+        <div class="small text-muted mt-1">Ubica y resalta el producto en los resultados actuales, sin cambiar los filtros ni la consulta.</div>
+        <div class="small mt-1" id="stockLocateStatus" aria-live="polite"></div>
     </div>
 </div>
 
@@ -181,7 +195,8 @@ $qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $
                         $totalStockValor += $stock * (float)($p['precomp'] ?? 0);
                         $totalVendidoValor += (float)($p['total_vendido'] ?? 0) * (float)($p['precomp'] ?? 0);
                         ?>
-                        <tr style="<?= $isFirst ? 'border-top:2px solid #adb5bd' : '' ?>">
+                        <tr style="<?= $isFirst ? 'border-top:2px solid #adb5bd' : '' ?>"
+                            data-stock-locate="<?= htmlspecialchars(mb_strtolower((string)($p['produ'] ?? '') . ' ' . (string)($p['codscan'] ?? '') . ' ' . (string)($p['codprodu'] ?? '') . ' ' . (string)($p['codprodup'] ?? ''), 'UTF-8'), ENT_QUOTES, 'UTF-8') ?>">
                             <td>
                                 <?php if ($p['imagen'] ?? ''): ?>
                                     <img src="<?= htmlspecialchars(\Perfushopping\Web\Support\Format::uploadUrl((string)$p['imagen'])) ?>" style="width:32px;height:32px;object-fit:cover;border-radius:4px" alt="" />
@@ -216,7 +231,8 @@ $qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $
                                         data-producto="<?= htmlspecialchars((string)($p['produ'] ?? ''), ENT_QUOTES) ?>"
                                         data-variedad="<?= htmlspecialchars((string)($p['nomgusto'] ?? ''), ENT_QUOTES) ?>"
                                         data-codscan="<?= htmlspecialchars((string)($p['codscan'] ?? ''), ENT_QUOTES) ?>"
-                                        data-codprodup="<?= htmlspecialchars((string)($p['codprodup'] ?? ''), ENT_QUOTES) ?>" />
+                                        data-codprodup="<?= htmlspecialchars((string)($p['codprodup'] ?? ''), ENT_QUOTES) ?>"
+                                        data-precomp="<?= htmlspecialchars((string)($p['precomp'] ?? '0'), ENT_QUOTES) ?>" />
                                 <?php endif; ?>
                             </td>
                             <?php if ($isSuper): ?>
@@ -308,6 +324,29 @@ function irStockExport(base) {
     window.location.href = url + '?' + (cur ? cur + '&' : '') + extra;
     return false;
 }
+function ubicarProductoStock() {
+    const input = document.getElementById('stockLocateInput');
+    const status = document.getElementById('stockLocateStatus');
+    const query = (input?.value || '').trim().toLocaleLowerCase('es');
+    document.querySelectorAll('tr.stock-located-row').forEach(tr => tr.classList.remove('stock-located-row'));
+    if (!query) {
+        if (status) status.textContent = 'Ingresá un código de barra o una descripción.';
+        return;
+    }
+    const rows = Array.from(document.querySelectorAll('tbody tr[data-stock-locate]'));
+    const match = rows.find(tr => (tr.dataset.stockLocate || '').toLocaleLowerCase('es').includes(query));
+    if (!match) {
+        if (status) status.textContent = 'No se encontró en los resultados visibles. Los filtros y la consulta siguen intactos.';
+        return;
+    }
+    match.classList.add('stock-located-row');
+    match.scrollIntoView({behavior: 'smooth', block: 'center'});
+    if (status) status.textContent = 'Producto ubicado en los resultados actuales.';
+}
+document.getElementById('stockLocateButton')?.addEventListener('click', ubicarProductoStock);
+document.getElementById('stockLocateInput')?.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); ubicarProductoStock(); }
+});
 function npKey(idprodu, idcodgusto) { return String(idprodu) + '|' + String(idcodgusto); }
 function npLeerAcumulado() {
     try {
@@ -333,6 +372,7 @@ function npGuardarPaginaActual() {
                 variedad: inp.dataset.variedad || '',
                 codscan: inp.dataset.codscan || '',
                 codprodup: inp.dataset.codprodup || '',
+                precomp: parseFloat(inp.dataset.precomp) || 0,
                 qty: qty,
             };
         } else {

@@ -30,15 +30,21 @@ $csrf = $csrf ?? '';
                         <thead>
                             <tr>
                                 <th style="width:30px"></th>
+                                <th>ID</th>
                                 <th>Producto</th>
                                 <th>Variedad</th>
                                 <th>Cód. barra</th>
                                 <th>Cód. proveedor</th>
+                                <th class="text-end">Costo s/IVA</th>
                                 <th style="width:80px" class="text-center">Cantidad</th>
+                                <th class="text-end">Total</th>
                             </tr>
                         </thead>
                         <tbody id="npItemsBody">
                         </tbody>
+                        <tfoot id="npItemsFoot" style="display:none">
+                            <tr><td colspan="8" class="text-end fw-bold">Total general</td><td class="text-end fw-bold" id="npTotalGeneral">$0,00</td></tr>
+                        </tfoot>
                     </table>
                 </div>
                 <div id="npEmpty" class="text-center text-muted py-4 small">No hay productos cargados.</div>
@@ -92,26 +98,42 @@ try {
 function renderItems() {
     const tbody = document.getElementById('npItemsBody');
     const empty = document.getElementById('npEmpty');
+    const foot = document.getElementById('npItemsFoot');
     tbody.innerHTML = '';
     if (pendingItems.length === 0) {
         empty.style.display = 'block';
+        if (foot) foot.style.display = 'none';
+        document.getElementById('npTotalGeneral').textContent = money(0);
         return;
     }
     empty.style.display = 'none';
     pendingItems.forEach((item, idx) => {
+        const costo = Number(item.precomp || 0);
+        const cantidad = Math.max(1, parseInt(item.qty) || 1);
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td><button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="removeItem(${idx})">&times;</button></td>
+            <td class="small">${parseInt(item.idprodu) || 0}</td>
             <td class="small">${esc(item.producto || '')}</td>
             <td class="small text-muted">${esc(item.variedad || '—')}</td>
             <td class="small text-muted">${esc(item.codscan || '')}</td>
             <td class="small text-muted">${esc(item.codprodup || '')}</td>
-            <td><input type="number" class="form-control form-control-sm text-center" value="${item.qty || 1}" min="1" onchange="pendingItems[${idx}].qty = Math.max(1, parseInt(this.value) || 1)" /></td>
+            <td class="text-end small">${money(costo)}</td>
+            <td><input type="number" class="form-control form-control-sm text-center" value="${cantidad}" min="1" onchange="actualizarCantidad(${idx}, this.value)" /></td>
+            <td class="text-end small fw-semibold">${money(costo * cantidad)}</td>
         `;
         tbody.appendChild(tr);
     });
+    if (foot) foot.style.display = '';
+    const total = pendingItems.reduce((sum, item) => sum + Number(item.precomp || 0) * Math.max(1, parseInt(item.qty) || 1), 0);
+    document.getElementById('npTotalGeneral').textContent = money(total);
 }
 renderItems();
+
+function actualizarCantidad(idx, valor) {
+    pendingItems[idx].qty = Math.max(1, parseInt(valor) || 1);
+    renderItems();
+}
 
 function removeItem(idx) {
     pendingItems.splice(idx, 1);
@@ -173,5 +195,8 @@ provInput.addEventListener('blur', function() {
 function esc(s) {
     if (!s) return '';
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function money(value) {
+    return '$' + Number(value || 0).toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 }
 </script>

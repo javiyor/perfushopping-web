@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS notas_pedido_items (
   variedad VARCHAR(255) DEFAULT NULL,
   codscan VARCHAR(60) DEFAULT NULL,
   codprodup VARCHAR(60) DEFAULT NULL,
+  unit_cost DECIMAL(14,2) NOT NULL DEFAULT 0.00,
   qty INT NOT NULL DEFAULT 0,
   KEY idx_npi_nota (nota_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
