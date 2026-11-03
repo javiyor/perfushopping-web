@@ -173,15 +173,13 @@ $qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $
                     <th class="text-center" style="width:55px">Stock</th>
                     <th class="text-center" style="width:60px">Ventas</th>
                     <th class="text-center" style="width:60px">Pedir</th>
-                    <?php if ($isSuper): ?>
-                        <th class="text-center" style="width:38px">Disc.</th>
-                    <?php endif; ?>
+                    <th class="text-center" style="width:38px">Disc.</th>
                     <th style="width:50px"></th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (!$list): ?>
-                    <tr><td colspan="<?= $isSuper ? 15 : 14 ?>" class="text-muted text-center">Sin productos.</td></tr>
+                    <tr><td colspan="15" class="text-muted text-center">Sin productos.</td></tr>
                 <?php else: ?>
                     <?php
                     $prevId = -1;
@@ -235,15 +233,13 @@ $qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $
                                         data-precomp="<?= htmlspecialchars((string)($p['precomp'] ?? '0'), ENT_QUOTES) ?>" />
                                 <?php endif; ?>
                             </td>
-                            <?php if ($isSuper): ?>
-                                <td class="text-center">
-                                    <?php if ($isFirst): ?>
-                                        <input type="checkbox" class="form-check-input np-disc" style="cursor:pointer"
-                                            data-idcodgusto="<?= $gid ?>"
-                                            <?= (int)($p['discont'] ?? 0) === 1 ? 'checked' : '' ?> />
-                                    <?php endif; ?>
-                                </td>
-                            <?php endif; ?>
+                            <td class="text-center">
+                                <?php if ($isFirst): ?>
+                                    <input type="checkbox" class="form-check-input np-disc" style="cursor:pointer"
+                                        data-idcodgusto="<?= $gid ?>"
+                                        <?= (int)($p['discont'] ?? 0) === 1 ? 'checked' : '' ?> />
+                                <?php endif; ?>
+                            </td>
                             <td><a class="btn btn-sm btn-outline-secondary" href="/admin/stock/<?= (int)($p['idprodu'] ?? 0) ?>"><i class="bi bi-eye"></i></a></td>
                         </tr>
                     <?php endforeach; ?>
@@ -256,9 +252,7 @@ $qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $
                         <td class="text-center fw-bold">$<?= number_format($totalStockValor, 2, ',', '.') ?></td>
                         <td class="text-center fw-bold">$<?= number_format($totalVendidoValor, 2, ',', '.') ?></td>
                         <td></td>
-                        <?php if ($isSuper): ?>
-                            <td></td>
-                        <?php endif; ?>
+                        <td></td>
                         <td></td>
                     </tr>
                 </tfoot>
