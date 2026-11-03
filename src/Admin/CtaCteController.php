@@ -252,6 +252,145 @@ final class CtaCteController
         }
     }
 
+    public function pagoErpSinImputarForm(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requirePermiso('cta_cte');
+        $idclien = (int)($params['id'] ?? 0);
+        $st = Db::pdo()->prepare('SELECT idclien, razon, cuit, direc FROM clientes WHERE idclien = :id LIMIT 1');
+        $st->execute([':id' => $idclien]);
+        $cliente = $st->fetch();
+        if (!$cliente) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Cliente ERP no encontrado.'];
+            Response::redirect('/admin/ctacte');
+        }
+
+        $formasPago = array_values(array_filter(
+            (new \Perfushopping\Web\Repo\FormaPagoRepo())->findActivas(),
+            static fn(array $forma): bool => !in_array((string)($forma['tipo'] ?? ''), ['moneda', 'ctacte'], true)
+                && (string)($forma['codigo'] ?? '') !== 'cuenta_corriente'
+        ));
+        echo View::adminPage('admin/ctacte/pago-sin-imputar.php', [
+            'adminUser' => $adminUser,
+            'cliente' => $cliente,
+            'formasPago' => $formasPago,
+            'csrf' => Csrf::token(),
+            'pageTitle' => 'Pago a cuenta — ' . ($cliente['razon'] ?? ''),
+        ]);
+    }
+
+    public function pagoErpSinImputar(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requirePermiso('cta_cte');
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $idclien = (int)($_POST['idclien'] ?? 0);
+        $clienteSt = Db::pdo()->prepare('SELECT idclien, razon, cuit, direc, COALESCE(condicion_iva, \'consumidor_final\') AS condicion_iva FROM clientes WHERE idclien = :id LIMIT 1');
+        $clienteSt->execute([':id' => $idclien]);
+        $cliente = $clienteSt->fetch();
+        if (!$cliente) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Cliente ERP no encontrado.'];
+            Response::redirect('/admin/ctacte');
+        }
+
+        $rawMonto = trim((string)($_POST['monto'] ?? '0'));
+        if (str_contains($rawMonto, ',') && str_contains($rawMonto, '.')) {
+            $rawMonto = strrpos($rawMonto, ',') > strrpos($rawMonto, '.')
+                ? str_replace(',', '.', str_replace('.', '', $rawMonto))
+                : str_replace(',', '', $rawMonto);
+        } else {
+            $rawMonto = str_replace(',', '.', $rawMonto);
+        }
+        $montoCents = is_numeric($rawMonto) ? (int)round((float)$rawMonto * 100) : 0;
+        if ($montoCents <= 0) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Ingresá un importe mayor a cero.'];
+            Response::redirect('/admin/ctacte/erp/' . $idclien . '/pago-sin-imputar');
+        }
+
+        $formaPago = trim((string)($_POST['forma_pago'] ?? ''));
+        $forma = (new \Perfushopping\Web\Repo\FormaPagoRepo())->findActivoByCodigo($formaPago);
+        $tipoForma = (string)($forma['tipo'] ?? '');
+        if (!$forma || in_array($tipoForma, ['moneda', 'ctacte'], true) || $formaPago === 'cuenta_corriente') {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Seleccioná una forma de cobro válida.'];
+            Response::redirect('/admin/ctacte/erp/' . $idclien . '/pago-sin-imputar');
+        }
+
+        $fecha = trim((string)($_POST['fecha'] ?? date('Y-m-d')));
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha) || !strtotime($fecha)) $fecha = date('Y-m-d');
+        $notas = trim((string)($_POST['notas'] ?? ''));
+        $concepto = mb_substr(trim((string)($_POST['concepto'] ?? '')) ?: 'Pago a cuenta sin imputar facturas', 0, 255);
+        $pdo = Db::pdo();
+        $pdo->beginTransaction();
+        try {
+            $chequeId = null;
+            if ($tipoForma === 'cheque') {
+                $banco = trim((string)($_POST['cheque_banco'] ?? ''));
+                $numero = trim((string)($_POST['cheque_numero'] ?? ''));
+                if ($banco === '' || $numero === '') {
+                    throw new \RuntimeException('Completá banco y número del cheque.');
+                }
+                $chequeId = (new \Perfushopping\Web\Repo\ChequeRepo())->create([
+                    'tipo' => 'tercero',
+                    'estado' => 'en_cartera',
+                    'banco_emisor' => $banco,
+                    'numero_cheque' => $numero,
+                    'titular' => trim((string)($_POST['cheque_titular'] ?? '')),
+                    'cuit_titular' => trim((string)($_POST['cheque_cuit'] ?? '')),
+                    'monto_cents' => $montoCents,
+                    'fecha_emision' => $fecha,
+                    'fecha_vencimiento' => trim((string)($_POST['cheque_vencimiento'] ?? '')) ?: null,
+                    'concepto' => 'Pago a cuenta — ' . (string)$cliente['razon'],
+                ], (int)$adminUser['id']);
+            }
+
+            $codigo = (new \Perfushopping\Web\Repo\ReciboRepo())->nextCodigo();
+            $reciboId = (new \Perfushopping\Web\Repo\ReciboRepo())->create([
+                'codigo' => $codigo,
+                'tipo_comprobante' => 'REC-B',
+                'cliente_id' => null,
+                'idclien' => $idclien,
+                'cliente_nombre' => (string)$cliente['razon'],
+                'cliente_cuit' => (string)($cliente['cuit'] ?? ''),
+                'cliente_direc' => (string)($cliente['direc'] ?? ''),
+                'cliente_condicion_iva' => (string)($cliente['condicion_iva'] ?? 'consumidor_final'),
+                'fecha' => $fecha,
+                'monto_cents' => $montoCents,
+                'forma_pago' => $formaPago,
+                'concepto' => $concepto,
+                'estado' => 'emitido',
+                'notas' => $notas,
+                'created_by' => (int)$adminUser['id'],
+            ], [[
+                'factura_id' => null,
+                'forma_pago' => $formaPago,
+                'cheque_id' => $chequeId,
+                'monto_cents' => $montoCents,
+            ]]);
+
+            if ($chequeId) {
+                (new \Perfushopping\Web\Repo\ChequeRepo())->agregarMovimiento($chequeId, 'recibido', 'recibo', $reciboId, 'Pago a cuenta ' . $codigo, (int)$adminUser['id']);
+            }
+            (new CtaCteRepo())->agregarMovimiento(
+                'credito',
+                'recibo',
+                $reciboId,
+                null,
+                $idclien,
+                $montoCents,
+                mb_substr('Recibo ' . $codigo . ' — pago a cuenta sin imputar facturas: ' . $concepto, 0, 255),
+                (int)$adminUser['id']
+            );
+            $pdo->commit();
+            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Pago a cuenta registrado en el recibo ' . $codigo . '. No se imputó a ninguna factura.'];
+            Response::redirect('/admin/recibos/' . $reciboId);
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se pudo registrar el pago: ' . $e->getMessage()];
+            Response::redirect('/admin/ctacte/erp/' . $idclien . '/pago-sin-imputar');
+        }
+    }
+
     public function ajuste(array $params): void
     {
         $auth = new AdminAuthService();

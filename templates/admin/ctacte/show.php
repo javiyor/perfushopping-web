@@ -39,8 +39,12 @@ $origenLabels = ['factura'=>'Factura','recibo'=>'Recibo','ajuste'=>'Ajuste manua
 <div class="card shadow-sm mb-3">
     <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
         <span><i class="bi bi-cash-coin"></i> Cobrar facturas de cuenta corriente</span>
-        <span class="badge bg-secondary"><?= count($facturasPendientes) ?> pendiente(s)</span>
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-secondary"><?= count($facturasPendientes) ?> pendiente(s)</span>
+            <a class="btn btn-sm btn-outline-success" href="/admin/ctacte/erp/<?= (int)$cliente['idclien'] ?>/pago-sin-imputar"><i class="bi bi-cash-stack"></i> Pago sin imputar</a>
+        </div>
     </div>
+    <div class="small text-muted px-3 pt-2">Las facturas totalmente cubiertas por pagos imputados ya no aparecen en esta lista; las parcialmente pagadas muestran solo el saldo pendiente.</div>
     <?php if (!$facturasPendientes): ?>
         <div class="card-body small text-muted">Este cliente no tiene facturas pendientes en cuenta corriente.</div>
     <?php else: ?>
@@ -105,7 +109,7 @@ $origenLabels = ['factura'=>'Factura','recibo'=>'Recibo','ajuste'=>'Ajuste manua
 
 <div class="card shadow-sm">
     <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
-        <span>Movimientos</span>
+        <span>Todos los movimientos</span>
         <span class="badge bg-secondary"><?= count($movimientos) ?> mov.</span>
     </div>
     <div class="table-responsive">

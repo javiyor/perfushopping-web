@@ -84,7 +84,7 @@ $formaPagoLabels = ($formasPagoLabels ?? []) + [
     <table>
         <thead>
             <tr>
-                <th>Factura</th>
+                <th>Factura / destino</th>
                 <th class="text-right">Monto</th>
             </tr>
         </thead>

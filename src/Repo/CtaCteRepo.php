@@ -205,10 +205,9 @@ final class CtaCteRepo
         }
     }
 
-    public function movimientosErp(int $idclien, int $limit = 100): array
+    public function movimientosErp(int $idclien): array
     {
-        $limit = max(1, min(500, $limit));
-        $st = Db::pdo()->prepare('SELECT m.*, a.nombre AS created_by_nombre FROM ctacte_movimientos m LEFT JOIN admin_users a ON a.id = m.created_by WHERE m.cliente_id IS NULL AND m.idclien = :c ORDER BY m.id DESC LIMIT ' . $limit);
+        $st = Db::pdo()->prepare('SELECT m.*, a.nombre AS created_by_nombre FROM ctacte_movimientos m LEFT JOIN admin_users a ON a.id = m.created_by WHERE m.cliente_id IS NULL AND m.idclien = :c ORDER BY m.id DESC');
         $st->execute([':c' => $idclien]);
         return $st->fetchAll();
     }

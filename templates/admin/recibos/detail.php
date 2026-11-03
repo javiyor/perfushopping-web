@@ -114,7 +114,7 @@ $formaPagoLabels = ($formasPagoLabels ?? []) + [
     <div class="col-lg-8">
         <div class="card shadow-sm">
             <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
-                <span>Facturas canceladas</span>
+                <span>Pagos incluidos e imputaciones</span>
                 <span class="badge bg-secondary"><?= count($pagos) ?> pago(s)</span>
             </div>
             <?php if ($pagos): ?>

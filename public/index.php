@@ -452,6 +452,8 @@ $router->get('/admin/recibos/buscar-facturas', [AdminReciboController::class, 's
 $router->get('/admin/recibos/imprimir/(?P<id>\d+)', [AdminReciboController::class, 'print']);
 $router->get('/admin/ctacte', [AdminCtaCteController::class, 'index']);
 $router->post('/admin/ctacte/erp/pagar', [AdminCtaCteController::class, 'pagarErp']);
+$router->get('/admin/ctacte/erp/(?P<id>\d+)/pago-sin-imputar', [AdminCtaCteController::class, 'pagoErpSinImputarForm']);
+$router->post('/admin/ctacte/erp/pago-sin-imputar', [AdminCtaCteController::class, 'pagoErpSinImputar']);
 $router->get('/admin/ctacte/erp/(?P<id>\d+)', [AdminCtaCteController::class, 'showErp']);
 $router->get('/admin/ctacte/(?P<id>\d+)', [AdminCtaCteController::class, 'show']);
 $router->get('/admin/ctacte/ajuste/(?P<id>\d+)', [AdminCtaCteController::class, 'ajuste']);
