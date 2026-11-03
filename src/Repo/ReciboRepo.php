@@ -214,24 +214,35 @@ final class ReciboRepo
         }
         try {
             $st = Db::pdo()->prepare("
-                SELECT f.id, f.codigo, f.tipo_comprobante, f.total_cents, f.fecha,
-                       COALESCE(NULLIF((SELECT SUM(fp.monto_cents) FROM factura_pagos fp WHERE fp.factura_id = f.id AND fp.forma_pago = 'cuenta_corriente'), 0), f.total_cents) AS total_ctacte_cents,
-                       COALESCE((SELECT SUM(rp.monto_cents)
-                                 FROM recibo_pagos rp
-                                 INNER JOIN recibos r ON r.id = rp.recibo_id AND r.estado = 'emitido'
-                                 WHERE rp.factura_id = f.id), 0) AS pagado_cents,
-                       COALESCE(NULLIF((SELECT SUM(fp.monto_cents) FROM factura_pagos fp WHERE fp.factura_id = f.id AND fp.forma_pago = 'cuenta_corriente'), 0), f.total_cents)
-                         - COALESCE((SELECT SUM(rp.monto_cents)
-                                     FROM recibo_pagos rp
-                                     INNER JOIN recibos r ON r.id = rp.recibo_id AND r.estado = 'emitido'
-                                     WHERE rp.factura_id = f.id), 0) AS pendiente_cents
-                FROM facturas f
-                WHERE f.idclien = :c
-                   AND f.estado = 'emitida'
-                   AND (f.forma_pago = 'cuenta_corriente' OR EXISTS (SELECT 1 FROM factura_pagos fp WHERE fp.factura_id = f.id AND fp.forma_pago = 'cuenta_corriente'))
-                   AND COALESCE(f.tipo_comprobante, '') <> 'NC'
-                HAVING pendiente_cents > 0
-                ORDER BY f.fecha ASC, f.id ASC
+                SELECT pendientes.*
+                FROM (
+                    SELECT cta.factura_id AS id,
+                           COALESCE(f.codigo, cta.concepto) AS codigo,
+                           f.tipo_comprobante,
+                           COALESCE(f.total_cents, cta.total_ctacte_cents) AS total_cents,
+                           COALESCE(f.fecha, DATE(cta.fecha)) AS fecha,
+                           cta.total_ctacte_cents,
+                           COALESCE(pagado.pagado_cents, 0) AS pagado_cents,
+                           cta.total_ctacte_cents - COALESCE(pagado.pagado_cents, 0) AS pendiente_cents
+                    FROM (
+                        SELECT origen_id AS factura_id, SUM(monto_cents) AS total_ctacte_cents,
+                               MAX(concepto) AS concepto, MIN(created_at) AS fecha
+                        FROM ctacte_movimientos
+                        WHERE idclien = :c AND cliente_id IS NULL
+                          AND tipo = 'debito' AND origen = 'factura' AND origen_id IS NOT NULL
+                        GROUP BY origen_id
+                    ) cta
+                    LEFT JOIN facturas f ON f.id = cta.factura_id
+                    LEFT JOIN (
+                        SELECT rp.factura_id, SUM(rp.monto_cents) AS pagado_cents
+                        FROM recibo_pagos rp
+                        INNER JOIN recibos r ON r.id = rp.recibo_id AND r.estado = 'emitido'
+                        WHERE rp.factura_id IS NOT NULL
+                        GROUP BY rp.factura_id
+                    ) pagado ON pagado.factura_id = f.id
+                ) pendientes
+                WHERE pendientes.pendiente_cents > 0
+                ORDER BY pendientes.fecha ASC, pendientes.id ASC
             ");
             $st->execute([':c' => $idclien]);
             return $st->fetchAll();

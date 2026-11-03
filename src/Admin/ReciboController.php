@@ -98,6 +98,7 @@ final class ReciboController
         $pagos = [];
         $pendientesPorFactura = [];
         if ($clienteErpId) {
+            (new \Perfushopping\Web\Repo\CtaCteRepo())->sincronizarFacturasErp($clienteErpId, (int)$adminUser['id']);
             foreach ((new ReciboRepo())->findFacturasPendientesErp($clienteErpId) as $factura) {
                 $pendientesPorFactura[(int)$factura['id']] = (int)$factura['pendiente_cents'];
             }
@@ -406,6 +407,7 @@ final class ReciboController
         $clienteId = (int)($_GET['cliente_id'] ?? 0);
         $idclien = (int)($_GET['idclien'] ?? 0);
         if ($idclien > 0) {
+            (new \Perfushopping\Web\Repo\CtaCteRepo())->sincronizarFacturasErp($idclien, (int)$adminUser['id']);
             $facturas = (new ReciboRepo())->findFacturasPendientesErp($idclien);
             if ($facturas) {
                 foreach ($facturas as &$factura) {
