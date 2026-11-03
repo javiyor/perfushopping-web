@@ -16,17 +16,20 @@ $depositos = $depositos ?? [];
 $stockFilters = ['' => 'Todos', 'sin_stock' => 'Sin stock', 'bajo_stock' => 'Stock bajo (≤5)', 'con_stock' => 'Con stock'];
 $enweb = (string)($enweb ?? '');
 $webFilters = ['' => 'Web: todos', '1' => 'Publicados', '0' => 'No publicados'];
+$discontinuados = (string)($discontinuados ?? '');
+$discontinuadosFilters = ['' => 'Estado: todos', '0' => 'No discontinuados', '1' => 'Discontinuados'];
 $isSuper = ($adminUser['rol'] ?? '') === 'superadmin';
 $page = (int)($page ?? 1);
 $lastPage = (int)($lastPage ?? 1);
 $perPage = (int)($perPage ?? 80);
 $total = (int)($total ?? 0);
 $perPageOptions = $perPageOptions ?? [50, 80, 100, 200, 300, 500];
-$qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $iddepo, $desde, $hasta, $enweb, $perPage): string {
+$qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $iddepo, $desde, $hasta, $enweb, $discontinuados, $perPage): string {
     $p = [
         'q' => $q, 'codepar' => $codepar, 'stock' => $stockFilter,
         'codrub' => $codrub, 'codsub' => $codsub, 'codprove' => $codprove,
-        'iddepo' => $iddepo, 'desde' => $desde, 'hasta' => $hasta, 'enweb' => $enweb, 'per_page' => $perPage,
+        'iddepo' => $iddepo, 'desde' => $desde, 'hasta' => $hasta, 'enweb' => $enweb,
+        'discontinuados' => $discontinuados, 'per_page' => $perPage,
     ];
     foreach ($overrides as $k => $v) {
         $p[$k] = $v;
@@ -119,6 +122,13 @@ $qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $
                 </select>
             </div>
             <div class="col-lg-2">
+                <select class="form-select form-select-sm" name="discontinuados" title="Estado de discontinuado">
+                    <?php foreach ($discontinuadosFilters as $v => $label): ?>
+                        <option value="<?= htmlspecialchars($v) ?>" <?= $discontinuados === $v ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-lg-2">
                 <select class="form-select form-select-sm" name="iddepo">
                     <option value="0">Todos los depósitos</option>
                     <?php foreach ($depositos as $d): ?>
@@ -136,7 +146,7 @@ $qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $
                 <button class="btn btn-accent btn-sm w-100" type="submit"><i class="bi bi-search"></i></button>
             </div>
             <div class="col-lg-1">
-                <?php if ($q !== '' || $codprove !== '' || $codsub > 0 || $codrub > 0 || $stockFilter !== '' || $iddepo > 0 || $enweb !== ''): ?>
+                <?php if ($q !== '' || $codprove !== '' || $codsub > 0 || $codrub > 0 || $stockFilter !== '' || $iddepo > 0 || $enweb !== '' || $discontinuados !== ''): ?>
                     <a class="btn btn-outline-secondary btn-sm w-100" href="/admin/stock?desde=<?= urlencode($desde) ?>&hasta=<?= urlencode($hasta) ?>">Limpiar</a>
                 <?php endif; ?>
             </div>
@@ -265,7 +275,7 @@ $qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $
             <?php foreach ([
                 'q' => $q, 'codepar' => $codepar, 'stock' => $stockFilter, 'codrub' => $codrub,
                 'codsub' => $codsub, 'codprove' => $codprove, 'iddepo' => $iddepo,
-                'desde' => $desde, 'hasta' => $hasta, 'enweb' => $enweb,
+                'desde' => $desde, 'hasta' => $hasta, 'enweb' => $enweb, 'discontinuados' => $discontinuados,
             ] as $key => $value): if ($value !== '' && $value !== 0): ?>
                 <input type="hidden" name="<?= htmlspecialchars($key) ?>" value="<?= htmlspecialchars((string)$value) ?>" />
             <?php endif; endforeach; ?>

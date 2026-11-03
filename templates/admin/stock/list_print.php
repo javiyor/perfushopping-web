@@ -13,6 +13,7 @@ $codprove = (string)($codprove ?? '');
 $iddepo = (int)($iddepo ?? 0);
 $desde = (string)($desde ?? '');
 $hasta = (string)($hasta ?? '');
+$discontinuados = (string)($discontinuados ?? '');
 $nCols = count($expHeaders) + 1;
 ?>
 <!DOCTYPE html>
@@ -93,6 +94,7 @@ $nCols = count($expHeaders) + 1;
     <div>Rubro: <?= $codrub > 0 ? 'Rubro ' . $codrub : '' ?></div>
     <div>Subrubro: <?= $codsub > 0 ? 'Subrubro ' . $codsub : '' ?></div>
     <div>Proveedor: <?= htmlspecialchars($codprove) ?: 'Todos' ?></div>
+    <div>Discontinuados: <?= $discontinuados === '1' ? 'Solo discontinuados' : ($discontinuados === '0' ? 'Sin discontinuados' : 'Todos') ?></div>
     <div>Depósito: <?= $iddepo > 0 ? 'Depósito ' . $iddepo : 'Todos' ?></div>
     <div>Fecha: <?= $desde ?> - <?= $hasta ?></div>
 </div>

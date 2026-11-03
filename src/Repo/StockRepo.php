@@ -40,13 +40,13 @@ final class StockRepo
         self::$ajustesAuthTableReady = true;
     }
 
-    public function listarStock(string $q = '', int $codepar = 0, string $stockFilter = '', int $codrub = 0, int $codsub = 0, string $codprove = '', int $limit = 80, ?int $iddepo = null, string $desde = '', string $hasta = '', int $page = 1, ?string $enweb = null): array
+    public function listarStock(string $q = '', int $codepar = 0, string $stockFilter = '', int $codrub = 0, int $codsub = 0, string $codprove = '', int $limit = 80, ?int $iddepo = null, string $desde = '', string $hasta = '', int $page = 1, ?string $enweb = null, ?string $discontinuados = null): array
     {
         $limit = max(1, min(500, $limit));
         $page = max(1, $page);
         $offset = ($page - 1) * $limit;
 
-        [$where, $stockWhere, $depDepo, $params] = $this->stockFilterParts($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $iddepo, $desde, $hasta, $enweb);
+        [$where, $stockWhere, $depDepo, $params] = $this->stockFilterParts($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $iddepo, $desde, $hasta, $enweb, $discontinuados);
 
         if ($desde === '') $desde = date('Y-m-01');
         if ($hasta === '') $hasta = date('Y-m-d');
@@ -123,9 +123,9 @@ final class StockRepo
         return $st->fetchAll();
     }
 
-    public function contarStock(string $q = '', int $codepar = 0, string $stockFilter = '', int $codrub = 0, int $codsub = 0, string $codprove = '', ?int $iddepo = null, string $desde = '', string $hasta = '', ?string $enweb = null): int
+    public function contarStock(string $q = '', int $codepar = 0, string $stockFilter = '', int $codrub = 0, int $codsub = 0, string $codprove = '', ?int $iddepo = null, string $desde = '', string $hasta = '', ?string $enweb = null, ?string $discontinuados = null): int
     {
-        [$where, $stockWhere, $depDepo, $params] = $this->stockFilterParts($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $iddepo, $desde, $hasta, $enweb);
+        [$where, $stockWhere, $depDepo, $params] = $this->stockFilterParts($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $iddepo, $desde, $hasta, $enweb, $discontinuados);
 
         $sql = "
             SELECT COUNT(*)
@@ -149,7 +149,7 @@ final class StockRepo
         return $conds ? 'WHERE ' . implode(' AND ', $conds) : '';
     }
 
-    private function stockFilterParts(string $q, int $codepar, string $stockFilter, int $codrub, int $codsub, string $codprove, ?int $iddepo, string $desde, string $hasta, ?string $enweb = null): array
+    private function stockFilterParts(string $q, int $codepar, string $stockFilter, int $codrub, int $codsub, string $codprove, ?int $iddepo, string $desde, string $hasta, ?string $enweb = null, ?string $discontinuados = null): array
     {
         $params = [];
         $where = [];
@@ -157,6 +157,11 @@ final class StockRepo
             $where[] = 'p.enweb = 1';
         } elseif ($enweb === '0') {
             $where[] = '(p.enweb = 0 OR p.enweb IS NULL)';
+        }
+        if ($discontinuados === '1') {
+            $where[] = 'g.discont = 1';
+        } elseif ($discontinuados === '0') {
+            $where[] = '(g.discont = 0 OR g.discont IS NULL)';
         }
 
         if ($q !== '') {

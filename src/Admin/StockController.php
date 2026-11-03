@@ -28,16 +28,18 @@ final class StockController
         $iddepo = (int)($_GET['iddepo'] ?? 0);
         $enweb = trim((string)($_GET['enweb'] ?? ''));
         if (!in_array($enweb, ['', '1', '0'], true)) $enweb = '';
+        $discontinuados = trim((string)($_GET['discontinuados'] ?? ''));
+        if (!in_array($discontinuados, ['', '1', '0'], true)) $discontinuados = '';
         if ($desde === '') $desde = date('Y-m-01');
         if ($hasta === '') $hasta = date('Y-m-d');
         $page = max(1, (int)($_GET['page'] ?? 1));
         $perPageOptions = [50, 80, 100, 200, 300, 500];
         $requestedPerPage = (int)($_GET['per_page'] ?? 80);
         $perPage = in_array($requestedPerPage, $perPageOptions, true) ? $requestedPerPage : 80;
-        $total = $repo->contarStock($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $iddepo ?: null, $desde, $hasta, $enweb === '' ? null : $enweb);
+        $total = $repo->contarStock($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $iddepo ?: null, $desde, $hasta, $enweb === '' ? null : $enweb, $discontinuados === '' ? null : $discontinuados);
         $lastPage = max(1, (int)ceil($total / $perPage));
         $page = min($page, $lastPage);
-        $list = $repo->listarStock($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $perPage, $iddepo ?: null, $desde, $hasta, $page, $enweb === '' ? null : $enweb);
+        $list = $repo->listarStock($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $perPage, $iddepo ?: null, $desde, $hasta, $page, $enweb === '' ? null : $enweb, $discontinuados === '' ? null : $discontinuados);
         $rubros = $repo->grillaRubros();
         $subrubros = $repo->grillaSubrubros();
         $proveedores = $repo->grillaProveedores();
@@ -47,6 +49,7 @@ final class StockController
             'adminUser' => $adminUser,
             'list' => $list,
             'enweb' => $enweb,
+            'discontinuados' => $discontinuados,
             'q' => $q,
             'codepar' => $codepar,
             'stockFilter' => $stockFilter,
@@ -136,12 +139,12 @@ final class StockController
     }
 
     /** Trae TODAS las filas del listado con los filtros actuales (paginando de a 200). */
-    private function stockFiltradoCompleto(StockRepo $repo, string $q, int $codepar, string $stockFilter, int $codrub, int $codsub, string $codprove, ?int $iddepo, string $desde, string $hasta, ?string $enweb): array
+    private function stockFiltradoCompleto(StockRepo $repo, string $q, int $codepar, string $stockFilter, int $codrub, int $codsub, string $codprove, ?int $iddepo, string $desde, string $hasta, ?string $enweb, ?string $discontinuados): array
     {
         $todo = [];
         $page = 1;
         do {
-            $rows = $repo->listarStock($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, 200, $iddepo, $desde, $hasta, $page, $enweb);
+            $rows = $repo->listarStock($q, $codepar, $stockFilter, $codrub, $codsub, $codprove, 200, $iddepo, $desde, $hasta, $page, $enweb, $discontinuados);
             foreach ($rows as $r) {
                 $todo[] = $r;
             }
@@ -167,10 +170,12 @@ final class StockController
         $iddepo = (int)($_GET['iddepo'] ?? 0);
         $enweb = trim((string)($_GET['enweb'] ?? ''));
         if (!in_array($enweb, ['', '1', '0'], true)) $enweb = '';
+        $discontinuados = trim((string)($_GET['discontinuados'] ?? ''));
+        if (!in_array($discontinuados, ['', '1', '0'], true)) $discontinuados = '';
         if ($desde === '') $desde = date('Y-m-01');
         if ($hasta === '') $hasta = date('Y-m-d');
 
-        $list = $this->stockFiltradoCompleto($repo, $q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $iddepo ?: null, $desde, $hasta, $enweb === '' ? null : $enweb);
+        $list = $this->stockFiltradoCompleto($repo, $q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $iddepo ?: null, $desde, $hasta, $enweb === '' ? null : $enweb, $discontinuados === '' ? null : $discontinuados);
         [$expHeaders, $expRows] = $this->stockExportData($list, $this->stockColsSel());
 
         echo View::adminPage('admin/stock/list_print.php', [
@@ -187,6 +192,7 @@ final class StockController
             'iddepo' => $iddepo,
             'desde' => $desde,
             'hasta' => $hasta,
+            'discontinuados' => $discontinuados,
             'csrf' => Csrf::token(),
             'pageTitle' => 'Listado de Stock - Imprimir',
         ]);
@@ -209,9 +215,11 @@ final class StockController
         $iddepo = (int)($_GET['iddepo'] ?? 0);
         $enweb = trim((string)($_GET['enweb'] ?? ''));
         if (!in_array($enweb, ['', '1', '0'], true)) $enweb = '';
+        $discontinuados = trim((string)($_GET['discontinuados'] ?? ''));
+        if (!in_array($discontinuados, ['', '1', '0'], true)) $discontinuados = '';
         if ($desde === '') $desde = date('Y-m-01');
         if ($hasta === '') $hasta = date('Y-m-d');
-        $list = $this->stockFiltradoCompleto($repo, $q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $iddepo ?: null, $desde, $hasta, $enweb === '' ? null : $enweb);
+        $list = $this->stockFiltradoCompleto($repo, $q, $codepar, $stockFilter, $codrub, $codsub, $codprove, $iddepo ?: null, $desde, $hasta, $enweb === '' ? null : $enweb, $discontinuados === '' ? null : $discontinuados);
         [$expHeaders, $expRows] = $this->stockExportData($list, $this->stockColsSel());
 
         // Archivo Excel real (SpreadsheetML) con todo lo listado
