@@ -227,16 +227,16 @@ final class ReciboRepo
                                      WHERE rp.factura_id = f.id), 0) AS pendiente_cents
                 FROM facturas f
                 WHERE f.idclien = :c
-                  AND f.estado = 'emitida'
-                  AND (f.forma_pago = 'cuenta_corriente' OR EXISTS (SELECT 1 FROM factura_pagos fp WHERE fp.factura_id = f.id AND fp.forma_pago = 'cuenta_corriente'))
-                  AND f.tipo_comprobante IN ('FACT-A','FACT-B','FACT-C','ND')
+                   AND f.estado = 'emitida'
+                   AND (f.forma_pago = 'cuenta_corriente' OR EXISTS (SELECT 1 FROM factura_pagos fp WHERE fp.factura_id = f.id AND fp.forma_pago = 'cuenta_corriente'))
+                   AND COALESCE(f.tipo_comprobante, '') <> 'NC'
                 HAVING pendiente_cents > 0
                 ORDER BY f.fecha ASC, f.id ASC
             ");
             $st->execute([':c' => $idclien]);
             return $st->fetchAll();
         } catch (\Throwable $e) {
-            error_log('ReciboRepo::findFacturasPendientesErp error: ' . $e->getMessage());
+            error_log('ReciboRepo::findFacturasPendientesErp idclien=' . $idclien . ' error: ' . $e->getMessage());
             return [];
         }
     }
