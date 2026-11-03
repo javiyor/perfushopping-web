@@ -59,7 +59,27 @@ final class ReciboController
         $adminUser = $auth->requirePermiso('recibos');
         Csrf::check($_POST['_csrf'] ?? null);
 
+        $clienteId = (int)($_POST['cliente_id'] ?? 0) ?: null;
+        $clienteErpId = (int)($_POST['idclien'] ?? 0) ?: null;
         $clienteNombre = trim((string)($_POST['cliente_nombre'] ?? ''));
+        $clienteCuit = trim((string)($_POST['cliente_cuit'] ?? ''));
+        $clienteDirec = trim((string)($_POST['cliente_direc'] ?? ''));
+        $clienteCondIva = trim((string)($_POST['cliente_condicion_iva'] ?? 'consumidor_final'));
+        if ($clienteErpId) {
+            $clienteSt = \Perfushopping\Web\Infra\Db::pdo()->prepare('SELECT razon, cuit, direc, COALESCE(condicion_iva, \'consumidor_final\') AS condicion_iva FROM clientes WHERE idclien = :id LIMIT 1');
+            $clienteSt->execute([':id' => $clienteErpId]);
+            $clienteErp = $clienteSt->fetch();
+            if (!$clienteErp) {
+                $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Cliente ERP no encontrado.'];
+                Response::redirect('/admin/recibos/nuevo');
+            }
+            $clienteNombre = (string)$clienteErp['razon'];
+            $clienteCuit = (string)($clienteErp['cuit'] ?? '');
+            $clienteDirec = (string)($clienteErp['direc'] ?? '');
+            $clienteCondIva = (string)($clienteErp['condicion_iva'] ?? 'consumidor_final');
+            // Los recibos de facturas ERP se imputan al saldo por idclien.
+            $clienteId = null;
+        }
         if ($clienteNombre === '') {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'El nombre del cliente es obligatorio.'];
             Response::redirect('/admin/recibos/nuevo');
@@ -73,16 +93,57 @@ final class ReciboController
 
         $formaPago = trim((string)($_POST['forma_pago'] ?? 'efectivo'));
 
-        // Create cheque record if forma_pago = cheque
+        $facturaIds = $_POST['factura_id'] ?? [];
+        $montosPago = $_POST['pago_monto'] ?? [];
+        $pagos = [];
+        $pendientesPorFactura = [];
+        if ($clienteErpId) {
+            foreach ((new ReciboRepo())->findFacturasPendientesErp($clienteErpId) as $factura) {
+                $pendientesPorFactura[(int)$factura['id']] = (int)$factura['pendiente_cents'];
+            }
+        } elseif ($clienteId) {
+            foreach ((new ReciboRepo())->findFacturasPendientes((int)$clienteId) as $factura) {
+                $pendientesPorFactura[(int)$factura['id']] = max(0, (int)$factura['total_cents'] - (int)($factura['pagado_cents'] ?? 0));
+            }
+        }
+        $totalPagosCents = 0;
+        $idsUsados = [];
+        if (is_array($facturaIds)) {
+            foreach ($facturaIds as $idx => $fid) {
+                $fid = (int)$fid;
+                if ($fid <= 0) continue;
+                $pm = (int)($montosPago[$idx] ?? 0);
+                if ($pm <= 0) continue;
+                if (!isset($pendientesPorFactura[$fid]) || isset($idsUsados[$fid]) || $pm > $pendientesPorFactura[$fid]) {
+                    $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Una factura ya no está pendiente para este cliente o su importe excede el saldo.'];
+                    Response::redirect('/admin/recibos/nuevo');
+                }
+                $idsUsados[$fid] = true;
+                $pagoRow = ['factura_id' => $fid, 'monto_cents' => $pm];
+                $pagos[] = $pagoRow;
+                $totalPagosCents += $pm;
+            }
+        }
+
+        if (!$pagos) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Seleccioná al menos una factura pendiente para aplicar el recibo.'];
+            Response::redirect('/admin/recibos/nuevo');
+        }
+
+        if ($totalPagosCents !== $montoCents) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'El monto total debe coincidir con la suma aplicada a las facturas seleccionadas.'];
+            Response::redirect('/admin/recibos/nuevo');
+        }
+
+        // Create cheque record after validating selected invoices and amounts.
         $chequeId = null;
         if ($formaPago === 'cheque') {
-            $chequeRepo = new ChequeRepo();
             $chequeMontoCents = (int)($_POST['cheque_monto_cents'] ?? 0);
-            if ($chequeMontoCents <= 0) {
-                $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Completá los datos del cheque.'];
+            if ($chequeMontoCents !== $montoCents) {
+                $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'El monto del cheque debe coincidir con el monto del recibo.'];
                 Response::redirect('/admin/recibos/nuevo');
             }
-            $chequeId = $chequeRepo->create([
+            $chequeId = (new ChequeRepo())->create([
                 'tipo' => 'tercero',
                 'estado' => 'en_cartera',
                 'banco_emisor' => trim((string)($_POST['cheque_banco'] ?? '')),
@@ -92,42 +153,18 @@ final class ReciboController
                 'monto_cents' => $chequeMontoCents,
                 'fecha_emision' => (string)($_POST['fecha'] ?? date('Y-m-d')),
                 'fecha_vencimiento' => trim((string)($_POST['cheque_vencimiento'] ?? '')) ?: null,
-                'concepto' => 'Recibo — ' . trim((string)($_POST['cliente_nombre'] ?? '')),
+                'concepto' => 'Recibo — ' . $clienteNombre,
             ], (int)$adminUser['id']);
-            $chequeRepo->agregarMovimiento($chequeId, 'recibido', 'recibo', 0, '', (int)$adminUser['id']);
-        }
-
-        $facturaIds = $_POST['factura_id'] ?? [];
-        $montosPago = $_POST['pago_monto'] ?? [];
-        $pagos = [];
-        if (is_array($facturaIds)) {
-            foreach ($facturaIds as $idx => $fid) {
-                $fid = (int)$fid;
-                if ($fid <= 0) continue;
-                $pm = (int)($montosPago[$idx] ?? 0);
-                if ($pm <= 0) continue;
-                $pagoRow = ['factura_id' => $fid, 'monto_cents' => $pm];
-                if ($chequeId) {
-                    $pagoRow['forma_pago'] = 'cheque';
-                    $pagoRow['cheque_id'] = $chequeId;
-                }
-                $pagos[] = $pagoRow;
+            foreach ($pagos as &$pago) {
+                $pago['forma_pago'] = 'cheque';
+                $pago['cheque_id'] = $chequeId;
             }
-        }
-
-        if (!$pagos) {
-            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Seleccioná al menos una factura o ingresá un concepto.'];
-            Response::redirect('/admin/recibos/nuevo');
+            unset($pago);
+            $chequeId && (new ChequeRepo())->agregarMovimiento($chequeId, 'recibido', 'recibo', 0, '', (int)$adminUser['id']);
         }
 
         $repo = new ReciboRepo();
-        $clienteId = (int)($_POST['cliente_id'] ?? 0) ?: null;
-        $clienteCuit = trim((string)($_POST['cliente_cuit'] ?? ''));
-        $clienteDirec = trim((string)($_POST['cliente_direc'] ?? ''));
-        $clienteCondIva = trim((string)($_POST['cliente_condicion_iva'] ?? 'consumidor_final'));
-        $clienteErpId = null;
-
-        if ($clienteId) {
+        if (!$clienteErpId && $clienteId) {
             $erp = $repo->findClienteErpByWebId($clienteId);
             $clienteErpId = $erp ? (int)$erp['idclien'] : null;
         }
@@ -152,7 +189,7 @@ final class ReciboController
         ], $pagos);
 
         // Auto-post credits to current account
-        if ($clienteId) {
+        if ($clienteErpId || $clienteId) {
             $ctaCte = new \Perfushopping\Web\Repo\CtaCteRepo();
             foreach ($pagos as $pg) {
                 $facturaCodigo = '';
@@ -367,12 +404,28 @@ final class ReciboController
         $adminUser = $auth->requirePermiso('recibos');
 
         $clienteId = (int)($_GET['cliente_id'] ?? 0);
+        $idclien = (int)($_GET['idclien'] ?? 0);
+        if ($idclien > 0) {
+            $facturas = (new ReciboRepo())->findFacturasPendientesErp($idclien);
+            if ($facturas) {
+                foreach ($facturas as &$factura) {
+                    $factura['origen_ctacte'] = 'erp';
+                }
+                unset($factura);
+                Response::json($facturas);
+                return;
+            }
+        }
         if ($clienteId <= 0) {
             Response::json([]);
             return;
         }
 
         $results = (new ReciboRepo())->findFacturasPendientes($clienteId);
+        foreach ($results as &$factura) {
+            $factura['origen_ctacte'] = 'web';
+        }
+        unset($factura);
         Response::json($results);
     }
 

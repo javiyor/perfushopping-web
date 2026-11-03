@@ -28,6 +28,7 @@ if (!$formaPagoLabels) {
 <form method="post" action="/admin/recibos/guardar" id="reciboForm">
     <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrfToken) ?>" />
     <input type="hidden" name="cliente_id" id="clienteId" value="0" />
+    <input type="hidden" name="idclien" id="idclien" value="0" />
     <input type="hidden" name="cliente_cuit" id="clienteCuit" value="" />
     <input type="hidden" name="cliente_direc" id="clienteDirec" value="" />
     <input type="hidden" name="cliente_condicion_iva" id="clienteCondIva" value="consumidor_final" />
@@ -81,7 +82,8 @@ if (!$formaPagoLabels) {
                         <label class="form-label small">Monto total <span class="text-danger">*</span></label>
                         <div class="input-group input-group-sm">
                             <span class="input-group-text">$</span>
-                            <input class="form-control" name="monto_cents" id="montoCents" type="number" value="0" min="1" required />
+                            <input class="form-control" id="montoTotalDisplay" type="number" value="0.00" step="0.01" readonly />
+                            <input type="hidden" name="monto_cents" id="montoCents" value="0" />
                         </div>
                     </div>
                     <div>
@@ -111,7 +113,8 @@ if (!$formaPagoLabels) {
                                 <label class="small">Monto del cheque</label>
                                 <div class="input-group input-group-sm">
                                     <span class="input-group-text">$</span>
-                                    <input class="form-control" name="cheque_monto_cents" type="number" placeholder="En centavos" />
+                                    <input class="form-control" id="chequeMontoDisplay" type="number" value="0.00" step="0.01" readonly />
+                                    <input type="hidden" name="cheque_monto_cents" id="chequeMontoCents" value="0" />
                                 </div>
                             </div>
                         </div>
@@ -194,29 +197,33 @@ cliInput.addEventListener('blur', function() {
 
 function selectCliente(c) {
     document.getElementById('clienteId').value = c.id || 0;
+    document.getElementById('idclien').value = c.idclien || 0;
     document.getElementById('clienteNombre').value = c.name || '';
     document.getElementById('clienteCuit').value = c.cuit || '';
     document.getElementById('clienteDirec').value = c.direc || c.address || '';
     document.getElementById('clienteCondIva').value = c.condicion_iva || 'consumidor_final';
     cliInput.value = c.name || '';
     cliSuggestions.innerHTML = '';
-    loadFacturasPendientes(c.id || 0);
+    loadFacturasPendientes(c.id || 0, c.idclien || 0);
 }
 
-function loadFacturasPendientes(clienteId) {
+function loadFacturasPendientes(clienteId, idclien) {
     const container = document.getElementById('facturasContainer');
     const count = document.getElementById('pendientesCount');
 
-    if (clienteId <= 0) {
+    if (clienteId <= 0 && idclien <= 0) {
         container.innerHTML = '<div class="text-muted text-center py-4 small">Seleccioná un cliente para ver sus facturas pendientes</div>';
         count.textContent = '0';
         return;
     }
 
-    fetch('/admin/recibos/buscar-facturas?cliente_id=' + clienteId)
+    fetch('/admin/recibos/buscar-facturas?cliente_id=' + clienteId + '&idclien=' + idclien)
         .then(r => r.json())
         .then(data => {
             facturasCache = data || [];
+            if (facturasCache[0]?.origen_ctacte === 'web') {
+                document.getElementById('idclien').value = '0';
+            }
             count.textContent = facturasCache.length;
 
             if (facturasCache.length === 0) {
@@ -225,7 +232,7 @@ function loadFacturasPendientes(clienteId) {
             }
 
             let html = facturasCache.map((f, idx) => {
-                const saldo = f.total_cents - (f.pagado_cents || 0);
+                const saldo = Number(f.pendiente_cents ?? (f.total_cents - (f.pagado_cents || 0)));
                 const tipoLabel = {'FACT-A':'FA','FACT-B':'FB','FACT-C':'FC','NC':'NC','ND':'ND'}[f.tipo_comprobante] || f.tipo_comprobante;
                 return `
                     <div class="factura-pago-row">
@@ -233,9 +240,9 @@ function loadFacturasPendientes(clienteId) {
                         <input type="hidden" name="factura_id[]" class="fp-fid" value="${f.id}" disabled />
                         <input type="hidden" name="pago_monto[]" class="fp-monto" value="0" disabled />
                         <div class="fp-codigo"><span class="badge bg-secondary me-1">${tipoLabel}</span>${esc(f.codigo)}</div>
-                        <div class="fp-total">$${(saldo).toLocaleString('es-AR')}</div>
+                        <div class="fp-total">Saldo: $${(saldo / 100).toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
                         <div class="fp-pago">
-                            <input type="number" class="fp-monto-input" value="${saldo}" min="0" max="${saldo}" disabled onchange="updateMontoFactura(${idx}, this.value)" />
+                            <input type="number" class="fp-monto-input" value="${(saldo / 100).toFixed(2)}" min="0.01" max="${(saldo / 100).toFixed(2)}" step="0.01" disabled onchange="updateMontoFactura(${idx}, this.value)" />
                         </div>
                     </div>
                 `;
@@ -248,16 +255,17 @@ function loadFacturasPendientes(clienteId) {
 function toggleFactura(idx) {
     const row = document.querySelectorAll('.factura-pago-row')[idx];
     const checked = row.querySelector('.fp-check').checked;
+    const montoInput = row.querySelector('.fp-monto-input');
     row.querySelector('.fp-fid').disabled = !checked;
     row.querySelector('.fp-monto').disabled = !checked;
-    row.querySelector('.fp-monto-input').disabled = !checked;
-    if (checked) recalcTotal();
-    else { recalcTotal(); }
+    montoInput.disabled = !checked;
+    row.querySelector('.fp-monto').value = checked ? Math.round((parseFloat(montoInput.value) || 0) * 100) : 0;
+    recalcTotal();
 }
 
 function updateMontoFactura(idx, val) {
     const row = document.querySelectorAll('.factura-pago-row')[idx];
-    const monto = Math.max(0, parseInt(val) || 0);
+    const monto = Math.max(0, Math.round((parseFloat(val) || 0) * 100));
     row.querySelector('.fp-monto').value = monto;
     recalcTotal();
 }
@@ -268,13 +276,16 @@ function recalcTotal() {
     document.querySelectorAll('.factura-pago-row').forEach((row, idx) => {
         const checked = row.querySelector('.fp-check').checked;
         if (checked) {
-            const monto = parseInt(row.querySelector('.fp-monto-input').value) || 0;
+            const monto = parseInt(row.querySelector('.fp-monto').value) || 0;
             total += monto;
             const codigo = facturasCache[idx]?.codigo || '';
             conceptoParts.push(codigo);
         }
     });
     document.getElementById('montoCents').value = total;
+    document.getElementById('montoTotalDisplay').value = (total / 100).toFixed(2);
+    document.getElementById('chequeMontoCents').value = total;
+    document.getElementById('chequeMontoDisplay').value = (total / 100).toFixed(2);
     if (conceptoParts.length > 0) {
         document.getElementById('concepto').value = 'Pago: ' + conceptoParts.join(', ');
     }
