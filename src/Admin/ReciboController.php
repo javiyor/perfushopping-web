@@ -136,6 +136,9 @@ final class ReciboController
             Response::redirect('/admin/recibos/nuevo');
         }
 
+        $repo = new ReciboRepo();
+        $repo->ensurePaymentStorage();
+
         // Create cheque record after validating selected invoices and amounts.
         $chequeId = null;
         if ($formaPago === 'cheque') {
@@ -164,7 +167,6 @@ final class ReciboController
             $chequeId && (new ChequeRepo())->agregarMovimiento($chequeId, 'recibido', 'recibo', 0, '', (int)$adminUser['id']);
         }
 
-        $repo = new ReciboRepo();
         if (!$clienteErpId && $clienteId) {
             $erp = $repo->findClienteErpByWebId($clienteId);
             $clienteErpId = $erp ? (int)$erp['idclien'] : null;

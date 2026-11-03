@@ -320,6 +320,8 @@ final class CtaCteController
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha) || !strtotime($fecha)) $fecha = date('Y-m-d');
         $notas = trim((string)($_POST['notas'] ?? ''));
         $concepto = mb_substr(trim((string)($_POST['concepto'] ?? '')) ?: 'Pago a cuenta sin imputar facturas', 0, 255);
+        $reciboRepo = new \Perfushopping\Web\Repo\ReciboRepo();
+        $reciboRepo->ensurePaymentStorage();
         $pdo = Db::pdo();
         $pdo->beginTransaction();
         try {
@@ -344,8 +346,8 @@ final class CtaCteController
                 ], (int)$adminUser['id']);
             }
 
-            $codigo = (new \Perfushopping\Web\Repo\ReciboRepo())->nextCodigo();
-            $reciboId = (new \Perfushopping\Web\Repo\ReciboRepo())->create([
+            $codigo = $reciboRepo->nextCodigo();
+            $reciboId = $reciboRepo->create([
                 'codigo' => $codigo,
                 'tipo_comprobante' => 'REC-B',
                 'cliente_id' => null,

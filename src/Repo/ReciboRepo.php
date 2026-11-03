@@ -7,9 +7,45 @@ use Perfushopping\Web\Infra\Db;
 
 final class ReciboRepo
 {
+    private static bool $paymentTableReady = false;
+
+    private function ensurePaymentTable(): void
+    {
+        if (self::$paymentTableReady) return;
+        $pdo = Db::pdo();
+        $pdo->exec("CREATE TABLE IF NOT EXISTS recibo_pagos (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            recibo_id INT UNSIGNED NOT NULL,
+            factura_id INT UNSIGNED DEFAULT NULL,
+            forma_pago VARCHAR(40) DEFAULT NULL,
+            cheque_id INT UNSIGNED DEFAULT NULL,
+            monto_cents INT NOT NULL DEFAULT 0,
+            KEY idx_recibo_pagos_recibo (recibo_id),
+            KEY idx_recibo_pagos_factura (factura_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        foreach ([
+            'forma_pago' => 'VARCHAR(40) DEFAULT NULL AFTER factura_id',
+            'cheque_id' => 'INT UNSIGNED DEFAULT NULL AFTER forma_pago',
+        ] as $column => $definition) {
+            $st = $pdo->query("SHOW COLUMNS FROM recibo_pagos LIKE '{$column}'");
+            if ($st->fetch() === false) {
+                $pdo->exec('ALTER TABLE recibo_pagos ADD COLUMN `' . $column . '` ' . $definition);
+            }
+        }
+        self::$paymentTableReady = true;
+    }
+
+    /** Prepara el storage antes de abrir una transacción externa que insertará recibos. */
+    public function ensurePaymentStorage(): void
+    {
+        $this->ensurePaymentTable();
+    }
+
     public function search(string $q = '', string $estado = '', int $limit = 60, string $fecha = ''): array
     {
         try {
+            $this->ensurePaymentTable();
             $limit = max(1, min(200, $limit));
             $q = trim($q);
             $estado = trim($estado);
@@ -65,6 +101,7 @@ final class ReciboRepo
     public function pagos(int $reciboId): array
     {
         try {
+            $this->ensurePaymentTable();
             $st = Db::pdo()->prepare('
                 SELECT rp.*, f.codigo AS factura_codigo, f.total_cents AS factura_total,
                        c.banco_emisor AS cheque_banco, c.numero_cheque, c.titular AS cheque_titular, c.fecha_vencimiento AS cheque_vto
@@ -91,6 +128,7 @@ final class ReciboRepo
 
     public function create(array $data, array $pagos): int
     {
+        $this->ensurePaymentTable();
         $pdo = Db::pdo();
         $ownsTransaction = !$pdo->inTransaction();
         if ($ownsTransaction) {
@@ -189,6 +227,7 @@ final class ReciboRepo
     public function findFacturasPendientes(int $clienteId): array
     {
         try {
+            $this->ensurePaymentTable();
             $st = Db::pdo()->prepare('
                 SELECT f.id, f.codigo, f.tipo_comprobante, f.total_cents, f.fecha,
                        COALESCE(SUM(rp.monto_cents), 0) AS pagado_cents
@@ -213,6 +252,7 @@ final class ReciboRepo
             return [];
         }
         try {
+            $this->ensurePaymentTable();
             $st = Db::pdo()->prepare("
                 SELECT pendientes.*
                 FROM (
