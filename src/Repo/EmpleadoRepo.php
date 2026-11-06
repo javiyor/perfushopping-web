@@ -629,6 +629,8 @@ final class EmpleadoRepo
 
     public function guardarLiquidacion(array $liq, int $createdBy): int
     {
+        // Table creation may implicitly commit; initialize before the transaction starts.
+        $this->ensureAdelantosTable();
         $pdo = Db::pdo();
         $pdo->beginTransaction();
         try {
@@ -737,13 +739,14 @@ final class EmpleadoRepo
 
     public function anularLiquidacion(int $id): void
     {
+        // CREATE TABLE can implicitly commit in MySQL; make sure it runs before opening the transaction.
+        $this->ensureAdelantosTable();
         $pdo = Db::pdo();
         $pdo->beginTransaction();
         try {
             $st = $pdo->prepare("UPDATE empleado_liquidacion SET estado = 'anulada' WHERE id = :id AND estado = 'calculada' LIMIT 1");
             $st->execute([':id' => $id]);
             if ($st->rowCount() > 0) {
-                $this->ensureAdelantosTable();
                 $pdo->prepare('UPDATE empleado_adelantos SET liquidacion_id=NULL WHERE liquidacion_id=:id')->execute([':id'=>$id]);
             }
             $pdo->commit();

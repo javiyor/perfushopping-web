@@ -395,6 +395,7 @@ final class EmpleadoController
             'liquidacion' => $liquidacion,
             'detalle' => $detalle,
             'adelantos' => $repo->adelantosDeLiquidacion($id),
+            'empresa' => (new \Perfushopping\Web\Repo\EmpresaRepo())->getDefault(),
             'fechaImpresion' => date('d/m/Y'),
         ]);
     }
