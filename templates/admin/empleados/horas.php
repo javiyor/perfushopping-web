@@ -51,11 +51,12 @@ $turnosIncluidos = (int)($turnosIncluidos ?? 0);
                             <th>Horas</th>
                             <th>Concepto</th>
                             <th>Cargó</th>
+                            <th class="text-end">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (!$horas): ?>
-                        <tr><td colspan="4" class="text-muted text-center py-3">Sin horas registradas este período.</td></tr>
+                        <tr><td colspan="5" class="text-muted text-center py-3">Sin horas registradas este período.</td></tr>
                         <?php endif; ?>
                         <?php foreach ($horas as $h): ?>
                         <tr>
@@ -63,6 +64,14 @@ $turnosIncluidos = (int)($turnosIncluidos ?? 0);
                             <td class="fw-bold"><?= htmlspecialchars((string)$h['horas']) ?></td>
                             <td class="small text-muted"><?= htmlspecialchars($h['concepto'] ?? '-') ?></td>
                             <td class="small text-muted"><?= htmlspecialchars((string)($h['created_by'] ?? '-')) ?></td>
+                            <td class="text-end">
+                                <button class="btn btn-sm btn-outline-primary py-0 px-1" type="button" title="Modificar horas"
+                                    data-id="<?= (int)$h['id'] ?>"
+                                    data-fecha="<?= htmlspecialchars((string)$h['fecha'], ENT_QUOTES) ?>"
+                                    data-horas="<?= htmlspecialchars((string)$h['horas'], ENT_QUOTES) ?>"
+                                    data-concepto="<?= htmlspecialchars((string)($h['concepto'] ?? ''), ENT_QUOTES) ?>"
+                                    onclick="editarHoras(this)"><i class="bi bi-pencil"></i></button>
+                            </td>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -154,5 +163,51 @@ $turnosIncluidos = (int)($turnosIncluidos ?? 0);
     </div>
 </div>
 <?php elseif ($vendedorId > 0 && !$config): ?>
-<div class="alert alert-warning">Este vendedor no tiene configuración salarial. <a href="/admin/empleados/<?= $vendedorId ?>">Configurar ahora</a></div>
+    <div class="alert alert-warning">Este vendedor no tiene configuración salarial. <a href="/admin/empleados/<?= $vendedorId ?>">Configurar ahora</a></div>
+<?php endif; ?>
+
+<?php if ($vendedorId > 0 && $config): ?>
+<div class="modal fade" id="modalEditarHoras" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="/admin/empleados/horas/actualizar">
+                <div class="modal-header">
+                    <h5 class="modal-title">Modificar horas cargadas</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                    <input type="hidden" name="id" id="editarHorasId" />
+                    <input type="hidden" name="admin_user_id" value="<?= $vendedorId ?>" />
+                    <input type="hidden" name="periodo_actual" value="<?= htmlspecialchars($periodo) ?>" />
+                    <div class="mb-3">
+                        <label class="form-label small">Fecha</label>
+                        <input class="form-control" type="date" name="fecha" id="editarHorasFecha" required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small">Horas</label>
+                        <input class="form-control" type="number" name="horas" id="editarHorasCantidad" min="0.5" max="24" step="0.5" required />
+                    </div>
+                    <div>
+                        <label class="form-label small">Concepto</label>
+                        <input class="form-control" name="concepto" id="editarHorasConcepto" maxlength="200" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-accent">Guardar cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+function editarHoras(button) {
+    document.getElementById('editarHorasId').value = button.dataset.id || '';
+    document.getElementById('editarHorasFecha').value = button.dataset.fecha || '';
+    document.getElementById('editarHorasCantidad').value = button.dataset.horas || '';
+    document.getElementById('editarHorasConcepto').value = button.dataset.concepto || '';
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modalEditarHoras')).show();
+}
+</script>
 <?php endif; ?>

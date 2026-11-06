@@ -403,6 +403,24 @@ final class EmpleadoRepo
         return (int)Db::pdo()->lastInsertId();
     }
 
+    public function actualizarHoras(int $id, int $adminUserId, string $fecha, float $horas, string $concepto): bool
+    {
+        $st = Db::pdo()->prepare('UPDATE empleado_horas
+            SET fecha = :fecha, horas = :horas, concepto = :concepto
+            WHERE id = :id AND admin_user_id = :uid LIMIT 1');
+        $st->execute([
+            ':fecha' => $fecha,
+            ':horas' => $horas,
+            ':concepto' => $concepto !== '' ? $concepto : null,
+            ':id' => $id,
+            ':uid' => $adminUserId,
+        ]);
+        if ($st->rowCount() > 0) return true;
+        $check = Db::pdo()->prepare('SELECT COUNT(*) FROM empleado_horas WHERE id = :id AND admin_user_id = :uid');
+        $check->execute([':id' => $id, ':uid' => $adminUserId]);
+        return (int)$check->fetchColumn() > 0;
+    }
+
     public function ventasDelMes(int $vendedorId, string $periodo): array
     {
         $st = Db::pdo()->prepare("

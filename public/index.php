@@ -651,6 +651,7 @@ $router->post('/admin/empleados/comisiones/eliminar', [AdminEmpleadoController::
 $router->post('/admin/empleados/comisiones/compartir', [AdminEmpleadoController::class, 'compartirComisiones']);
 $router->get('/admin/empleados/horas', [AdminEmpleadoController::class, 'horas']);
 $router->post('/admin/empleados/horas/guardar', [AdminEmpleadoController::class, 'horasStore']);
+$router->post('/admin/empleados/horas/actualizar', [AdminEmpleadoController::class, 'horasUpdate']);
 $router->get('/admin/empleados/liquidar', [AdminEmpleadoController::class, 'liquidar']);
 $router->post('/admin/empleados/liquidar/guardar', [AdminEmpleadoController::class, 'liquidarStore']);
 $router->get('/admin/empleados/liquidaciones', [AdminEmpleadoController::class, 'liquidaciones']);

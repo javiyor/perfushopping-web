@@ -239,6 +239,39 @@ final class EmpleadoController
         Response::redirect('/admin/empleados/horas?vendedor_id=' . $adminUserId . '&periodo=' . substr($fecha, 0, 7));
     }
 
+    public function horasUpdate(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $auth->requirePermiso('usuarios_admin');
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $id = (int)($_POST['id'] ?? 0);
+        $adminUserId = (int)($_POST['admin_user_id'] ?? 0);
+        $fecha = trim((string)($_POST['fecha'] ?? ''));
+        $horas = (float)($_POST['horas'] ?? 0);
+        $concepto = trim((string)($_POST['concepto'] ?? ''));
+        $periodoActual = trim((string)($_POST['periodo_actual'] ?? ''));
+        $back = '/admin/empleados/horas?vendedor_id=' . $adminUserId
+            . ($periodoActual !== '' ? '&periodo=' . urlencode($periodoActual) : '');
+
+        $fechaValida = preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha) === 1
+            && strtotime($fecha) !== false
+            && date('Y-m-d', strtotime($fecha)) === $fecha;
+        if ($id <= 0 || $adminUserId <= 0 || !$fechaValida || $horas < 0.5 || $horas > 24) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Revisá fecha y horas; el rango permitido es de 0,5 a 24 horas.'];
+            Response::redirect($back);
+        }
+
+        $actualizado = (new EmpleadoRepo())->actualizarHoras($id, $adminUserId, $fecha, $horas, $concepto);
+        if (!$actualizado) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se encontró ese registro de horas para el empleado.'];
+            Response::redirect($back);
+        }
+
+        $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Registro de horas actualizado.'];
+        Response::redirect('/admin/empleados/horas?vendedor_id=' . $adminUserId . '&periodo=' . substr($fecha, 0, 7));
+    }
+
     public function liquidar(array $params): void
     {
         $auth = new AdminAuthService();
