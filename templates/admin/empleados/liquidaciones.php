@@ -1,20 +1,36 @@
+<style>
+    @page { size: A4 portrait; margin: 10mm; }
+    @media print {
+        .sidebar, .sidebar-backdrop, .topbar, .screen-controls, .flash-msg { display: none !important; }
+        .main-content { width: 100% !important; margin: 0 !important; }
+        .content-wrap { padding: 0 !important; margin: 0 !important; }
+        .liquidaciones-card { border: 0 !important; box-shadow: none !important; }
+        .liquidaciones-card .card-body { padding: 0 !important; }
+        .liquidaciones-table { width: 100%; font-size: 9px; }
+        .liquidaciones-table th, .liquidaciones-table td { padding: 4px 5px; }
+        .liquidaciones-table th:last-child, .liquidaciones-table td:last-child { display: none !important; }
+        .badge { color: #111 !important; border: 1px solid #777; background: #fff !important; }
+    }
+</style>
+
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
         <h4 class="fw-bold mb-1">Liquidaciones</h4>
-        <p class="text-muted small">Historial de sueldos liquidados</p>
+        <p class="text-muted small screen-controls">Historial de sueldos liquidados</p>
     </div>
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 screen-controls">
         <form method="get" class="d-flex gap-2 align-items-center">
             <input class="form-control form-control-sm" type="month" name="periodo" value="<?= htmlspecialchars($periodo) ?>" onchange="this.form.submit()" style="width:160px" />
             <a class="btn btn-accent btn-sm" href="/admin/empleados/liquidar"><i class="bi bi-calculator"></i> Nueva liquidación</a>
         </form>
+        <button class="btn btn-outline-primary btn-sm" type="button" onclick="window.print()"><i class="bi bi-printer"></i> Imprimir listado</button>
     </div>
 </div>
 
-<div class="card shadow-sm">
+<div class="card shadow-sm liquidaciones-card">
     <div class="card-body p-0">
         <div class="table-responsive">
-        <table class="table table-sm mb-0">
+        <table class="table table-sm mb-0 liquidaciones-table">
             <thead>
                 <tr>
                     <th>Período</th>
