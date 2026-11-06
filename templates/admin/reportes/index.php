@@ -121,7 +121,7 @@ $puntosVenta = $puntosVenta ?? [];
         <div class="col-6 col-md-4">
             <div class="card-dashboard text-center">
                 <div class="h3 fw-bold mb-0" id="kpiPromDiario">-</div>
-                <div class="small text-muted">Promedio diario (<span id="kpiPromDiarioDias">-</span> días)</div>
+                <div class="small text-muted">Promedio diario (<span id="kpiPromDiarioDias">-</span> días con ventas)</div>
             </div>
         </div>
     </div>
@@ -421,7 +421,8 @@ function cargarReportes() {
             const noaut = (d.autorizacion && d.autorizacion.no_autorizadas) || {};
             const totAll = parseInt(aut.total_cents ?? 0) + parseInt(noaut.total_cents ?? 0);
             const cantAll = parseInt(aut.cantidad ?? 0) + parseInt(noaut.cantidad ?? 0);
-            const dias = Math.max(1, parseInt(d.dias ?? 1));
+            const diarias = d.diarias || [];
+            const diasConVentas = Math.max(0, parseInt(d.dias_con_ventas ?? diarias.reduce((total, dia) => total + parseInt(dia.hubo_ventas ?? 0), 0)));
             document.getElementById('kpiTotal').textContent = fmtCents(totAll);
             document.getElementById('kpiTicket').textContent = cantAll > 0 ? fmtCents(Math.round(totAll / cantAll)) : '—';
 
@@ -486,8 +487,8 @@ function cargarReportes() {
             document.getElementById('kpiAutorizadasCant').textContent = parseInt(aut.cantidad ?? 0);
             document.getElementById('kpiNoAutorizadas').textContent = fmtCents(parseInt(noaut.total_cents ?? 0));
             document.getElementById('kpiNoAutorizadasCant').textContent = parseInt(noaut.cantidad ?? 0);
-            document.getElementById('kpiPromDiario').textContent = fmtCents(Math.round(totAll / dias));
-            document.getElementById('kpiPromDiarioDias').textContent = dias;
+            document.getElementById('kpiPromDiario').textContent = fmtCents(diasConVentas > 0 ? Math.round(totAll / diasConVentas) : 0);
+            document.getElementById('kpiPromDiarioDias').textContent = diasConVentas;
 
             // Comparativas
             const compBody = document.getElementById('compBody');
@@ -509,7 +510,6 @@ function cargarReportes() {
             });
 
             // Diarias chart
-            const diarias = d.diarias || [];
             const labels = diarias.map(x => x.fecha);
             const dataVentas = diarias.map(x => parseInt(x.total_cents || 0) / 100);
             const dataCant = diarias.map(x => parseInt(x.cantidad || 0));
@@ -602,7 +602,6 @@ function cargarReportes() {
             const sucBody = document.getElementById('sucursalBody');
             sucBody.innerHTML = '';
             const sucs = d.porSucursal || [];
-            const diasS = Math.max(1, parseInt(d.dias ?? 1));
             if (!sucs.length) {
                 sucBody.innerHTML = '<tr><td colspan="11" class="text-muted text-center">Sin datos</td></tr>';
             } else {
@@ -616,7 +615,8 @@ function cargarReportes() {
                     const gastos = parseInt(s.gastos_cents || 0);
                     const margen = (s.margen_pct !== null && s.margen_pct !== undefined) ? parseFloat(s.margen_pct).toFixed(1) + '%' : '—';
                     const ticket = cant > 0 ? fmtCents(Math.round(total / cant)) : '—';
-                    const promDiario = fmtCents(Math.round(total / diasS));
+                    const diasSucursal = Math.max(0, parseInt(s.dias_con_ventas ?? 0));
+                    const promDiario = fmtCents(diasSucursal > 0 ? Math.round(total / diasSucursal) : 0);
                     sucBody.innerHTML += '<tr>'
                         + '<td>' + escHtml(s.sucursal) + '</td>'
                         + '<td class="text-end">' + cant + '</td>'
@@ -782,7 +782,7 @@ function exportarCSV() {
             const noautCsv = (d.autorizacion && d.autorizacion.no_autorizadas) || {};
             const totCsv = parseInt(autCsv.total_cents ?? 0) + parseInt(noautCsv.total_cents ?? 0);
             const cantCsv = parseInt(autCsv.cantidad ?? 0) + parseInt(noautCsv.cantidad ?? 0);
-            const diasCsv = Math.max(1, parseInt(d.dias ?? 1));
+            const diasCsv = Math.max(0, parseInt(d.dias_con_ventas ?? 0));
             csv += 'Total,' + (totCsv / 100).toFixed(2) + '\n';
             csv += 'Ticket promedio,' + (cantCsv > 0 ? (totCsv / cantCsv / 100).toFixed(2) : '0') + '\n';
             csv += 'IVA,' + (parseInt(res.iva_cents ?? 0) / 100).toFixed(2) + '\n';
@@ -790,8 +790,8 @@ function exportarCSV() {
             csv += 'Autorizadas total,' + (parseInt(autCsv.total_cents ?? 0) / 100).toFixed(2) + '\n';
             csv += 'No autorizadas cant.,' + (noautCsv.cantidad ?? 0) + '\n';
             csv += 'No autorizadas total,' + (parseInt(noautCsv.total_cents ?? 0) / 100).toFixed(2) + '\n';
-            csv += 'Dias periodo,' + diasCsv + '\n';
-            csv += 'Promedio diario,' + (totCsv / diasCsv / 100).toFixed(2) + '\n\n';
+            csv += 'Dias con ventas,' + diasCsv + '\n';
+            csv += 'Promedio diario,' + (diasCsv > 0 ? (totCsv / diasCsv / 100).toFixed(2) : '0.00') + '\n\n';
 
             const gananciasCsv = d.ganancia || {};
             const comprasGastosCsv = d.comprasYGastos || {};
@@ -866,7 +866,8 @@ function exportarCSV() {
                 const gana = parseInt(s.ganancia_cents || 0);
                 const margen = neto > 0 ? (gana / neto * 100).toFixed(1) : '0';
                 const ticket = cant > 0 ? (total / cant / 100).toFixed(2) : '0';
-                const promD = (total / diasCsv / 100).toFixed(2);
+                const diasSucursal = Math.max(0, parseInt(s.dias_con_ventas ?? 0));
+                const promD = (diasSucursal > 0 ? total / diasSucursal / 100 : 0).toFixed(2);
                 csv += '"' + String(s.sucursal || '').replace(/"/g, '""') + '",' + cant + ','
                     + (total / 100).toFixed(2) + ','
                     + (neto / 100).toFixed(2) + ','

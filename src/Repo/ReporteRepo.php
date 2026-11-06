@@ -68,7 +68,8 @@ final class ReporteRepo
         }
         $total = $this->montoSignado('f.total_cents');
         $st = Db::pdo()->prepare("
-            SELECT f.fecha, COUNT(*) AS cantidad, COALESCE(SUM({$total}), 0) AS total_cents
+            SELECT f.fecha, COUNT(*) AS cantidad, COALESCE(SUM({$total}), 0) AS total_cents,
+                   MAX(CASE WHEN COALESCE(f.tipo_comprobante, '') <> 'NC' THEN 1 ELSE 0 END) AS hubo_ventas
             FROM facturas f
             WHERE f.estado = 'emitida'
               AND f.fecha BETWEEN :desde AND :hasta
@@ -351,6 +352,7 @@ final class ReporteRepo
                     COALESCE(s.id, CONCAT('pv-', f.punto_venta)) AS sucursal_key,
                     COALESCE(s.nomsuc, spv_suc.nomsuc, CONCAT('PV ', f.punto_venta)) AS sucursal,
                     COUNT(*) AS cantidad,
+                    COUNT(DISTINCT CASE WHEN COALESCE(f.tipo_comprobante, '') <> 'NC' THEN f.fecha END) AS dias_con_ventas,
                     COALESCE(SUM({$total}), 0) AS total_cents,
                     COALESCE(SUM({$subtotal}), 0) AS subtotal_cents,
                     COALESCE(SUM({$iva}), 0) AS iva_cents,
@@ -371,6 +373,7 @@ final class ReporteRepo
                     'sucursal_key' => $r['sucursal_key'],
                     'sucursal' => (string)$r['sucursal'],
                     'cantidad' => (int)$r['cantidad'],
+                    'dias_con_ventas' => (int)$r['dias_con_ventas'],
                     'total_cents' => (int)$r['total_cents'],
                     'subtotal_cents' => (int)$r['subtotal_cents'],
                     'iva_cents' => (int)$r['iva_cents'],

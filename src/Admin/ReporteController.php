@@ -74,23 +74,12 @@ final class ReporteController
             $inventario['error'] = 'No se pudo guardar o consultar la captura mensual de inventario.';
         }
 
-        // Días naturales del período (inclusive) para promedios diarios.
-        $dias = 1;
-        try {
-            $d1 = new \DateTime($desde);
-            $d2 = new \DateTime($hasta);
-            if ($d2 >= $d1) {
-                $dias = max(1, (int)$d1->diff($d2)->days + 1);
-            }
-        } catch (\Throwable $e) {
-            $dias = 1;
-        }
-
         try {
             $step = 'resumen';
             $resumen = $repo->resumenVentas($desde, $hasta, $puntoVenta);
             $step = 'diarias';
             $diarias = $repo->ventasDiarias($desde, $hasta, $puntoVenta);
+            $diasConVentas = array_sum(array_map(static fn(array $dia): int => (int)($dia['hubo_ventas'] ?? 0), $diarias));
             $step = 'topProductos';
             $topProductos = $repo->topProductos($desde, $hasta, 15, $puntoVenta);
             $step = 'porDepartamento';
@@ -172,7 +161,7 @@ final class ReporteController
             'porTipo' => $porTipo,
             'autorizacion' => $autorizacion ?? ['autorizadas' => [], 'no_autorizadas' => []],
             'porVendedor' => $porVendedor ?? [],
-            'dias' => $dias,
+            'dias_con_ventas' => $diasConVentas,
             'porSucursal' => $porSucursal,
             'comparativas' => $comparativas,
             'mensuales' => $mensuales,

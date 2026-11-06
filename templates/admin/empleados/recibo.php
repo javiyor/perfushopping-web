@@ -88,42 +88,54 @@ $renderRecibo = static function (bool $encabezadoEmpresa) use ($empresa, $liquid
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Recibo de sueldo - <?= htmlspecialchars($liquidacion['nombre'] ?? $liquidacion['username'] ?? '') ?></title>
     <style>
-        @page { size: 210mm 297mm; margin: 8mm; }
+        @page { size: 210mm 297mm; margin: 6mm; }
         * { box-sizing: border-box; }
-        body { margin: 0; color: #111; font: 10px/1.25 Arial, sans-serif; }
+        body { margin: 0; color: #111; font: 8px/1.1 Arial, sans-serif; }
         .no-print { margin: 12px 0; text-align: center; }
         .no-print button { padding: 8px 24px; cursor: pointer; }
-        .recibo-copia { width: 100%; padding: 3mm 2mm 4mm; }
-        .encabezado-empresa { margin-bottom: 2mm; text-align: center; font-size: 10px; }
-        .razon { font-size: 13px; font-weight: 700; }
-        h1 { margin: 0 0 2mm; text-align: center; font-size: 14px; letter-spacing: .03em; }
-        .datos-empleado { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 3mm 8mm; margin: 2mm 0; }
-        .detalle-recibo { display: grid; grid-template-columns: 1fr; gap: 2mm; }
-        .subtitulo { margin: 1mm 0; font-weight: 700; }
+        .recibos-hoja { width: 100%; }
+        .recibo-copia { width: 100%; padding: 1.5mm 1mm 2mm; break-inside: avoid; page-break-inside: avoid; }
+        .encabezado-empresa { margin-bottom: 1mm; text-align: center; font-size: 8px; }
+        .razon { font-size: 10px; font-weight: 700; }
+        h1 { margin: 0 0 1mm; text-align: center; font-size: 11px; letter-spacing: .03em; }
+        .datos-empleado { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1mm 4mm; margin: 1mm 0; }
+        .detalle-recibo { display: grid; grid-template-columns: 1fr; gap: 1mm; }
+        .subtitulo { margin: .5mm 0; font-weight: 700; }
         table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 1.2mm 1.5mm; border-bottom: 1px solid #aaa; text-align: left; }
+        th, td { padding: .45mm 1mm; border-bottom: 1px solid #aaa; text-align: left; }
         th:last-child, td:last-child { text-align: right; white-space: nowrap; }
         .total-haberes td { border-top: 1px solid #333; font-weight: 700; }
-        .total-descuentos { display: flex; justify-content: space-between; border-top: 1px solid #777; padding: 1.5mm; }
-        .sin-gastos { padding: 2mm 1.5mm; }
-        .saldo { display: flex; justify-content: space-between; margin-top: 2mm; padding: 2mm 1.5mm; border-top: 2px solid #111; border-bottom: 2px solid #111; font-size: 13px; font-weight: 700; }
-        .declaracion { margin: 2mm 0; }
-        .firmas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12mm; margin: 8mm 4mm 0; text-align: center; }
-        .firmas div { border-top: 1px dotted #222; padding-top: 1mm; }
-        .separador-copias { margin: 2mm 0; border: 0; border-top: 2px dotted #444; }
+        .total-descuentos { display: flex; justify-content: space-between; border-top: 1px solid #777; padding: .75mm 1mm; }
+        .sin-gastos { padding: 1mm; }
+        .saldo { display: flex; justify-content: space-between; margin-top: 1mm; padding: 1mm; border-top: 2px solid #111; border-bottom: 2px solid #111; font-size: 10px; font-weight: 700; }
+        .declaracion { margin: 1mm 0; }
+        .firmas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8mm; margin: 4mm 4mm 0; text-align: center; }
+        .firmas div { border-top: 1px dotted #222; padding-top: .5mm; }
+        .separador-copias { margin: 1mm 0; border: 0; border-top: 2px dotted #444; }
+        @media screen {
+            body { font-size: 11px; }
+            .encabezado-empresa { font-size: 10px; }
+            .razon { font-size: 13px; }
+            h1 { font-size: 14px; }
+            th, td { padding: 1mm 1.5mm; }
+            .firmas { margin-top: 6mm; }
+        }
         @media print {
             html, body { width: 100%; }
             .no-print { display: none !important; }
-            .recibo-copia { width: 100%; break-inside: avoid; }
+            .recibos-hoja { width: 100%; break-inside: avoid; page-break-inside: avoid; }
+            .recibo-copia { width: 100%; break-inside: avoid; page-break-inside: avoid; }
             .detalle-recibo { grid-template-columns: 1fr; }
-            .separador-copias { break-after: avoid; }
+            .separador-copias { break-before: avoid; break-after: avoid; page-break-before: avoid; page-break-after: avoid; }
         }
     </style>
 </head>
 <body>
     <div class="no-print"><button type="button" onclick="window.print()">Imprimir recibos</button></div>
+    <main class="recibos-hoja">
     <?= $renderRecibo(true) ?>
     <hr class="separador-copias" />
     <?= $renderRecibo(false) ?>
+    </main>
 </body>
 </html>
