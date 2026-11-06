@@ -91,7 +91,7 @@ final class GastoRepo
         $joinCreated = $hasCreatedBy ? ' LEFT JOIN admin_users au ON au.id = g.created_by' : '';
         $orderBy = $hasFecha ? "g.fecha DESC, g.`$pk` DESC" : "g.`$pk` DESC";
 
-        $sql = "SELECT g.*, g.`$pk` AS id, $selectCuenta $selectBanco $selectCheque $selectCreated FROM gastos g$joinCuenta$joinBanco$joinCheque$joinCreated";
+        $sql = "SELECT g.*, g.`$pk` AS id, (SELECT aa.admin_user_id FROM empleado_adelantos aa WHERE aa.gasto_id=g.`$pk` LIMIT 1) AS empleado_id, $selectCuenta $selectBanco $selectCheque $selectCreated FROM gastos g$joinCuenta$joinBanco$joinCheque$joinCreated";
         if ($where) $sql .= ' WHERE ' . implode(' AND ', $where);
         $sql .= " ORDER BY $orderBy LIMIT 500";
         try {
@@ -139,7 +139,7 @@ final class GastoRepo
         $joinCheque = $hasCheque ? ' LEFT JOIN cheques ch ON ch.id = g.cheque_id' : '';
         $selectCreated = $hasCreatedBy ? 'au.nombre AS created_by_nombre' : 'NULL AS created_by_nombre';
         $joinCreated = $hasCreatedBy ? ' LEFT JOIN admin_users au ON au.id=g.created_by' : '';
-        $sql = "SELECT g.*, g.`$pk` AS id, $selectCuenta $selectBanco $selectCheque $selectCreated FROM gastos g$joinCuenta$joinBanco$joinCheque$joinCreated WHERE g.`$pk`=:id LIMIT 1";
+        $sql = "SELECT g.*, g.`$pk` AS id, (SELECT aa.admin_user_id FROM empleado_adelantos aa WHERE aa.gasto_id=g.`$pk` LIMIT 1) AS empleado_id, $selectCuenta $selectBanco $selectCheque $selectCreated FROM gastos g$joinCuenta$joinBanco$joinCheque$joinCreated WHERE g.`$pk`=:id LIMIT 1";
         try {
             $st = Db::pdo()->prepare($sql);
             $st->execute([':id'=>$id]);

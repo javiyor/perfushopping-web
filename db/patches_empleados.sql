@@ -59,6 +59,20 @@ CREATE TABLE IF NOT EXISTS empleado_liquidacion (
   CONSTRAINT fk_emp_liq_creator FOREIGN KEY (created_by) REFERENCES admin_users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS empleado_adelantos (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  gasto_id INT UNSIGNED NOT NULL UNIQUE,
+  admin_user_id INT UNSIGNED NOT NULL,
+  fecha DATE NOT NULL,
+  importe_cents INT NOT NULL,
+  liquidacion_id INT UNSIGNED DEFAULT NULL,
+  created_at DATETIME NOT NULL,
+  KEY idx_emp_adelanto_periodo (admin_user_id, fecha, liquidacion_id),
+  KEY idx_emp_adelanto_liquidacion (liquidacion_id),
+  CONSTRAINT fk_emp_adelanto_admin FOREIGN KEY (admin_user_id) REFERENCES admin_users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_emp_adelanto_liquidacion FOREIGN KEY (liquidacion_id) REFERENCES empleado_liquidacion(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS empleado_asistencia_turnos (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   admin_user_id INT UNSIGNED NOT NULL,

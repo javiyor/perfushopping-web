@@ -95,6 +95,10 @@
                     <dt class="col-sm-6">Comisiones:</dt>
                     <dd class="col-sm-6 text-end"><?= \Perfushopping\Web\Support\Format::moneyFromCents((int)($resultado['comision_cents'] ?? 0)) ?></dd>
                     <?php endif; ?>
+                    <?php if (($resultado['adelanto_cents'] ?? 0) > 0): ?>
+                    <dt class="col-sm-6">Adelantos desde la última liquidación pagada:</dt>
+                    <dd class="col-sm-6 text-end text-danger">− <?= \Perfushopping\Web\Support\Format::moneyFromCents((int)$resultado['adelanto_cents']) ?></dd>
+                    <?php endif; ?>
                 </dl>
                 <hr />
                 <div class="d-flex justify-content-between fw-bold" style="font-size:20px">

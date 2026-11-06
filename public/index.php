@@ -655,6 +655,7 @@ $router->post('/admin/empleados/horas/actualizar', [AdminEmpleadoController::cla
 $router->get('/admin/empleados/liquidar', [AdminEmpleadoController::class, 'liquidar']);
 $router->post('/admin/empleados/liquidar/guardar', [AdminEmpleadoController::class, 'liquidarStore']);
 $router->get('/admin/empleados/liquidaciones', [AdminEmpleadoController::class, 'liquidaciones']);
+$router->get('/admin/empleados/liquidaciones/(?P<id>\d+)/imprimir', [AdminEmpleadoController::class, 'imprimirLiquidacion']);
 $router->post('/admin/empleados/liquidaciones/pagar', [AdminEmpleadoController::class, 'liquidacionPagada']);
 $router->post('/admin/empleados/liquidaciones/anular', [AdminEmpleadoController::class, 'liquidacionAnular']);
 $router->get('/admin/orders', [AdminWebOrderController::class, 'index']);

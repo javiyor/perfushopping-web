@@ -10,6 +10,7 @@ use Perfushopping\Web\Repo\ChequeRepo;
 use Perfushopping\Web\Repo\CompraRepo;
 use Perfushopping\Web\Repo\CobroCuentaRepo;
 use Perfushopping\Web\Repo\GastoRepo;
+use Perfushopping\Web\Repo\EmpleadoRepo;
 use Perfushopping\Web\Service\AdminAuthService;
 use Perfushopping\Web\Support\Csrf;
 use Perfushopping\Web\Support\Response;
@@ -22,6 +23,10 @@ final class GastoController
         $auth = new AdminAuthService();
         $adminUser = $auth->requirePermiso('compras');
         $repo = new GastoRepo();
+        $empleadoRepo = new EmpleadoRepo();
+        $empleadoRepo->prepararAdelantos();
+        $empleados = $empleadoRepo->listConfig();
+        $empleados = array_values(array_filter($empleados, static fn(array $e): bool => (int)($e['activo'] ?? 0) === 1 && (int)($e['user_activo'] ?? 0) === 1));
         $desde = trim((string)($_GET['desde'] ?? ''));
         $hasta = trim((string)($_GET['hasta'] ?? ''));
         $hasFiltro = isset($_GET['desde']) || isset($_GET['hasta']) || isset($_GET['q']);
@@ -35,14 +40,23 @@ final class GastoController
         }
         $list = $repo->findAll(['q'=>trim((string)($_GET['q'] ?? '')), 'desde'=>$desde, 'hasta'=>$hasta]);
         $today = date('Y-m-d');
+        $returnParams = [];
+        foreach (['q', 'desde', 'hasta'] as $key) {
+            if (isset($_GET[$key]) && trim((string)$_GET[$key]) !== '') {
+                $returnParams[$key] = trim((string)$_GET[$key]);
+            }
+        }
+        $returnUrl = '/admin/gastos' . ($returnParams ? '?' . http_build_query($returnParams) : '');
         echo View::adminPage('admin/gastos/list.php', [
             'adminUser'=>$adminUser,
             'list'=>$list,
             'cuentas'=>$repo->cuentas(),
+            'empleados'=>$empleados,
             'bancos'=>(new BancoCuentaRepo())->findAll(),
             'desde'=>$desde,
             'hasta'=>$hasta,
             'today'=>$today,
+            'returnUrl'=>$returnUrl,
             'csrf'=>Csrf::token(),
             'pageTitle'=>'Gastos varios',
         ]);
@@ -53,9 +67,12 @@ final class GastoController
         $auth = new AdminAuthService();
         $adminUser = $auth->requirePermiso('compras');
         Csrf::check($_POST['_csrf'] ?? null);
+        $returnUrl = $this->returnUrl();
+        $repo = new GastoRepo();
 
         $fecha = trim((string)($_POST['fecha'] ?? date('Y-m-d')));
         $idcta1 = (int)($_POST['idcta1'] ?? 0);
+        $empleadoId = (int)($_POST['empleado_id'] ?? 0);
         $descripcion = trim((string)($_POST['descripcion'] ?? ''));
         $importeCents = (int)($_POST['importe_cents'] ?? 0);
         if ($importeCents <= 0) {
@@ -68,10 +85,20 @@ final class GastoController
 
         if ($descripcion === '' || $importeCents <= 0 || $idcta1 <= 0) {
             $_SESSION['admin_flash'] = ['type'=>'danger','text'=>'Completá cuenta, descripción e importe.'];
-            Response::redirect('/admin/gastos');
+            Response::redirect($returnUrl);
         }
         if (!in_array($formaPago, ['efectivo','transferencia','cheque'], true)) $formaPago='efectivo';
         if (!in_array($cajaDestino, ['chica','general'], true)) $cajaDestino='general';
+
+        $empleadoRepo = new EmpleadoRepo();
+        if ($empleadoId > 0 && !$this->esCuentaSueldo($idcta1, $repo)) {
+            $_SESSION['admin_flash'] = ['type'=>'danger','text'=>'La asignación de empleado solo corresponde a gastos de sueldos.'];
+            Response::redirect($returnUrl);
+        }
+        if ($this->esCuentaSueldo($idcta1, $repo) && ($empleadoId <= 0 || !$empleadoRepo->empleadoActivo($empleadoId))) {
+            $_SESSION['admin_flash'] = ['type'=>'danger','text'=>'Seleccioná un empleado activo para registrar el adelanto.'];
+            Response::redirect($returnUrl);
+        }
 
         $chequeId = null;
         if ($formaPago === 'cheque') {
@@ -97,7 +124,6 @@ final class GastoController
             $repoCh->agregarMovimiento($chequeId, 'emitido', 'gasto', null, 'Gasto varios', (int)$adminUser['id']);
         }
 
-        $repo = new GastoRepo();
         $gastoId = $repo->create([
             'fecha'=>$fecha,
             'idcta1'=>$idcta1,
@@ -111,6 +137,7 @@ final class GastoController
             'punto_venta'=>$auth->getPuntoVenta(),
             'created_by'=>(int)$adminUser['id'],
         ]);
+        $empleadoRepo->sincronizarAdelanto($gastoId, $empleadoId, $fecha, $importeCents);
 
         // Movimientos caja / banco
         $this->registrarMovimientosGasto([
@@ -123,7 +150,7 @@ final class GastoController
         ], $gastoId, $auth, (int)$adminUser['id']);
 
         $_SESSION['admin_flash'] = ['type'=>'ok','text'=>'Gasto registrado.'];
-        Response::redirect('/admin/gastos');
+        Response::redirect($returnUrl);
     }
 
     public function update(array $params): void
@@ -131,17 +158,23 @@ final class GastoController
         $auth = new AdminAuthService();
         $adminUser = $auth->requirePermiso('compras');
         Csrf::check($_POST['_csrf'] ?? null);
+        $returnUrl = $this->returnUrl();
 
         $id = (int)($_POST['id'] ?? 0);
         $repo = new GastoRepo();
         $actual = $id > 0 ? $repo->findById($id) : null;
         if (!$actual) {
             $_SESSION['admin_flash'] = ['type'=>'danger','text'=>'Gasto no encontrado.'];
-            Response::redirect('/admin/gastos');
+            Response::redirect($returnUrl);
+        }
+        if ((new EmpleadoRepo())->adelantoAsignado($id)) {
+            $_SESSION['admin_flash'] = ['type'=>'danger','text'=>'Este adelanto ya está incluido en una liquidación y no se puede editar.'];
+            Response::redirect($returnUrl);
         }
 
         $fecha = trim((string)($_POST['fecha'] ?? date('Y-m-d')));
         $idcta1 = (int)($_POST['idcta1'] ?? 0);
+        $empleadoId = (int)($_POST['empleado_id'] ?? 0);
         $descripcion = trim((string)($_POST['descripcion'] ?? ''));
         $importeCents = (int)($_POST['importe_cents'] ?? 0);
         if ($importeCents <= 0) {
@@ -154,10 +187,20 @@ final class GastoController
 
         if ($descripcion === '' || $importeCents <= 0 || $idcta1 <= 0) {
             $_SESSION['admin_flash'] = ['type'=>'danger','text'=>'Completá cuenta, descripción e importe.'];
-            Response::redirect('/admin/gastos');
+            Response::redirect($returnUrl);
         }
         if (!in_array($formaPago, ['efectivo','transferencia','cheque'], true)) $formaPago='efectivo';
         if (!in_array($cajaDestino, ['chica','general'], true)) $cajaDestino='general';
+
+        $empleadoRepo = new EmpleadoRepo();
+        if ($empleadoId > 0 && !$this->esCuentaSueldo($idcta1, $repo)) {
+            $_SESSION['admin_flash'] = ['type'=>'danger','text'=>'La asignación de empleado solo corresponde a gastos de sueldos.'];
+            Response::redirect($returnUrl);
+        }
+        if ($this->esCuentaSueldo($idcta1, $repo) && ($empleadoId <= 0 || !$empleadoRepo->empleadoActivo($empleadoId))) {
+            $_SESSION['admin_flash'] = ['type'=>'danger','text'=>'Seleccioná un empleado activo para registrar el adelanto.'];
+            Response::redirect($returnUrl);
+        }
 
         $conceptoNuevo = 'Gasto: '.$descripcion;
         $conceptoViejo = 'Gasto: '.trim((string)($actual['descripcion'] ?? ''));
@@ -229,9 +272,10 @@ final class GastoController
             'banco_cuenta_id' => ($formaPago !== 'efectivo' ? ($bancoCuentaId ?: null) : null),
             'cheque_id' => $chequeId,
         ]);
+        $empleadoRepo->sincronizarAdelanto($id, $empleadoId, $fecha, $importeCents);
 
         $_SESSION['admin_flash'] = ['type'=>'ok','text'=>'Gasto actualizado.'];
-        Response::redirect('/admin/gastos');
+        Response::redirect($returnUrl);
     }
 
     public function eliminar(array $params): void
@@ -239,13 +283,18 @@ final class GastoController
         $auth = new AdminAuthService();
         $adminUser = $auth->requirePermiso('compras');
         Csrf::check($_POST['_csrf'] ?? null);
+        $returnUrl = $this->returnUrl();
 
         $id = (int)($_POST['id'] ?? 0);
         $repo = new GastoRepo();
         $gasto = $id > 0 ? $repo->findById($id) : null;
         if (!$gasto) {
             $_SESSION['admin_flash'] = ['type'=>'danger','text'=>'Gasto no encontrado.'];
-            Response::redirect('/admin/gastos');
+            Response::redirect($returnUrl);
+        }
+        if ((new EmpleadoRepo())->adelantoAsignado($id)) {
+            $_SESSION['admin_flash'] = ['type'=>'danger','text'=>'Este adelanto ya está incluido en una liquidación y no se puede eliminar.'];
+            Response::redirect($returnUrl);
         }
 
         // Autorización: credenciales de un admin activo con permiso.
@@ -255,11 +304,11 @@ final class GastoController
         );
         if (!$autoriza) {
             $_SESSION['admin_flash'] = ['type'=>'danger','text'=>'Autorización rechazada: usuario o contraseña de admin incorrectos.'];
-            Response::redirect('/admin/gastos');
+            Response::redirect($returnUrl);
         }
         if (!AdminAuthService::adminPuedeAutorizar($autoriza)) {
             $_SESSION['admin_flash'] = ['type'=>'danger','text'=>'Autorización rechazada: ese admin no tiene permiso para eliminar gastos.'];
-            Response::redirect('/admin/gastos');
+            Response::redirect($returnUrl);
         }
 
         $concepto = 'Gasto: '.trim((string)($gasto['descripcion'] ?? ''));
@@ -282,10 +331,11 @@ final class GastoController
         }
 
         $repo->delete($id);
+        (new EmpleadoRepo())->eliminarAdelanto($id);
 
         $autorizaNombre = (string)($autoriza['nombre'] ?? $autoriza['username'] ?? 'admin');
         $_SESSION['admin_flash'] = ['type'=>'ok','text'=>'Gasto eliminado. Autorizado por: '.$autorizaNombre.'.'];
-        Response::redirect('/admin/gastos');
+        Response::redirect($returnUrl);
     }
 
     /** Registra los movimientos de caja general / banco de un gasto (mismos criterios que al crear). */
@@ -326,6 +376,24 @@ final class GastoController
             }
         }
         // cheque: sin egreso en caja general (el flujo queda en el módulo de cheques).
+    }
+
+    private function returnUrl(): string
+    {
+        $url = trim((string)($_POST['return_url'] ?? ''));
+        return str_starts_with($url, '/admin/gastos') && !str_starts_with($url, '//')
+            ? $url
+            : '/admin/gastos';
+    }
+
+    private function esCuentaSueldo(int $idcta1, GastoRepo $repo): bool
+    {
+        foreach ($repo->cuentas() as $cuenta) {
+            if ((int)($cuenta['idcta1'] ?? 0) !== $idcta1) continue;
+            return stripos((string)($cuenta['nomcta1'] ?? ''), 'sueldo') !== false
+                || stripos((string)($cuenta['nomcta'] ?? ''), 'sueldo') !== false;
+        }
+        return false;
     }
 
     public function depositarForm(array $params): void

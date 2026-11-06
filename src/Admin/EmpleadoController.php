@@ -354,6 +354,28 @@ final class EmpleadoController
         ]);
     }
 
+    public function imprimirLiquidacion(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $auth->requirePermiso('usuarios_admin');
+        $id = (int)($params['id'] ?? 0);
+        $repo = new EmpleadoRepo();
+        $liquidacion = $id > 0 ? $repo->findLiquidacion($id) : null;
+        if (!$liquidacion) {
+            http_response_code(404);
+            echo 'Liquidación no encontrada.';
+            return;
+        }
+        $detalle = json_decode((string)($liquidacion['detalle'] ?? ''), true);
+        if (!is_array($detalle)) $detalle = [];
+        echo View::render('admin/empleados/recibo.php', [
+            'liquidacion' => $liquidacion,
+            'detalle' => $detalle,
+            'adelantos' => $repo->adelantosDeLiquidacion($id),
+            'fechaImpresion' => date('d/m/Y'),
+        ]);
+    }
+
     public function liquidacionPagada(array $params): void
     {
         $auth = new AdminAuthService();

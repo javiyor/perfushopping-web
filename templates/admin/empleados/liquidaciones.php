@@ -47,6 +47,7 @@
                     </td>
                     <td class="small text-muted"><?= htmlspecialchars(substr($liq['created_at'] ?? '', 0, 10)) ?></td>
                     <td class="text-end">
+                        <a class="btn btn-sm btn-outline-primary py-0 px-1" href="/admin/empleados/liquidaciones/<?= (int)$liq['id'] ?>/imprimir" target="_blank" title="Imprimir recibo de sueldo"><i class="bi bi-printer"></i></a>
                         <?php if ($liq['estado'] === 'calculada'): ?>
                         <form method="post" action="/admin/empleados/liquidaciones/pagar" style="display:inline">
                             <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />

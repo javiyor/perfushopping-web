@@ -45,6 +45,7 @@
     <div class="modal-dialog">
         <form method="post" action="/admin/gastos/guardar" class="modal-content" id="gastoForm">
             <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>" />
+            <input type="hidden" name="return_url" value="<?= htmlspecialchars($returnUrl ?? '/admin/gastos') ?>" />
             <input type="hidden" name="id" id="gastoId" value="0" />
             <div class="modal-header"><h5 class="modal-title" id="gastoModalTitle">Nuevo gasto</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
@@ -57,7 +58,16 @@
                     <select name="idcta1" class="form-select form-select-sm" required>
                         <option value="">— Seleccionar —</option>
                         <?php foreach ($cuentas as $c): ?>
-                            <option value="<?= (int)$c['idcta1'] ?>"><?= htmlspecialchars($c['nomcta'].' / '.$c['nomcta1']) ?></option>
+                            <option value="<?= (int)$c['idcta1'] ?>" data-sueldo="<?= (stripos((string)($c['nomcta1'] ?? ''), 'sueldo') !== false || stripos((string)($c['nomcta'] ?? ''), 'sueldo') !== false) ? '1' : '0' ?>"><?= htmlspecialchars($c['nomcta'].' / '.$c['nomcta1']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="mb-2" id="gastoEmpleadoBox" style="display:none">
+                    <label class="form-label small">Empleado (adelanto de sueldo)</label>
+                    <select name="empleado_id" id="gastoEmpleado" class="form-select form-select-sm">
+                        <option value="">— Seleccionar empleado —</option>
+                        <?php foreach ($empleados ?? [] as $empleado): ?>
+                            <option value="<?= (int)$empleado['admin_user_id'] ?>"><?= htmlspecialchars($empleado['nombre'] ?? $empleado['username'] ?? '') ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -112,6 +122,7 @@
     <div class="modal-dialog">
         <form method="post" action="/admin/gastos/eliminar" class="modal-content">
             <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>" />
+            <input type="hidden" name="return_url" value="<?= htmlspecialchars($returnUrl ?? '/admin/gastos') ?>" />
             <input type="hidden" name="id" id="eliminarGastoId" value="0" />
             <div class="modal-header"><h5 class="modal-title">Eliminar gasto</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
@@ -144,6 +155,16 @@ function onGastoForma(){
     document.getElementById('gastoBancoBox').style.display = (f!=='efectivo' ? '' : 'none');
     document.getElementById('gastoChequeBox').style.display = (f==='cheque' ? '' : 'none');
 }
+function onGastoCuenta(){
+    const select=document.querySelector('#gastoForm select[name="idcta1"]');
+    const option=select.options[select.selectedIndex];
+    const box=document.getElementById('gastoEmpleadoBox');
+    const employee=document.getElementById('gastoEmpleado');
+    const sueldo=option && option.dataset.sueldo==='1';
+    box.style.display=sueldo?'':'none';
+    employee.required=!!sueldo;
+    if(!sueldo) employee.value='';
+}
 function filaData(btn){ return JSON.parse(btn.closest('tr').getAttribute('data-gasto')); }
 function modoNuevoGasto(){
     const f = document.getElementById('gastoForm');
@@ -151,6 +172,7 @@ function modoNuevoGasto(){
     f.action = '/admin/gastos/guardar';
     document.getElementById('gastoId').value = '0';
     document.getElementById('gastoModalTitle').textContent = 'Nuevo gasto';
+    onGastoCuenta();
     onGastoForma();
 }
 function editarGasto(btn){
@@ -162,6 +184,7 @@ function editarGasto(btn){
     document.getElementById('gastoModalTitle').textContent = 'Editar gasto #' + (g.id || '');
     f.fecha.value = String(g.fecha || '').slice(0, 10);
     f.idcta1.value = g.idcta1 || '';
+    f.empleado_id.value = g.empleado_id || '';
     f.descripcion.value = g.descripcion || '';
     f.importe.value = (((g.importe_cents || 0) / 100).toFixed(2));
     f.forma_pago.value = g.forma_pago || 'efectivo';
@@ -171,6 +194,7 @@ function editarGasto(btn){
     f.numero_cheque.value = g.numero_cheque || '';
     f.fecha_vencimiento.value = String(g.cheque_venc || '').slice(0, 10);
     f.titular.value = g.cheque_titular || '';
+    onGastoCuenta();
     onGastoForma();
     bootstrap.Modal.getOrCreateInstance(document.getElementById('gastoModal')).show();
 }
@@ -181,4 +205,6 @@ function eliminarGasto(btn){
     document.getElementById('eliminarGastoImporte').textContent = (((g.importe_cents || 0) / 100).toFixed(2));
     bootstrap.Modal.getOrCreateInstance(document.getElementById('gastoEliminarModal')).show();
 }
+document.querySelector('#gastoForm select[name="idcta1"]').addEventListener('change', onGastoCuenta);
+onGastoCuenta();
 </script>
