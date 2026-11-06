@@ -88,7 +88,7 @@ $renderRecibo = static function (bool $encabezadoEmpresa) use ($empresa, $liquid
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Recibo de sueldo - <?= htmlspecialchars($liquidacion['nombre'] ?? $liquidacion['username'] ?? '') ?></title>
     <style>
-        @page { size: A4 landscape; margin: 8mm; }
+        @page { size: A4 portrait; margin: 8mm; }
         * { box-sizing: border-box; }
         body { margin: 0; color: #111; font: 10px/1.25 Arial, sans-serif; }
         .no-print { margin: 12px 0; text-align: center; }
