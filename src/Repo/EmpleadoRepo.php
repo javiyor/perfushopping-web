@@ -7,6 +7,98 @@ use Perfushopping\Web\Infra\Db;
 
 final class EmpleadoRepo
 {
+    private static bool $asistenciaTableReady = false;
+
+    private function ensureAsistenciaTable(): void
+    {
+        if (self::$asistenciaTableReady) return;
+        Db::pdo()->exec("CREATE TABLE IF NOT EXISTS empleado_asistencia_turnos (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            admin_user_id INT UNSIGNED NOT NULL,
+            sucursal_id INT UNSIGNED NOT NULL,
+            turno VARCHAR(10) NOT NULL,
+            fecha DATE NOT NULL,
+            horas DECIMAL(5,2) NOT NULL DEFAULT 4.00,
+            created_by INT UNSIGNED DEFAULT NULL,
+            created_at DATETIME NOT NULL,
+            UNIQUE KEY uq_empleado_asistencia_turno (admin_user_id, fecha, turno),
+            KEY idx_empleado_asistencia_fecha (fecha),
+            KEY idx_empleado_asistencia_user (admin_user_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        self::$asistenciaTableReady = true;
+    }
+
+    /** Persiste como 4 horas cada turno en el que el vendedor fue marcado presente. */
+    public function registrarAsistenciaTurno(array $adminUserIds, int $sucursalId, string $turno, string $fecha, int $createdBy): int
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $adminUserIds), static fn(int $id): bool => $id > 0)));
+        if (!$ids || $sucursalId <= 0 || !in_array($turno, ['manana', 'tarde'], true) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha)) {
+            return 0;
+        }
+        $this->ensureAsistenciaTable();
+        $st = Db::pdo()->prepare('INSERT IGNORE INTO empleado_asistencia_turnos
+            (admin_user_id, sucursal_id, turno, fecha, horas, created_by, created_at)
+            VALUES (:uid, :sucursal, :turno, :fecha, 4.00, :created_by, NOW())');
+        $registradas = 0;
+        foreach ($ids as $id) {
+            $st->execute([
+                ':uid' => $id,
+                ':sucursal' => $sucursalId,
+                ':turno' => $turno,
+                ':fecha' => $fecha,
+                ':created_by' => $createdBy > 0 ? $createdBy : null,
+            ]);
+            $registradas += $st->rowCount();
+        }
+        return $registradas;
+    }
+
+    public function turnosPresentesMes(int $adminUserId, string $periodo): array
+    {
+        $this->ensureAsistenciaTable();
+        $st = Db::pdo()->prepare("SELECT et.*, s.nomsuc AS sucursal_nombre
+            FROM empleado_asistencia_turnos et
+            LEFT JOIN admin_sucursales s ON s.id = et.sucursal_id
+            WHERE et.admin_user_id = :uid AND DATE_FORMAT(et.fecha, '%Y-%m') = :periodo
+            ORDER BY et.fecha ASC, et.turno ASC");
+        $st->execute([':uid' => $adminUserId, ':periodo' => $periodo]);
+        return $st->fetchAll();
+    }
+
+    public function horasTurnosMes(int $adminUserId, string $periodo): float
+    {
+        return (float)$this->resumenHorasMes($adminUserId, $periodo)['horas_turnos'];
+    }
+
+    /** Horas manuales por fecha prevalecen sobre el cómputo automático de turnos de ese día. */
+    public function resumenHorasMes(int $adminUserId, string $periodo): array
+    {
+        $horasManualesPorFecha = [];
+        foreach ($this->horasDelMes($adminUserId, $periodo) as $registro) {
+            $fecha = (string)($registro['fecha'] ?? '');
+            if ($fecha !== '') {
+                $horasManualesPorFecha[$fecha] = ($horasManualesPorFecha[$fecha] ?? 0.0) + (float)($registro['horas'] ?? 0);
+            }
+        }
+
+        $horasTurnos = 0.0;
+        $turnosIncluidos = 0;
+        foreach ($this->turnosPresentesMes($adminUserId, $periodo) as $turno) {
+            $fecha = (string)($turno['fecha'] ?? '');
+            if ($fecha === '' || isset($horasManualesPorFecha[$fecha])) continue;
+            $horasTurnos += (float)($turno['horas'] ?? 4);
+            $turnosIncluidos++;
+        }
+
+        $manuales = array_sum($horasManualesPorFecha);
+        return [
+            'horas_manuales' => (float)$manuales,
+            'horas_turnos' => $horasTurnos,
+            'total_horas' => (float)($manuales + $horasTurnos),
+            'turnos_incluidos' => $turnosIncluidos,
+        ];
+    }
+
     public function listConfig(): array
     {
         return Db::pdo()->query('
@@ -155,7 +247,7 @@ final class EmpleadoRepo
 
     /**
      * Comisiones ganadas por marca y total por empleado en un periodo (YYYY-MM).
-     * Mismos criterios que la liquidación: facturas emitidas con CAE, redondeo por item.
+     * Considera facturas emitidas aunque todavía no tengan CAE.
      * Si $soloUid viene informado, devuelve solo ese empleado.
      */
     public function comisionesGanadas(string $periodo, ?int $soloUid = null): array
@@ -223,12 +315,12 @@ final class EmpleadoRepo
         }
 
         $sql = "
-            SELECT f.vendedor_id, COALESCE(p.codsub, 0) AS codsub, fi.total_cents
+            SELECT f.vendedor_id, COALESCE(p.codsub, 0) AS codsub,
+                   CASE WHEN f.tipo_comprobante = 'NC' THEN -fi.total_cents ELSE fi.total_cents END AS total_cents
             FROM factura_items fi
             INNER JOIN facturas f ON f.id = fi.factura_id
             LEFT JOIN producto p ON p.idprodu = fi.idprodu
             WHERE f.estado = 'emitida'
-              AND f.cae IS NOT NULL
               AND f.vendedor_id IS NOT NULL
               AND DATE_FORMAT(f.fecha, '%Y-%m') = :periodo
         ";
@@ -280,7 +372,7 @@ final class EmpleadoRepo
         return $st->fetchAll();
     }
 
-    public function totalHorasMes(int $adminUserId, string $periodo): float
+    public function horasManualesMes(int $adminUserId, string $periodo): float
     {
         $st = Db::pdo()->prepare("
             SELECT COALESCE(SUM(horas), 0) FROM empleado_horas
@@ -288,6 +380,11 @@ final class EmpleadoRepo
         ");
         $st->execute([':uid' => $adminUserId, ':periodo' => $periodo]);
         return (float)$st->fetchColumn();
+    }
+
+    public function totalHorasMes(int $adminUserId, string $periodo): float
+    {
+        return (float)$this->resumenHorasMes($adminUserId, $periodo)['total_horas'];
     }
 
     public function guardarHoras(int $adminUserId, string $fecha, float $horas, string $concepto, int $createdBy): int
@@ -309,14 +406,13 @@ final class EmpleadoRepo
     public function ventasDelMes(int $vendedorId, string $periodo): array
     {
         $st = Db::pdo()->prepare("
-            SELECT fi.*, p.codsub
+            SELECT fi.*, p.codsub, f.tipo_comprobante
             FROM factura_items fi
             INNER JOIN facturas f ON f.id = fi.factura_id
             LEFT JOIN producto p ON p.idprodu = fi.idprodu
             WHERE f.vendedor_id = :vid
               AND f.estado = 'emitida'
               AND DATE_FORMAT(f.fecha, '%Y-%m') = :periodo
-              AND f.cae IS NOT NULL
             ORDER BY f.fecha ASC
         ");
         $st->execute([':vid' => $vendedorId, ':periodo' => $periodo]);
@@ -347,8 +443,13 @@ final class EmpleadoRepo
 
         $sueldoBase = (int)$config['sueldo_base_cents'];
         $valorHora = (int)$config['valor_hora_cents'];
-        $totalHoras = $this->totalHorasMes($vendedorId, $periodo);
-        $horasCents = (int)round($totalHoras * $valorHora);
+        $resumenHoras = $this->resumenHorasMes($vendedorId, $periodo);
+        $horasManuales = $resumenHoras['horas_manuales'];
+        $horasTurnos = $resumenHoras['horas_turnos'];
+        $totalHoras = $resumenHoras['total_horas'];
+        $tipo = (string)$config['tipo'];
+        $sueldoBaseAplicado = in_array($tipo, ['fijo', 'mixto'], true) ? $sueldoBase : 0;
+        $horasCents = in_array($tipo, ['horas', 'mixto'], true) ? (int)round($totalHoras * $valorHora) : 0;
 
         $comisionCents = 0;
         $comisiones = $this->comisionesDelVendedor($vendedorId);
@@ -358,32 +459,33 @@ final class EmpleadoRepo
                 $codsub = (int)($it['codsub'] ?? 0);
                 $pct = $comisiones[$codsub] ?? 0;
                 if ($pct > 0) {
-                    $comisionCents += (int)round((int)$it['total_cents'] * $pct / 100);
+                    $importeVenta = (int)$it['total_cents'];
+                    if ((string)($it['tipo_comprobante'] ?? '') === 'NC') $importeVenta = -$importeVenta;
+                    $comisionCents += (int)round($importeVenta * $pct / 100);
                 }
             }
         }
 
-        $tipo = $config['tipo'];
-        if ($tipo === 'fijo') {
-            $total = $sueldoBase;
-        } elseif ($tipo === 'horas') {
-            $total = $horasCents;
-        } elseif ($tipo === 'comision') {
-            $total = $comisionCents;
-        } else {
-            $total = $sueldoBase + $horasCents + $comisionCents;
-        }
+        $total = $sueldoBaseAplicado + $horasCents + $comisionCents;
 
         return [
             'admin_user_id' => $vendedorId,
             'periodo' => $periodo,
             'tipo' => $tipo,
-            'sueldo_base_cents' => $sueldoBase,
+            'sueldo_base_cents' => $sueldoBaseAplicado,
             'horas_cents' => $horasCents,
             'comision_cents' => $comisionCents,
             'total_cents' => $total,
+            'horas_manuales' => $horasManuales,
+            'horas_turnos' => $horasTurnos,
+            'total_horas' => $totalHoras,
+            'turnos_presentes' => $resumenHoras['turnos_incluidos'],
+            'valor_hora_cents' => $valorHora,
             'detalle' => json_encode([
                 'total_horas' => $totalHoras,
+                'horas_manuales' => $horasManuales,
+                'horas_turnos' => $horasTurnos,
+                'turnos_incluidos' => $resumenHoras['turnos_incluidos'],
                 'comisiones_aplicadas' => $comisiones,
             ]),
         ];
@@ -465,12 +567,11 @@ final class EmpleadoRepo
     public function facturasVendedorMes(int $vendedorId, string $periodo): array
     {
         $st = Db::pdo()->prepare("
-            SELECT f.id, f.codigo, f.fecha, f.total_cents, f.cliente_nombre, f.cae
+            SELECT f.id, f.codigo, f.tipo_comprobante, f.fecha, f.total_cents, f.cliente_nombre, f.cae
             FROM facturas f
             WHERE f.vendedor_id = :vid
               AND f.estado = 'emitida'
               AND DATE_FORMAT(f.fecha, '%Y-%m') = :periodo
-              AND f.cae IS NOT NULL
             ORDER BY f.fecha DESC
         ");
         $st->execute([':vid' => $vendedorId, ':periodo' => $periodo]);

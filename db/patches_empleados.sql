@@ -58,3 +58,17 @@ CREATE TABLE IF NOT EXISTS empleado_liquidacion (
   CONSTRAINT fk_emp_liq_admin FOREIGN KEY (admin_user_id) REFERENCES admin_users(id) ON DELETE CASCADE,
   CONSTRAINT fk_emp_liq_creator FOREIGN KEY (created_by) REFERENCES admin_users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS empleado_asistencia_turnos (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  admin_user_id INT UNSIGNED NOT NULL,
+  sucursal_id INT UNSIGNED NOT NULL,
+  turno VARCHAR(10) NOT NULL,
+  fecha DATE NOT NULL,
+  horas DECIMAL(5,2) NOT NULL DEFAULT 4.00,
+  created_by INT UNSIGNED DEFAULT NULL,
+  created_at DATETIME NOT NULL,
+  UNIQUE KEY uq_empleado_asistencia_turno (admin_user_id, fecha, turno),
+  KEY idx_empleado_asistencia_fecha (fecha),
+  KEY idx_empleado_asistencia_user (admin_user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

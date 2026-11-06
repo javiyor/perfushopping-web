@@ -77,7 +77,7 @@
             </div>
 
             <?php if ($editId > 0): ?>
-            <div class="card shadow-sm mt-3">
+            <div class="card shadow-sm mt-3" id="comisiones">
                 <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
                     <span>Comisiones por marca</span>
                     <span class="d-flex gap-1">

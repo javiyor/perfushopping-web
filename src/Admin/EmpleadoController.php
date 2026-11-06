@@ -89,7 +89,13 @@ final class EmpleadoController
             return;
         }
 
-        (new EmpleadoRepo())->saveComision($adminUserId, $codsub, $porcentaje);
+        $repo = new EmpleadoRepo();
+        $marcasIds = array_map('intval', array_column($repo->listMarcas(), 'codsub'));
+        if ($porcentaje <= 0 || $porcentaje > 100 || !in_array($codsub, $marcasIds, true)) {
+            Response::json(['ok' => false, 'error' => 'Elegí una marca válida e ingresá una comisión entre 0 y 100%.']);
+            return;
+        }
+        $repo->saveComision($adminUserId, $codsub, $porcentaje);
         Response::json(['ok' => true]);
     }
 
@@ -142,7 +148,7 @@ final class EmpleadoController
 
         $periodo = trim((string)($_GET['periodo'] ?? ''));
         if (!preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $periodo)) {
-            $periodo = date('Y-m');
+            $periodo = (new \DateTimeImmutable('first day of last month'))->format('Y-m');
         }
 
         $uidSel = (int)($_GET['uid'] ?? 0);
@@ -176,12 +182,21 @@ final class EmpleadoController
         $vendedorId = (int)($_GET['vendedor_id'] ?? 0);
         $periodo = trim((string)($_GET['periodo'] ?? date('Y-m')));
         $horas = [];
+        $turnosPresentes = [];
+        $horasManuales = 0.0;
+        $horasTurnos = 0.0;
+        $turnosIncluidos = 0;
         $totalHoras = 0;
         $config = null;
 
         if ($vendedorId > 0) {
             $horas = $repo->horasDelMes($vendedorId, $periodo);
-            $totalHoras = $repo->totalHorasMes($vendedorId, $periodo);
+            $turnosPresentes = $repo->turnosPresentesMes($vendedorId, $periodo);
+            $resumenHoras = $repo->resumenHorasMes($vendedorId, $periodo);
+            $horasManuales = $resumenHoras['horas_manuales'];
+            $horasTurnos = $resumenHoras['horas_turnos'];
+            $turnosIncluidos = $resumenHoras['turnos_incluidos'];
+            $totalHoras = $resumenHoras['total_horas'];
             $config = $repo->findConfig($vendedorId);
         }
 
@@ -191,6 +206,10 @@ final class EmpleadoController
             'vendedorId' => $vendedorId,
             'periodo' => $periodo,
             'horas' => $horas,
+            'turnosPresentes' => $turnosPresentes,
+            'horasManuales' => $horasManuales,
+            'horasTurnos' => $horasTurnos,
+            'turnosIncluidos' => $turnosIncluidos,
             'totalHoras' => $totalHoras,
             'config' => $config,
             'csrf' => Csrf::token(),
@@ -229,7 +248,8 @@ final class EmpleadoController
         $vendedores = $repo->listVendedoresDisponibles();
 
         $vendedorId = (int)($_GET['vendedor_id'] ?? 0);
-        $periodo = trim((string)($_GET['periodo'] ?? date('Y-m')));
+        $periodoAnterior = (new \DateTimeImmutable('first day of last month'))->format('Y-m');
+        $periodo = trim((string)($_GET['periodo'] ?? $periodoAnterior));
         $resultado = null;
         $config = null;
         $facturas = [];

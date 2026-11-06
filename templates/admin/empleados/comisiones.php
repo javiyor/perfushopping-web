@@ -1,7 +1,7 @@
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
         <h4 class="fw-bold mb-1">Comisiones ganadas</h4>
-        <p class="text-muted small">Comisión por marca sobre ventas del mes (facturas emitidas con CAE)</p>
+        <p class="text-muted small">Comisión por marca sobre las ventas del mes con factura emitida, aunque aún no tenga CAE</p>
     </div>
     <?php if (!empty($esAdmin)): ?>
     <a class="btn btn-outline-secondary btn-sm" href="/admin/empleados">Volver</a>

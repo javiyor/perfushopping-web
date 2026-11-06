@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Perfushopping\Web\Admin;
 
 use Perfushopping\Web\Repo\CajaRepo;
+use Perfushopping\Web\Repo\EmpleadoRepo;
 use Perfushopping\Web\Repo\SucursalRepo;
 use Perfushopping\Web\Service\AdminAuthService;
 use Perfushopping\Web\Support\Csrf;
@@ -45,9 +46,6 @@ final class SesionController
         }
         unset($s);
 
-        $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
-        $isMobile = preg_match('/Mobile|Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i', $ua) === 1;
-
         $lastVendedores = [];
         if (isset($_SESSION['last_vendedores']) && is_array($_SESSION['last_vendedores'])) {
             $lastVendedores = $_SESSION['last_vendedores'];
@@ -58,7 +56,6 @@ final class SesionController
             'sucursales' => $sucursales,
             'vendedores' => $vendedores,
             'puntosVentaMap' => $puntosVentaMap,
-            'isMobile' => $isMobile,
             'lastVendedores' => $lastVendedores,
             'csrf' => Csrf::token(),
             'pageTitle' => 'Iniciar turno',
@@ -103,6 +100,20 @@ final class SesionController
         }
         if ($puntoVenta <= 0 || !in_array($puntoVenta, $puntosSucursal, true)) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Seleccioná un punto de venta válido para la sucursal.'];
+            Response::redirect('/admin/sesion/iniciar');
+        }
+
+        try {
+            (new EmpleadoRepo())->registrarAsistenciaTurno(
+                $vendedores,
+                $sucursalId,
+                $turno,
+                date('Y-m-d'),
+                (int)($adminUser['id'] ?? 0)
+            );
+        } catch (\Throwable $e) {
+            error_log('SesionController::guardar asistencia turno error: ' . $e->getMessage());
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se pudo registrar la asistencia del turno. Volvé a intentar.'];
             Response::redirect('/admin/sesion/iniciar');
         }
 

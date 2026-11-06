@@ -1,3 +1,9 @@
+<?php
+$turnosPresentes = $turnosPresentes ?? [];
+$horasManuales = (float)($horasManuales ?? 0);
+$horasTurnos = (float)($horasTurnos ?? 0);
+$turnosIncluidos = (int)($turnosIncluidos ?? 0);
+?>
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
         <h4 class="fw-bold mb-1">Horas trabajadas</h4>
@@ -33,8 +39,8 @@
     <div class="col-lg-7">
         <div class="card shadow-sm">
             <div class="card-header bg-white fw-semibold d-flex justify-content-between">
-                <span>Registro de horas</span>
-                <span class="badge bg-info fs-6">Total: <?= htmlspecialchars((string)$totalHoras) ?> hs</span>
+                 <span>Horas manuales/adicionales</span>
+                 <span class="badge bg-secondary fs-6">Manual: <?= htmlspecialchars((string)$horasManuales) ?> hs</span>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
@@ -57,6 +63,34 @@
                             <td class="fw-bold"><?= htmlspecialchars((string)$h['horas']) ?></td>
                             <td class="small text-muted"><?= htmlspecialchars($h['concepto'] ?? '-') ?></td>
                             <td class="small text-muted"><?= htmlspecialchars((string)($h['created_by'] ?? '-')) ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mt-3">
+            <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+                <span>Turnos con asistencia marcada (4 horas por turno)</span>
+                <span class="badge bg-info"><?= $turnosIncluidos ?> turno(s) computados · <?= htmlspecialchars((string)$horasTurnos) ?> h</span>
+            </div>
+            <div class="card-body p-0">
+                <?php if ($horasManuales > 0): ?><div class="small text-muted px-3 py-2">Los turnos de fechas con horas ingresadas manualmente se muestran aquí, pero no se vuelven a sumar.</div><?php endif; ?>
+                <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Fecha</th><th>Turno</th><th>Sucursal</th><th class="text-end">Horas</th></tr></thead>
+                    <tbody>
+                        <?php if (!$turnosPresentes): ?>
+                        <tr><td colspan="4" class="text-muted text-center py-3">No hay turnos marcados como presente en este período.</td></tr>
+                        <?php endif; ?>
+                        <?php foreach ($turnosPresentes as $turno): ?>
+                        <tr>
+                            <td><?= htmlspecialchars($turno['fecha'] ?? '') ?></td>
+                            <td><?= ($turno['turno'] ?? '') === 'manana' ? 'Mañana' : 'Tarde' ?></td>
+                            <td><?= htmlspecialchars($turno['sucursal_nombre'] ?? ('Sucursal #' . (int)($turno['sucursal_id'] ?? 0))) ?></td>
+                            <td class="text-end fw-semibold"><?= htmlspecialchars((string)($turno['horas'] ?? 4)) ?> h</td>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -95,7 +129,15 @@
             <div class="card-header bg-white fw-semibold">Resumen</div>
             <div class="card-body">
                 <div class="d-flex justify-content-between small">
-                    <span>Total horas:</span>
+                    <span>Horas por turnos:</span>
+                    <strong><?= htmlspecialchars((string)$horasTurnos) ?> hs</strong>
+                </div>
+                <div class="d-flex justify-content-between small">
+                    <span>Horas manuales/adicionales:</span>
+                    <strong><?= htmlspecialchars((string)$horasManuales) ?> hs</strong>
+                </div>
+                <div class="d-flex justify-content-between small">
+                    <span>Total horas trabajadas:</span>
                     <strong><?= htmlspecialchars((string)$totalHoras) ?> hs</strong>
                 </div>
                 <div class="d-flex justify-content-between small">

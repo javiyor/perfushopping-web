@@ -49,9 +49,9 @@ $puntosVentaMap = $puntosVentaMap ?? [];
                         </div>
                     </div>
 
-                    <?php if (!$isMobile): ?>
                     <div class="mb-4">
-                        <label class="form-label fw-semibold">Personal que trabaja este turno</label>
+                        <label class="form-label fw-semibold">Personal presente en este turno</label>
+                        <p class="form-text small">Cada vendedor marcado suma 4 horas trabajadas para la liquidación.</p>
                         <?php if (!$vendedores): ?>
                             <p class="text-muted small">No hay vendedores disponibles.</p>
                         <?php else: ?>
@@ -72,7 +72,6 @@ $puntosVentaMap = $puntosVentaMap ?? [];
                             </div>
                         <?php endif; ?>
                     </div>
-                    <?php endif; ?>
 
                     <button class="btn btn-accent w-100 py-2 fw-bold" type="submit">
                         <i class="bi bi-play-fill"></i> Iniciar turno

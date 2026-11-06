@@ -5,6 +5,9 @@
     </div>
     <div class="d-flex gap-2">
         <a class="btn btn-outline-primary btn-sm" href="/admin/empleados/comisiones"><i class="bi bi-graph-up"></i> Comisiones</a>
+        <a class="btn btn-outline-primary btn-sm" href="/admin/empleados/horas"><i class="bi bi-clock-history"></i> Horas</a>
+        <a class="btn btn-outline-primary btn-sm" href="/admin/empleados/liquidar"><i class="bi bi-calculator"></i> Liquidar sueldo</a>
+        <a class="btn btn-outline-secondary btn-sm" href="/admin/empleados/liquidaciones"><i class="bi bi-list-ul"></i> Liquidaciones</a>
         <a class="btn btn-accent btn-sm" href="/admin/empleados/nuevo"><i class="bi bi-plus-lg"></i> Nueva config</a>
     </div>
 </div>
@@ -43,6 +46,9 @@
                         </span>
                     </td>
                     <td class="text-end">
+                        <a class="btn btn-outline-success btn-sm" href="/admin/empleados/<?= (int)$emp['admin_user_id'] ?>#comisiones" title="Agregar o modificar marcas y comisiones">
+                            <i class="bi bi-percent"></i> Comisiones
+                        </a>
                         <a class="btn btn-outline-primary btn-sm" href="/admin/empleados/<?= (int)$emp['admin_user_id'] ?>">
                             <i class="bi bi-pencil"></i>
                         </a>
