@@ -658,6 +658,7 @@ $router->get('/admin/empleados/liquidaciones', [AdminEmpleadoController::class, 
 $router->get('/admin/empleados/liquidaciones/(?P<id>\d+)/imprimir', [AdminEmpleadoController::class, 'imprimirLiquidacion']);
 $router->post('/admin/empleados/liquidaciones/pagar', [AdminEmpleadoController::class, 'liquidacionPagada']);
 $router->post('/admin/empleados/liquidaciones/anular', [AdminEmpleadoController::class, 'liquidacionAnular']);
+$router->post('/admin/empleados/liquidaciones/eliminar', [AdminEmpleadoController::class, 'liquidacionEliminar']);
 $router->get('/admin/orders', [AdminWebOrderController::class, 'index']);
 $router->get('/admin/prepare', [AdminWebOrderController::class, 'prepare']);
 $router->post('/admin/order/status', [AdminWebOrderController::class, 'status']);

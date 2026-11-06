@@ -285,16 +285,27 @@ final class EmpleadoController
         $periodo = trim((string)($_GET['periodo'] ?? $periodoAnterior));
         $resultado = null;
         $config = null;
-        $facturas = [];
-        $comisiones = [];
+        $gastosDesde = trim((string)($_GET['gastos_desde'] ?? ''));
+        $gastosHasta = trim((string)($_GET['gastos_hasta'] ?? date('Y-m-d')));
 
         if ($vendedorId > 0) {
             $config = $repo->findConfig($vendedorId);
             if ($config) {
-                $resultado = $repo->calcularLiquidacion($vendedorId, $periodo);
-                $facturas = $repo->facturasVendedorMes($vendedorId, $periodo);
-                $comisiones = $repo->getComisiones($vendedorId);
+                if ($gastosDesde === '' || !$this->fechaValida($gastosDesde)) {
+                    $gastosDesde = $repo->fechaInicioAdelantos($vendedorId);
+                }
+                if (!$this->fechaValida($gastosHasta)) {
+                    $gastosHasta = date('Y-m-d');
+                }
+                if ($gastosDesde > $gastosHasta) $gastosDesde = $gastosHasta;
+                $adelantos = $repo->adelantosDisponibles($vendedorId, $gastosDesde, $gastosHasta);
+                $adelantoIds = array_map(static fn(array $a): int => (int)$a['id'], $adelantos);
+                $resultado = $repo->calcularLiquidacion($vendedorId, $periodo, $adelantoIds, $gastosDesde, $gastosHasta);
+            } else {
+                $adelantos = [];
             }
+        } else {
+            $adelantos = [];
         }
 
         echo View::adminPage('admin/empleados/liquidacion.php', [
@@ -304,8 +315,9 @@ final class EmpleadoController
             'periodo' => $periodo,
             'resultado' => $resultado,
             'config' => $config,
-            'facturas' => $facturas,
-            'comisiones' => $comisiones,
+            'adelantos' => $adelantos,
+            'gastosDesde' => $gastosDesde,
+            'gastosHasta' => $gastosHasta,
             'csrf' => Csrf::token(),
             'pageTitle' => 'Liquidar sueldo',
         ]);
@@ -319,22 +331,33 @@ final class EmpleadoController
 
         $vendedorId = (int)($_POST['vendedor_id'] ?? 0);
         $periodo = trim((string)($_POST['periodo'] ?? ''));
+        $gastosDesde = trim((string)($_POST['gastos_desde'] ?? ''));
+        $gastosHasta = trim((string)($_POST['gastos_hasta'] ?? ''));
+        $adelantoIds = is_array($_POST['adelanto_ids'] ?? null) ? array_map('intval', $_POST['adelanto_ids']) : [];
 
-        if ($vendedorId <= 0 || $periodo === '') {
+        if ($vendedorId <= 0 || !preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $periodo)
+            || !$this->fechaValida($gastosDesde) || !$this->fechaValida($gastosHasta) || $gastosDesde > $gastosHasta) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Datos inválidos.'];
             Response::redirect('/admin/empleados/liquidar');
         }
 
         try {
             $repo = new EmpleadoRepo();
-            $liq = $repo->calcularLiquidacion($vendedorId, $periodo);
+            $adelantosDisponibles = $repo->adelantosDisponibles($vendedorId, $gastosDesde, $gastosHasta);
+            $disponiblesIds = array_map(static fn(array $a): int => (int)$a['id'], $adelantosDisponibles);
+            $seleccionadosIds = array_values(array_unique(array_filter($adelantoIds, static fn(int $id): bool => $id > 0)));
+            if (array_diff($seleccionadosIds, $disponiblesIds)) {
+                throw new \RuntimeException('Uno o más gastos seleccionados ya no están disponibles. Volvé a revisar la selección.');
+            }
+            $liq = $repo->calcularLiquidacion($vendedorId, $periodo, $seleccionadosIds, $gastosDesde, $gastosHasta);
             $repo->guardarLiquidacion($liq, (int)$adminUser['id']);
             $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Liquidación calculada y guardada.'];
         } catch (\Throwable $e) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => $e->getMessage()];
         }
 
-        Response::redirect('/admin/empleados/liquidar?vendedor_id=' . $vendedorId . '&periodo=' . $periodo);
+        Response::redirect('/admin/empleados/liquidar?vendedor_id=' . $vendedorId . '&periodo=' . $periodo
+            . '&gastos_desde=' . urlencode($gastosDesde) . '&gastos_hasta=' . urlencode($gastosHasta));
     }
 
     public function liquidaciones(array $params): void
@@ -402,5 +425,31 @@ final class EmpleadoController
         (new EmpleadoRepo())->anularLiquidacion($id);
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Liquidación anulada.'];
         Response::redirect('/admin/empleados/liquidaciones');
+    }
+
+    public function liquidacionEliminar(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $auth->requirePermiso('usuarios_admin');
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $id = (int)($_POST['id'] ?? 0);
+        if ($id <= 0) {
+            $_SESSION['admin_flash'] = ['type'=>'danger', 'text'=>'Liquidación inválida.'];
+            Response::redirect('/admin/empleados/liquidaciones');
+        }
+
+        $eliminada = (new EmpleadoRepo())->eliminarLiquidacionAnulada($id);
+        $_SESSION['admin_flash'] = $eliminada
+            ? ['type'=>'ok', 'text'=>'Liquidación anulada eliminada.']
+            : ['type'=>'danger', 'text'=>'Solo se pueden eliminar liquidaciones anuladas.'];
+        Response::redirect('/admin/empleados/liquidaciones');
+    }
+
+    private function fechaValida(string $fecha): bool
+    {
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha)) return false;
+        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $fecha);
+        return $date !== false && $date->format('Y-m-d') === $fecha;
     }
 }

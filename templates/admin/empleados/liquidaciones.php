@@ -60,6 +60,13 @@
                             <button class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="return confirm('Anular esta liquidación?')" title="Anular"><i class="bi bi-x-lg"></i></button>
                         </form>
                         <?php endif; ?>
+                        <?php if ($liq['estado'] === 'anulada'): ?>
+                        <form method="post" action="/admin/empleados/liquidaciones/eliminar" style="display:inline">
+                            <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                            <input type="hidden" name="id" value="<?= (int)$liq['id'] ?>" />
+                            <button class="btn btn-sm btn-outline-danger py-0 px-1" onclick="return confirm('Eliminar definitivamente esta liquidación anulada?')" title="Eliminar liquidación anulada"><i class="bi bi-trash"></i></button>
+                        </form>
+                        <?php endif; ?>
                     </td>
                 </tr>
                 <?php endforeach; ?>

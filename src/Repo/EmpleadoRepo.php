@@ -67,27 +67,57 @@ final class EmpleadoRepo
         return $id !== false && $id !== null;
     }
 
-    private function adelantosPendientes(int $adminUserId, bool $forUpdate = false): array
+    public function fechaInicioAdelantos(int $adminUserId): string
     {
         $this->ensureAdelantosTable();
-        $st = Db::pdo()->prepare("SELECT aa.* FROM empleado_adelantos aa
-            LEFT JOIN (
-                SELECT admin_user_id, MAX(pagada_at) AS ultima_pagada
-                FROM empleado_liquidacion
-                WHERE estado='pagada' AND admin_user_id=:uidPaid
-                GROUP BY admin_user_id
-            ) ul ON ul.admin_user_id=aa.admin_user_id
-            WHERE aa.admin_user_id=:uid AND aa.liquidacion_id IS NULL
-              AND aa.fecha >= COALESCE(DATE(ul.ultima_pagada), '1000-01-01')
-              AND aa.fecha <= CURRENT_DATE()
-            ORDER BY aa.fecha, aa.id" . ($forUpdate ? ' FOR UPDATE' : ''));
-        $st->execute([':uidPaid'=>$adminUserId, ':uid'=>$adminUserId]);
-        return $st->fetchAll();
+        $st = Db::pdo()->prepare("SELECT DATE(MAX(pagada_at)) FROM empleado_liquidacion WHERE admin_user_id=:uid AND estado='pagada'");
+        $st->execute([':uid'=>$adminUserId]);
+        $ultimaLiquidacion = (string)($st->fetchColumn() ?: '');
+        if ($ultimaLiquidacion !== '') return $ultimaLiquidacion;
+
+        $st = Db::pdo()->prepare('SELECT MIN(fecha) FROM empleado_adelantos WHERE admin_user_id=:uid AND liquidacion_id IS NULL AND fecha<=CURRENT_DATE()');
+        $st->execute([':uid'=>$adminUserId]);
+        return (string)($st->fetchColumn() ?: date('Y-m-01'));
     }
 
-    public function adelantosPendientesTotal(int $adminUserId): int
+    public function adelantosDisponibles(int $adminUserId, string $desde, string $hasta): array
     {
-        return array_sum(array_map(static fn(array $a): int => (int)$a['importe_cents'], $this->adelantosPendientes($adminUserId)));
+        $this->ensureAdelantosTable();
+        $st = Db::pdo()->prepare('SELECT id, gasto_id, fecha, importe_cents FROM empleado_adelantos
+            WHERE admin_user_id=:uid AND liquidacion_id IS NULL AND fecha BETWEEN :desde AND :hasta
+            ORDER BY fecha, id');
+        $st->execute([':uid'=>$adminUserId, ':desde'=>$desde, ':hasta'=>$hasta]);
+        return $this->agregarDescripcionGastos($st->fetchAll());
+    }
+
+    private function adelantosSeleccionados(int $adminUserId, array $ids, string $desde, string $hasta, bool $forUpdate = false): array
+    {
+        $this->ensureAdelantosTable();
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn(int $id): bool => $id > 0)));
+        if (!$ids) return [];
+        $holders = [];
+        $params = [':uid'=>$adminUserId, ':desde'=>$desde, ':hasta'=>$hasta];
+        foreach ($ids as $i => $id) {
+            $key = ':advance'.$i;
+            $holders[] = $key;
+            $params[$key] = $id;
+        }
+        $st = Db::pdo()->prepare('SELECT id, gasto_id, fecha, importe_cents FROM empleado_adelantos
+            WHERE admin_user_id=:uid AND liquidacion_id IS NULL AND fecha BETWEEN :desde AND :hasta
+              AND id IN ('.implode(',', $holders).') ORDER BY fecha, id'.($forUpdate ? ' FOR UPDATE' : ''));
+        $st->execute($params);
+        return $this->agregarDescripcionGastos($st->fetchAll());
+    }
+
+    private function agregarDescripcionGastos(array $adelantos): array
+    {
+        $gastosRepo = new GastoRepo();
+        foreach ($adelantos as &$adelanto) {
+            $gasto = $gastosRepo->findById((int)$adelanto['gasto_id']);
+            $adelanto['descripcion'] = (string)($gasto['descripcion'] ?? $gasto['concepto'] ?? 'Adelanto de sueldo');
+        }
+        unset($adelanto);
+        return $adelantos;
     }
 
     private function ensureAsistenciaTable(): void
@@ -533,7 +563,7 @@ final class EmpleadoRepo
         return $result;
     }
 
-    public function calcularLiquidacion(int $vendedorId, string $periodo): array
+    public function calcularLiquidacion(int $vendedorId, string $periodo, array $adelantoIds = [], string $adelantosDesde = '', string $adelantosHasta = ''): array
     {
         $config = $this->findConfig($vendedorId);
         if (!$config) {
@@ -565,7 +595,8 @@ final class EmpleadoRepo
             }
         }
 
-        $adelantoCents = $this->adelantosPendientesTotal($vendedorId);
+        $adelantos = $this->adelantosSeleccionados($vendedorId, $adelantoIds, $adelantosDesde, $adelantosHasta);
+        $adelantoCents = array_sum(array_map(static fn(array $a): int => (int)$a['importe_cents'], $adelantos));
         $total = $sueldoBaseAplicado + $horasCents + $comisionCents - $adelantoCents;
 
         return [
@@ -576,6 +607,9 @@ final class EmpleadoRepo
             'horas_cents' => $horasCents,
             'comision_cents' => $comisionCents,
             'adelanto_cents' => $adelantoCents,
+            'adelanto_ids' => array_map(static fn(array $a): int => (int)$a['id'], $adelantos),
+            'adelantos_desde' => $adelantosDesde,
+            'adelantos_hasta' => $adelantosHasta,
             'total_cents' => $total,
             'horas_manuales' => $horasManuales,
             'horas_turnos' => $horasTurnos,
@@ -598,7 +632,18 @@ final class EmpleadoRepo
         $pdo = Db::pdo();
         $pdo->beginTransaction();
         try {
-        $adelantos = $this->adelantosPendientes((int)$liq['admin_user_id'], true);
+        $adelantoIds = (array)($liq['adelanto_ids'] ?? []);
+        $adelantos = $this->adelantosSeleccionados(
+            (int)$liq['admin_user_id'],
+            $adelantoIds,
+            (string)($liq['adelantos_desde'] ?? ''),
+            (string)($liq['adelantos_hasta'] ?? ''),
+            true
+        );
+        $expectedIds = array_values(array_unique(array_filter(array_map('intval', $adelantoIds), static fn(int $id): bool => $id > 0)));
+        if (count($adelantos) !== count($expectedIds)) {
+            throw new \RuntimeException('Uno o más gastos seleccionados ya no están disponibles. Revisá el período y volvé a calcular la liquidación.');
+        }
         $adelantoCents = array_sum(array_map(static fn(array $a): int => (int)$a['importe_cents'], $adelantos));
         $liq['adelanto_cents'] = $adelantoCents;
         $liq['total_cents'] = (int)$liq['sueldo_base_cents'] + (int)$liq['horas_cents'] + (int)$liq['comision_cents'] - $adelantoCents;
@@ -681,17 +726,7 @@ final class EmpleadoRepo
         $this->ensureAdelantosTable();
         $st = Db::pdo()->prepare('SELECT gasto_id, fecha, importe_cents FROM empleado_adelantos WHERE liquidacion_id=:id ORDER BY fecha, id');
         $st->execute([':id'=>$liquidacionId]);
-        $gastosRepo = new GastoRepo();
-        $rows = [];
-        foreach ($st->fetchAll() as $adelanto) {
-            $gasto = $gastosRepo->findById((int)$adelanto['gasto_id']);
-            $rows[] = [
-                'fecha' => (string)$adelanto['fecha'],
-                'descripcion' => (string)($gasto['descripcion'] ?? $gasto['concepto'] ?? 'Adelanto de sueldo'),
-                'importe_cents' => (int)$adelanto['importe_cents'],
-            ];
-        }
-        return $rows;
+        return $this->agregarDescripcionGastos($st->fetchAll());
     }
 
     public function marcarPagada(int $id, int $userId): void
@@ -712,6 +747,30 @@ final class EmpleadoRepo
                 $pdo->prepare('UPDATE empleado_adelantos SET liquidacion_id=NULL WHERE liquidacion_id=:id')->execute([':id'=>$id]);
             }
             $pdo->commit();
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            throw $e;
+        }
+    }
+
+    public function eliminarLiquidacionAnulada(int $id): bool
+    {
+        $this->ensureAdelantosTable();
+        $pdo = Db::pdo();
+        $pdo->beginTransaction();
+        try {
+            $st = $pdo->prepare('SELECT estado FROM empleado_liquidacion WHERE id=:id FOR UPDATE');
+            $st->execute([':id'=>$id]);
+            if ($st->fetchColumn() !== 'anulada') {
+                $pdo->rollBack();
+                return false;
+            }
+            $pdo->prepare('UPDATE empleado_adelantos SET liquidacion_id=NULL WHERE liquidacion_id=:id')->execute([':id'=>$id]);
+            $st = $pdo->prepare("DELETE FROM empleado_liquidacion WHERE id=:id AND estado='anulada' LIMIT 1");
+            $st->execute([':id'=>$id]);
+            $deleted = $st->rowCount() > 0;
+            $pdo->commit();
+            return $deleted;
         } catch (\Throwable $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
             throw $e;
