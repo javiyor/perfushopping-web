@@ -292,6 +292,22 @@ $sucursalId = $auth->getSucursalId();
         Response::redirect('/admin/caja/movimientos');
     }
 
+    private function urlCajaGeneralConFiltrosActuales(): string
+    {
+        $query = [];
+        $tipo = trim((string)($_GET['tipo'] ?? ''));
+        if (in_array($tipo, ['ingreso', 'egreso'], true)) $query['tipo'] = $tipo;
+        foreach (['desde', 'hasta'] as $campo) {
+            $valor = trim((string)($_GET[$campo] ?? ''));
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $valor) && strtotime($valor)) {
+                $query[$campo] = $valor;
+            }
+        }
+        $q = trim((string)($_GET['q'] ?? ''));
+        if ($q !== '') $query['q'] = $q;
+        return '/admin/caja/general' . ($query ? '?' . http_build_query($query) : '');
+    }
+
     public function general(array $params): void
     {
         $auth = new AdminAuthService();
@@ -363,14 +379,14 @@ $sucursalId = $auth->getSucursalId();
 
         if (!in_array($tipo, ['ingreso', 'egreso'], true) || $concepto === '' || $monto <= 0) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Completá todos los campos.'];
-            Response::redirect('/admin/caja/general');
+            Response::redirect($this->urlCajaGeneralConFiltrosActuales());
         }
 
         $repo = new CajaRepo();
         $repo->agregarMovimientoGeneral($tipo, 'directo', null, $concepto, $monto, (int)$adminUser['id']);
 
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Movimiento registrado en Caja General.'];
-        Response::redirect('/admin/caja/general');
+        Response::redirect($this->urlCajaGeneralConFiltrosActuales());
     }
 
     public function storeTransferencia(array $params): void
@@ -389,7 +405,7 @@ $sucursalId = $auth->getSucursalId();
 
         if (!in_array($direccion, ['caja_a_banco', 'banco_a_caja'], true) || $bancoCuentaId <= 0 || $monto <= 0) {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Completá dirección, banco y monto.'];
-            Response::redirect('/admin/caja/general');
+            Response::redirect($this->urlCajaGeneralConFiltrosActuales());
         }
 
         $cajaRepo = new CajaRepo();
@@ -400,21 +416,21 @@ $sucursalId = $auth->getSucursalId();
         if ($direccion === 'caja_a_banco') {
             if ($monto > $cajaRepo->saldoGeneral()) {
                 $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Fondos insuficientes en Caja General: $' . number_format($cajaRepo->saldoGeneral() / 100, 2, ',', '.') . '.'];
-                Response::redirect('/admin/caja/general');
+                Response::redirect($this->urlCajaGeneralConFiltrosActuales());
             }
             $cajaRepo->agregarMovimientoGeneral('egreso', 'deposito_banco', null, $concepto, $monto, $uid);
             $bancoRepo->create($bancoCuentaId, 'credito', 'deposito', null, $concepto, $monto, $fecha, $uid);
         } else {
             if ($monto > $bancoRepo->saldo($bancoCuentaId)) {
                 $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Fondos insuficientes en la cuenta bancaria: $' . number_format($bancoRepo->saldo($bancoCuentaId) / 100, 2, ',', '.') . '.'];
-                Response::redirect('/admin/caja/general');
+                Response::redirect($this->urlCajaGeneralConFiltrosActuales());
             }
             $bancoRepo->create($bancoCuentaId, 'debito', 'retiro', null, $concepto, $monto, $fecha, $uid);
             $cajaRepo->agregarMovimientoGeneral('ingreso', 'retiro_banco', null, $concepto, $monto, $uid);
         }
 
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Transferencia registrada (caja ↔ banco).'];
-        Response::redirect('/admin/caja/general');
+        Response::redirect($this->urlCajaGeneralConFiltrosActuales());
     }
 
     public function controlarMovimiento(array $params): void
@@ -427,7 +443,7 @@ $sucursalId = $auth->getSucursalId();
         $accion = (string)($_POST['accion'] ?? 'controlar');
 
         if ($id <= 0) {
-            Response::redirect('/admin/caja/general');
+            Response::redirect($this->urlCajaGeneralConFiltrosActuales());
         }
 
         $repo = new CajaRepo();
@@ -437,7 +453,7 @@ $sucursalId = $auth->getSucursalId();
             $repo->controlarMovimientoGeneral($id, (int)$adminUser['id']);
         }
 
-        Response::redirect('/admin/caja/general');
+        Response::redirect($this->urlCajaGeneralConFiltrosActuales());
     }
 
     public function controlarCierre(array $params): void
@@ -450,7 +466,7 @@ $sucursalId = $auth->getSucursalId();
         $accion = (string)($_POST['accion'] ?? 'controlar');
 
         if ($id <= 0) {
-            Response::redirect('/admin/caja/general');
+            Response::redirect($this->urlCajaGeneralConFiltrosActuales());
         }
 
         $repo = new CajaRepo();
@@ -460,7 +476,7 @@ $sucursalId = $auth->getSucursalId();
             $repo->controlarCierre($id, (int)$adminUser['id']);
         }
 
-        Response::redirect('/admin/caja/general');
+        Response::redirect($this->urlCajaGeneralConFiltrosActuales());
     }
 
     public function arqueoForm(array $params): void

@@ -11,6 +11,13 @@ $tipo = (string)($tipo ?? '');
 $desde = (string)($desde ?? '');
 $hasta = (string)($hasta ?? '');
 $q = (string)($q ?? '');
+$filterActionParams = array_filter([
+    'tipo' => $tipo,
+    'desde' => $desde,
+    'hasta' => $hasta,
+    'q' => $q,
+], static fn(string $value): bool => $value !== '');
+$filterActionSuffix = $filterActionParams ? '?' . http_build_query($filterActionParams) : '';
 ?>
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
@@ -124,7 +131,7 @@ $q = (string)($q ?? '');
                             </td>
                             <td class="text-nowrap">
                                 <a class="btn btn-outline-primary btn-sm py-0 px-1" title="Imprimir resumen de cierre" href="/admin/caja/cierre/imprimir?id=<?= (int)($c['id'] ?? 0) ?>" target="_blank"><i class="bi bi-printer"></i></a>
-                                <form method="post" action="/admin/caja/cierre/controlar" style="display:inline">
+                                <form method="post" action="/admin/caja/cierre/controlar<?= htmlspecialchars($filterActionSuffix) ?>" style="display:inline">
                                     <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
                                     <input type="hidden" name="id" value="<?= (int)($c['id'] ?? 0) ?>" />
                                     <?php if (!empty($c['controlado_por'])): ?>
@@ -179,7 +186,7 @@ $q = (string)($q ?? '');
         <div class="card shadow-sm mb-3">
             <div class="card-header bg-white fw-semibold">Nuevo movimiento directo</div>
             <div class="card-body">
-                <form method="post" action="/admin/caja/general/guardar">
+                <form method="post" action="/admin/caja/general/guardar<?= htmlspecialchars($filterActionSuffix) ?>">
                     <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
 
                     <div class="mb-3">
@@ -212,7 +219,7 @@ $q = (string)($q ?? '');
         <div class="card shadow-sm mb-3">
             <div class="card-header bg-white fw-semibold">Transferencia banco ↔ caja</div>
             <div class="card-body">
-                <form method="post" action="/admin/caja/general/transferir">
+                <form method="post" action="/admin/caja/general/transferir<?= htmlspecialchars($filterActionSuffix) ?>">
                     <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
 
                     <div class="mb-3">
@@ -323,7 +330,7 @@ $q = (string)($q ?? '');
                                         <?php endif; ?>
                                     </td>
                                     <td>
-                                        <form method="post" action="/admin/caja/general/controlar" style="display:inline">
+                                        <form method="post" action="/admin/caja/general/controlar<?= htmlspecialchars($filterActionSuffix) ?>" style="display:inline">
                                             <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
                                             <input type="hidden" name="id" value="<?= (int)$m['id'] ?>" />
                                             <?php if ($m['controlado']): ?>
