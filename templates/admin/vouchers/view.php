@@ -56,7 +56,7 @@ $fraseInferior = (string)($design['frase_inferior'] ?? '¡Te esperamos con mucho
         .ribbon { position:relative; display:inline-block; margin-top:1%; padding:1.1% 9%; color:#080808; background:linear-gradient(100deg,#8b681b,#f8e7a0 28%,#c9b037 58%,#fff0a8 78%,#94701f); font:700 clamp(12px,2.3vw,21px)/1.1 'Playfair Display',Georgia,serif; letter-spacing:.2em; box-shadow:0 2px 9px #d7b64a88; }
         .hero { display:grid; grid-template-columns:46% 54%; min-height:0; border-top:1px solid #c9b03788; border-bottom:1px solid #c9b03788; overflow:hidden; }
         .model-frame { position:relative; width:100%; height:100%; min-height:0; background:linear-gradient(155deg,#181818,#070707); overflow:hidden; }
-        .model-photo { position:absolute; inset:0; display:block; width:100%; height:100%; object-fit:contain; object-position:center center; }
+        .model-photo { position:absolute; inset:0; display:block; width:100%; height:100%; object-fit:contain; object-position:center 20%; }
         .photo-missing { position:absolute; inset:0; display:grid; place-items:center; padding:8%; text-align:center; color:#d3bd73; font:500 clamp(13px,2.1vw,20px)/1.4 'Playfair Display',Georgia,serif; background:radial-gradient(ellipse at 50% 30%,#40321666,transparent 62%); }
         .message { align-self:center; padding:7%; color:#f4f0e5; font:400 clamp(12px,2vw,19px)/1.5 'Playfair Display',Georgia,serif; white-space:pre-line; }
         .heart { display:block; margin:5% 0 4%; text-align:center; color:var(--gold-light); font-size:clamp(18px,3vw,28px); text-shadow:0 0 10px #e8c954aa; }
