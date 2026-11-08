@@ -24,3 +24,16 @@ CREATE TABLE IF NOT EXISTS voucher_regalos (
 
 INSERT IGNORE INTO formas_pago (codigo, nombre, tipo, activo, orden, created_at, updated_at)
 VALUES ('voucher_regalo', 'Voucher regalo', 'voucher', 1, 9, NOW(), NOW());
+
+CREATE TABLE IF NOT EXISTS voucher_regalo_diseno (
+  id TINYINT UNSIGNED NOT NULL PRIMARY KEY,
+  modelo_imagen VARCHAR(255) DEFAULT NULL,
+  titulo VARCHAR(80) NOT NULL,
+  cinta VARCHAR(80) NOT NULL,
+  mensaje TEXT NOT NULL,
+  frase_inferior VARCHAR(160) NOT NULL,
+  updated_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT IGNORE INTO voucher_regalo_diseno (id, modelo_imagen, titulo, cinta, mensaje, frase_inferior, updated_at)
+VALUES (1, '/assets/brand/voucher-model.png', '¡FELICITACIONES!', 'GIFT VOUCHER', 'Qué alegría compartir este regalo con vos.\n\nGracias por ser parte de este momento.\n\nDeseamos que este regalo te acompañe en recuerdos hermosos.', '¡Te esperamos con mucho cariño!', NOW());

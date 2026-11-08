@@ -409,8 +409,10 @@ $router->get('/admin/remitos/buscar-presupuestos', [AdminRemitoController::class
 $router->get('/admin/remitos/buscar-proveedores', [AdminRemitoController::class, 'searchProveedores']);
 $router->get('/admin/facturas', [AdminFacturaController::class, 'pos']);
 $router->get('/voucher/(?P<code>[A-Z0-9-]+)', [AdminVoucherController::class, 'publicView']);
+$router->post('/voucher/(?P<code>[A-Z0-9-]+)/pdf', [AdminVoucherController::class, 'downloadPdf']);
 $router->get('/admin/vouchers', [AdminVoucherController::class, 'index']);
 $router->post('/admin/vouchers/generar', [AdminVoucherController::class, 'generate']);
+$router->post('/admin/vouchers/diseno', [AdminVoucherController::class, 'saveDesign']);
 $router->get('/admin/facturas/comprobantes', [AdminFacturaController::class, 'index']);
 $router->get('/admin/facturas/diagnostico-stock', [AdminFacturaController::class, 'diagnosticoStock']);
 $router->get('/admin/facturas/nueva', [AdminFacturaController::class, 'pos']);

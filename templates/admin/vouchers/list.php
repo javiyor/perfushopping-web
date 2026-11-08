@@ -1,6 +1,7 @@
 <?php
 $formasPago = $formasPago ?? [];
 $formaPagoLabels = array_column($formasPago, 'nombre', 'codigo');
+$voucherDesign = $voucherDesign ?? [];
 ?>
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
@@ -15,6 +16,45 @@ $formaPagoLabels = array_column($formasPago, 'nombre', 'codigo');
     <a class="btn btn-sm btn-success" target="_blank" href="/voucher/<?= rawurlencode((string)$generatedVoucher['codigo']) ?>">Abrir vista previa</a>
 </div>
 <?php endif; ?>
+
+<div class="card shadow-sm mb-3" id="voucherDesign">
+    <div class="card-header bg-white fw-semibold">Diseño del voucher</div>
+    <div class="card-body">
+        <form method="post" action="/admin/vouchers/diseno" enctype="multipart/form-data" class="row g-2 align-items-end">
+            <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+            <div class="col-lg-4">
+                <?php if (!empty($voucherDesign['modelo_imagen'])): ?>
+                    <img src="<?= htmlspecialchars(\Perfushopping\Web\Support\Format::uploadUrl((string)$voucherDesign['modelo_imagen'])) ?>" alt="Foto de modelo actual" class="img-fluid rounded mb-2" style="max-height:190px" />
+                <?php else: ?>
+                    <div class="alert alert-warning small mb-2">Subí una foto real de la modelo (25–30 años, rubia recogida, vestido negro) sosteniendo una bolsa negra y dorada de frente. No uses una imagen con perfume en las manos; el logo original se superpone sobre la bolsa.</div>
+                <?php endif; ?>
+                <label class="form-label small">Fotografía principal (JPG, PNG o WEBP)</label>
+                <input class="form-control form-control-sm" type="file" name="modelo_imagen" accept="image/jpeg,image/png,image/webp" />
+            </div>
+            <div class="col-lg-8 row g-2">
+                <div class="col-md-6">
+                    <label class="form-label small">Título</label>
+                    <input class="form-control form-control-sm" name="titulo" maxlength="80" value="<?= htmlspecialchars($voucherDesign['titulo'] ?? '¡FELICITACIONES!') ?>" required />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small">Cinta</label>
+                    <input class="form-control form-control-sm" name="cinta" maxlength="80" value="<?= htmlspecialchars($voucherDesign['cinta'] ?? 'GIFT VOUCHER') ?>" required />
+                </div>
+                <div class="col-12">
+                    <label class="form-label small">Mensaje (separá los párrafos con una línea en blanco)</label>
+                    <textarea class="form-control form-control-sm" name="mensaje" rows="4" required><?= htmlspecialchars($voucherDesign['mensaje'] ?? '') ?></textarea>
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label small">Frase inferior</label>
+                    <input class="form-control form-control-sm" name="frase_inferior" maxlength="160" value="<?= htmlspecialchars($voucherDesign['frase_inferior'] ?? '¡Te esperamos con mucho cariño!') ?>" required />
+                </div>
+                <div class="col-md-4 d-grid">
+                    <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-palette"></i> Guardar diseño</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
 
 <div class="card shadow-sm mb-3">
     <div class="card-header bg-white fw-semibold">Generar voucher</div>

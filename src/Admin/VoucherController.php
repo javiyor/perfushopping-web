@@ -8,12 +8,13 @@ use Perfushopping\Web\Repo\BancoCuentaRepo;
 use Perfushopping\Web\Repo\BancoMovimientoRepo;
 use Perfushopping\Web\Repo\CajaRepo;
 use Perfushopping\Web\Repo\SucursalRepo;
+use Perfushopping\Web\Repo\VoucherDisenoRepo;
 use Perfushopping\Web\Repo\VoucherRegaloRepo;
 use Perfushopping\Web\Service\AdminAuthService;
 use Perfushopping\Web\Support\Csrf;
 use Perfushopping\Web\Support\Format;
-use Perfushopping\Web\Support\Pdf;
 use Perfushopping\Web\Support\Response;
+use Perfushopping\Web\Support\UploadValidator;
 use Perfushopping\Web\Support\View;
 
 final class VoucherController
@@ -35,6 +36,7 @@ final class VoucherController
             'formasPago'=>$metodosCobro,
             'selectedBranchId'=>$auth->getSucursalId(),
             'generatedVoucher'=>$voucherCode !== '' ? (new VoucherRegaloRepo())->findByCode($voucherCode) : null,
+            'voucherDesign'=>(new VoucherDisenoRepo())->get(),
             'csrf'=>Csrf::token(),
             'pageTitle'=>'Vouchers regalo',
         ]);
@@ -106,6 +108,51 @@ final class VoucherController
         }
     }
 
+    public function saveDesign(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $auth->requirePermiso('facturacion');
+        Csrf::check($_POST['_csrf'] ?? null);
+        $repo = new VoucherDisenoRepo();
+        $current = $repo->get();
+        $imagePath = (string)($current['modelo_imagen'] ?? '');
+        try {
+            $file = $_FILES['modelo_imagen'] ?? null;
+            if (is_array($file) && (int)($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+                UploadValidator::validate($file);
+                $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                $mime = $finfo ? finfo_file($finfo, $file['tmp_name']) : '';
+                if ($finfo) finfo_close($finfo);
+                if (!in_array($mime, ['image/jpeg','image/png','image/webp'], true)) {
+                    throw new \RuntimeException('La foto debe ser JPG, PNG o WEBP.');
+                }
+                $root = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? (defined('APP_BASE_DIR') ? APP_BASE_DIR : dirname(__DIR__, 2))), '/\\');
+                $uploadDir = $root . '/upload/vouchers';
+                if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true) && !is_dir($uploadDir)) {
+                    throw new \RuntimeException('No se pudo preparar la carpeta para guardar la foto.');
+                }
+                $fileName = UploadValidator::store($file, $uploadDir);
+                $imagePath = '/upload/vouchers/' . $fileName;
+            }
+
+            $design = [
+                'modelo_imagen'=>$imagePath,
+                'titulo'=>trim((string)($_POST['titulo'] ?? '')),
+                'cinta'=>trim((string)($_POST['cinta'] ?? '')),
+                'mensaje'=>trim((string)($_POST['mensaje'] ?? '')),
+                'frase_inferior'=>trim((string)($_POST['frase_inferior'] ?? '')),
+            ];
+            if ($design['titulo'] === '' || $design['cinta'] === '' || $design['mensaje'] === '' || $design['frase_inferior'] === '') {
+                throw new \InvalidArgumentException('Completá los textos del diseño del voucher.');
+            }
+            $repo->save($design);
+            $_SESSION['admin_flash'] = ['type'=>'ok','text'=>'Diseño del voucher actualizado.'];
+        } catch (\Throwable $e) {
+            $_SESSION['admin_flash'] = ['type'=>'danger','text'=>$e->getMessage()];
+        }
+        Response::redirect('/admin/vouchers#voucherDesign');
+    }
+
     public function publicView(array $params): void
     {
         $codigo = strtoupper(trim((string)($params['code'] ?? '')));
@@ -117,156 +164,61 @@ final class VoucherController
         }
 
         $empresa = (new EmpresaRepo())->getDefault() ?? [];
-        $branches = array_values(array_filter((new SucursalRepo())->findAll(), static fn(array $s): bool => (int)($s['activo'] ?? 0) === 1));
+        $design = (new VoucherDisenoRepo())->get();
         $host = (string)($_SERVER['HTTP_HOST'] ?? 'perfushopping.ar');
         $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
         $scheme = $secure ? 'https' : 'http';
         $voucherUrl = $scheme . '://' . $host . '/voucher/' . rawurlencode($codigo);
         $formato = (string)($_GET['formato'] ?? 'a5') === 'etiqueta' ? 'etiqueta' : 'a5';
-        $descargar = strtolower((string)($_GET['descargar'] ?? ''));
-        if (in_array($descargar, ['pdf','jpg'], true)) {
-            $jpeg = $this->voucherJpeg($voucher, $empresa, $branches, $formato);
-            $width = $formato === 'etiqueta' ? 1181 : 1748;
-            $height = $formato === 'etiqueta' ? 709 : 2480;
-            $stem = preg_replace('/[^A-Z0-9-]/', '', $codigo) ?: 'voucher-regalo';
-            if ($descargar === 'jpg') {
-                header('Content-Type: image/jpeg');
-                header('Content-Disposition: attachment; filename="'.$stem.'-'.$formato.'.jpg"');
-                echo $jpeg;
-                return;
-            }
-            $pdf = $this->jpegToPdf($jpeg, $width, $height, $formato);
-            header('Content-Type: application/pdf');
-            header('Content-Disposition: attachment; filename="'.$stem.'-'.$formato.'.pdf"');
-            echo $pdf;
-            return;
-        }
-
         $logo = !empty($empresa['logo']) ? Format::uploadUrl((string)$empresa['logo']) : '';
+        $modeloUrl = !empty($design['modelo_imagen']) ? Format::uploadUrl((string)$design['modelo_imagen']) : '';
         echo View::render('admin/vouchers/view.php', [
             'voucher'=>$voucher,
             'empresa'=>$empresa,
-            'branches'=>$branches,
+            'design'=>$design,
             'logoUrl'=>$logo,
+            'modeloUrl'=>$modeloUrl,
             'voucherUrl'=>$voucherUrl,
             'formato'=>$formato,
         ]);
     }
 
-    private function voucherJpeg(array $voucher, array $empresa, array $branches, string $formato): string
+    public function downloadPdf(array $params): void
     {
-        if (!function_exists('imagecreatetruecolor')) throw new \RuntimeException('La extensión GD es necesaria para generar la imagen del voucher.');
-        $label = $formato === 'etiqueta';
-        $width = $label ? 1181 : 1748;
-        $height = $label ? 709 : 2480;
-        $image = imagecreatetruecolor($width, $height);
-        $white = imagecolorallocate($image, 255, 255, 255);
-        $ink = imagecolorallocate($image, 35, 42, 54);
-        $gold = imagecolorallocate($image, 191, 151, 63);
-        imagefill($image, 0, 0, $white);
-        $font = $this->fontPath();
-        $draw = function (string $text, int $x, int $y, int $size, bool $bold = false, int $color = 0) use ($image, $font, $ink): void {
-            $color = $color ?: $ink;
-            if ($font !== null && function_exists('imagettftext')) {
-                imagettftext($image, $size, 0, $x, $y, $color, $font, $text);
-                return;
-            }
-            imagestring($image, 5, $x, max(0, $y - 15), $text, $color);
-        };
-        $margin = $label ? 46 : 96;
-        $y = $label ? 70 : 120;
-
-        $logoPath = $this->logoPath((string)($empresa['logo'] ?? ''));
-        if ($logoPath !== '' && is_file($logoPath)) {
-            $logo = @imagecreatefromstring((string)file_get_contents($logoPath));
-            if ($logo) {
-                $lw = imagesx($logo); $lh = imagesy($logo);
-                $maxW = $label ? 210 : 300; $maxH = $label ? 95 : 150;
-                $scale = min($maxW / max(1,$lw), $maxH / max(1,$lh));
-                $dw = (int)round($lw * $scale); $dh = (int)round($lh * $scale);
-                imagecopyresampled($image, $logo, $margin, $y, 0, 0, $dw, $dh, $lw, $lh);
-                imagedestroy($logo);
-            }
+        $codigo = strtoupper(trim((string)($params['code'] ?? '')));
+        if (!(new VoucherRegaloRepo())->findByCode($codigo)) {
+            Response::json(['ok'=>false,'error'=>'Voucher no encontrado.'], 404);
+            return;
         }
-        $companyX = $label ? 290 : $margin;
-        $companyY = $y + ($label ? 36 : 190);
-        $draw((string)($empresa['razon_emp'] ?? $empresa['nomemp'] ?? 'PERFUSHOPPING'), $companyX, $companyY, $label ? 22 : 32, true);
-        if (!empty($empresa['cuit'])) $draw('CUIT '.$empresa['cuit'], $companyX, $companyY + ($label ? 30 : 42), $label ? 16 : 20);
-        if (!$label && !empty($empresa['dire_emp'])) $draw((string)$empresa['dire_emp'], $companyX, $companyY + 82, 18);
-        if (!$label && !empty($empresa['telefono'])) $draw('Tel. '.$empresa['telefono'], $companyX, $companyY + 112, 18);
-        $y = $label ? 205 : 330;
-
-        if (!$label) {
-            $draw('SUCURSALES ACTIVAS', $margin, $y, 22, true, $gold); $y += 40;
-            foreach ($branches as $branch) {
-                $line = trim((string)($branch['nomsuc'] ?? 'Sucursal') . ' — ' . (string)($branch['direccion'] ?? '') . ' — Tel. ' . (string)($branch['telefono'] ?? ''));
-                foreach ($this->wrapText($line, 92) as $branchLine) {
-                    $draw($branchLine, $margin, $y, 17); $y += 27;
-                }
-            }
-            $y += 28;
-        } else {
-            foreach ($branches as $branch) {
-                $line = trim((string)($branch['nomsuc'] ?? 'Sucursal') . ': ' . (string)($branch['direccion'] ?? '') . ' Tel. ' . (string)($branch['telefono'] ?? ''));
-                foreach ($this->wrapText($line, 105) as $branchLine) {
-                    $draw($branchLine, $margin, $y, 11); $y += 15;
-                }
-            }
-            $y += 5;
+        $input = json_decode(file_get_contents('php://input'), true);
+        $dataUrl = (string)($input['image'] ?? '');
+        if (!preg_match('/^data:image\/jpeg;base64,([A-Za-z0-9+\/=]+)$/', $dataUrl, $match) || strlen($dataUrl) > 16000000) {
+            Response::json(['ok'=>false,'error'=>'La imagen para el PDF no es válida.'], 422);
+            return;
         }
-
-        $draw('VOUCHER DE REGALO', $margin, $y, $label ? 26 : 46, true, $gold); $y += $label ? 48 : 80;
-        $draw('Para: '.(string)$voucher['destinatario_nombre'], $margin, $y, $label ? 22 : 34, true); $y += $label ? 42 : 64;
-        $draw('De: '.(string)$voucher['remitente_nombre'].' · Tel. '.(string)$voucher['remitente_telefono'], $margin, $y, $label ? 16 : 24); $y += $label ? 48 : 86;
-        $draw('VALOR: '.Format::moneyFromCents((int)$voucher['importe_cents']), $margin, $y, $label ? 27 : 48, true); $y += $label ? 54 : 100;
-        imagesetthickness($image, $label ? 2 : 4);
-        imagerectangle($image, $margin, $y - ($label ? 36 : 64), $width - $margin, $y + ($label ? 40 : 74), $gold);
-        $draw((string)$voucher['codigo'], $margin + 14, $y, $label ? 30 : 58, true);
-        $y += $label ? 66 : 130;
-        $draw('Código de un solo uso. Presentalo al momento de pagar.', $margin, $y, $label ? 14 : 20);
-
-        ob_start();
-        imagejpeg($image, null, 92);
-        $jpeg = (string)ob_get_clean();
-        imagedestroy($image);
-        return $jpeg;
-    }
-
-    private function wrapText(string $text, int $width): array
-    {
-        $text = trim((string)preg_replace('/\s+/u', ' ', $text));
-        if ($text === '') return [];
-        return explode("\n", wordwrap($text, $width, "\n", true));
-    }
-
-    private function fontPath(): ?string
-    {
-        foreach ([
-            '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
-            '/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf',
-            '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
-            'C:/Windows/Fonts/arial.ttf',
-        ] as $font) if (is_file($font)) return $font;
-        return null;
-    }
-
-    private function logoPath(string $logo): string
-    {
-        if ($logo === '') return '';
-        $path = parse_url($logo, PHP_URL_PATH) ?: $logo;
-        $root = (string)($_SERVER['DOCUMENT_ROOT'] ?? '');
-        $base = defined('APP_BASE_DIR') ? (string)APP_BASE_DIR : dirname(__DIR__, 2);
-        foreach ([rtrim($root, '/\\').'/'.ltrim($path, '/\\'), rtrim($base, '/\\').'/public/'.ltrim($path, '/\\'), rtrim($base, '/\\').'/'.ltrim($path, '/\\')] as $candidate) {
-            if (is_file($candidate)) return $candidate;
+        $jpeg = base64_decode($match[1], true);
+        $imageInfo = $jpeg !== false ? getimagesizefromstring($jpeg) : false;
+        if (!$imageInfo || ($imageInfo['mime'] ?? '') !== 'image/jpeg' || (int)$imageInfo[0] > 5000 || (int)$imageInfo[1] > 7000) {
+            Response::json(['ok'=>false,'error'=>'La imagen no tiene dimensiones o formato válidos.'], 422);
+            return;
         }
-        return '';
+        $formato = (string)($input['formato'] ?? 'a5') === 'etiqueta' ? 'etiqueta' : 'a5';
+        $pdf = $this->jpegToPdf($jpeg, (int)$imageInfo[0], (int)$imageInfo[1], $formato);
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: attachment; filename="voucher-'.preg_replace('/[^A-Z0-9-]/', '', $codigo).'-'.$formato.'.pdf"');
+        echo $pdf;
     }
 
     private function jpegToPdf(string $jpeg, int $imageWidth, int $imageHeight, string $formato): string
     {
         $pageWidth = ($formato === 'etiqueta' ? 100 : 148) * 72 / 25.4;
         $pageHeight = ($formato === 'etiqueta' ? 60 : 210) * 72 / 25.4;
-        $content = "q\n{$pageWidth} 0 0 {$pageHeight} 0 0 cm\n/Im0 Do\nQ\n";
+        $scale = min($pageWidth / max(1, $imageWidth), $pageHeight / max(1, $imageHeight));
+        $drawWidth = $imageWidth * $scale;
+        $drawHeight = $imageHeight * $scale;
+        $offsetX = ($pageWidth - $drawWidth) / 2;
+        $offsetY = ($pageHeight - $drawHeight) / 2;
+        $content = sprintf("q\n%.3f 0 0 %.3f %.3f %.3f cm\n/Im0 Do\nQ\n", $drawWidth, $drawHeight, $offsetX, $offsetY);
         $objects = [
             1=>'<< /Type /Catalog /Pages 2 0 R >>',
             2=>'<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
