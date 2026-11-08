@@ -112,6 +112,80 @@ final class VoucherRegaloRepo
         Db::pdo()->prepare("UPDATE voucher_regalos SET estado='anulado' WHERE id=:id AND estado='activo' LIMIT 1")->execute([':id'=>$id]);
     }
 
+    /** Anula un voucher activo y registra el reintegro en el medio de cobro original. */
+    public function anularConReintegro(int $id, int $adminUserId): void
+    {
+        self::ensureTable();
+        $pdo = Db::pdo();
+        $pdo->beginTransaction();
+        try {
+            $st = $pdo->prepare('SELECT * FROM voucher_regalos WHERE id = :id LIMIT 1 FOR UPDATE');
+            $st->execute([':id' => $id]);
+            $voucher = $st->fetch();
+            if (!$voucher) {
+                throw new \RuntimeException('No se encontró el voucher.');
+            }
+            if ((string)$voucher['estado'] !== 'activo') {
+                throw new \RuntimeException((string)$voucher['estado'] === 'canjeado'
+                    ? 'No se puede anular un voucher que ya fue canjeado.'
+                    : 'El voucher ya está anulado.');
+            }
+
+            $codigo = (string)$voucher['codigo'];
+            $concepto = 'Reintegro anulación voucher ' . $codigo;
+            $monto = (int)$voucher['importe_cents'];
+            if ((string)$voucher['forma_pago'] === 'efectivo') {
+                $aperturaId = (int)($voucher['caja_apertura_id'] ?? 0);
+                if ($aperturaId <= 0) {
+                    $mov = $pdo->prepare('SELECT caja_id FROM caja_movimientos WHERE concepto = :concepto ORDER BY id ASC LIMIT 1');
+                    $mov->execute([':concepto' => 'Cobro emisión voucher ' . $codigo]);
+                    $aperturaId = (int)($mov->fetchColumn() ?: 0);
+                }
+                $cajaRepo = new CajaRepo();
+                if ($aperturaId > 0) {
+                    $movementId = $cajaRepo->agregarMovimiento($aperturaId, 'egreso', $concepto, $monto, $adminUserId);
+                } else {
+                    $movement = $pdo->prepare("INSERT INTO caja_general_movimientos
+                        (tipo, origen, origen_id, concepto, monto_cents, created_by, created_at)
+                        VALUES ('egreso', 'voucher_regalo_anulacion', :id, :concepto, :monto, :usuario, NOW())");
+                    $movement->execute([':id' => $id, ':concepto' => $concepto, ':monto' => $monto, ':usuario' => $adminUserId]);
+                    $movementId = (int)$pdo->lastInsertId();
+                }
+                if ($movementId <= 0) {
+                    throw new \RuntimeException('No se pudo registrar el reintegro en caja.');
+                }
+            } else {
+                $bancoCuentaId = (int)($voucher['banco_cuenta_id'] ?? 0);
+                if ($bancoCuentaId <= 0) {
+                    throw new \RuntimeException('El voucher no tiene una cuenta bancaria asociada para reintegrar el cobro.');
+                }
+                $movementId = (new BancoMovimientoRepo())->create(
+                    $bancoCuentaId,
+                    'debito',
+                    'voucher_regalo_anulacion',
+                    $id,
+                    $concepto,
+                    $monto,
+                    date('Y-m-d'),
+                    $adminUserId
+                );
+                if ($movementId <= 0) {
+                    throw new \RuntimeException('No se pudo registrar el reintegro bancario.');
+                }
+            }
+
+            $upd = $pdo->prepare("UPDATE voucher_regalos SET estado = 'anulado' WHERE id = :id AND estado = 'activo'");
+            $upd->execute([':id' => $id]);
+            if ($upd->rowCount() !== 1) {
+                throw new \RuntimeException('El estado del voucher cambió; no se completó la anulación.');
+            }
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            throw $e;
+        }
+    }
+
     /** Debe ejecutarse dentro de la transacción de creación de factura. */
     public static function canjearEnFactura(string $codigo, int $importeCents, int $facturaId): void
     {

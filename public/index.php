@@ -412,6 +412,7 @@ $router->get('/voucher/(?P<code>[A-Z0-9-]+)', [AdminVoucherController::class, 'p
 $router->post('/voucher/(?P<code>[A-Z0-9-]+)/pdf', [AdminVoucherController::class, 'downloadPdf']);
 $router->get('/admin/vouchers', [AdminVoucherController::class, 'index']);
 $router->post('/admin/vouchers/generar', [AdminVoucherController::class, 'generate']);
+$router->post('/admin/vouchers/anular', [AdminVoucherController::class, 'cancel']);
 $router->post('/admin/vouchers/diseno', [AdminVoucherController::class, 'saveDesign']);
 $router->get('/admin/facturas/comprobantes', [AdminFacturaController::class, 'index']);
 $router->get('/admin/facturas/diagnostico-stock', [AdminFacturaController::class, 'diagnosticoStock']);

@@ -151,7 +151,16 @@ $voucherDesign = $voucherDesign ?? [];
                     <td><?= htmlspecialchars($formaPagoLabels[$voucher['forma_pago'] ?? ''] ?? ($voucher['forma_pago'] ?? '')) ?></td>
                     <td><span class="badge bg-<?= ($voucher['estado'] ?? '') === 'activo' ? 'success' : (($voucher['estado'] ?? '') === 'canjeado' ? 'secondary' : 'danger') ?>"><?= htmlspecialchars($voucher['estado'] ?? '') ?></span></td>
                     <td><?= htmlspecialchars($voucher['sucursal_nombre'] ?? '-') ?></td>
-                    <td><a class="btn btn-sm btn-outline-primary py-0 px-1" target="_blank" title="Vista previa / descarga" href="/voucher/<?= rawurlencode((string)$voucher['codigo']) ?>"><i class="bi bi-eye"></i></a></td>
+                    <td class="text-nowrap">
+                        <a class="btn btn-sm btn-outline-primary py-0 px-1" target="_blank" title="Vista previa / descarga" href="/voucher/<?= rawurlencode((string)$voucher['codigo']) ?>"><i class="bi bi-eye"></i></a>
+                        <?php if (($voucher['estado'] ?? '') === 'activo'): ?>
+                        <form method="post" action="/admin/vouchers/anular" class="d-inline" onsubmit="return confirm('¿Anular el voucher <?= htmlspecialchars((string)($voucher['codigo'] ?? ''), ENT_QUOTES) ?> y registrar el reintegro?')">
+                            <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                            <input type="hidden" name="id" value="<?= (int)($voucher['id'] ?? 0) ?>" />
+                            <button class="btn btn-sm btn-outline-danger py-0 px-1" type="submit" title="Anular voucher y reintegrar el cobro">Anular</button>
+                        </form>
+                        <?php endif; ?>
+                    </td>
                 </tr>
             <?php endforeach; endif; ?>
             </tbody>

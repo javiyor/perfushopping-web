@@ -110,6 +110,23 @@ final class VoucherController
         }
     }
 
+    public function cancel(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requirePermiso('facturacion');
+        Csrf::check($_POST['_csrf'] ?? null);
+        $id = (int)($_POST['id'] ?? 0);
+        try {
+            if ($id <= 0) throw new \RuntimeException('Voucher inválido.');
+            (new VoucherRegaloRepo())->anularConReintegro($id, (int)$adminUser['id']);
+            $_SESSION['admin_flash'] = ['type'=>'ok','text'=>'Voucher anulado y reintegro registrado en el medio de cobro original.'];
+        } catch (\Throwable $e) {
+            error_log('VoucherController::cancel: '.$e->getMessage());
+            $_SESSION['admin_flash'] = ['type'=>'danger','text'=>$e->getMessage()];
+        }
+        Response::redirect('/admin/vouchers');
+    }
+
     public function saveDesign(array $params): void
     {
         $auth = new AdminAuthService();

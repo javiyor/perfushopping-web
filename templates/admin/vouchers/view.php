@@ -16,6 +16,7 @@ $shareText = 'Te enviaron un voucher de regalo de ' . Format::moneyFromCents((in
 $titulo = (string)($design['titulo'] ?? '¡FELICITACIONES!');
 $cinta = (string)($design['cinta'] ?? 'GIFT VOUCHER');
 $mensaje = (string)($design['mensaje'] ?? 'Qué alegría compartir este regalo con vos.\n\nGracias por ser parte de este momento.\n\nDeseamos que este regalo te acompañe en recuerdos hermosos.');
+$mensajeParrafos = preg_split('/\R{2,}/u', trim($mensaje)) ?: [];
 $fraseInferior = (string)($design['frase_inferior'] ?? '¡Te esperamos con mucho cariño!');
 ?>
 <!doctype html>
@@ -55,32 +56,33 @@ $fraseInferior = (string)($design['frase_inferior'] ?? '¡Te esperamos con mucho
         .corner { position:absolute; color:var(--gold-light); font-size:clamp(17px,3vw,30px); line-height:1; text-shadow:0 0 8px #c9b037; }
         .corner-tr { top:-.4%; right:1.5%; }
         .corner-bl { bottom:-.4%; left:1.5%; }
-        .voucher-layout { position:relative; z-index:2; height:100%; display:grid; grid-template-rows:auto auto minmax(0,1fr) auto auto auto; gap:1.2%; }
-        .brand { display:flex; justify-content:center; align-items:center; min-height:8%; text-align:center; }
+        .voucher-layout { position:relative; z-index:2; height:100%; display:grid; grid-template-rows:auto auto minmax(0,1fr) auto auto auto; row-gap:0; }
+        .brand { display:flex; justify-content:center; align-items:center; min-height:8%; margin-bottom:1.2%; text-align:center; }
         .brand-logo { display:block; max-width:44%; max-height:9vh; object-fit:contain; }
-        .title-area { text-align:center; }
+        .title-area { margin-bottom:1.2%; text-align:center; }
         .congrats { margin:0; color:var(--gold-light); font:700 clamp(23px,5vw,50px)/1.05 'Playfair Display',Georgia,serif; letter-spacing:.08em; text-shadow:0 0 11px #c9b03799; }
         .ribbon { position:relative; display:inline-block; margin-top:1%; padding:1.1% 9%; color:#080808; background:linear-gradient(100deg,#8b681b,#f8e7a0 28%,#c9b037 58%,#fff0a8 78%,#94701f); font:700 clamp(12px,2.3vw,21px)/1.1 'Playfair Display',Georgia,serif; letter-spacing:.2em; box-shadow:0 2px 9px #d7b64a88; }
         .hero { display:grid; grid-template-columns:46% 54%; min-height:0; border-top:1px solid #c9b03788; border-bottom:1px solid #c9b03788; overflow:hidden; }
         .model-frame { position:relative; width:100%; height:100%; min-height:0; background:radial-gradient(ellipse at 65% 67%,#60481e 0%,#241a0c 38%,#070707 78%); overflow:hidden; }
         .model-photo { position:absolute; inset:0; display:block; width:100%; height:100%; object-fit:contain; object-position:center top; }
         .photo-missing { position:absolute; inset:0; display:grid; place-items:center; padding:8%; text-align:center; color:#d3bd73; font:500 clamp(13px,2.1vw,20px)/1.4 'Playfair Display',Georgia,serif; background:radial-gradient(ellipse at 50% 30%,#40321666,transparent 62%); }
-        .message { align-self:center; padding:6% 7%; color:#f4f0e5; text-align:center; font:400 clamp(13px,2.2vw,21px)/1.45 'Cormorant Garamond',Georgia,serif; white-space:pre-line; }
-        .message-copy { color:#f4efdf; font-weight:500; letter-spacing:.015em; line-height:1.38; text-shadow:0 1px 8px #000; }
+        .message { align-self:stretch; display:flex; flex-direction:column; justify-content:space-between; padding:6% 7%; color:#f4f0e5; text-align:center; font:400 clamp(13px,2.2vw,21px)/1.45 'Cormorant Garamond',Georgia,serif; }
+        .message-copy { flex:1; display:flex; flex-direction:column; justify-content:space-evenly; gap:3%; color:#f4efdf; font-weight:500; letter-spacing:.015em; line-height:1.38; text-shadow:0 1px 8px #000; }
+        .message-copy p { margin:0; }
         .message-copy::before,.message-copy::after { display:block; color:var(--gold-light); font:400 clamp(9px,1.25vw,13px)/1 Arial,sans-serif; letter-spacing:.65em; text-shadow:0 0 7px #d7b64a88; }
         .message-copy::before { content:'✦  ✧  ✦'; margin:0 auto 5%; }
         .message-copy::after { content:'✧  ·  ✧'; margin:5% auto 0; }
         .heart { display:block; margin:5% 0 4%; text-align:center; color:var(--gold-light); font-size:clamp(18px,3vw,28px); text-shadow:0 0 10px #e8c954aa; }
         .recipient { margin-top:4%; color:#d2d2d2; text-align:center; font:12px/1.3 Arial,sans-serif; }
         .recipient-name { display:block; margin-top:2%; color:#fff; font:600 clamp(16px,2.7vw,26px)/1.2 'Playfair Display',Georgia,serif; }
-        .voucher-data { display:grid; grid-template-columns:1fr 1fr; align-items:center; gap:2% 4%; padding:1% 2%; }
+        .voucher-data { display:grid; grid-template-columns:1fr 1fr; align-items:center; gap:2% 4%; margin:1.2% 0; padding:1% 2%; }
         .value { color:var(--gold-light); font:600 clamp(16px,3vw,29px)/1.2 'Playfair Display',Georgia,serif; }
         .sender { color:#ddd; text-align:right; font:11px/1.3 Arial,sans-serif; }
         .sender strong { color:#fff; font-family:'Playfair Display',Georgia,serif; }
         .voucher-code { grid-column:1/-1; color:var(--gold-light); text-align:center; font:600 clamp(13px,2.4vw,23px)/1.2 'Playfair Display',Georgia,serif; letter-spacing:.17em; }
         .voucher-code span { display:block; margin-bottom:3px; color:#adadad; font:8px/1.2 Arial,sans-serif; letter-spacing:.2em; text-transform:uppercase; }
         .closing-brush { display:block; width:92%; justify-self:center; padding:2% 1%; color:#101010; text-align:center; background:linear-gradient(95deg,#98701d,#f8e9a2 25%,#c9b037 52%,#fff0a8 74%,#8e6819); clip-path:polygon(2% 14%,98% 0,96% 78%,4% 100%); font:400 clamp(17px,3vw,30px)/1.1 'Great Vibes','Brush Script MT',cursive; }
-        .pickup-locations { color:#e7d79d; text-align:center; font:500 8px/1.25 Arial,sans-serif; letter-spacing:.02em; }
+        .pickup-locations { margin-top:1.2%; color:#e7d79d; text-align:center; font:500 8px/1.25 Arial,sans-serif; letter-spacing:.02em; }
         .pickup-title { display:block; margin-bottom:1mm; color:var(--gold-light); font:600 10px/1.2 'Playfair Display',Georgia,serif; }
         .pickup-address { margin:.5mm 0; }
         @media (max-width:600px) {
@@ -131,17 +133,21 @@ $fraseInferior = (string)($design['frase_inferior'] ?? '¡Te esperamos con mucho
                     <?php else: ?><div class="photo-missing">Fotografía de modelo<br />con bolsa de regalo</div><?php endif; ?>
                 </div>
                 <div class="message">
-                    <div class="message-copy"><?= nl2br(htmlspecialchars($design['mensaje'] ?? '')) ?></div>
+                    <div class="message-copy">
+                        <?php foreach ($mensajeParrafos as $parrafo): ?>
+                        <p><?= nl2br(htmlspecialchars($parrafo)) ?></p>
+                        <?php endforeach; ?>
+                    </div>
                     <span class="heart" aria-hidden="true">♥</span>
                     <div class="recipient">Para:<span class="recipient-name"><?= htmlspecialchars($voucher['destinatario_nombre'] ?? '') ?></span></div>
                 </div>
             </section>
+            <footer class="closing-brush"><?= htmlspecialchars($design['frase_inferior'] ?? '¡Te esperamos con mucho cariño!') ?></footer>
             <section class="voucher-data">
                 <div class="value">Valor <?= Format::moneyFromCents((int)($voucher['importe_cents'] ?? 0)) ?></div>
                 <div class="sender">De <strong><?= htmlspecialchars($voucher['remitente_nombre'] ?? '') ?></strong><br /><?= htmlspecialchars($voucher['remitente_telefono'] ?? '') ?></div>
                 <div class="voucher-code"><span>Número de voucher</span><?= htmlspecialchars($voucher['codigo'] ?? '') ?></div>
             </section>
-            <footer class="closing-brush"><?= htmlspecialchars($design['frase_inferior'] ?? '¡Te esperamos con mucho cariño!') ?></footer>
             <section class="pickup-locations">
                 <strong class="pickup-title">Retirar en:</strong>
                 <?php foreach ($branches as $branch): ?>
