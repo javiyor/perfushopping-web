@@ -207,6 +207,13 @@ final class FacturaController
             }
         }
 
+        $vouchersDisponibles = [];
+        try {
+            $vouchersDisponibles = (new \Perfushopping\Web\Repo\VoucherRegaloRepo())->disponibles();
+        } catch (\Throwable $e) {
+            error_log('FacturaController::posCommon vouchers error: '.$e->getMessage());
+        }
+
         return [
             'adminUser' => $adminUser,
             'pedidosPendientes' => $pedidosPendientes,
@@ -217,6 +224,7 @@ final class FacturaController
             'equipos' => $this->equipos((int)$auth->getSucursalId()),
             'plazos' => $this->plazos(),
             'formasPago' => (new \Perfushopping\Web\Repo\FormaPagoRepo())->findActivas(),
+            'vouchersDisponibles' => $vouchersDisponibles,
             'transferCuentaId' => $transferCuentaId,
             'tarjetaBancoMap' => $tarjetaBancoMap,
             'emisorIva' => ArcaValidacionService::condicionEmisor(),

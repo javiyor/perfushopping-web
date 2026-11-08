@@ -106,13 +106,6 @@ final class VoucherController
         }
     }
 
-    public function disponibles(array $params): void
-    {
-        $auth = new AdminAuthService();
-        $auth->requirePermiso('facturacion');
-        Response::json((new VoucherRegaloRepo())->disponibles());
-    }
-
     public function publicView(array $params): void
     {
         $codigo = strtoupper(trim((string)($params['code'] ?? '')));

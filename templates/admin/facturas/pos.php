@@ -1593,6 +1593,7 @@ const TRANSFER_CUENTA_ID = <?= json_encode($transferCuentaId) ?: 'null' ?>;
 const TARJETA_BANCO_MAP = <?= json_encode($tarjetaBancoMap) ?: '[]' ?>;
 const PLAZOS = <?= json_encode($plazos, JSON_UNESCAPED_UNICODE) ?: '[]' ?>;
 const FORMAS_PAGO_RAW = <?= json_encode($formasPago, JSON_UNESCAPED_UNICODE) ?: '[]' ?>;
+const VOUCHERS_DISPONIBLES = <?= json_encode($vouchersDisponibles ?? [], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) ?: '[]' ?>;
 const FORMAS_PAGO = (FORMAS_PAGO_RAW.length ? FORMAS_PAGO_RAW : [
     {codigo: 'efectivo', nombre: 'Efectivo', tipo: 'efectivo'},
     {codigo: 'transferencia', nombre: 'Transferencia bancaria', tipo: 'banco'},
@@ -1706,25 +1707,16 @@ function onPagoFormaChange(sel) {
             const option = voucherSelect.options[voucherSelect.selectedIndex];
             const amountCents = Number(option?.dataset.cents || 0);
             if (montoInput) montoInput.value = amountCents > 0 ? (amountCents / 100).toFixed(2) : '0';
-            status.textContent = amountCents > 0 ? 'Valor del voucher: ' + fmtCents(amountCents) + '. Se canjeará una sola vez.' : 'Elegí un voucher disponible.';
+            status.textContent = amountCents > 0 ? 'Valor del voucher: $' + fmtPrice(amountCents) + '. Se canjeará una sola vez.' : 'Elegí un voucher disponible.';
             status.className = 'col-12 small fp-voucher-status ' + (amountCents > 0 ? 'text-success' : 'text-muted');
             recalcTotals();
         });
-        fetch('/admin/vouchers/disponibles')
-            .then(response => { if (!response.ok) throw new Error('No se pudo cargar la lista.'); return response.json(); })
-            .then(vouchers => {
-                voucherSelect.innerHTML = '<option value="">— Seleccionar voucher —</option>' + vouchers.map(v =>
-                    `<option value="${esc(v.codigo)}" data-cents="${Number(v.importe_cents || 0)}">${esc(v.destinatario_nombre)} — ${esc(v.codigo)} — ${fmtCents(Number(v.importe_cents || 0))}</option>`
-                ).join('');
-                voucherSelect.disabled = vouchers.length === 0;
-                status.textContent = vouchers.length ? 'Elegí por nombre o código. El listado está ordenado alfabéticamente.' : 'No hay vouchers disponibles para canjear.';
-                status.className = 'col-12 small fp-voucher-status ' + (vouchers.length ? 'text-muted' : 'text-warning');
-            })
-            .catch(error => {
-                voucherSelect.innerHTML = '<option value="">No se pudo cargar la lista</option>';
-                status.textContent = error.message || 'No se pudieron cargar los vouchers.';
-                status.className = 'col-12 small fp-voucher-status text-danger';
-            });
+        voucherSelect.innerHTML = '<option value="">— Seleccionar voucher —</option>' + VOUCHERS_DISPONIBLES.map(v =>
+            `<option value="${esc(v.codigo)}" data-cents="${Number(v.importe_cents || 0)}">${esc(v.destinatario_nombre)} — ${esc(v.codigo)} — $${fmtPrice(Number(v.importe_cents || 0))}</option>`
+        ).join('');
+        voucherSelect.disabled = VOUCHERS_DISPONIBLES.length === 0;
+        status.textContent = VOUCHERS_DISPONIBLES.length ? 'Elegí por nombre o código. El listado está ordenado alfabéticamente.' : 'No hay vouchers disponibles para canjear.';
+        status.className = 'col-12 small fp-voucher-status ' + (VOUCHERS_DISPONIBLES.length ? 'text-muted' : 'text-warning');
     } else if (tipo === 'cheque') {
         let bopts = '<option value="">— Seleccionar banco —</option>';
         BANCOS.forEach(b => { bopts += `<option value="${b.idban}">${esc(b.nombanc)}</option>`; });
