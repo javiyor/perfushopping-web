@@ -371,6 +371,7 @@ $pedidoDescPct = $pedidoDescPct ?? 0;
                     <span><input type="number" id="posPuntosUsar" value="0" min="0" step="1" style="width:80px;text-align:right;font-size:14px;border:1px solid #ccc;border-radius:4px;padding:2px 4px" onchange="recalcTotals()" /></span>
                 </div>
                 <div class="pt-row" id="posPuntosSaldo" style="display:none;font-size:12px;color:#6c757d"><span>Saldo disponible</span><span><span id="posPuntosSaldoVal">0</span> <button type="button" class="btn btn-outline-warning btn-sm" style="padding:1px 7px;font-size:11px;line-height:1.4;vertical-align:middle" onclick="canjearPuntos()">Canjear puntos</button></span></div>
+                <div class="pt-row" id="posRedondeoRow" style="display:none"><span>Redondeo al peso</span><span id="posRedondeo"></span></div>
                 <div class="pt-row pt-total"><span>TOTAL</span><span id="posTotal">$0</span></div>
             </div>
         </div>
@@ -502,6 +503,17 @@ document.getElementById('btnScanCam').addEventListener('click', function() {
 
 function fmtPrice(cents) {
     return (cents / 100).toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+
+function redondearTotalFacturaCents(montoCents, tipoComprobante) {
+    const monto = Math.max(0, Math.round(Number(montoCents) || 0));
+    if (tipoComprobante === 'NC' || monto === 0) return {total: monto, redondeo: 0};
+    const total = Math.floor((monto + 50) / 100) * 100;
+    return {total: total, redondeo: total - monto};
+}
+
+function fmtPesosEnteros(cents) {
+    return Math.round((Number(cents) || 0) / 100).toLocaleString('es-AR', {maximumFractionDigits: 0});
 }
 
 function getCondIva() {
@@ -837,8 +849,13 @@ function recalcTotals() {
         if (puntosUsados < parseInt(puntosEl.value)) puntosEl.value = puntosUsados;
     }
     const puntosCents = puntosUsados * 100;
-    const totalFinal = totalConDto - puntosCents;
-    document.getElementById('posTotal').textContent = '$' + fmtPrice(totalFinal);
+    const totalSinRedondear = Math.max(0, totalConDto - puntosCents);
+    const redondeado = redondearTotalFacturaCents(totalSinRedondear, document.getElementById('tipoComprobante').value);
+    const totalFinal = redondeado.total;
+    const redondeoRow = document.getElementById('posRedondeoRow');
+    redondeoRow.style.display = redondeado.redondeo !== 0 ? 'flex' : 'none';
+    document.getElementById('posRedondeo').textContent = (redondeado.redondeo > 0 ? '+' : '−') + '$' + fmtPrice(Math.abs(redondeado.redondeo));
+    document.getElementById('posTotal').textContent = '$' + (document.getElementById('tipoComprobante').value === 'NC' ? fmtPrice(totalFinal) : fmtPesosEnteros(totalFinal));
 
     let pagado = 0;
     document.querySelectorAll('#pagosContainer .fp-monto').forEach(inp => {
@@ -1256,7 +1273,10 @@ function toggleAsociada() {
         document.getElementById('asociadaSel').style.display = 'none';
     }
 }
-document.getElementById('tipoComprobante').addEventListener('change', toggleAsociada);
+document.getElementById('tipoComprobante').addEventListener('change', function() {
+    toggleAsociada();
+    recalcTotals();
+});
 
 function mostrarAsociada(id, codigo, tipo, cliente, totalCents, fecha) {
     const hid = document.getElementById('comprobanteAsociadoId');
@@ -1881,10 +1901,30 @@ function submitFactura() {
     }
     const totalFactura = totalBruto - descuentoCents;
     const puntosCanje = Math.max(0, parseInt(document.getElementById('posPuntosUsar').value) || 0);
-    const totalACobrar = totalFactura - puntosCanje * 100;
+    const totalSinRedondear = Math.max(0, totalFactura - puntosCanje * 100);
+    const redondeado = redondearTotalFacturaCents(totalSinRedondear, tipo);
+    const totalACobrar = redondeado.total;
     const totalPagado = pagos.reduce((s, p) => s + p.monto_cents, 0);
+    const totalVoucher = pagos.filter(p => formaTipo(p.forma_pago) === 'voucher').reduce((s, p) => s + p.monto_cents, 0);
+    if (totalVoucher > totalACobrar || (totalVoucher > 0 && totalPagado < totalACobrar)) {
+        alert('El voucher se canjea por su valor completo. Agregá otro medio de pago para cubrir el saldo pendiente.');
+        btn.disabled = false;
+        btn.innerHTML = BTN_LABEL;
+        return;
+    }
+    let excesoSinEfectivo = Math.max(0, totalPagado - totalACobrar);
+    for (let i = pagos.length - 1; i >= 0 && excesoSinEfectivo > 0; i--) {
+        if (formaTipo(pagos[i].forma_pago) !== 'efectivo') continue;
+        excesoSinEfectivo -= Math.min(excesoSinEfectivo, pagos[i].monto_cents);
+    }
+    if (totalVoucher > 0 && excesoSinEfectivo > 0) {
+        alert('El total de los medios de pago supera la compra. Ajustá los importes para que el voucher y los demás pagos coincidan con el total.');
+        btn.disabled = false;
+        btn.innerHTML = BTN_LABEL;
+        return;
+    }
     if (totalPagado < totalACobrar) {
-        const ok = confirm('El total pagado ($' + fmtPrice(totalPagado) + ') es menor que el total a cobrar ($' + fmtPrice(totalACobrar) + '). ¿Continuar igual?');
+        const ok = confirm('El total pagado ($' + fmtPrice(totalPagado) + ') es menor que el total a cobrar ($' + fmtPesosEnteros(totalACobrar) + '). ¿Continuar igual?');
         if (!ok) {
             btn.disabled = false;
             btn.innerHTML = BTN_LABEL;
@@ -1924,6 +1964,7 @@ function submitFactura() {
         notas: notas,
         fecha: EDITAR_ID > 0 && EDITAR_FACTURA && EDITAR_FACTURA.fecha ? EDITAR_FACTURA.fecha : (function() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })(),
         descuento_cents: descuentoCents,
+        redondeo_cents: redondeado.redondeo,
         puntos_usados: parseInt(document.getElementById('posPuntosUsar').value) || 0,
         cliente: {
             id: clienteId || null,

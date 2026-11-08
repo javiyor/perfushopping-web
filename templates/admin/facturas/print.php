@@ -17,6 +17,13 @@ $formaPagoLabels = ($formasPagoLabels ?? []) + [
     'cuenta_corriente'=>'Cta. cte.', 'cheque'=>'Cheque',
 ];
 $discriminaIva = in_array($factura['tipo_comprobante'] ?? '', ['FACT-A', 'FACT-C']);
+$subtotalCents = (int)($factura['subtotal_cents'] ?? 0);
+$ivaCents = (int)($factura['iva_cents'] ?? 0);
+$descuentoCents = (int)($factura['descuento_cents'] ?? 0);
+$puntosCents = (int)($factura['puntos_cents'] ?? 0);
+$totalCents = (int)($factura['total_cents'] ?? 0);
+$totalSinRedondeoCents = max(0, $subtotalCents + $ivaCents - $descuentoCents - $puntosCents);
+$redondeoCents = $totalCents - $totalSinRedondeoCents;
 $isTicket = $formato !== 'a4';
 $bodyWidth = $formato === '58mm' ? '58mm' : ($formato === '80mm' ? '80mm' : '210mm');
 $bodyFontSize = $formato === '58mm' ? '10px' : '12px';
@@ -184,20 +191,22 @@ $esEnvio = ($factura['entrega_tipo'] ?? 'local') === 'envio';
 
     <div class="totals">
         <?php if ($discriminaIva): ?>
-        <div class="row"><span>Subtotal:</span><span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($factura['subtotal_cents'] ?? 0))) ?></span></div>
-        <div class="row"><span>IVA:</span><span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($factura['iva_cents'] ?? 0))) ?></span></div>
+        <div class="row"><span>Subtotal:</span><span><?= htmlspecialchars(Format::moneyRoundedFromCents($subtotalCents)) ?></span></div>
+        <div class="row"><span>IVA:</span><span><?= htmlspecialchars(Format::moneyRoundedFromCents($ivaCents)) ?></span></div>
         <?php else: ?>
-        <div class="row"><span>Subtotal (con IVA):</span><span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($factura['total_cents'] ?? 0))) ?></span></div>
+        <div class="row"><span>Subtotal (con IVA):</span><span><?= htmlspecialchars(Format::moneyRoundedFromCents($subtotalCents + $ivaCents)) ?></span></div>
         <?php endif; ?>
-        <?php $descuento = (int)($factura['descuento_cents'] ?? 0); ?>
+        <?php $descuento = $descuentoCents; ?>
         <?php if ($descuento > 0): ?>
         <div class="row"><span>Descuento:</span><span>-<?= htmlspecialchars(Format::moneyRoundedFromCents($descuento)) ?></span></div>
         <?php endif; ?>
-        <?php $puntosCents = (int)($factura['puntos_cents'] ?? 0); ?>
         <?php if ($puntosCents > 0): ?>
         <div class="row"><span>Canje puntos:</span><span>-<?= htmlspecialchars(Format::moneyRoundedFromCents($puntosCents)) ?> (<?= (int)($puntosCents / 100) ?> pts)</span></div>
         <?php endif; ?>
-        <div class="row total"><span>TOTAL:</span><span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($factura['total_cents'] ?? 0))) ?></span></div>
+        <?php if ($redondeoCents !== 0): ?>
+        <div class="row"><span>Redondeo al peso:</span><span><?= $redondeoCents > 0 ? '+' : '−' ?><?= htmlspecialchars(Format::moneyFromCents(abs($redondeoCents))) ?></span></div>
+        <?php endif; ?>
+        <div class="row total"><span>TOTAL:</span><span><?= htmlspecialchars(Format::moneyRoundedFromCents($totalCents)) ?></span></div>
     </div>
 
     <?php if ($pagos): ?>

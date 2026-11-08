@@ -157,7 +157,7 @@ $tipoBadges = ['FACT-A' => 'primary', 'FACT-B' => 'success', 'FACT-C' => 'second
                                 <?php
                                 $waTel = preg_replace('/\D/', '', (string)($f['cliente_tele'] ?? ''));
                                 if ($waTel !== ''):
-                                    $waText = 'Hola ' . ($f['cliente_nombre'] ?? '') . ', le enviamos su comprobante ' . ($f['codigo'] ?? '') . ' por un total de ' . Format::moneyFromCents((int)($f['total_cents'] ?? 0)) . '. ¡Gracias por su compra!';
+                                    $waText = 'Hola ' . ($f['cliente_nombre'] ?? '') . ', le enviamos su comprobante ' . ($f['codigo'] ?? '') . ' por un total de ' . Format::moneyRoundedFromCents((int)($f['total_cents'] ?? 0)) . '. ¡Gracias por su compra!';
                                 ?>
                                 <a class="btn btn-sm btn-outline-success py-0 px-1 wa-send-comprobante" title="Enviar por WhatsApp con imagen del ticket" target="_blank" href="https://wa.me/<?= htmlspecialchars($waTel) ?>?text=<?= urlencode($waText) ?>" data-wa-id="<?= (int)($f['id'] ?? 0) ?>" data-wa-phone="<?= htmlspecialchars($waTel) ?>" data-wa-text="<?= htmlspecialchars($waText, ENT_QUOTES) ?>"><i class="bi bi-whatsapp"></i></a>
                                 <?php endif; ?>

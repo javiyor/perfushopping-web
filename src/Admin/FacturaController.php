@@ -440,7 +440,8 @@ final class FacturaController
         }
 
         // Vuelto: registrar lo cobrado en efectivo, no el billete entregado.
-        $totalFacturado = $subtotal + $ivaTotal - $descuento - $puntosUsadosCents;
+        $totalAntesRedondeo = max(0, $subtotal + $ivaTotal - $descuento - $puntosUsadosCents);
+        $totalFacturado = $this->redondearTotalAPagar($totalAntesRedondeo, $tipo);
         $pagos = $this->absorberVuelto($pagos, $totalFacturado);
         $voucherCents = array_sum(array_map(static fn(array $p): int => !empty($p['voucher_code']) ? (int)($p['monto_cents'] ?? 0) : 0, $pagos));
         $pagadoCents = array_sum(array_map(static fn(array $p): int => (int)($p['monto_cents'] ?? 0), $pagos));
@@ -489,7 +490,7 @@ final class FacturaController
             'iva_cents' => $ivaTotal,
             'descuento_cents' => $descuento,
             'puntos_cents' => $puntosUsadosCents,
-            'total_cents' => $subtotal + $ivaTotal - $descuento - $puntosUsadosCents,
+            'total_cents' => $totalFacturado,
             'estado' => 'emitida',
             'forma_pago' => $formaPago,
             'entrega_tipo' => $entregaTipo,
@@ -518,8 +519,7 @@ final class FacturaController
                 }
                 $intentos++;
                 $codigo = $repo->nextCodigo($tipo);
-            }
-            catch (\RuntimeException $e) {
+            } catch (\RuntimeException $e) {
                 Response::json(['ok'=>false,'error'=>$e->getMessage()], 409);
                 return;
             }
@@ -833,6 +833,16 @@ final class FacturaController
         return array_values(array_filter($pagos, static function ($p): bool {
             return (int)$p['monto_cents'] > 0;
         }));
+    }
+
+    /** Redondea el importe a pagar al peso más cercano; las NC son créditos, no cobros. */
+    private function redondearTotalAPagar(int $montoCents, string $tipoComprobante): int
+    {
+        $montoCents = max(0, $montoCents);
+        if ($tipoComprobante === 'NC' || $montoCents === 0) {
+            return $montoCents;
+        }
+        return intdiv($montoCents + 50, 100) * 100;
     }
 
     private function montoCuentaCorriente(array $pagos): int
@@ -1269,7 +1279,8 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
         }
 
         // Vuelto: registrar lo cobrado en efectivo, no el billete entregado.
-        $totalFacturado = $subtotal + $ivaTotal - $descuento - $puntosUsadosCents;
+        $totalAntesRedondeo = max(0, $subtotal + $ivaTotal - $descuento - $puntosUsadosCents);
+        $totalFacturado = $this->redondearTotalAPagar($totalAntesRedondeo, $tipo);
         $pagos = $this->absorberVuelto($pagos, $totalFacturado);
         $formaPago = $pagos[0]['forma_pago'] ?? $formaPago;
 
@@ -1372,7 +1383,7 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
             'iva_cents' => $ivaTotal,
             'descuento_cents' => $descuento,
             'puntos_cents' => $puntosUsadosCents,
-            'total_cents' => $subtotal + $ivaTotal - $descuento - $puntosUsadosCents,
+            'total_cents' => $totalFacturado,
             'forma_pago' => $formaPago,
             'entrega_tipo' => $entregaTipo,
             'transporte' => $transporte,
@@ -2256,7 +2267,16 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
         if ((int)($factura['descuento_cents'] ?? 0) > 0) {
             $lines[] = ['text' => 'Descuento: $' . $money((int)$factura['descuento_cents'])];
         }
-        $lines[] = ['text' => 'TOTAL: $' . $money((int)($factura['total_cents'] ?? 0)), 'bold' => true, 'size' => 13];
+        if ((int)($factura['puntos_cents'] ?? 0) > 0) {
+            $lines[] = ['text' => 'Canje de puntos: -$' . $money((int)$factura['puntos_cents'])];
+        }
+        $redondeoCents = (int)($factura['total_cents'] ?? 0)
+            - max(0, (int)($factura['subtotal_cents'] ?? 0) + (int)($factura['iva_cents'] ?? 0)
+                - (int)($factura['descuento_cents'] ?? 0) - (int)($factura['puntos_cents'] ?? 0));
+        if ($redondeoCents !== 0) {
+            $lines[] = ['text' => 'Redondeo al peso: ' . ($redondeoCents > 0 ? '+' : '-') . '$' . $money(abs($redondeoCents))];
+        }
+        $lines[] = ['text' => 'TOTAL: ' . \Perfushopping\Web\Support\Format::moneyRoundedFromCents((int)($factura['total_cents'] ?? 0)), 'bold' => true, 'size' => 13];
         $lines[] = ['text' => 'Estado: ' . (string)($factura['estado'] ?? '')];
         if (!empty($factura['cae'])) {
             $lines[] = ['text' => 'CAE: ' . (string)$factura['cae']];
@@ -2337,6 +2357,14 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
         $attachmentHtml .= '<p>IVA: ' . Format::moneyRoundedFromCents((int)($factura['iva_cents'] ?? 0)) . '</p>';
         $desc = (int)($factura['descuento_cents'] ?? 0);
         if ($desc > 0) $attachmentHtml .= '<p style="color:#dc3545">Descuento: -' . Format::moneyRoundedFromCents($desc) . '</p>';
+        $puntosCents = (int)($factura['puntos_cents'] ?? 0);
+        if ($puntosCents > 0) $attachmentHtml .= '<p>Canje de puntos: -' . Format::moneyRoundedFromCents($puntosCents) . '</p>';
+        $redondeoCents = (int)($factura['total_cents'] ?? 0)
+            - max(0, (int)($factura['subtotal_cents'] ?? 0) + (int)($factura['iva_cents'] ?? 0)
+                - $desc - $puntosCents);
+        if ($redondeoCents !== 0) {
+            $attachmentHtml .= '<p>Redondeo al peso: ' . ($redondeoCents > 0 ? '+' : '−') . Format::moneyFromCents(abs($redondeoCents)) . '</p>';
+        }
         $attachmentHtml .= '<p class="total">TOTAL: ' . Format::moneyRoundedFromCents((int)($factura['total_cents'] ?? 0)) . '</p></div>';
         $puntosObtenidos = (new \Perfushopping\Web\Repo\PuntosRepo())->acumulacionFactura($id);
         $puntosTotales = (new \Perfushopping\Web\Repo\PuntosRepo())->saldo((int)($factura['idclien'] ?? 0));
@@ -2360,7 +2388,7 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
         ];
 
         $emailBody = '<p>Estimado/a,</p><p>Adjuntamos la factura <strong>' . htmlspecialchars($factura['codigo'] ?? '') . '</strong>.</p>';
-        $emailBody .= '<p>Monto total: <strong>' . Format::moneyFromCents((int)($factura['total_cents'] ?? 0)) . '</strong></p>';
+        $emailBody .= '<p>Monto total: <strong>' . Format::moneyRoundedFromCents((int)($factura['total_cents'] ?? 0)) . '</strong></p>';
         if ($factura['cae'] ?? '') {
             $emailBody .= '<p>CAE: <strong>' . htmlspecialchars($factura['cae']) . '</strong> — Vto: ' . htmlspecialchars($factura['cae_vto'] ?? '') . '</p>';
         }

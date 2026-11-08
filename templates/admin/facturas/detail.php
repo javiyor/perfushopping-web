@@ -22,6 +22,13 @@ $formaPagoLabels = ($formasPagoLabels ?? []) + [
 
 // Gross price display for CF (B) and Mono (C); net for RI (A)
 $discriminaIva = in_array($factura['tipo_comprobante'] ?? '', ['FACT-A']);
+$subtotalCents = (int)($factura['subtotal_cents'] ?? 0);
+$ivaCents = (int)($factura['iva_cents'] ?? 0);
+$descuentoCents = (int)($factura['descuento_cents'] ?? 0);
+$puntosCents = (int)($factura['puntos_cents'] ?? 0);
+$totalCents = (int)($factura['total_cents'] ?? 0);
+$totalSinRedondeoCents = max(0, $subtotalCents + $ivaCents - $descuentoCents - $puntosCents);
+$redondeoCents = $totalCents - $totalSinRedondeoCents;
 ?>
 
 <nav aria-label="breadcrumb" class="mb-3">
@@ -104,7 +111,7 @@ $discriminaIva = in_array($factura['tipo_comprobante'] ?? '', ['FACT-A']);
                     <div class="col-md-5 offset-md-7">
                         <div class="d-flex justify-content-between small">
                             <span><?= $discriminaIva ? 'Subtotal:' : 'Subtotal (con IVA):' ?></span>
-                            <span><?= htmlspecialchars(Format::moneyRoundedFromCents($discriminaIva ? (int)($factura['subtotal_cents'] ?? 0) : (int)($factura['total_cents'] ?? 0))) ?></span>
+                            <span><?= htmlspecialchars(Format::moneyRoundedFromCents($discriminaIva ? $subtotalCents : ($subtotalCents + $ivaCents))) ?></span>
                         </div>
                         <?php if ($discriminaIva): ?>
                         <div class="d-flex justify-content-between small">
@@ -112,23 +119,28 @@ $discriminaIva = in_array($factura['tipo_comprobante'] ?? '', ['FACT-A']);
                             <span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($factura['iva_cents'] ?? 0))) ?></span>
                         </div>
                         <?php endif; ?>
-                        <?php $descuento = (int)($factura['descuento_cents'] ?? 0); ?>
+                        <?php $descuento = $descuentoCents; ?>
                         <?php if ($descuento > 0): ?>
                         <div class="d-flex justify-content-between small text-danger">
                             <span>Descuento:</span>
                             <span>-<?= htmlspecialchars(Format::moneyRoundedFromCents($descuento)) ?></span>
                         </div>
                         <?php endif; ?>
-                        <?php $puntosCents = (int)($factura['puntos_cents'] ?? 0); ?>
                         <?php if ($puntosCents > 0): ?>
                         <div class="d-flex justify-content-between small text-warning">
                             <span>Canje de puntos:</span>
                             <span>-<?= htmlspecialchars(Format::moneyRoundedFromCents($puntosCents)) ?> (<?= (int)($puntosCents / 100) ?> pts)</span>
                         </div>
                         <?php endif; ?>
+                        <?php if ($redondeoCents !== 0): ?>
+                        <div class="d-flex justify-content-between small">
+                            <span>Redondeo al peso:</span>
+                            <span><?= $redondeoCents > 0 ? '+' : '−' ?><?= htmlspecialchars(Format::moneyFromCents(abs($redondeoCents))) ?></span>
+                        </div>
+                        <?php endif; ?>
                         <div class="d-flex justify-content-between fw-bold" style="font-size:20px">
                             <span>Total:</span>
-                            <span><?= htmlspecialchars(Format::moneyRoundedFromCents((int)($factura['total_cents'] ?? 0))) ?></span>
+                            <span><?= htmlspecialchars(Format::moneyRoundedFromCents($totalCents)) ?></span>
                         </div>
                         <?php $cliNombre = trim((string)($factura['cliente_nombre'] ?? '')); ?>
                         <?php if ($cliNombre !== '' && strcasecmp($cliNombre, 'Consumidor Final') !== 0): ?>

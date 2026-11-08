@@ -198,15 +198,27 @@ final class AfipWsfe
         }
         unset($g);
 
-        // Total cobrado = subtotal + iva - descuento (los puntos de fidelidad
-        // reducen el pago, no el comprobante y no se informan a ARCA).
+        // Los puntos reducen el pago, pero no el comprobante. El total guardado
+        // incluye el redondeo final; para el total fiscal se los vuelve a sumar.
         $subtotalF = isset($factura['subtotal_cents']) ? (int)$factura['subtotal_cents'] : null;
         $ivaF = isset($factura['iva_cents']) ? (int)$factura['iva_cents'] : null;
         $impNetoFull = array_sum(array_column($grupos, 'base'));
         $impIvaFull = array_sum(array_column($grupos, 'iva'));
-        $target = ($subtotalF !== null && $ivaF !== null)
+        $baseSinRedondeo = ($subtotalF !== null && $ivaF !== null)
             ? max(0, $subtotalF + $ivaF - $descuento)
             : max(0, $impNetoFull + $impIvaFull - $descuento);
+        $puntosCents = (int)($factura['puntos_cents'] ?? 0);
+        $targetFactura = isset($factura['total_cents'])
+            ? max(0, (int)$factura['total_cents'] + $puntosCents)
+            : $baseSinRedondeo;
+        $redondeoCents = $targetFactura - $baseSinRedondeo;
+        $impTotConcRedondeo = max(0, $redondeoCents);
+        if ($redondeoCents < 0) {
+            $descuento += abs($redondeoCents);
+            $target = $targetFactura;
+        } else {
+            $target = $baseSinRedondeo;
+        }
 
         // El descuento del POS es un % sobre el bruto (neto + IVA): la parte
         // neta a descontar de las bases es descuento * neto / bruto.
@@ -250,7 +262,7 @@ final class AfipWsfe
 
         // Alinear el total enviado con el total cobrado: el IVA se redondea
         // por línea al guardar y por grupo al facturar (± unos centavos).
-        for ($i = 0; $i < 60; $i++) {
+        for ($i = 0; $i < 200; $i++) {
             $neto = array_sum(array_column($grupos, 'base'));
             $ivaAux = array_sum(array_column($grupos, 'iva'));
             $err = $target - ($neto + $ivaAux);
@@ -282,13 +294,35 @@ final class AfipWsfe
 
         $impNeto = array_sum(array_column($grupos, 'base'));
         $impIva = array_sum(array_column($grupos, 'iva'));
-        $impTotal = $impNeto + $impIva;
+        // Si el redondeo deja un desfase de centavos que no puede absorberse
+        // exactamente en la base imponible, completarlo como concepto no gravado.
+        for ($i = 0; $i < 100 && $impNeto + $impIva > $target; $i++) {
+            $reduccion = null;
+            foreach ($grupos as $k => $g) {
+                if ($g['base'] <= 0) continue;
+                $baseNueva = $g['base'] - 1;
+                $ivaNuevo = (int)round($baseNueva * $g['rate'] / 100);
+                $totalNuevo = $impNeto - $g['base'] + $baseNueva + $impIva - $g['iva'] + $ivaNuevo;
+                if ($totalNuevo < $impNeto + $impIva) {
+                    $reduccion = ['k' => $k, 'base' => $baseNueva, 'iva' => $ivaNuevo];
+                    break;
+                }
+            }
+            if ($reduccion === null) break;
+            $grupos[$reduccion['k']]['base'] = $reduccion['base'];
+            $grupos[$reduccion['k']]['iva'] = $reduccion['iva'];
+            $impNeto = array_sum(array_column($grupos, 'base'));
+            $impIva = array_sum(array_column($grupos, 'iva'));
+        }
+        $impTotConc = $impTotConcRedondeo + max(0, $target - $impNeto - $impIva);
+        $impTotal = $impNeto + $impIva + $impTotConc;
 
         // Para Factura C no se informa IVA
         $esFacturaC = $tipoCbte === 11;
         if ($esFacturaC) {
             $impNeto = $impTotal;
             $impIva = 0;
+            $impTotConc = 0;
             $grupos = [];
         }
 
@@ -348,7 +382,7 @@ final class AfipWsfe
         $detalle .= '<CbteHasta>' . $cbteNro . '</CbteHasta>';
         $detalle .= '<CbteFch>' . $fecha . '</CbteFch>';
         $detalle .= '<ImpTotal>' . $this->centsToDecimal($impTotal) . '</ImpTotal>';
-        $detalle .= '<ImpTotConc>' . $this->centsToDecimal(0) . '</ImpTotConc>';
+        $detalle .= '<ImpTotConc>' . $this->centsToDecimal($impTotConc) . '</ImpTotConc>';
         $detalle .= '<ImpNeto>' . $this->centsToDecimal($impNeto) . '</ImpNeto>';
         $detalle .= '<ImpOpEx>' . $this->centsToDecimal(0) . '</ImpOpEx>';
         $detalle .= '<ImpTrib>' . $this->centsToDecimal(0) . '</ImpTrib>';
@@ -462,14 +496,9 @@ final class AfipWsfe
         $tipoCbte = self::tipoCbteDeFactura($factura);
         $puntoVenta = $this->resolvePuntoVentaArca($factura);
 
-        $descuento = (int)($factura['descuento_cents'] ?? 0);
-        $subtotal = (int)($factura['subtotal_cents'] ?? 0);
-        $iva = (int)($factura['iva_cents'] ?? 0);
-        $importeNeto = $subtotal - $descuento;
-        if ($importeNeto < 0) {
-            $importeNeto = 0;
-        }
-        $importeTotal = $importeNeto + $iva;
+        // El total de la factura puede incluir canje de puntos; ARCA no los
+        // informa, pero sí debe reflejar el redondeo fiscal persistido.
+        $importeTotal = max(0, (int)($factura['total_cents'] ?? 0) + (int)($factura['puntos_cents'] ?? 0));
 
         $tipoDocRec = $this->getTipoDoc($factura);
         $nroDocRec = $this->getNroDoc($factura);
