@@ -1,6 +1,7 @@
 <?php
 $cliente = $cliente ?? [];
 $formasPago = $formasPago ?? [];
+$bancos = $bancos ?? [];
 $idclien = (int)($cliente['idclien'] ?? 0);
 ?>
 <div class="d-flex justify-content-between align-items-start mb-3">
@@ -49,7 +50,15 @@ $idclien = (int)($cliente['idclien'] ?? 0);
                 </div>
                 <div class="col-12" id="pagoCuentaCheque" style="display:none">
                     <div class="row g-2 p-3 bg-light rounded">
-                        <div class="col-md-3"><label class="form-label small">Banco</label><input class="form-control form-control-sm" name="cheque_banco" /></div>
+                        <div class="col-md-3">
+                            <label class="form-label small">Banco</label>
+                            <select class="form-select form-select-sm" name="cheque_banco_id">
+                                <option value="">Seleccionar banco</option>
+                                <?php foreach ($bancos as $banco): ?>
+                                    <option value="<?= (int)$banco['idban'] ?>"><?= htmlspecialchars((string)$banco['nombanc']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
                         <div class="col-md-2"><label class="form-label small">Número de cheque</label><input class="form-control form-control-sm" name="cheque_numero" /></div>
                         <div class="col-md-3"><label class="form-label small">Titular</label><input class="form-control form-control-sm" name="cheque_titular" /></div>
                         <div class="col-md-2"><label class="form-label small">CUIT titular</label><input class="form-control form-control-sm" name="cheque_cuit" /></div>

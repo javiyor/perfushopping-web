@@ -93,6 +93,7 @@ final class CtaCteController
             'movimientos' => $repo->movimientosErp($idclien),
             'facturasPendientes' => (new \Perfushopping\Web\Repo\ReciboRepo())->findFacturasPendientesErp($idclien),
             'formasPago' => (new \Perfushopping\Web\Repo\FormaPagoRepo())->findActivas(),
+            'bancos' => (new \Perfushopping\Web\Repo\BancoRepo())->findAll(),
             'csrf' => Csrf::token(),
             'pageTitle' => 'Cta. cte. — ' . ($cliente['name'] ?? ''),
         ]);
@@ -183,11 +184,15 @@ final class CtaCteController
                 if ($chequeMonto !== $totalCents) {
                     throw new \RuntimeException('El monto del cheque debe coincidir con el total asignado a facturas.');
                 }
+                $banco = (new \Perfushopping\Web\Repo\BancoRepo())->findById((int)($_POST['cheque_banco_id'] ?? 0));
+                if (!$banco) {
+                    throw new \RuntimeException('Elegí un banco de la lista.');
+                }
                 $chequeRepo = new \Perfushopping\Web\Repo\ChequeRepo();
                 $chequeId = $chequeRepo->create([
                     'tipo' => 'tercero',
                     'estado' => 'en_cartera',
-                    'banco_emisor' => trim((string)($_POST['cheque_banco'] ?? '')),
+                    'banco_emisor' => (string)$banco['nombanc'],
                     'numero_cheque' => trim((string)($_POST['cheque_numero'] ?? '')),
                     'titular' => trim((string)($_POST['cheque_titular'] ?? '')),
                     'cuit_titular' => trim((string)($_POST['cheque_cuit'] ?? '')),
@@ -274,6 +279,7 @@ final class CtaCteController
             'adminUser' => $adminUser,
             'cliente' => $cliente,
             'formasPago' => $formasPago,
+            'bancos' => (new \Perfushopping\Web\Repo\BancoRepo())->findAll(),
             'csrf' => Csrf::token(),
             'pageTitle' => 'Pago a cuenta — ' . ($cliente['razon'] ?? ''),
         ]);
@@ -327,15 +333,15 @@ final class CtaCteController
         try {
             $chequeId = null;
             if ($tipoForma === 'cheque') {
-                $banco = trim((string)($_POST['cheque_banco'] ?? ''));
+                $bancoRow = (new \Perfushopping\Web\Repo\BancoRepo())->findById((int)($_POST['cheque_banco_id'] ?? 0));
                 $numero = trim((string)($_POST['cheque_numero'] ?? ''));
-                if ($banco === '' || $numero === '') {
-                    throw new \RuntimeException('Completá banco y número del cheque.');
+                if (!$bancoRow || $numero === '') {
+                    throw new \RuntimeException('Elegí un banco de la lista e ingresá el número del cheque.');
                 }
                 $chequeId = (new \Perfushopping\Web\Repo\ChequeRepo())->create([
                     'tipo' => 'tercero',
                     'estado' => 'en_cartera',
-                    'banco_emisor' => $banco,
+                    'banco_emisor' => (string)$bancoRow['nombanc'],
                     'numero_cheque' => $numero,
                     'titular' => trim((string)($_POST['cheque_titular'] ?? '')),
                     'cuit_titular' => trim((string)($_POST['cheque_cuit'] ?? '')),

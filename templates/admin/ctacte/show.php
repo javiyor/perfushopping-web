@@ -6,6 +6,7 @@ $saldo = (int)($saldo ?? 0);
 $movimientos = $movimientos ?? [];
 $facturasPendientes = $facturasPendientes ?? [];
 $formasPago = $formasPago ?? [];
+$bancos = $bancos ?? [];
 if (!$cliente):
 ?>
     <div class="alert alert-warning">Cliente no encontrado.</div>
@@ -89,7 +90,15 @@ $origenLabels = ['factura'=>'Factura','recibo'=>'Recibo','ajuste'=>'Ajuste manua
                     </div>
                     <div class="col-12" id="ctaCobroCheque" style="display:none">
                         <div class="row g-2">
-                            <div class="col-md-3"><label class="form-label small">Banco</label><input class="form-control form-control-sm" name="cheque_banco" /></div>
+                            <div class="col-md-3">
+                                <label class="form-label small">Banco</label>
+                                <select class="form-select form-select-sm" name="cheque_banco_id">
+                                    <option value="">Seleccionar banco</option>
+                                    <?php foreach ($bancos as $banco): ?>
+                                        <option value="<?= (int)$banco['idban'] ?>"><?= htmlspecialchars((string)$banco['nombanc']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
                             <div class="col-md-2"><label class="form-label small">Número</label><input class="form-control form-control-sm" name="cheque_numero" /></div>
                             <div class="col-md-3"><label class="form-label small">Titular</label><input class="form-control form-control-sm" name="cheque_titular" /></div>
                             <div class="col-md-2"><label class="form-label small">CUIT</label><input class="form-control form-control-sm" name="cheque_cuit" /></div>
