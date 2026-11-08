@@ -24,6 +24,7 @@ final class VoucherRegaloRepo
             forma_pago VARCHAR(40) NOT NULL,
             banco_cuenta_id INT UNSIGNED DEFAULT NULL,
             sucursal_id INT UNSIGNED DEFAULT NULL,
+            caja_apertura_id INT UNSIGNED DEFAULT NULL,
             estado ENUM('activo','canjeado','anulado') NOT NULL DEFAULT 'activo',
             factura_id INT UNSIGNED DEFAULT NULL,
             created_by INT UNSIGNED DEFAULT NULL,
@@ -34,6 +35,10 @@ final class VoucherRegaloRepo
             KEY idx_voucher_regalos_estado (estado),
             KEY idx_voucher_regalos_factura (factura_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $columns = array_column(Db::pdo()->query('SHOW COLUMNS FROM voucher_regalos')->fetchAll(), 'Field');
+        if (!in_array('caja_apertura_id', $columns, true)) {
+            Db::pdo()->exec('ALTER TABLE voucher_regalos ADD COLUMN caja_apertura_id INT UNSIGNED DEFAULT NULL AFTER sucursal_id');
+        }
         self::$tableReady = true;
     }
 
@@ -45,8 +50,8 @@ final class VoucherRegaloRepo
             $codigo = 'VR-' . strtoupper(bin2hex(random_bytes(10)));
             try {
                 $st = $pdo->prepare('INSERT INTO voucher_regalos
-                    (codigo, importe_cents, destinatario_nombre, destinatario_dni, destinatario_telefono, remitente_nombre, remitente_telefono, forma_pago, banco_cuenta_id, sucursal_id, estado, created_by, created_at, cobrado_at)
-                    VALUES (:codigo, :importe, :destNombre, :destDni, :destTelefono, :remNombre, :remTelefono, :forma, :banco, :sucursal, \'activo\', :usuario, NOW(), NOW())');
+                    (codigo, importe_cents, destinatario_nombre, destinatario_dni, destinatario_telefono, remitente_nombre, remitente_telefono, forma_pago, banco_cuenta_id, sucursal_id, caja_apertura_id, estado, created_by, created_at, cobrado_at)
+                    VALUES (:codigo, :importe, :destNombre, :destDni, :destTelefono, :remNombre, :remTelefono, :forma, :banco, :sucursal, :apertura, \'activo\', :usuario, NOW(), NOW())');
                 $st->execute([
                     ':codigo'=>$codigo,
                     ':importe'=>(int)$data['importe_cents'],
@@ -58,6 +63,7 @@ final class VoucherRegaloRepo
                     ':forma'=>trim((string)$data['forma_pago']),
                     ':banco'=>(int)($data['banco_cuenta_id'] ?? 0) ?: null,
                     ':sucursal'=>(int)($data['sucursal_id'] ?? 0) ?: null,
+                    ':apertura'=>(int)($data['caja_apertura_id'] ?? 0) ?: null,
                     ':usuario'=>(int)($data['created_by'] ?? 0) ?: null,
                 ]);
                 return $this->findByCode($codigo) ?? throw new \RuntimeException('No se pudo recuperar el voucher generado.');

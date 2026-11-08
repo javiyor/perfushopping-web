@@ -3,6 +3,8 @@ use Perfushopping\Web\Support\Format;
 $apertura = $apertura ?? null;
 $ventasEfectivo = (int)($ventasEfectivo ?? 0);
 $ventasTransferencia = (int)($ventasTransferencia ?? 0);
+$ventasTarjeta = (int)($ventasTarjeta ?? 0);
+$vouchersPorForma = $vouchersPorForma ?? ['efectivo' => 0, 'transferencia' => 0, 'tarjeta' => 0];
 $totalRecibos = (int)($totalRecibos ?? 0);
 $totalesMov = $totalesMov ?? ['total_ingresos' => 0, 'total_egresos' => 0];
 $esperadoEfectivo = (int)($esperadoEfectivo ?? 0);
@@ -26,10 +28,15 @@ $esperadoEfectivo = (int)($esperadoEfectivo ?? 0);
                 <dl class="row small mb-0">
                     <dt class="col-sm-6">Apertura</dt>
                     <dd class="col-sm-6 text-end"><?= Format::moneyFromCents((int)($apertura['monto_inicial_cents'] ?? 0)) ?></dd>
-                    <dt class="col-sm-6">Ventas en efectivo</dt>
+                    <dt class="col-sm-6">Ventas en efectivo (incl. vouchers)</dt>
                     <dd class="col-sm-6 text-end text-success">+ <?= Format::moneyFromCents($ventasEfectivo) ?></dd>
-                    <dt class="col-sm-6">Ventas transf./MP</dt>
+                    <?php if ((int)($vouchersPorForma['efectivo'] ?? 0) > 0): ?><dt class="col-sm-6 ps-4 text-muted">De ese total, vouchers</dt><dd class="col-sm-6 text-end text-muted"><?= Format::moneyFromCents((int)$vouchersPorForma['efectivo']) ?></dd><?php endif; ?>
+                    <dt class="col-sm-6">Ventas transf./MP (incl. vouchers)</dt>
                     <dd class="col-sm-6 text-end text-info"><?= Format::moneyFromCents($ventasTransferencia) ?></dd>
+                    <?php if ((int)($vouchersPorForma['transferencia'] ?? 0) > 0): ?><dt class="col-sm-6 ps-4 text-muted">De ese total, vouchers</dt><dd class="col-sm-6 text-end text-muted"><?= Format::moneyFromCents((int)$vouchersPorForma['transferencia']) ?></dd><?php endif; ?>
+                    <dt class="col-sm-6">Ventas con tarjeta (incl. vouchers)</dt>
+                    <dd class="col-sm-6 text-end text-info"><?= Format::moneyFromCents($ventasTarjeta) ?></dd>
+                    <?php if ((int)($vouchersPorForma['tarjeta'] ?? 0) > 0): ?><dt class="col-sm-6 ps-4 text-muted">De ese total, vouchers</dt><dd class="col-sm-6 text-end text-muted"><?= Format::moneyFromCents((int)$vouchersPorForma['tarjeta']) ?></dd><?php endif; ?>
                     <dt class="col-sm-6">Cobrado (recibos)</dt>
                     <dd class="col-sm-6 text-end text-primary"><?= Format::moneyFromCents($totalRecibos) ?></dd>
                     <dt class="col-sm-6">Mov. ingresos extra</dt>

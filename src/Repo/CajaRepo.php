@@ -109,6 +109,7 @@ final class CajaRepo
                 COALESCE(SUM(CASE WHEN tipo = 'egreso' THEN monto_cents ELSE 0 END), 0) AS total_egresos
             FROM caja_movimientos
             WHERE caja_id = :ci
+              AND concepto NOT LIKE 'Cobro emisión voucher %'
         ");
         $st->execute([':ci' => $cajaId]);
         return $st->fetch() ?: ['total_ingresos' => 0, 'total_egresos' => 0];
@@ -422,7 +423,8 @@ final class CajaRepo
                 SELECT f.punto_venta, COALESCE(s.nomsuc, CONCAT('Punto ', f.punto_venta)) AS sucursal_nombre,
                        COALESCE(SUM(CASE WHEN {$tipo} = 'efectivo' {$extraEfectivo} THEN {$monto} ELSE 0 END), 0) AS total_efectivo,
                        COALESCE(SUM(CASE WHEN {$tipo} = 'banco' THEN {$monto} ELSE 0 END), 0) AS total_transferencia,
-                       COALESCE(SUM(CASE WHEN {$tipo} = 'efectivo' {$extraEfectivo} THEN {$monto} WHEN {$tipo} = 'banco' THEN {$monto} ELSE 0 END), 0) AS total
+                       COALESCE(SUM(CASE WHEN {$tipo} = 'tarjeta' THEN {$monto} ELSE 0 END), 0) AS total_tarjeta,
+                       COALESCE(SUM(CASE WHEN {$tipo} = 'efectivo' {$extraEfectivo} THEN {$monto} WHEN {$tipo} IN ('banco','tarjeta') THEN {$monto} ELSE 0 END), 0) AS total
                 FROM facturas f
                 INNER JOIN factura_pagos fp ON fp.factura_id = f.id
                 LEFT JOIN sucursales s ON s.id = f.punto_venta
@@ -430,7 +432,43 @@ final class CajaRepo
                 GROUP BY f.punto_venta
             ");
             $st->execute([':fec' => $fecha]);
-            return $st->fetchAll();
+            $rows = $st->fetchAll();
+            $byPv = [];
+            foreach ($rows as $i => $row) {
+                $rows[$i]['total_tarjeta'] = (int)($row['total_tarjeta'] ?? 0);
+                $byPv[(int)$row['punto_venta']] = $i;
+            }
+            try {
+                \Perfushopping\Web\Repo\VoucherRegaloRepo::ensureTable();
+                $vouchers = Db::pdo()->prepare("SELECT COALESCE(a.punto_venta, 0) AS punto_venta,
+                        COALESCE(s.nomsuc, a.nomsuc, CONCAT('Punto ', COALESCE(a.punto_venta, 0))) AS sucursal_nombre,
+                        COALESCE(SUM(CASE WHEN v.forma_pago = 'efectivo' THEN v.importe_cents ELSE 0 END), 0) AS total_efectivo,
+                        COALESCE(SUM(CASE WHEN v.forma_pago IN ('transferencia','mercadopago') THEN v.importe_cents ELSE 0 END), 0) AS total_transferencia,
+                        COALESCE(SUM(CASE WHEN v.forma_pago = 'tarjeta' THEN v.importe_cents ELSE 0 END), 0) AS total_tarjeta,
+                        COALESCE(SUM(v.importe_cents), 0) AS total
+                    FROM voucher_regalos v
+                    LEFT JOIN admin_sucursales a ON a.id = v.sucursal_id
+                    LEFT JOIN sucursales s ON s.id = a.punto_venta
+                    WHERE DATE(v.created_at) = :fec AND v.estado IN ('activo','canjeado')
+                    GROUP BY a.punto_venta, s.nomsuc, a.nomsuc");
+                $vouchers->execute([':fec' => $fecha]);
+                foreach ($vouchers->fetchAll() as $voucher) {
+                    $pv = (int)$voucher['punto_venta'];
+                    if (isset($byPv[$pv])) {
+                        $i = $byPv[$pv];
+                        foreach (['total_efectivo', 'total_transferencia', 'total_tarjeta', 'total'] as $field) {
+                            $rows[$i][$field] = (int)($rows[$i][$field] ?? 0) + (int)($voucher[$field] ?? 0);
+                        }
+                    } else {
+                        $byPv[$pv] = count($rows);
+                        $rows[] = array_map(static fn($value) => is_numeric($value) ? (int)$value : $value, $voucher);
+                    }
+                }
+            } catch (\Throwable $e) {
+                error_log('CajaRepo::ventasPorPuntoVenta vouchers error: ' . $e->getMessage());
+            }
+            usort($rows, static fn(array $a, array $b): int => (int)$a['punto_venta'] <=> (int)$b['punto_venta']);
+            return $rows;
         } catch (\Throwable $e) {
             error_log('CajaRepo::ventasPorPuntoVenta error: ' . $e->getMessage());
             return [];
@@ -792,6 +830,9 @@ final class CajaRepo
             foreach ($out as $k => $v) {
                 $out[$k] = (int)($row[$k] ?? 0);
             }
+            $out['efectivo'] += $this->totalVouchersTurno($cajaId, $fecha, $aperturaCreada, 'efectivo');
+            $out['tarjeta'] += $this->totalVouchersTurno($cajaId, $fecha, $aperturaCreada, 'tarjeta');
+            $out['transferencia'] += $this->totalVouchersTurno($cajaId, $fecha, $aperturaCreada, 'banco');
         } catch (\Throwable $e) {
             error_log('CajaRepo::ingresosPorFormaTurno error: ' . $e->getMessage());
         }
@@ -994,6 +1035,61 @@ final class CajaRepo
         return "({$alias}.caja_apertura_id = :caja OR ({$alias}.caja_apertura_id IS NULL AND {$alias}.created_at >= :apCreada))";
     }
 
+    /** Vouchers cobrados durante el turno, mostrados junto con las ventas. */
+    public function vouchersEmitidosTurno(int $cajaId, string $fecha, string $aperturaCreada): array
+    {
+        try {
+            \Perfushopping\Web\Repo\VoucherRegaloRepo::ensureTable();
+            $st = Db::pdo()->prepare("SELECT v.codigo, v.importe_cents, v.forma_pago, v.destinatario_nombre, v.created_at
+                FROM voucher_regalos v
+                WHERE (v.caja_apertura_id = :caja OR (
+                    v.caja_apertura_id IS NULL
+                    AND COALESCE(v.sucursal_id, 0) = COALESCE((
+                        SELECT ca.sucursal_id FROM caja_aperturas ca WHERE ca.id = :cajaLegacy LIMIT 1
+                    ), 0)
+                    AND v.created_at >= :apCreada
+                    AND v.created_at < DATE_ADD(:fec, INTERVAL 1 DAY)
+                ))
+                  AND v.estado IN ('activo', 'canjeado')
+                ORDER BY v.created_at ASC, v.id ASC");
+            $st->execute([':caja' => $cajaId, ':cajaLegacy' => $cajaId, ':apCreada' => $aperturaCreada, ':fec' => $fecha]);
+            return $st->fetchAll();
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::vouchersEmitidosTurno error: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    private function totalVouchersTurno(int $cajaId, string $fecha, string $aperturaCreada, string $tipo): int
+    {
+        $condicion = match ($tipo) {
+            'efectivo' => "v.forma_pago = 'efectivo'",
+            'banco' => "v.forma_pago IN ('transferencia', 'mercadopago')",
+            'tarjeta' => "v.forma_pago = 'tarjeta'",
+            default => '1 = 0',
+        };
+        try {
+            \Perfushopping\Web\Repo\VoucherRegaloRepo::ensureTable();
+            $st = Db::pdo()->prepare("SELECT COALESCE(SUM(v.importe_cents), 0)
+                FROM voucher_regalos v
+                WHERE (v.caja_apertura_id = :caja OR (
+                    v.caja_apertura_id IS NULL
+                    AND COALESCE(v.sucursal_id, 0) = COALESCE((
+                        SELECT ca.sucursal_id FROM caja_aperturas ca WHERE ca.id = :cajaLegacy LIMIT 1
+                    ), 0)
+                    AND v.created_at >= :apCreada
+                    AND v.created_at < DATE_ADD(:fec, INTERVAL 1 DAY)
+                ))
+                  AND v.estado IN ('activo', 'canjeado')
+                  AND {$condicion}");
+            $st->execute([':caja' => $cajaId, ':cajaLegacy' => $cajaId, ':apCreada' => $aperturaCreada, ':fec' => $fecha]);
+            return (int)$st->fetchColumn();
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::totalVouchersTurno error: ' . $e->getMessage());
+            return 0;
+        }
+    }
+
     public function totalVentasEfectivoTurno(int $cajaId, string $fecha, int $puntoVenta, string $aperturaCreada): int
     {
         $this->ensureCajaColumnas();
@@ -1013,7 +1109,7 @@ final class CajaRepo
                   {$extra}
             ");
             $st->execute([':fec' => $fecha, ':pv' => $puntoVenta, ':caja' => $cajaId, ':apCreada' => $aperturaCreada]);
-            return (int)$st->fetchColumn();
+            return (int)$st->fetchColumn() + $this->totalVouchersTurno($cajaId, $fecha, $aperturaCreada, 'efectivo');
         } catch (\Throwable $e) {
             error_log('CajaRepo::totalVentasEfectivoTurno error: ' . $e->getMessage());
             return 0;
@@ -1037,9 +1133,33 @@ final class CajaRepo
                   AND {$tipo} = 'banco'
             ");
             $st->execute([':fec' => $fecha, ':pv' => $puntoVenta, ':caja' => $cajaId, ':apCreada' => $aperturaCreada]);
-            return (int)$st->fetchColumn();
+            return (int)$st->fetchColumn() + $this->totalVouchersTurno($cajaId, $fecha, $aperturaCreada, 'banco');
         } catch (\Throwable $e) {
             error_log('CajaRepo::totalVentasTransferenciaTurno error: ' . $e->getMessage());
+            return 0;
+        }
+    }
+
+    public function totalVentasTarjetaTurno(int $cajaId, string $fecha, int $puntoVenta, string $aperturaCreada): int
+    {
+        $this->ensureCajaColumnas();
+        try {
+            $tipo = $this->formaPagoTipoExpr('fp');
+            $monto = $this->montoSignadoSql();
+            $st = Db::pdo()->prepare("
+                SELECT COALESCE(SUM({$monto}), 0)
+                FROM factura_pagos fp
+                INNER JOIN facturas f ON f.id = fp.factura_id
+                WHERE f.estado = 'emitida'
+                  AND f.fecha = :fec
+                  AND f.punto_venta = :pv
+                  AND " . $this->turnoWhere('f') . "
+                  AND {$tipo} = 'tarjeta'
+            ");
+            $st->execute([':fec' => $fecha, ':pv' => $puntoVenta, ':caja' => $cajaId, ':apCreada' => $aperturaCreada]);
+            return (int)$st->fetchColumn() + $this->totalVouchersTurno($cajaId, $fecha, $aperturaCreada, 'tarjeta');
+        } catch (\Throwable $e) {
+            error_log('CajaRepo::totalVentasTarjetaTurno error: ' . $e->getMessage());
             return 0;
         }
     }

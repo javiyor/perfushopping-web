@@ -82,6 +82,11 @@ final class VoucherController
             Response::redirect('/admin/vouchers');
         }
 
+        $cajaRepo = new CajaRepo();
+        $apertura = (int)($data['sucursal_id'] ?? 0) > 0
+            ? $cajaRepo->aperturaActiva((int)$data['sucursal_id'], $auth->getTurno(), date('Y-m-d'))
+            : null;
+        $data['caja_apertura_id'] = (int)($apertura['id'] ?? 0) ?: null;
         $voucher = null;
         try {
             $voucherRepo = new VoucherRegaloRepo();
@@ -91,9 +96,6 @@ final class VoucherController
                 $movementId = (new BancoMovimientoRepo())->create($data['banco_cuenta_id'], 'credito', 'voucher_regalo', (int)$voucher['id'], $concepto, $importeCents, date('Y-m-d'), (int)$adminUser['id']);
                 if ($movementId <= 0) throw new \RuntimeException('No se pudo registrar el ingreso bancario del voucher.');
             } else {
-                $cajaRepo = new CajaRepo();
-                $sucursalId = (int)($data['sucursal_id'] ?? 0);
-                $apertura = $sucursalId > 0 ? $cajaRepo->aperturaActiva($sucursalId, $auth->getTurno(), date('Y-m-d')) : null;
                 $movementId = $apertura
                     ? $cajaRepo->agregarMovimiento((int)$apertura['id'], 'ingreso', $concepto, $importeCents, (int)$adminUser['id'])
                     : $cajaRepo->agregarMovimientoGeneral('ingreso', 'voucher_regalo', (int)$voucher['id'], $concepto, $importeCents, (int)$adminUser['id'], date('Y-m-d'));

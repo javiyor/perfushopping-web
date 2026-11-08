@@ -48,6 +48,7 @@ $sucursalId = $auth->getSucursalId();
         $totalesMov = ['total_ingresos' => 0, 'total_egresos' => 0];
         $ventasEfectivo = 0;
         $ventasTransferencia = 0;
+        $ventasTarjeta = 0;
         $totalRecibos = 0;
         $arqueos = [];
 
@@ -63,6 +64,7 @@ $sucursalId = $auth->getSucursalId();
             $totalesMov = $repo->totalMovimientos($apId);
             $ventasEfectivo = $repo->totalVentasEfectivoTurno($apId, $fecha, $puntoVenta, $apCreada);
             $ventasTransferencia = $repo->totalVentasTransferenciaTurno($apId, $fecha, $puntoVenta, $apCreada);
+            $ventasTarjeta = $repo->totalVentasTarjetaTurno($apId, $fecha, $puntoVenta, $apCreada);
             $totalRecibos = $repo->totalRecibosTurno($apId, $fecha, $puntoVenta, $apCreada);
             $arqueos = $repo->arqueos($apId);
 
@@ -79,6 +81,22 @@ $sucursalId = $auth->getSucursalId();
                     'monto' => (int)($v['monto_cents'] ?? 0),
                 ];
             }
+            foreach ($repo->vouchersEmitidosTurno($apId, $fecha, $apCreada) as $v) {
+                $forma = (string)($v['forma_pago'] ?? '');
+                $detalleTurno[] = [
+                    'hora' => (string)($v['created_at'] ?? ''),
+                    'tipo' => 'venta',
+                    'detalle' => 'Voucher ' . ($v['codigo'] ?? '') . ' — ' . ($v['destinatario_nombre'] ?? ''),
+                    'forma' => $forma,
+                    'forma_tipo' => match ($forma) {
+                        'efectivo' => 'efectivo',
+                        'tarjeta' => 'tarjeta',
+                        'transferencia', 'mercadopago' => 'banco',
+                        default => 'otro',
+                    },
+                    'monto' => (int)($v['importe_cents'] ?? 0),
+                ];
+            }
             foreach ($repo->recibosDetalleTurno($apId, $fecha, $puntoVenta, $apCreada) as $r) {
                 $detalleTurno[] = [
                     'hora' => (string)($r['created_at'] ?? ''),
@@ -89,6 +107,9 @@ $sucursalId = $auth->getSucursalId();
                 ];
             }
             foreach ($movimientos as $m) {
+                if (str_starts_with((string)($m['concepto'] ?? ''), 'Cobro emisión voucher ')) {
+                    continue;
+                }
                 $monto = (int)($m['monto_cents'] ?? 0);
 
                 $detalleTurno[] = [
@@ -135,6 +156,7 @@ $sucursalId = $auth->getSucursalId();
             'totalesMov' => $totalesMov,
             'ventasEfectivo' => $ventasEfectivo,
             'ventasTransferencia' => $ventasTransferencia,
+            'ventasTarjeta' => $ventasTarjeta,
             'totalRecibos' => $totalRecibos,
             'ventasPorPuntoVenta' => $ventasPorPuntoVenta,
             'saldoGeneral' => $saldoGeneral,
@@ -580,7 +602,14 @@ $sucursalId = $auth->getSucursalId();
         $fecha = date('Y-m-d');
         $ventasEfectivo = $repo->totalVentasEfectivoTurno($apId, $fecha, $puntoVenta, $apCreada);
         $ventasTransferencia = $repo->totalVentasTransferenciaTurno($apId, $fecha, $puntoVenta, $apCreada);
+        $ventasTarjeta = $repo->totalVentasTarjetaTurno($apId, $fecha, $puntoVenta, $apCreada);
         $totalRecibos = $repo->totalRecibosTurno($apId, $fecha, $puntoVenta, $apCreada);
+        $vouchersPorForma = ['efectivo' => 0, 'transferencia' => 0, 'tarjeta' => 0];
+        foreach ($repo->vouchersEmitidosTurno($apId, $fecha, $apCreada) as $voucher) {
+            $forma = (string)($voucher['forma_pago'] ?? '');
+            $tipo = $forma === 'efectivo' ? 'efectivo' : (in_array($forma, ['transferencia', 'mercadopago'], true) ? 'transferencia' : ($forma === 'tarjeta' ? 'tarjeta' : ''));
+            if ($tipo !== '') $vouchersPorForma[$tipo] += (int)($voucher['importe_cents'] ?? 0);
+        }
         $totalesMov = $repo->totalMovimientos($apId);
 
         $montoInicial = (int)$apertura['monto_inicial_cents'];
@@ -591,6 +620,8 @@ $sucursalId = $auth->getSucursalId();
             'apertura' => $apertura,
             'ventasEfectivo' => $ventasEfectivo,
             'ventasTransferencia' => $ventasTransferencia,
+            'ventasTarjeta' => $ventasTarjeta,
+            'vouchersPorForma' => $vouchersPorForma,
             'totalRecibos' => $totalRecibos,
             'totalesMov' => $totalesMov,
             'esperadoEfectivo' => $esperadoEfectivo,
@@ -890,6 +921,12 @@ $sucursalId = $auth->getSucursalId();
 
         // Desglose de efectivo del turno
         $ef = $repo->efectivoCierre($apertura, $ptoVta);
+        $vouchersPorForma = ['efectivo' => 0, 'transferencia' => 0, 'tarjeta' => 0];
+        foreach ($repo->vouchersEmitidosTurno((int)($apertura['id'] ?? 0), (string)($apertura['fecha'] ?? date('Y-m-d')), (string)($apertura['created_at'] ?? '')) as $voucher) {
+            $forma = (string)($voucher['forma_pago'] ?? '');
+            $tipo = $forma === 'efectivo' ? 'efectivo' : (in_array($forma, ['transferencia', 'mercadopago'], true) ? 'transferencia' : ($forma === 'tarjeta' ? 'tarjeta' : ''));
+            if ($tipo !== '') $vouchersPorForma[$tipo] += (int)($voucher['importe_cents'] ?? 0);
+        }
 
         echo View::render('admin/caja/cierre_print.php', [
             'empresa' => (new \Perfushopping\Web\Repo\EmpresaRepo())->getDefault(),
@@ -901,6 +938,7 @@ $sucursalId = $auth->getSucursalId();
             'estado' => (string)($apertura['estado'] ?? ''),
             'montoInicial' => $ef['inicial'],
             'ventasEfectivo' => $ef['ventas_efectivo'],
+            'vouchersPorForma' => $vouchersPorForma,
             'totalIngresos' => $ef['ingresos'],
             'totalEgresos' => $ef['egresos'],
             'saldoCaja' => $ef['saldo'],

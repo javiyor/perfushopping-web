@@ -11,6 +11,7 @@ $estado = (string)($estado ?? '');
 
 $montoInicial = (int)($montoInicial ?? 0);
 $ventasEfectivo = (int)($ventasEfectivo ?? 0);
+$vouchersPorForma = $vouchersPorForma ?? ['efectivo' => 0, 'transferencia' => 0, 'tarjeta' => 0];
 $totalIngresos = (int)($totalIngresos ?? 0);
 $totalEgresos = (int)($totalEgresos ?? 0);
 $saldoCaja = (int)($saldoCaja ?? 0);
@@ -64,9 +65,15 @@ $proximaApertura = (int)($proximaApertura ?? 0);
     </div>
 
     <div class="section">
-        <span class="label">Ingresos ef. (ventas)</span>
+        <span class="label">Ingresos ef. (ventas incl. voucher)</span>
         <span class="value">$<?= Format::moneyRoundedFromCents($ventasEfectivo) ?></span>
     </div>
+    <?php if ((int)($vouchersPorForma['efectivo'] ?? 0) > 0): ?>
+    <div class="section">
+        <span class="label">De ellos, vouchers</span>
+        <span class="value">$<?= Format::moneyRoundedFromCents((int)$vouchersPorForma['efectivo']) ?></span>
+    </div>
+    <?php endif; ?>
 
     <div class="section">
         <span class="label">Ingresos ef. (movim.)</span>

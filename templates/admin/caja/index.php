@@ -6,6 +6,7 @@ $movimientos = $movimientos ?? [];
 $totalesMov = $totalesMov ?? ['total_ingresos' => 0, 'total_egresos' => 0];
 $ventasEfectivo = (int)($ventasEfectivo ?? 0);
 $ventasTransferencia = (int)($ventasTransferencia ?? 0);
+$ventasTarjeta = (int)($ventasTarjeta ?? 0);
 $totalRecibos = (int)($totalRecibos ?? 0);
 $arqueos = $arqueos ?? [];
 $detalleTurno = $detalleTurno ?? [];
@@ -136,6 +137,12 @@ $saldoEsperado = $montoInicial + $ventasEfectivo + (int)$totalesMov['total_ingre
         <div class="card-dashboard text-center">
             <div class="h5 fw-bold mb-0 text-info"><?= Format::moneyFromCents($ventasTransferencia) ?></div>
             <div class="small text-muted">Transferencia/MP</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card-dashboard text-center">
+            <div class="h5 fw-bold mb-0 text-info"><?= Format::moneyFromCents($ventasTarjeta) ?></div>
+            <div class="small text-muted">Ventas con tarjeta</div>
         </div>
     </div>
     <div class="col-6 col-md-3">
@@ -323,6 +330,7 @@ $saldoEsperado = $montoInicial + $ventasEfectivo + (int)$totalesMov['total_ingre
                             <th>Punto de venta</th>
                             <th class="text-end">Efectivo</th>
                             <th class="text-end">Transferencia/MP</th>
+                            <th class="text-end">Tarjeta</th>
                             <th class="text-end">Total</th>
                         </tr>
                     </thead>
@@ -332,6 +340,7 @@ $saldoEsperado = $montoInicial + $ventasEfectivo + (int)$totalesMov['total_ingre
                                 <td><?= htmlspecialchars((string)($vp['sucursal_nombre'] ?? 'PV #' . ($vp['punto_venta'] ?? 0))) ?></td>
                                 <td class="text-end"><?= Format::moneyFromCents((int)($vp['total_efectivo'] ?? 0)) ?></td>
                                 <td class="text-end"><?= Format::moneyFromCents((int)($vp['total_transferencia'] ?? 0)) ?></td>
+                                <td class="text-end"><?= Format::moneyFromCents((int)($vp['total_tarjeta'] ?? 0)) ?></td>
                                 <td class="text-end fw-bold"><?= Format::moneyFromCents((int)($vp['total'] ?? 0)) ?></td>
                             </tr>
                         <?php endforeach; ?>

@@ -26,7 +26,7 @@ $fraseInferior = (string)($design['frase_inferior'] ?? '¡Te esperamos con mucho
     <title><?= htmlspecialchars($titulo) ?> · <?= htmlspecialchars($voucher['codigo'] ?? '') ?></title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Great+Vibes&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <style>
         @page { size: <?= $esEtiqueta ? '100mm 60mm' : 'A5 portrait' ?>; margin: <?= $esEtiqueta ? '2mm' : '8mm' ?>; }
         :root { --gold:#c9b037; --gold-light:#f7e7a0; --gold-dark:#7e5b14; --black:#000; }
@@ -42,6 +42,8 @@ $fraseInferior = (string)($design['frase_inferior'] ?? '¡Te esperamos con mucho
         .label-row { display:flex; justify-content:space-between; align-items:baseline; gap:3mm; border-bottom:1px solid #bbb; padding-bottom:2%; }
         .label-row strong { text-align:right; }
         .label-code { font-size:1.25em; font-weight:700; letter-spacing:.05em; }
+        .label-row.label-code { flex-direction:column; align-items:center; justify-content:center; gap:1mm; }
+        .label-code span,.label-code strong { width:100%; text-align:center; overflow-wrap:anywhere; }
         .voucher-artwork::before,.voucher-artwork::after { content:'✦'; position:absolute; z-index:4; color:var(--gold-light); text-shadow:0 0 10px #f5d75e; font-size:clamp(20px,4vw,42px); }
         .voucher-artwork::before { top:1.3%; left:1.4%; }
         .voucher-artwork::after { right:1.4%; bottom:1.3%; }
@@ -63,7 +65,11 @@ $fraseInferior = (string)($design['frase_inferior'] ?? '¡Te esperamos con mucho
         .model-frame { position:relative; width:100%; height:100%; min-height:0; background:radial-gradient(ellipse at 65% 67%,#60481e 0%,#241a0c 38%,#070707 78%); overflow:hidden; }
         .model-photo { position:absolute; inset:0; display:block; width:100%; height:100%; object-fit:contain; object-position:center top; }
         .photo-missing { position:absolute; inset:0; display:grid; place-items:center; padding:8%; text-align:center; color:#d3bd73; font:500 clamp(13px,2.1vw,20px)/1.4 'Playfair Display',Georgia,serif; background:radial-gradient(ellipse at 50% 30%,#40321666,transparent 62%); }
-        .message { align-self:center; padding:7%; color:#f4f0e5; font:400 clamp(12px,2vw,19px)/1.5 'Playfair Display',Georgia,serif; white-space:pre-line; }
+        .message { align-self:center; padding:6% 7%; color:#f4f0e5; text-align:center; font:400 clamp(13px,2.2vw,21px)/1.45 'Cormorant Garamond',Georgia,serif; white-space:pre-line; }
+        .message-copy { color:#f4efdf; font-weight:500; letter-spacing:.015em; line-height:1.38; text-shadow:0 1px 8px #000; }
+        .message-copy::before,.message-copy::after { display:block; color:var(--gold-light); font:400 clamp(9px,1.25vw,13px)/1 Arial,sans-serif; letter-spacing:.65em; text-shadow:0 0 7px #d7b64a88; }
+        .message-copy::before { content:'✦  ✧  ✦'; margin:0 auto 5%; }
+        .message-copy::after { content:'✧  ·  ✧'; margin:5% auto 0; }
         .heart { display:block; margin:5% 0 4%; text-align:center; color:var(--gold-light); font-size:clamp(18px,3vw,28px); text-shadow:0 0 10px #e8c954aa; }
         .recipient { margin-top:4%; color:#d2d2d2; text-align:center; font:12px/1.3 Arial,sans-serif; }
         .recipient-name { display:block; margin-top:2%; color:#fff; font:600 clamp(16px,2.7vw,26px)/1.2 'Playfair Display',Georgia,serif; }
@@ -125,7 +131,7 @@ $fraseInferior = (string)($design['frase_inferior'] ?? '¡Te esperamos con mucho
                     <?php else: ?><div class="photo-missing">Fotografía de modelo<br />con bolsa de regalo</div><?php endif; ?>
                 </div>
                 <div class="message">
-                    <?= nl2br(htmlspecialchars($design['mensaje'] ?? '')) ?>
+                    <div class="message-copy"><?= nl2br(htmlspecialchars($design['mensaje'] ?? '')) ?></div>
                     <span class="heart" aria-hidden="true">♥</span>
                     <div class="recipient">Para:<span class="recipient-name"><?= htmlspecialchars($voucher['destinatario_nombre'] ?? '') ?></span></div>
                 </div>
