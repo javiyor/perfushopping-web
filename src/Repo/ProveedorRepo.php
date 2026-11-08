@@ -47,29 +47,57 @@ final class ProveedorRepo
         return $st->fetch() ?: null;
     }
 
-    public function create(string $codprove, string $razon, string $cuit, string $direc, string $tele, string $codpost, string $mail, string $localidad): int
+    public function create(string $razon, string $cuit, string $direc, string $tele, string $codpost, string $mail, string $localidad): int
     {
-        $st = Db::pdo()->prepare('
-            INSERT INTO proveedo (codprove, razon, cuit, direc, tele, codpost, mail, Localidad, activo, fealta)
-            VALUES (:cp, :r, :c, :d, :t, :po, :m, :l, 1, CURDATE())
-        ');
-        $st->execute([
-            ':cp' => $codprove, ':r' => $razon, ':c' => $cuit, ':d' => $direc,
-            ':t' => $tele, ':po' => $codpost, ':m' => $mail, ':l' => $localidad,
-        ]);
-        return (int)Db::pdo()->lastInsertId();
+        $pdo = Db::pdo();
+        $pdo->beginTransaction();
+        try {
+            // A temporary numeric code satisfies legacy NOT NULL/unique schemas until the generated ID exists.
+            do {
+                $temporaryCode = (string)random_int(100000000, 2000000000);
+            } while ($this->findByCodprove($temporaryCode));
+
+            $st = $pdo->prepare('
+                INSERT INTO proveedo (codprove, razon, cuit, direc, tele, codpost, mail, Localidad, activo, fealta)
+                VALUES (:cp, :r, :c, :d, :t, :po, :m, :l, 1, CURDATE())
+            ');
+            $st->execute([
+                ':cp' => $temporaryCode, ':r' => $razon, ':c' => $cuit, ':d' => $direc,
+                ':t' => $tele, ':po' => $codpost, ':m' => $mail, ':l' => $localidad,
+            ]);
+            $id = (int)$pdo->lastInsertId();
+            $pdo->prepare('UPDATE proveedo SET codprove=:code WHERE idprovee=:id LIMIT 1')
+                ->execute([':code'=>(string)$id, ':id'=>$id]);
+            $pdo->commit();
+            return $id;
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            throw $e;
+        }
     }
 
     public function update(int $idprovee, string $codprove, string $razon, string $cuit, string $direc, string $tele, string $codpost, string $mail, string $localidad, int $activo): void
     {
-        $st = Db::pdo()->prepare('
-            UPDATE proveedo SET codprove=:cp, razon=:r, cuit=:c, direc=:d, tele=:t,
+        if ($codprove !== '') {
+            $st = Db::pdo()->prepare('
+                UPDATE proveedo SET codprove=:cp, razon=:r, cuit=:c, direc=:d, tele=:t,
+                    codpost=:po, mail=:m, Localidad=:l, activo=:a
+                WHERE idprovee=:i LIMIT 1
+            ');
+            $st->execute([
+                ':cp' => $codprove, ':r' => $razon, ':c' => $cuit, ':d' => $direc,
+                ':t' => $tele, ':po' => $codpost, ':m' => $mail, ':l' => $localidad,
+                ':a' => $activo, ':i' => $idprovee,
+            ]);
+            return;
+        }
+        Db::pdo()->prepare('
+            UPDATE proveedo SET razon=:r, cuit=:c, direc=:d, tele=:t,
                 codpost=:po, mail=:m, Localidad=:l, activo=:a
             WHERE idprovee=:i LIMIT 1
-        ');
-        $st->execute([
-            ':cp' => $codprove, ':r' => $razon, ':c' => $cuit, ':d' => $direc,
-            ':t' => $tele, ':po' => $codpost, ':m' => $mail, ':l' => $localidad,
+        ')->execute([
+            ':r' => $razon, ':c' => $cuit, ':d' => $direc, ':t' => $tele,
+            ':po' => $codpost, ':m' => $mail, ':l' => $localidad,
             ':a' => $activo, ':i' => $idprovee,
         ]);
     }

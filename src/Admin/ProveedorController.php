@@ -47,24 +47,26 @@ final class ProveedorController
         $localidad = trim((string)($_POST['localidad'] ?? ''));
         $activo = isset($_POST['activo']) ? 1 : 0;
 
-        if ($codprove === '' || $razon === '') {
-            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Código de proveedor y razón social son obligatorios.'];
+        if ($razon === '') {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'La razón social es obligatoria.'];
             Response::redirect('/admin/proveedores');
         }
 
         $repo = new ProveedorRepo();
 
         if ($id > 0) {
+            if ($codprove !== '') {
+                $existing = $repo->findByCodprove($codprove);
+                if ($existing && (int)$existing['idprovee'] !== $id) {
+                    $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Ya existe un proveedor con ese código.'];
+                    Response::redirect('/admin/proveedores');
+                }
+            }
             $repo->update($id, $codprove, $razon, $cuit, $direc, $tele, $codpost, $mail, $localidad, $activo);
             $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Proveedor actualizado.'];
         } else {
-            $existing = $repo->findByCodprove($codprove);
-            if ($existing) {
-                $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Ya existe un proveedor con ese código.'];
-                Response::redirect('/admin/proveedores');
-            }
-            $repo->create($codprove, $razon, $cuit, $direc, $tele, $codpost, $mail, $localidad);
-            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Proveedor creado.'];
+            $newId = $repo->create($razon, $cuit, $direc, $tele, $codpost, $mail, $localidad);
+            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Proveedor creado con ID ' . $newId . '.'];
         }
 
         Response::redirect('/admin/proveedores');

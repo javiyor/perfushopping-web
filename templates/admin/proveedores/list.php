@@ -94,8 +94,9 @@ $list = $list ?? [];
                 <div class="modal-body">
                     <div class="row g-2">
                         <div class="col-md-4">
-                            <label class="form-label">Código <span class="text-danger">*</span></label>
-                            <input class="form-control" name="codprove" id="provCodigo" required />
+                            <label class="form-label">Código / ID</label>
+                            <input class="form-control" name="codprove" id="provCodigo" readonly placeholder="Se asigna automáticamente" />
+                            <div class="form-text">Al crear se usa el ID generado por el sistema.</div>
                         </div>
                         <div class="col-md-8">
                             <label class="form-label">Razón social <span class="text-danger">*</span></label>

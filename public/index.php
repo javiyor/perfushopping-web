@@ -50,6 +50,7 @@ use Perfushopping\Web\Admin\ProveedorController as AdminProveedorController;
 use Perfushopping\Web\Admin\PresupuestoController as AdminPresupuestoController;
 use Perfushopping\Web\Admin\RemitoController as AdminRemitoController;
 use Perfushopping\Web\Admin\FacturaController as AdminFacturaController;
+use Perfushopping\Web\Admin\VoucherController as AdminVoucherController;
 use Perfushopping\Web\Admin\UbicacionController as AdminUbicacionController;
 use Perfushopping\Web\Admin\FormaPagoController as AdminFormaPagoController;
 use Perfushopping\Web\Admin\ReciboController as AdminReciboController;
@@ -407,6 +408,10 @@ $router->get('/admin/remitos/buscar-clientes', [AdminRemitoController::class, 's
 $router->get('/admin/remitos/buscar-presupuestos', [AdminRemitoController::class, 'searchPresupuestos']);
 $router->get('/admin/remitos/buscar-proveedores', [AdminRemitoController::class, 'searchProveedores']);
 $router->get('/admin/facturas', [AdminFacturaController::class, 'pos']);
+$router->get('/voucher/(?P<code>[A-Z0-9-]+)', [AdminVoucherController::class, 'publicView']);
+$router->get('/admin/vouchers', [AdminVoucherController::class, 'index']);
+$router->post('/admin/vouchers/generar', [AdminVoucherController::class, 'generate']);
+$router->get('/admin/vouchers/validar', [AdminVoucherController::class, 'validateCode']);
 $router->get('/admin/facturas/comprobantes', [AdminFacturaController::class, 'index']);
 $router->get('/admin/facturas/diagnostico-stock', [AdminFacturaController::class, 'diagnosticoStock']);
 $router->get('/admin/facturas/nueva', [AdminFacturaController::class, 'pos']);

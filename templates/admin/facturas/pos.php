@@ -1693,6 +1693,40 @@ function onPagoFormaChange(sel) {
                     <select class="form-select form-select-sm fp-plazo">${opts}</select>
                 </div>
             </div>`;
+    } else if (tipo === 'voucher') {
+        if (montoInput) { montoInput.value = '0'; montoInput.readOnly = true; }
+        extra.innerHTML = `
+            <div class="row g-1">
+                <div class="col-12"><label class="small text-muted">Código del voucher regalo</label><input class="form-control form-control-sm fp-voucher" autocomplete="off" placeholder="VR-XXXXXXXXXX" /></div>
+                <div class="col-12 small fp-voucher-status text-muted">Ingresá el código para consultar su valor disponible.</div>
+            </div>`;
+        const voucherInput = extra.querySelector('.fp-voucher');
+        const status = extra.querySelector('.fp-voucher-status');
+        voucherInput.addEventListener('input', function(){
+            if (montoInput) { montoInput.value = '0'; montoInput.readOnly = true; }
+            status.textContent = 'Ingresá el código para consultar su valor disponible.';
+            status.className = 'col-12 small fp-voucher-status text-muted';
+            recalcTotals();
+        });
+        voucherInput.addEventListener('change', async function(){
+            const code = voucherInput.value.trim();
+            if (!code) return;
+            status.textContent = 'Consultando voucher…';
+            try {
+                const response = await fetch('/admin/vouchers/validar?codigo=' + encodeURIComponent(code));
+                const data = await response.json();
+                if (!response.ok || !data.ok) throw new Error(data.error || 'Voucher no disponible.');
+                if (montoInput) { montoInput.value = (Number(data.importe_cents || 0) / 100).toFixed(2); montoInput.readOnly = true; }
+                status.textContent = 'Valor disponible: ' + fmtCents(Number(data.importe_cents || 0)) + '. Se canjeará una sola vez.';
+                status.className = 'col-12 small fp-voucher-status text-success';
+                recalcTotals();
+            } catch (error) {
+                if (montoInput) { montoInput.value = '0'; montoInput.readOnly = true; }
+                status.textContent = error.message || 'No se pudo consultar el voucher.';
+                status.className = 'col-12 small fp-voucher-status text-danger';
+                recalcTotals();
+            }
+        });
     } else if (tipo === 'cheque') {
         let bopts = '<option value="">— Seleccionar banco —</option>';
         BANCOS.forEach(b => { bopts += `<option value="${b.idban}">${esc(b.nombanc)}</option>`; });
@@ -1820,6 +1854,9 @@ function submitFactura() {
             entry.moneda = FORMAS_MONEDA[forma] || '';
             entry.monto_moneda_cents = Math.round((parseFloat(line.querySelector('.fp-monto-moneda')?.value) || 0) * 100);
             entry.cotizacion = parseFloat(line.querySelector('.fp-cotizacion')?.value) || 0;
+        }
+        if (tipo === 'voucher') {
+            entry.voucher_code = (line.querySelector('.fp-voucher')?.value || '').trim();
         }
         if (tipo === 'tarjeta') {
             entry.cupon_numero = (line.querySelector('.fp-cupon')?.value || '').trim();

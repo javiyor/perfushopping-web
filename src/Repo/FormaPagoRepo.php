@@ -14,6 +14,7 @@ final class FormaPagoRepo
         'cheque' => 'Cheque',
         'ctacte' => 'Cuenta corriente',
         'moneda' => 'Moneda extranjera',
+        'voucher' => 'Voucher regalo',
     ];
 
     private static ?bool $tableReady = null;
@@ -67,6 +68,8 @@ final class FormaPagoRepo
                     $ins->execute([':cod' => $cod, ':nom' => $nom, ':tipo' => $tipo, ':mon' => $mon, ':ord' => $ord]);
                 }
             }
+            Db::pdo()->prepare("INSERT IGNORE INTO formas_pago (codigo, nombre, tipo, activo, orden, created_at, updated_at)
+                VALUES ('voucher_regalo', 'Voucher regalo', 'voucher', 1, 9, NOW(), NOW())")->execute();
         } catch (\Throwable $e) {
             error_log('FormaPagoRepo::ensureTable error: ' . $e->getMessage());
         }

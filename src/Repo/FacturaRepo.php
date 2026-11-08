@@ -378,6 +378,8 @@ final class FacturaRepo
         $hasOrder = $this->ensureOrderColumn();
         $hasSucursal = $this->ensureSucursalColumn();
         $hasComprobanteAsociado = $this->ensureComprobanteAsociadoColumn();
+        \Perfushopping\Web\Repo\VoucherRegaloRepo::ensureTable();
+        $this->prepararColumnasItemsYPagos();
         $orderCol = $hasOrder ? ', order_id' : '';
         $orderVal = $hasOrder ? ', :order_id' : '';
         $sucursalCol = $hasSucursal ? ', sucursal_id' : '';
@@ -445,6 +447,12 @@ $st = $pdo->prepare('
 
             $this->insertarItems($id, $items);
             $this->insertarPagos($id, $pagos);
+            foreach ($pagos as $pago) {
+                $voucherCode = trim((string)($pago['voucher_code'] ?? ''));
+                if ($voucherCode !== '') {
+                    \Perfushopping\Web\Repo\VoucherRegaloRepo::canjearEnFactura($voucherCode, (int)$pago['monto_cents'], $id);
+                }
+            }
 
             $pdo->commit();
             return $id;
@@ -510,6 +518,32 @@ $st = $pdo->prepare('
                 $itemParams[':costo'] = $costos[$pid] ?? null;
             }
             $sti->execute($itemParams);
+        }
+    }
+
+    /** Run schema DDL before invoice creation starts its transaction. */
+    private function prepararColumnasItemsYPagos(): void
+    {
+        $pdo = Db::pdo();
+        try {
+            $fields = array_column($pdo->query('SHOW COLUMNS FROM factura_items')->fetchAll(), 'Field');
+            if (!in_array('costo_cents', $fields, true)) {
+                $pdo->exec('ALTER TABLE factura_items ADD COLUMN costo_cents INT DEFAULT NULL');
+            }
+        } catch (\Throwable $e) {
+            error_log('FacturaRepo::prepararColumnasItemsYPagos factura_items: '.$e->getMessage());
+        }
+        try {
+            $fields = array_column($pdo->query('SHOW COLUMNS FROM factura_pagos')->fetchAll(), 'Field');
+            foreach ([
+                'moneda' => 'ALTER TABLE factura_pagos ADD COLUMN moneda CHAR(3) DEFAULT NULL',
+                'monto_moneda_cents' => 'ALTER TABLE factura_pagos ADD COLUMN monto_moneda_cents INT DEFAULT NULL',
+                'cotizacion' => 'ALTER TABLE factura_pagos ADD COLUMN cotizacion DECIMAL(18,6) DEFAULT NULL',
+            ] as $column => $ddl) {
+                if (!in_array($column, $fields, true)) $pdo->exec($ddl);
+            }
+        } catch (\Throwable $e) {
+            error_log('FacturaRepo::prepararColumnasItemsYPagos factura_pagos: '.$e->getMessage());
         }
     }
 

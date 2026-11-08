@@ -331,7 +331,12 @@ final class FacturaController
         $subtotal = $itemsData['subtotal'];
         $ivaTotal = $itemsData['iva'];
 
-        $pagos = $this->normalizarPagos($input['pagos'] ?? [], $input, (int)$adminUser['id'], $clienteNombre, $subtotal + $ivaTotal);
+        try {
+            $pagos = $this->normalizarPagos($input['pagos'] ?? [], $input, (int)$adminUser['id'], $clienteNombre, $subtotal + $ivaTotal);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['ok'=>false,'error'=>$e->getMessage()], 422);
+            return;
+        }
 
         $entrega = $input['entrega'] ?? [];
         $entregaTipo = in_array($entrega['tipo'] ?? 'local', ['local','envio'], true) ? $entrega['tipo'] : 'local';
@@ -429,6 +434,12 @@ final class FacturaController
         // Vuelto: registrar lo cobrado en efectivo, no el billete entregado.
         $totalFacturado = $subtotal + $ivaTotal - $descuento - $puntosUsadosCents;
         $pagos = $this->absorberVuelto($pagos, $totalFacturado);
+        $voucherCents = array_sum(array_map(static fn(array $p): int => !empty($p['voucher_code']) ? (int)($p['monto_cents'] ?? 0) : 0, $pagos));
+        $pagadoCents = array_sum(array_map(static fn(array $p): int => (int)($p['monto_cents'] ?? 0), $pagos));
+        if ($voucherCents > $totalFacturado || ($voucherCents > 0 && $pagadoCents !== $totalFacturado)) {
+            Response::json(['ok'=>false,'error'=>'El voucher se canjea por su valor completo. Completá o ajustá los demás medios para cubrir exactamente la compra.'], 422);
+            return;
+        }
         $formaPago = $pagos[0]['forma_pago'] ?? 'efectivo';
 
         if ($this->montoCuentaCorriente($pagos) > 0
@@ -499,6 +510,10 @@ final class FacturaController
                 }
                 $intentos++;
                 $codigo = $repo->nextCodigo($tipo);
+            }
+            catch (\RuntimeException $e) {
+                Response::json(['ok'=>false,'error'=>$e->getMessage()], 409);
+                return;
             }
         }
 
@@ -655,6 +670,7 @@ final class FacturaController
     {
         $pagos = [];
         $bancoNombres = [];
+        $voucherCodes = [];
         if ($pagosRaw) {
             $st = \Perfushopping\Web\Infra\Db::pdo()->query('SELECT idban, nombanc FROM bancos');
             foreach ($st->fetchAll() as $b) {
@@ -663,16 +679,35 @@ final class FacturaController
         }
         foreach ($pagosRaw as $pg) {
             $monto = (int)($pg['monto_cents'] ?? 0);
-            if ($monto <= 0) continue;
             $formaPagoP = trim((string)($pg['forma_pago'] ?? 'efectivo'));
             // Compatibilidad: el código viejo 'tarjetas' equivale a 'tarjeta'
             if ($formaPagoP === 'tarjetas') $formaPagoP = 'tarjeta';
             $tipoPago = \Perfushopping\Web\Repo\FormaPagoRepo::tipoDe($formaPagoP);
+            if ($formaPagoP === 'voucher_regalo' && $tipoPago !== 'voucher') {
+                throw new \InvalidArgumentException('La forma de pago voucher regalo está desactivada.');
+            }
+            if ($monto <= 0 && $tipoPago !== 'voucher') continue;
             $bancoId = null;
             $chequeId = null;
             $moneda = null;
             $montoMoneda = null;
             $cotiz = null;
+            $voucherCode = null;
+            if ($tipoPago === 'voucher') {
+                $voucherCode = strtoupper(trim((string)($pg['voucher_code'] ?? '')));
+                if ($voucherCode === '') {
+                    throw new \InvalidArgumentException('Ingresá el código del voucher regalo.');
+                }
+                if (isset($voucherCodes[$voucherCode])) {
+                    throw new \InvalidArgumentException('El mismo voucher no se puede agregar más de una vez en una venta.');
+                }
+                $voucherCodes[$voucherCode] = true;
+                $voucher = (new \Perfushopping\Web\Repo\VoucherRegaloRepo())->findAvailableByCode($voucherCode);
+                if (!$voucher) {
+                    throw new \InvalidArgumentException('El código de voucher no existe o ya fue canjeado.');
+                }
+                $monto = (int)$voucher['importe_cents'];
+            }
             if ($tipoPago === 'moneda') {
                 $moneda = strtoupper(trim((string)($pg['moneda'] ?? '')));
                 $montoMoneda = (int)($pg['monto_moneda_cents'] ?? 0);
@@ -742,7 +777,7 @@ final class FacturaController
                 'forma_pago' => $formaPagoP,
                 'monto_cents' => $monto,
                 'cheque_id' => $chequeId,
-                'cupon_numero' => $tipoPago === 'tarjeta' ? trim((string)($pg['cupon_numero'] ?? '')) : null,
+                'cupon_numero' => $tipoPago === 'tarjeta' ? trim((string)($pg['cupon_numero'] ?? '')) : ($tipoPago === 'voucher' ? $voucherCode : null),
                 'cupon_monto_cents' => $tipoPago === 'tarjeta' ? (int)($pg['cupon_monto_cents'] ?? 0) : null,
                 'idplazo' => $tipoPago === 'ctacte' ? ((int)($pg['idplazo'] ?? 0) ?: null) : null,
                 'banco_id' => $bancoId,
@@ -752,6 +787,7 @@ final class FacturaController
                 'moneda' => $moneda,
                 'monto_moneda_cents' => $montoMoneda,
                 'cotizacion' => $cotiz,
+                'voucher_code' => $voucherCode,
             ];
         }
 
@@ -1104,6 +1140,12 @@ final class FacturaController
 
         $oldItems = $repo->items($editarId);
         $oldPagos = $repo->pagos($editarId);
+        foreach ($oldPagos as $oldPago) {
+            if ((string)($oldPago['forma_pago'] ?? '') === 'voucher_regalo') {
+                Response::json(['ok'=>false,'error'=>'Una factura canjeada con voucher no se puede editar.'], 422);
+                return;
+            }
+        }
 
         $tipo = (string)($input['tipo_comprobante'] ?? $old['tipo_comprobante'] ?? 'FACT-B');
         $comprobanteAsociadoId = (int)($input['comprobante_asociado_id'] ?? $old['comprobante_asociado_id'] ?? 0);
@@ -1137,6 +1179,11 @@ final class FacturaController
                 $subtotal + $ivaTotal,
                 false
             );
+            foreach ($pagos as $pago) {
+                if (!empty($pago['voucher_code'])) {
+                    throw new \InvalidArgumentException('Los vouchers solo se pueden canjear en una factura nueva, no al editar una existente.');
+                }
+            }
         } catch (\InvalidArgumentException $e) {
             Response::json(['ok' => false, 'error' => $e->getMessage()], 422);
             return;
