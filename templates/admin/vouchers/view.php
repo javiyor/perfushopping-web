@@ -6,7 +6,7 @@ $empresa = $empresa ?? [];
 $branches = $branches ?? [];
 $formato = ($formato ?? 'a5') === 'etiqueta' ? 'etiqueta' : 'a5';
 $esEtiqueta = $formato === 'etiqueta';
-$phoneTo = preg_replace('/\D+/', '', (string)($voucher['destinatario_telefono'] ?? '')) ?? '';
+$phoneTo = preg_replace('/\D+/', '', (string)(($voucher['destinatario_telefono'] ?? '') ?: ($voucher['remitente_telefono'] ?? ''))) ?? '';
 $shareText = 'Te enviaron un voucher de regalo de ' . Format::moneyFromCents((int)($voucher['importe_cents'] ?? 0)) . ': ' . (string)($voucherUrl ?? '');
 ?>
 <!doctype html>

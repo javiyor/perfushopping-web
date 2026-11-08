@@ -56,12 +56,12 @@ $formaPagoLabels = array_column($formasPago, 'nombre', 'codigo');
                 <input class="form-control form-control-sm" name="destinatario_nombre" maxlength="160" required />
             </div>
             <div class="col-md-4">
-                <label class="form-label small">DNI de quien recibe</label>
-                <input class="form-control form-control-sm" name="destinatario_dni" maxlength="30" required />
+                <label class="form-label small">DNI de quien recibe (opcional)</label>
+                <input class="form-control form-control-sm" name="destinatario_dni" maxlength="30" />
             </div>
             <div class="col-md-4">
-                <label class="form-label small">Teléfono de quien recibe</label>
-                <input class="form-control form-control-sm" name="destinatario_telefono" type="tel" maxlength="40" required />
+                <label class="form-label small">Teléfono de quien recibe (opcional)</label>
+                <input class="form-control form-control-sm" name="destinatario_telefono" type="tel" maxlength="40" />
             </div>
             <div class="col-md-4">
                 <label class="form-label small">Nombre de quien envía</label>

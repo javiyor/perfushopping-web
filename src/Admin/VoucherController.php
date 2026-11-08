@@ -67,9 +67,9 @@ final class VoucherController
                 Response::redirect('/admin/vouchers');
             }
         }
-        if ($importeCents <= 0 || $data['destinatario_nombre'] === '' || $data['destinatario_dni'] === ''
-            || $data['destinatario_telefono'] === '' || $data['remitente_nombre'] === '' || $data['remitente_telefono'] === '') {
-            $_SESSION['admin_flash'] = ['type'=>'danger','text'=>'Completá importe, nombre, DNI y teléfono del destinatario, y nombre y teléfono de quien envía el regalo.'];
+        if ($importeCents <= 0 || $data['destinatario_nombre'] === ''
+            || $data['remitente_nombre'] === '' || $data['remitente_telefono'] === '') {
+            $_SESSION['admin_flash'] = ['type'=>'danger','text'=>'Completá importe, nombre de quien recibe y nombre y teléfono de quien envía el regalo.'];
             Response::redirect('/admin/vouchers');
         }
         $mediosAceptados = ['efectivo','transferencia','tarjeta','mercadopago'];
@@ -106,17 +106,11 @@ final class VoucherController
         }
     }
 
-    public function validateCode(array $params): void
+    public function disponibles(array $params): void
     {
         $auth = new AdminAuthService();
         $auth->requirePermiso('facturacion');
-        $codigo = strtoupper(trim((string)($_GET['codigo'] ?? '')));
-        $voucher = $codigo !== '' ? (new VoucherRegaloRepo())->findAvailableByCode($codigo) : null;
-        if (!$voucher) {
-            Response::json(['ok'=>false,'error'=>'El código no existe o ya fue canjeado.'], 404);
-            return;
-        }
-        Response::json(['ok'=>true,'importe_cents'=>(int)$voucher['importe_cents']]);
+        Response::json((new VoucherRegaloRepo())->disponibles());
     }
 
     public function publicView(array $params): void

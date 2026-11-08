@@ -1697,36 +1697,34 @@ function onPagoFormaChange(sel) {
         if (montoInput) { montoInput.value = '0'; montoInput.readOnly = true; }
         extra.innerHTML = `
             <div class="row g-1">
-                <div class="col-12"><label class="small text-muted">Código del voucher regalo</label><input class="form-control form-control-sm fp-voucher" autocomplete="off" placeholder="VR-XXXXXXXXXX" /></div>
-                <div class="col-12 small fp-voucher-status text-muted">Ingresá el código para consultar su valor disponible.</div>
+                <div class="col-12"><label class="small text-muted">Voucher disponible — destinatario / código</label><select class="form-select form-select-sm fp-voucher" disabled><option value="">Cargando vouchers disponibles…</option></select></div>
+                <div class="col-12 small fp-voucher-status text-muted">Elegí por nombre o código. El listado está ordenado alfabéticamente.</div>
             </div>`;
-        const voucherInput = extra.querySelector('.fp-voucher');
+        const voucherSelect = extra.querySelector('.fp-voucher');
         const status = extra.querySelector('.fp-voucher-status');
-        voucherInput.addEventListener('input', function(){
-            if (montoInput) { montoInput.value = '0'; montoInput.readOnly = true; }
-            status.textContent = 'Ingresá el código para consultar su valor disponible.';
-            status.className = 'col-12 small fp-voucher-status text-muted';
+        voucherSelect.addEventListener('change', function(){
+            const option = voucherSelect.options[voucherSelect.selectedIndex];
+            const amountCents = Number(option?.dataset.cents || 0);
+            if (montoInput) montoInput.value = amountCents > 0 ? (amountCents / 100).toFixed(2) : '0';
+            status.textContent = amountCents > 0 ? 'Valor del voucher: ' + fmtCents(amountCents) + '. Se canjeará una sola vez.' : 'Elegí un voucher disponible.';
+            status.className = 'col-12 small fp-voucher-status ' + (amountCents > 0 ? 'text-success' : 'text-muted');
             recalcTotals();
         });
-        voucherInput.addEventListener('change', async function(){
-            const code = voucherInput.value.trim();
-            if (!code) return;
-            status.textContent = 'Consultando voucher…';
-            try {
-                const response = await fetch('/admin/vouchers/validar?codigo=' + encodeURIComponent(code));
-                const data = await response.json();
-                if (!response.ok || !data.ok) throw new Error(data.error || 'Voucher no disponible.');
-                if (montoInput) { montoInput.value = (Number(data.importe_cents || 0) / 100).toFixed(2); montoInput.readOnly = true; }
-                status.textContent = 'Valor disponible: ' + fmtCents(Number(data.importe_cents || 0)) + '. Se canjeará una sola vez.';
-                status.className = 'col-12 small fp-voucher-status text-success';
-                recalcTotals();
-            } catch (error) {
-                if (montoInput) { montoInput.value = '0'; montoInput.readOnly = true; }
-                status.textContent = error.message || 'No se pudo consultar el voucher.';
+        fetch('/admin/vouchers/disponibles')
+            .then(response => { if (!response.ok) throw new Error('No se pudo cargar la lista.'); return response.json(); })
+            .then(vouchers => {
+                voucherSelect.innerHTML = '<option value="">— Seleccionar voucher —</option>' + vouchers.map(v =>
+                    `<option value="${esc(v.codigo)}" data-cents="${Number(v.importe_cents || 0)}">${esc(v.destinatario_nombre)} — ${esc(v.codigo)} — ${fmtCents(Number(v.importe_cents || 0))}</option>`
+                ).join('');
+                voucherSelect.disabled = vouchers.length === 0;
+                status.textContent = vouchers.length ? 'Elegí por nombre o código. El listado está ordenado alfabéticamente.' : 'No hay vouchers disponibles para canjear.';
+                status.className = 'col-12 small fp-voucher-status ' + (vouchers.length ? 'text-muted' : 'text-warning');
+            })
+            .catch(error => {
+                voucherSelect.innerHTML = '<option value="">No se pudo cargar la lista</option>';
+                status.textContent = error.message || 'No se pudieron cargar los vouchers.';
                 status.className = 'col-12 small fp-voucher-status text-danger';
-                recalcTotals();
-            }
-        });
+            });
     } else if (tipo === 'cheque') {
         let bopts = '<option value="">— Seleccionar banco —</option>';
         BANCOS.forEach(b => { bopts += `<option value="${b.idban}">${esc(b.nombanc)}</option>`; });

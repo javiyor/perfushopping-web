@@ -84,6 +84,15 @@ final class VoucherRegaloRepo
         return $st->fetch() ?: null;
     }
 
+    public function disponibles(int $limit = 2000): array
+    {
+        self::ensureTable();
+        $limit = max(1, min(5000, $limit));
+        return Db::pdo()->query("SELECT codigo, destinatario_nombre, importe_cents
+            FROM voucher_regalos WHERE estado='activo'
+            ORDER BY destinatario_nombre ASC, codigo ASC LIMIT {$limit}")->fetchAll();
+    }
+
     public function recientes(int $limit = 100): array
     {
         self::ensureTable();
