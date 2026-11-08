@@ -10,6 +10,7 @@ $modeloUrl = $modeloUrl ?? '';
 $formato = ($formato ?? 'a5') === 'etiqueta' ? 'etiqueta' : 'a5';
 $esEtiqueta = $formato === 'etiqueta';
 $modeloDisponible = trim((string)$modeloUrl) !== '';
+$puedeExportar = $esEtiqueta || $modeloDisponible;
 $phoneTo = preg_replace('/\D+/', '', (string)(($voucher['destinatario_telefono'] ?? '') ?: ($voucher['remitente_telefono'] ?? ''))) ?? '';
 $shareText = 'Te enviaron un voucher de regalo de ' . Format::moneyFromCents((int)($voucher['importe_cents'] ?? 0)) . ': ' . (string)($voucherUrl ?? '');
 $titulo = (string)($design['titulo'] ?? '¡FELICITACIONES!');
@@ -37,6 +38,10 @@ $fraseInferior = (string)($design['frase_inferior'] ?? '¡Te esperamos con mucho
         .toolbar button:disabled { opacity:.45; cursor:not-allowed; }
         .missing-photo { max-width:760px; margin:0 auto 14px; padding:10px 14px; background:#362b10; border:1px solid var(--gold); border-radius:5px; color:#ffedb1; font-size:13px; text-align:center; }
         .voucher-artwork { position:relative; isolation:isolate; overflow:hidden; width:min(94vw,760px); aspect-ratio:4/5; margin:0 auto 28px; padding:3.5%; background:#000; color:#fff; border:2px solid var(--gold); box-shadow:0 0 25px #c9b03755; }
+        .voucher-label-text { width:min(94vw,470px); aspect-ratio:5/3; margin:0 auto 28px; padding:7%; display:flex; flex-direction:column; justify-content:center; gap:6%; background:#fff; color:#111; font:16px/1.3 Arial,sans-serif; }
+        .label-row { display:flex; justify-content:space-between; align-items:baseline; gap:3mm; border-bottom:1px solid #bbb; padding-bottom:2%; }
+        .label-row strong { text-align:right; }
+        .label-code { font-size:1.25em; font-weight:700; letter-spacing:.05em; }
         .voucher-artwork::before,.voucher-artwork::after { content:'✦'; position:absolute; z-index:4; color:var(--gold-light); text-shadow:0 0 10px #f5d75e; font-size:clamp(20px,4vw,42px); }
         .voucher-artwork::before { top:1.3%; left:1.4%; }
         .voucher-artwork::after { right:1.4%; bottom:1.3%; }
@@ -55,8 +60,8 @@ $fraseInferior = (string)($design['frase_inferior'] ?? '¡Te esperamos con mucho
         .congrats { margin:0; color:var(--gold-light); font:700 clamp(23px,5vw,50px)/1.05 'Playfair Display',Georgia,serif; letter-spacing:.08em; text-shadow:0 0 11px #c9b03799; }
         .ribbon { position:relative; display:inline-block; margin-top:1%; padding:1.1% 9%; color:#080808; background:linear-gradient(100deg,#8b681b,#f8e7a0 28%,#c9b037 58%,#fff0a8 78%,#94701f); font:700 clamp(12px,2.3vw,21px)/1.1 'Playfair Display',Georgia,serif; letter-spacing:.2em; box-shadow:0 2px 9px #d7b64a88; }
         .hero { display:grid; grid-template-columns:46% 54%; min-height:0; border-top:1px solid #c9b03788; border-bottom:1px solid #c9b03788; overflow:hidden; }
-        .model-frame { position:relative; width:100%; height:100%; min-height:0; background:linear-gradient(155deg,#181818,#070707); overflow:hidden; }
-        .model-photo { position:absolute; inset:0; display:block; width:100%; height:100%; object-fit:contain; object-position:center 20%; }
+        .model-frame { position:relative; width:100%; height:100%; min-height:0; background:radial-gradient(ellipse at 65% 67%,#60481e 0%,#241a0c 38%,#070707 78%); overflow:hidden; }
+        .model-photo { position:absolute; inset:0; display:block; width:100%; height:100%; object-fit:contain; object-position:center top; }
         .photo-missing { position:absolute; inset:0; display:grid; place-items:center; padding:8%; text-align:center; color:#d3bd73; font:500 clamp(13px,2.1vw,20px)/1.4 'Playfair Display',Georgia,serif; background:radial-gradient(ellipse at 50% 30%,#40321666,transparent 62%); }
         .message { align-self:center; padding:7%; color:#f4f0e5; font:400 clamp(12px,2vw,19px)/1.5 'Playfair Display',Georgia,serif; white-space:pre-line; }
         .heart { display:block; margin:5% 0 4%; text-align:center; color:var(--gold-light); font-size:clamp(18px,3vw,28px); text-shadow:0 0 10px #e8c954aa; }
@@ -72,24 +77,6 @@ $fraseInferior = (string)($design['frase_inferior'] ?? '¡Te esperamos con mucho
         .pickup-locations { color:#e7d79d; text-align:center; font:500 8px/1.25 Arial,sans-serif; letter-spacing:.02em; }
         .pickup-title { display:block; margin-bottom:1mm; color:var(--gold-light); font:600 10px/1.2 'Playfair Display',Georgia,serif; }
         .pickup-address { margin:.5mm 0; }
-        .is-label .voucher-layout { gap:1%; grid-template-rows:auto auto minmax(0,1fr) auto auto auto; }
-        .is-label .brand { min-height:0; }
-        .is-label .brand-logo { max-height:8mm; }
-        .is-label .congrats { font-size:17px; }
-        .is-label .ribbon { font-size:10px; margin-top:0; padding:1% 8%; }
-        .is-label .hero { grid-template-columns:35% 65%; }
-        .is-label .message { padding:4%; font-size:8px; line-height:1.25; }
-        .is-label .heart { margin:1% 0; font-size:12px; }
-        .is-label .recipient { font-size:7px; margin-top:1%; }
-        .is-label .recipient-name { font-size:11px; margin-top:1%; }
-        .is-label .value { font-size:12px; }
-        .is-label .sender { font-size:6px; }
-        .is-label .voucher-code { font-size:11px; }
-        .is-label .voucher-code span { font-size:5px; margin-bottom:0; }
-        .is-label .closing-brush { display:none; }
-        .is-label .pickup-locations { font-size:5px; line-height:1.05; }
-        .is-label .pickup-title { font-size:6px; margin-bottom:.3mm; }
-        .is-label .pickup-address { margin:0; }
         @media (max-width:600px) {
             .voucher-artwork { width:96vw; }
             .message { padding:5%; }
@@ -98,7 +85,7 @@ $fraseInferior = (string)($design['frase_inferior'] ?? '¡Te esperamos con mucho
             body { min-height:0; background:#fff; }
             .toolbar,.missing-photo { display:none !important; }
             .voucher-artwork { width:132mm; height:165mm; max-width:none; aspect-ratio:4/5; margin:0 auto; box-shadow:none; print-color-adjust:exact; -webkit-print-color-adjust:exact; }
-            .voucher-artwork.is-label { width:93mm; height:55.8mm; aspect-ratio:5/3; }
+            .voucher-label-text { width:96mm; height:57.6mm; aspect-ratio:5/3; margin:0 auto; padding:5mm; font-size:10pt; }
             .model-photo { print-color-adjust:exact; -webkit-print-color-adjust:exact; }
         }
     </style>
@@ -107,14 +94,20 @@ $fraseInferior = (string)($design['frase_inferior'] ?? '¡Te esperamos con mucho
     <nav class="toolbar">
         <button type="button" onclick="window.print()">Imprimir <?= $esEtiqueta ? 'etiqueta 10 × 6 cm' : 'voucher A5' ?></button>
         <?php if (!$esEtiqueta): ?><a href="/voucher/<?= rawurlencode((string)$voucher['codigo']) ?>?formato=etiqueta">Vista etiqueta 10 × 6</a><?php else: ?><a href="/voucher/<?= rawurlencode((string)$voucher['codigo']) ?>">Vista A5</a><?php endif; ?>
-        <button type="button" id="downloadPng" <?= $modeloDisponible ? '' : 'disabled' ?>>Descargar PNG</button>
-        <button type="button" id="downloadJpg" <?= $modeloDisponible ? '' : 'disabled' ?>>Descargar JPG</button>
-        <button type="button" id="downloadPdf" <?= $modeloDisponible ? '' : 'disabled' ?>>Descargar PDF</button>
+        <button type="button" id="downloadPng" <?= $puedeExportar ? '' : 'disabled' ?>>Descargar PNG</button>
+        <button type="button" id="downloadJpg" <?= $puedeExportar ? '' : 'disabled' ?>>Descargar JPG</button>
+        <button type="button" id="downloadPdf" <?= $puedeExportar ? '' : 'disabled' ?>>Descargar PDF</button>
         <?php if ($phoneTo !== ''): ?><a target="_blank" rel="noopener" href="https://wa.me/<?= htmlspecialchars($phoneTo) ?>?text=<?= rawurlencode($shareText) ?>">Enviar por WhatsApp</a><?php endif; ?>
     </nav>
     <?php if (!$modeloDisponible): ?><div class="missing-photo">Para completar el diseño y habilitar las descargas, cargá una fotografía real de la modelo sosteniendo la bolsa de regalo en la sección “Diseño del voucher”.</div><?php endif; ?>
 
-    <main id="voucherArtwork" class="voucher-artwork<?= $esEtiqueta ? ' is-label' : '' ?>">
+    <main id="voucherArtwork" class="<?= $esEtiqueta ? 'voucher-label-text' : 'voucher-artwork' ?>">
+        <?php if ($esEtiqueta): ?>
+        <div class="label-row"><span>Destinatario</span><strong><?= htmlspecialchars($voucher['destinatario_nombre'] ?? '') ?></strong></div>
+        <div class="label-row"><span>Envía</span><strong><?= htmlspecialchars($voucher['remitente_nombre'] ?? '') ?> · <?= htmlspecialchars($voucher['remitente_telefono'] ?? '') ?></strong></div>
+        <div class="label-row"><span>Valor</span><strong><?= Format::moneyFromCents((int)($voucher['importe_cents'] ?? 0)) ?></strong></div>
+        <div class="label-row label-code"><span>Código</span><strong><?= htmlspecialchars($voucher['codigo'] ?? '') ?></strong></div>
+        <?php else: ?>
         <div class="sparkles"></div>
         <div class="gold-frame"><span class="corner corner-tr">✦</span><span class="corner corner-bl">✦</span></div>
         <div class="voucher-layout">
@@ -151,9 +144,10 @@ $fraseInferior = (string)($design['frase_inferior'] ?? '¡Te esperamos con mucho
                 <?php endforeach; ?>
             </section>
         </div>
+        <?php endif; ?>
     </main>
 
-    <?php if ($modeloDisponible): ?>
+    <?php if ($puedeExportar): ?>
     <script>
     (function(){
         const artwork=document.getElementById('voucherArtwork');
