@@ -258,7 +258,7 @@ $qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $
             <?php if ($list): ?>
                 <tfoot class="table-light">
                     <tr>
-                        <td colspan="10" class="text-end fw-bold">Total</td>
+                        <td colspan="10" class="text-end fw-bold">Total de esta página</td>
                         <td class="text-center fw-bold">$<?= number_format($totalStockValor, 2, ',', '.') ?></td>
                         <td class="text-center fw-bold">$<?= number_format($totalVendidoValor, 2, ',', '.') ?></td>
                         <td></td>
