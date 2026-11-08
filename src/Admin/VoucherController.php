@@ -165,6 +165,7 @@ final class VoucherController
 
         $empresa = (new EmpresaRepo())->getDefault() ?? [];
         $design = (new VoucherDisenoRepo())->get();
+        $branches = array_values(array_filter((new SucursalRepo())->findAll(), static fn(array $s): bool => (int)($s['activo'] ?? 0) === 1));
         $host = (string)($_SERVER['HTTP_HOST'] ?? 'perfushopping.ar');
         $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
         $scheme = $secure ? 'https' : 'http';
@@ -176,6 +177,7 @@ final class VoucherController
             'voucher'=>$voucher,
             'empresa'=>$empresa,
             'design'=>$design,
+            'branches'=>$branches,
             'logoUrl'=>$logo,
             'modeloUrl'=>$modeloUrl,
             'voucherUrl'=>$voucherUrl,

@@ -4,6 +4,7 @@ use Perfushopping\Web\Support\Format;
 $voucher = $voucher ?? [];
 $empresa = $empresa ?? [];
 $design = $design ?? [];
+$branches = $branches ?? [];
 $logoUrl = $logoUrl ?? '';
 $modeloUrl = $modeloUrl ?? '';
 $formato = ($formato ?? 'a5') === 'etiqueta' ? 'etiqueta' : 'a5';
@@ -47,18 +48,15 @@ $fraseInferior = (string)($design['frase_inferior'] ?? '¡Te esperamos con mucho
         .corner { position:absolute; color:var(--gold-light); font-size:clamp(17px,3vw,30px); line-height:1; text-shadow:0 0 8px #c9b037; }
         .corner-tr { top:-.4%; right:1.5%; }
         .corner-bl { bottom:-.4%; left:1.5%; }
-        .voucher-layout { position:relative; z-index:2; height:100%; display:grid; grid-template-rows:auto auto minmax(0,1fr) auto auto; gap:1.2%; }
-        .brand { display:flex; justify-content:center; align-items:center; gap:2%; min-height:8%; text-align:center; }
-        .brand-logo { display:block; max-width:32%; max-height:8vh; object-fit:contain; }
-        .brand-ident { color:#ead99a; font:500 clamp(8px,1.35vw,13px)/1.25 'Playfair Display',Georgia,serif; letter-spacing:.06em; }
-        .brand-ident .cuit { display:block; color:#b8b8b8; font:9px/1.3 Arial,sans-serif; letter-spacing:0; margin-top:2px; }
+        .voucher-layout { position:relative; z-index:2; height:100%; display:grid; grid-template-rows:auto auto minmax(0,1fr) auto auto auto; gap:1.2%; }
+        .brand { display:flex; justify-content:center; align-items:center; min-height:8%; text-align:center; }
+        .brand-logo { display:block; max-width:44%; max-height:9vh; object-fit:contain; }
         .title-area { text-align:center; }
         .congrats { margin:0; color:var(--gold-light); font:700 clamp(23px,5vw,50px)/1.05 'Playfair Display',Georgia,serif; letter-spacing:.08em; text-shadow:0 0 11px #c9b03799; }
         .ribbon { position:relative; display:inline-block; margin-top:1%; padding:1.1% 9%; color:#080808; background:linear-gradient(100deg,#8b681b,#f8e7a0 28%,#c9b037 58%,#fff0a8 78%,#94701f); font:700 clamp(12px,2.3vw,21px)/1.1 'Playfair Display',Georgia,serif; letter-spacing:.2em; box-shadow:0 2px 9px #d7b64a88; }
         .hero { display:grid; grid-template-columns:46% 54%; min-height:0; border-top:1px solid #c9b03788; border-bottom:1px solid #c9b03788; overflow:hidden; }
         .model-frame { position:relative; min-height:0; background:linear-gradient(155deg,#181818,#070707); overflow:hidden; }
         .model-photo { display:block; width:100%; height:100%; object-fit:cover; object-position:center 25%; }
-        .bag-logo { position:absolute; z-index:2; left:55%; bottom:19%; width:32%; max-height:14%; object-fit:contain; filter:drop-shadow(0 1px 2px #000); pointer-events:none; }
         .photo-missing { position:absolute; inset:0; display:grid; place-items:center; padding:8%; text-align:center; color:#d3bd73; font:500 clamp(13px,2.1vw,20px)/1.4 'Playfair Display',Georgia,serif; background:radial-gradient(ellipse at 50% 30%,#40321666,transparent 62%); }
         .message { align-self:center; padding:7%; color:#f4f0e5; font:400 clamp(12px,2vw,19px)/1.5 'Playfair Display',Georgia,serif; white-space:pre-line; }
         .heart { display:block; margin:5% 0 4%; text-align:center; color:var(--gold-light); font-size:clamp(18px,3vw,28px); text-shadow:0 0 10px #e8c954aa; }
@@ -71,15 +69,15 @@ $fraseInferior = (string)($design['frase_inferior'] ?? '¡Te esperamos con mucho
         .voucher-code { grid-column:1/-1; color:var(--gold-light); text-align:center; font:600 clamp(13px,2.4vw,23px)/1.2 'Playfair Display',Georgia,serif; letter-spacing:.17em; }
         .voucher-code span { display:block; margin-bottom:3px; color:#adadad; font:8px/1.2 Arial,sans-serif; letter-spacing:.2em; text-transform:uppercase; }
         .closing-brush { display:block; width:92%; justify-self:center; padding:2% 1%; color:#101010; text-align:center; background:linear-gradient(95deg,#98701d,#f8e9a2 25%,#c9b037 52%,#fff0a8 74%,#8e6819); clip-path:polygon(2% 14%,98% 0,96% 78%,4% 100%); font:400 clamp(17px,3vw,30px)/1.1 'Great Vibes','Brush Script MT',cursive; }
-        .is-label .voucher-layout { gap:1%; grid-template-rows:auto auto minmax(0,1fr) auto; }
+        .pickup-locations { color:#e7d79d; text-align:center; font:500 8px/1.25 Arial,sans-serif; letter-spacing:.02em; }
+        .pickup-title { display:block; margin-bottom:1mm; color:var(--gold-light); font:600 10px/1.2 'Playfair Display',Georgia,serif; }
+        .pickup-address { margin:.5mm 0; }
+        .is-label .voucher-layout { gap:1%; grid-template-rows:auto auto minmax(0,1fr) auto auto auto; }
         .is-label .brand { min-height:0; }
         .is-label .brand-logo { max-height:8mm; }
-        .is-label .brand-ident { font-size:7px; }
-        .is-label .brand-ident .cuit { font-size:5px; }
         .is-label .congrats { font-size:17px; }
         .is-label .ribbon { font-size:10px; margin-top:0; padding:1% 8%; }
         .is-label .hero { grid-template-columns:35% 65%; }
-        .is-label .bag-logo { left:55%; bottom:19%; width:30%; max-height:14%; }
         .is-label .message { padding:4%; font-size:8px; line-height:1.25; }
         .is-label .heart { margin:1% 0; font-size:12px; }
         .is-label .recipient { font-size:7px; margin-top:1%; }
@@ -89,6 +87,9 @@ $fraseInferior = (string)($design['frase_inferior'] ?? '¡Te esperamos con mucho
         .is-label .voucher-code { font-size:11px; }
         .is-label .voucher-code span { font-size:5px; margin-bottom:0; }
         .is-label .closing-brush { display:none; }
+        .is-label .pickup-locations { font-size:5px; line-height:1.05; }
+        .is-label .pickup-title { font-size:6px; margin-bottom:.3mm; }
+        .is-label .pickup-address { margin:0; }
         @media (max-width:600px) {
             .voucher-artwork { width:96vw; }
             .message { padding:5%; }
@@ -119,10 +120,6 @@ $fraseInferior = (string)($design['frase_inferior'] ?? '¡Te esperamos con mucho
         <div class="voucher-layout">
             <header class="brand">
                 <?php if (!empty($logoUrl)): ?><img class="brand-logo" src="<?= htmlspecialchars($logoUrl) ?>" alt="Perfushopping" /><?php endif; ?>
-                <div class="brand-ident">
-                    <?= htmlspecialchars($empresa['razon_emp'] ?? $empresa['nomemp'] ?? 'PERFUSHOPPING') ?>
-                    <?php if (!empty($empresa['cuit'])): ?><span class="cuit">CUIT <?= htmlspecialchars($empresa['cuit']) ?></span><?php endif; ?>
-                </div>
             </header>
             <section class="title-area">
                 <h1 class="congrats"><?= htmlspecialchars($design['titulo'] ?? '¡FELICITACIONES!') ?></h1>
@@ -132,7 +129,6 @@ $fraseInferior = (string)($design['frase_inferior'] ?? '¡Te esperamos con mucho
                 <div class="model-frame">
                     <?php if ($modeloDisponible): ?>
                     <img class="model-photo" src="<?= htmlspecialchars($modeloUrl) ?>" alt="Modelo sosteniendo una bolsa de regalo Perfushopping" crossorigin="anonymous" />
-                    <?php if (!empty($logoUrl)): ?><img class="bag-logo" src="<?= htmlspecialchars($logoUrl) ?>" alt="Logo Perfushopping en la bolsa de regalo" crossorigin="anonymous" /><?php endif; ?>
                     <?php else: ?><div class="photo-missing">Fotografía de modelo<br />con bolsa de regalo</div><?php endif; ?>
                 </div>
                 <div class="message">
@@ -147,6 +143,13 @@ $fraseInferior = (string)($design['frase_inferior'] ?? '¡Te esperamos con mucho
                 <div class="voucher-code"><span>Número de voucher</span><?= htmlspecialchars($voucher['codigo'] ?? '') ?></div>
             </section>
             <footer class="closing-brush"><?= htmlspecialchars($design['frase_inferior'] ?? '¡Te esperamos con mucho cariño!') ?></footer>
+            <section class="pickup-locations">
+                <strong class="pickup-title">Retirar en:</strong>
+                <?php foreach ($branches as $branch): ?>
+                    <?php $direccion = trim((string)($branch['direccion'] ?? '')); ?>
+                    <?php if ($direccion !== ''): ?><div class="pickup-address"><?= htmlspecialchars($branch['nomsuc'] ?? '') ?> — <?= htmlspecialchars($direccion) ?></div><?php endif; ?>
+                <?php endforeach; ?>
+            </section>
         </div>
     </main>
 
