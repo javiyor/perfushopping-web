@@ -180,10 +180,27 @@ final class ReporteRepo
             error_log('ReporteRepo::comprasYGastos compras error: ' . $e->getMessage());
         }
 
-        $gastosCents = (new GastoRepo())->totalCentsPeriodo($desde, $hasta);
-        $gastosPorCuenta = (new GastoRepo())->totalCentsPeriodoPorCuenta($desde, $hasta);
+        $gastoRepo = new GastoRepo();
+        $gastosCentsOriginal = $gastoRepo->totalCentsPeriodo($desde, $hasta);
+        $gastosPorCuentaOriginal = $gastoRepo->totalCentsPeriodoPorCuenta($desde, $hasta);
+        $bienesCambioCents = 0;
+        $gastosPorCuenta = [];
+        foreach ($gastosPorCuentaOriginal as $gastoCuenta) {
+            $cuenta = mb_strtolower(trim((string)($gastoCuenta['cuenta'] ?? '')));
+            $grupo = mb_strtolower(trim((string)($gastoCuenta['cuenta_grupo'] ?? '')));
+            if (str_contains($cuenta, 'bienes de cambio') || str_contains($grupo, 'bienes de cambio')) {
+                $bienesCambioCents += (int)($gastoCuenta['total_cents'] ?? 0);
+                continue;
+            }
+            $gastosPorCuenta[] = $gastoCuenta;
+        }
+        $comprasComprobantesCents = $comprasCents;
+        $comprasCents += $bienesCambioCents;
+        $gastosCents = $gastosCentsOriginal - $bienesCambioCents;
         return [
             'compras_cents' => $comprasCents,
+            'compras_comprobantes_cents' => $comprasComprobantesCents,
+            'bienes_cambio_cents' => $bienesCambioCents,
             'gastos_cents' => $gastosCents,
             'gastos_por_cuenta' => $gastosPorCuenta,
             'total_cents' => $comprasCents + $gastosCents,

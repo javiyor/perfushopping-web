@@ -134,7 +134,7 @@ $puntosVenta = $puntosVenta ?? [];
                     <canvas id="comparativaPeriodoChart" height="110"></canvas>
                     <div class="small text-muted mt-2" id="comparativaPeriodoDetalle"></div>
                     <div class="mt-3" id="resumenGastosCuentas"></div>
-                    <div class="small text-muted">Las ventas y la ganancia respetan el punto de venta seleccionado. Compras y gastos son globales y se filtran por fecha; las compras incluyen comprobantes no anulados, las notas de crédito restan y las monedas extranjeras usan su tipo de cambio.</div>
+                    <div class="small text-muted">Las ventas y la ganancia respetan el punto de venta seleccionado. Compras y gastos son globales y se filtran por fecha; Compras incluye comprobantes no anulados y gastos en Bienes de cambio, las notas de crédito restan y las monedas extranjeras usan su tipo de cambio.</div>
                 </div>
             </div>
         </div>
@@ -430,11 +430,13 @@ function cargarReportes() {
             // Comparativa financiera del período. Compras y gastos no se asignan a un PV.
             const cg = d.comprasYGastos || {};
             const comprasCents = parseInt(cg.compras_cents || 0);
+            const bienesCambioCents = parseInt(cg.bienes_cambio_cents || 0);
             const gastosCents = parseInt(cg.gastos_cents || 0);
             const cgTotal = parseInt(cg.total_cents || 0);
             const comparativaDetalle = document.getElementById('comparativaPeriodoDetalle');
             if (comparativaDetalle) {
-                comparativaDetalle.innerHTML = '<span class="d-block text-primary">Compras: <strong>' + fmtCents(comprasCents) + '</strong></span>'
+                comparativaDetalle.innerHTML = '<span class="d-block text-primary">Compras (incluye bienes de cambio): <strong>' + fmtCents(comprasCents) + '</strong></span>'
+                    + (bienesCambioCents ? '<span class="d-block small text-primary">De ese total, bienes de cambio: ' + fmtCents(bienesCambioCents) + '</span>' : '')
                     + '<span class="d-block text-danger">Gastos: <strong>' + fmtCents(gastosCents) + '</strong></span>'
                     + '<span class="d-block text-dark fw-semibold">Compras + gastos: ' + fmtCents(cgTotal) + '</span>';
             }
@@ -818,7 +820,9 @@ function exportarCSV() {
             const invSnapshotCsv = invCsv.snapshot || {};
             csv += 'Comparativa financiera del período\n';
             csv += 'Ganancia neta,' + (parseInt(gananciasCsv.ganancia_cents ?? 0) / 100).toFixed(2) + '\n';
-            csv += 'Compras,' + (parseInt(comprasGastosCsv.compras_cents ?? 0) / 100).toFixed(2) + '\n';
+            csv += 'Compras (incluye bienes de cambio),' + (parseInt(comprasGastosCsv.compras_cents ?? 0) / 100).toFixed(2) + '\n';
+            csv += 'Compras según comprobantes,' + (parseInt(comprasGastosCsv.compras_comprobantes_cents ?? 0) / 100).toFixed(2) + '\n';
+            csv += 'Bienes de cambio reclasificados desde gastos,' + (parseInt(comprasGastosCsv.bienes_cambio_cents ?? 0) / 100).toFixed(2) + '\n';
             csv += 'Gastos,' + (parseInt(comprasGastosCsv.gastos_cents ?? 0) / 100).toFixed(2) + '\n';
             csv += 'Compras + gastos,' + (parseInt(comprasGastosCsv.total_cents ?? 0) / 100).toFixed(2) + '\n';
             csv += '\nGastos por cuenta\nCuenta,Grupo,Total\n';
