@@ -181,9 +181,11 @@ final class ReporteRepo
         }
 
         $gastosCents = (new GastoRepo())->totalCentsPeriodo($desde, $hasta);
+        $gastosPorCuenta = (new GastoRepo())->totalCentsPeriodoPorCuenta($desde, $hasta);
         return [
             'compras_cents' => $comprasCents,
             'gastos_cents' => $gastosCents,
+            'gastos_por_cuenta' => $gastosPorCuenta,
             'total_cents' => $comprasCents + $gastosCents,
         ];
     }

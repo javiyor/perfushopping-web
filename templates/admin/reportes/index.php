@@ -133,6 +133,7 @@ $puntosVenta = $puntosVenta ?? [];
                 <div class="card-body">
                     <canvas id="comparativaPeriodoChart" height="110"></canvas>
                     <div class="small text-muted mt-2" id="comparativaPeriodoDetalle"></div>
+                    <div class="mt-3" id="resumenGastosCuentas"></div>
                     <div class="small text-muted">Las ventas y la ganancia respetan el punto de venta seleccionado. Compras y gastos son globales y se filtran por fecha; las compras incluyen comprobantes no anulados, las notas de crédito restan y las monedas extranjeras usan su tipo de cambio.</div>
                 </div>
             </div>
@@ -433,26 +434,44 @@ function cargarReportes() {
             const cgTotal = parseInt(cg.total_cents || 0);
             const comparativaDetalle = document.getElementById('comparativaPeriodoDetalle');
             if (comparativaDetalle) {
-                comparativaDetalle.textContent = 'Compras: ' + fmtCents(comprasCents) + ' · Gastos: ' + fmtCents(gastosCents) + ' · Compras + gastos: ' + fmtCents(cgTotal);
+                comparativaDetalle.innerHTML = '<span class="d-block text-primary">Compras: <strong>' + fmtCents(comprasCents) + '</strong></span>'
+                    + '<span class="d-block text-danger">Gastos: <strong>' + fmtCents(gastosCents) + '</strong></span>'
+                    + '<span class="d-block text-dark fw-semibold">Compras + gastos: ' + fmtCents(cgTotal) + '</span>';
+            }
+            const gastosCuenta = cg.gastos_por_cuenta || [];
+            const gastosCuentaEl = document.getElementById('resumenGastosCuentas');
+            if (gastosCuentaEl) {
+                if (!gastosCuenta.length) {
+                    gastosCuentaEl.innerHTML = '<div class="small text-muted">No hay gastos registrados en el período.</div>';
+                } else {
+                    const rows = gastosCuenta.map(item => {
+                        const grupo = String(item.cuenta_grupo || '');
+                        const cuenta = String(item.cuenta || 'Sin cuenta');
+                        const nombre = grupo && grupo !== 'Sin grupo' ? grupo + ' · ' + cuenta : cuenta;
+                        return '<tr><td>' + escHtml(nombre) + '</td><td class="text-end">' + fmtCents(parseInt(item.total_cents || 0)) + '</td></tr>';
+                    }).join('');
+                    gastosCuentaEl.innerHTML = '<h6 class="small fw-semibold mb-2">Gastos del período por cuenta</h6>'
+                        + '<div class="table-responsive"><table class="table table-sm table-striped mb-0"><thead><tr><th>Cuenta</th><th class="text-end">Total</th></tr></thead><tbody>'
+                        + rows + '</tbody></table></div>';
+                }
             }
             if (comparativaPeriodoChartInstance) comparativaPeriodoChartInstance.destroy();
             comparativaPeriodoChartInstance = new Chart(document.getElementById('comparativaPeriodoChart').getContext('2d'), {
                 type: 'bar',
                 data: {
                     labels: ['Ventas totales', 'Ganancia neta', 'Compras + gastos'],
-                    datasets: [{
-                        label: 'Monto ($)',
-                        data: [totAll / 100, ganancia / 100, cgTotal / 100],
-                        backgroundColor: ['rgba(216,178,90,0.75)', 'rgba(25,135,84,0.7)', 'rgba(220,53,69,0.65)'],
-                        borderColor: ['rgb(216,178,90)', 'rgb(25,135,84)', 'rgb(220,53,69)'],
-                        borderWidth: 1,
-                    }],
+                    datasets: [
+                        {label: 'Ventas totales', data: [totAll / 100, 0, 0], backgroundColor: 'rgba(216,178,90,0.75)', borderColor: 'rgb(216,178,90)', borderWidth: 1, stack: 'comparativa'},
+                        {label: 'Ganancia neta', data: [0, ganancia / 100, 0], backgroundColor: 'rgba(25,135,84,0.7)', borderColor: 'rgb(25,135,84)', borderWidth: 1, stack: 'comparativa'},
+                        {label: 'Compras', data: [0, 0, comprasCents / 100], backgroundColor: 'rgba(13,110,253,0.72)', borderColor: 'rgb(13,110,253)', borderWidth: 1, stack: 'comparativa'},
+                        {label: 'Gastos', data: [0, 0, gastosCents / 100], backgroundColor: 'rgba(220,53,69,0.68)', borderColor: 'rgb(220,53,69)', borderWidth: 1, stack: 'comparativa'},
+                    ],
                 },
                 options: {
                     indexAxis: 'y',
                     responsive: true,
-                    plugins: {legend: {display: false}, tooltip: {callbacks: {label: ctx => fmtCents(Math.round(ctx.parsed.x * 100))}}},
-                    scales: {x: {beginAtZero: true, ticks: {callback: value => '$' + Number(value).toLocaleString('es-AR')}}},
+                    plugins: {legend: {display: true}, tooltip: {callbacks: {label: ctx => ctx.dataset.label + ': ' + fmtCents(Math.round(ctx.parsed.x * 100))}}},
+                    scales: {x: {beginAtZero: true, stacked: true, ticks: {callback: value => '$' + Number(value).toLocaleString('es-AR')}}, y: {stacked: true}},
                 },
             });
 
@@ -802,6 +821,12 @@ function exportarCSV() {
             csv += 'Compras,' + (parseInt(comprasGastosCsv.compras_cents ?? 0) / 100).toFixed(2) + '\n';
             csv += 'Gastos,' + (parseInt(comprasGastosCsv.gastos_cents ?? 0) / 100).toFixed(2) + '\n';
             csv += 'Compras + gastos,' + (parseInt(comprasGastosCsv.total_cents ?? 0) / 100).toFixed(2) + '\n';
+            csv += '\nGastos por cuenta\nCuenta,Grupo,Total\n';
+            (comprasGastosCsv.gastos_por_cuenta || []).forEach(g => {
+                const cuentaCsv = String(g.cuenta || 'Sin cuenta').replace(/"/g, '""');
+                const grupoCsv = String(g.cuenta_grupo || 'Sin grupo').replace(/"/g, '""');
+                csv += '"' + cuentaCsv + '","' + grupoCsv + '",' + (parseInt(g.total_cents ?? 0) / 100).toFixed(2) + '\n';
+            });
             csv += 'Inventario capturado,' + (invSnapshotCsv.fecha_captura || 'Sin captura') + ',' + (parseInt(invSnapshotCsv.valor_cents ?? 0) / 100).toFixed(2) + '\n\n';
 
             csv += 'Historial mensual del valor de inventario\n';

@@ -304,6 +304,36 @@ final class GastoRepo
         }
     }
 
+    /** Totales de gastos del período agrupados por cuenta contable. */
+    public function totalCentsPeriodoPorCuenta(string $desde, string $hasta): array
+    {
+        $importe = $this->importeColumn();
+        if (!$this->hasGastosColumn($importe) || !$this->hasGastosColumn('fecha')) {
+            return [];
+        }
+        $hasCuenta = $this->hasIdcta1();
+        $cuentaSelect = $hasCuenta
+            ? "COALESCE(NULLIF(TRIM(c1.nomcta1), ''), 'Sin cuenta') AS cuenta, COALESCE(NULLIF(TRIM(c.nomcta), ''), 'Sin grupo') AS cuenta_grupo"
+            : "'Sin cuenta' AS cuenta, 'Sin grupo' AS cuenta_grupo";
+        $cuentaJoin = $hasCuenta
+            ? ' LEFT JOIN contable1 c1 ON c1.idcta1 = g.idcta1 LEFT JOIN contable c ON c.idcta = c1.idcta'
+            : '';
+        $groupBy = $hasCuenta ? ' GROUP BY g.idcta1, c1.nomcta1, c.nomcta' : '';
+        try {
+            $st = Db::pdo()->prepare("SELECT {$cuentaSelect}, COUNT(*) AS cantidad,
+                    COALESCE(SUM(g.`{$importe}`), 0) AS total_cents
+                FROM gastos g{$cuentaJoin}
+                WHERE g.fecha BETWEEN :desde AND :hasta
+                {$groupBy}
+                ORDER BY total_cents DESC, cuenta ASC");
+            $st->execute([':desde' => $desde, ':hasta' => $hasta]);
+            return $st->fetchAll();
+        } catch (\Throwable $e) {
+            error_log('GastoRepo::totalCentsPeriodoPorCuenta error: ' . $e->getMessage());
+            return [];
+        }
+    }
+
     public function crearSubcuenta(string $nomcta1, int $idcta): int
     {
         $st = Db::pdo()->prepare('INSERT INTO contable1 (nomcta1, idcta) VALUES (:n, :c)');
