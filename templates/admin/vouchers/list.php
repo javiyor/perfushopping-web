@@ -152,7 +152,9 @@ $voucherDesign = $voucherDesign ?? [];
                     <td><span class="badge bg-<?= ($voucher['estado'] ?? '') === 'activo' ? 'success' : (($voucher['estado'] ?? '') === 'canjeado' ? 'secondary' : 'danger') ?>"><?= htmlspecialchars($voucher['estado'] ?? '') ?></span></td>
                     <td><?= htmlspecialchars($voucher['sucursal_nombre'] ?? '-') ?></td>
                     <td class="text-nowrap">
+                        <?php if (($voucher['estado'] ?? '') !== 'anulado'): ?>
                         <a class="btn btn-sm btn-outline-primary py-0 px-1" target="_blank" title="Vista previa / descarga" href="/voucher/<?= rawurlencode((string)$voucher['codigo']) ?>"><i class="bi bi-eye"></i></a>
+                        <?php endif; ?>
                         <?php if (($voucher['estado'] ?? '') === 'activo'): ?>
                         <form method="post" action="/admin/vouchers/anular" class="d-inline" onsubmit="return confirm('¿Anular el voucher <?= htmlspecialchars((string)($voucher['codigo'] ?? ''), ENT_QUOTES) ?> y registrar el reintegro?')">
                             <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />

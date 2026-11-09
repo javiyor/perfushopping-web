@@ -181,6 +181,11 @@ final class VoucherController
             echo 'Voucher no encontrado.';
             return;
         }
+        if ((string)($voucher['estado'] ?? '') === 'anulado') {
+            http_response_code(410);
+            echo 'Este voucher fue anulado y no se puede imprimir.';
+            return;
+        }
 
         $empresa = (new EmpresaRepo())->getDefault() ?? [];
         $design = (new VoucherDisenoRepo())->get();
@@ -207,8 +212,13 @@ final class VoucherController
     public function downloadPdf(array $params): void
     {
         $codigo = strtoupper(trim((string)($params['code'] ?? '')));
-        if (!(new VoucherRegaloRepo())->findByCode($codigo)) {
+        $voucher = (new VoucherRegaloRepo())->findByCode($codigo);
+        if (!$voucher) {
             Response::json(['ok'=>false,'error'=>'Voucher no encontrado.'], 404);
+            return;
+        }
+        if ((string)($voucher['estado'] ?? '') === 'anulado') {
+            Response::json(['ok'=>false,'error'=>'Este voucher fue anulado y no se puede imprimir.'], 410);
             return;
         }
         $input = json_decode(file_get_contents('php://input'), true);
