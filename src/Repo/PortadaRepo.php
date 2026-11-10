@@ -77,6 +77,16 @@ final class PortadaRepo
                   KEY idx_portada_productos_orden (orden, id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             ");
+            Db::pdo()->exec("
+                CREATE TABLE IF NOT EXISTS portada_confianza (
+                  slot_id TINYINT UNSIGNED NOT NULL PRIMARY KEY,
+                  foto VARCHAR(255) DEFAULT NULL,
+                  foto_titulo VARCHAR(120) DEFAULT NULL,
+                  video_url VARCHAR(500) DEFAULT NULL,
+                  video_titulo VARCHAR(120) DEFAULT NULL,
+                  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ");
             $st = Db::pdo()->query("SELECT COUNT(*) FROM portada_config WHERE id=1");
             if ((int)$st->fetchColumn() === 0) {
                 Db::pdo()->exec("INSERT IGNORE INTO portada_config (id, modo) VALUES (1, 'auto')");
@@ -399,6 +409,59 @@ final class PortadaRepo
         try {
             Db::pdo()->exec("DELETE FROM portada_productos");
         } catch (\Throwable $e) {
+        }
+    }
+
+    /** @return array<int,array{slot_id:int,foto:string,foto_titulo:string,video_url:string,video_titulo:string}> */
+    public function getTrustMedia(): array
+    {
+        $this->ensureTables();
+        $slots = [];
+        for ($i = 1; $i <= 3; $i++) {
+            $slots[$i] = ['slot_id' => $i, 'foto' => '', 'foto_titulo' => '', 'video_url' => '', 'video_titulo' => ''];
+        }
+        try {
+            foreach (Db::pdo()->query('SELECT * FROM portada_confianza ORDER BY slot_id ASC')->fetchAll() as $row) {
+                $id = (int)($row['slot_id'] ?? 0);
+                if ($id < 1 || $id > 3) continue;
+                $slots[$id] = [
+                    'slot_id' => $id,
+                    'foto' => trim((string)($row['foto'] ?? '')),
+                    'foto_titulo' => trim((string)($row['foto_titulo'] ?? '')),
+                    'video_url' => trim((string)($row['video_url'] ?? '')),
+                    'video_titulo' => trim((string)($row['video_titulo'] ?? '')),
+                ];
+            }
+        } catch (\Throwable $e) {
+            error_log('PortadaRepo::getTrustMedia error: ' . $e->getMessage());
+        }
+        return array_values($slots);
+    }
+
+    /** @param array<int,array{foto?:string,foto_titulo?:string,video_url?:string,video_titulo?:string}> $slots */
+    public function saveTrustMedia(array $slots): void
+    {
+        $this->ensureTables();
+        $pdo = Db::pdo();
+        $pdo->beginTransaction();
+        try {
+            $st = $pdo->prepare('INSERT INTO portada_confianza (slot_id, foto, foto_titulo, video_url, video_titulo, updated_at)
+                VALUES (:slot, :foto, :foto_titulo, :video_url, :video_titulo, NOW())
+                ON DUPLICATE KEY UPDATE foto=VALUES(foto), foto_titulo=VALUES(foto_titulo), video_url=VALUES(video_url), video_titulo=VALUES(video_titulo), updated_at=NOW()');
+            for ($i = 1; $i <= 3; $i++) {
+                $slot = $slots[$i] ?? [];
+                $st->execute([
+                    ':slot' => $i,
+                    ':foto' => trim((string)($slot['foto'] ?? '')) ?: null,
+                    ':foto_titulo' => mb_substr(trim((string)($slot['foto_titulo'] ?? '')), 0, 120) ?: null,
+                    ':video_url' => trim((string)($slot['video_url'] ?? '')) ?: null,
+                    ':video_titulo' => mb_substr(trim((string)($slot['video_titulo'] ?? '')), 0, 120) ?: null,
+                ]);
+            }
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            throw $e;
         }
     }
 }

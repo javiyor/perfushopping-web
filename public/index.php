@@ -699,6 +699,7 @@ $router->post('/admin/capacitaciones/horarios/save', [AdminCapacitacionControlle
 // Admin - Portada
 $router->get('/admin/portada', [AdminPortadaController::class, 'index']);
 $router->post('/admin/portada/guardar', [AdminPortadaController::class, 'save']);
+$router->post('/admin/portada/confianza/guardar', [AdminPortadaController::class, 'saveTrustMedia']);
 $router->post('/admin/portada/manual/agregar', [AdminPortadaController::class, 'addManual']);
 $router->post('/admin/portada/manual/agregar-varios', [AdminPortadaController::class, 'addManyManual']);
 $router->post('/admin/portada/manual/quitar', [AdminPortadaController::class, 'removeManual']);

@@ -64,6 +64,50 @@ foreach ([1, 2, 3] as $bi) {
 </div>
 <?php endif; ?>
 
+<?php
+$trustMedia = $trustMedia ?? [];
+$trustMedia = array_values(array_filter($trustMedia, static fn(array $slot): bool => trim((string)($slot['foto'] ?? '')) !== '' || trim((string)($slot['video_url'] ?? '')) !== ''));
+?>
+<?php if ($isNovedades && $trustMedia): ?>
+<style>
+.trust-media-section { margin-top:18px; }
+.trust-media-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px; }
+.trust-media-card { position:relative;display:flex;flex-direction:column;overflow:hidden;min-width:0;border:1px solid var(--c-section-border);border-radius:14px;background:var(--c-section-bg);color:var(--text);text-decoration:none; }
+.trust-media-card img { display:block;width:100%;height:190px;object-fit:cover;background:var(--c-product-media-bg); }
+.trust-media-caption { padding:10px 12px;font-weight:700;color:var(--c-hero-text); }
+.trust-video-card:after { content:'▶';position:absolute;top:68px;left:calc(50% - 25px);width:50px;height:50px;display:grid;place-items:center;border-radius:50%;background:#000a;color:#fff;font-size:21px;padding-left:3px; }
+.trust-video-card:hover { border-color:var(--c-product-hover-border);transform:translateY(-2px); }
+@media(max-width:760px) { .trust-media-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .trust-media-card img { height:160px; } }
+@media(max-width:480px) { .trust-media-grid { grid-template-columns:1fr 1fr;gap:8px; } .trust-media-card img { height:130px; } .trust-media-caption { padding:8px;font-size:13px; } }
+</style>
+<section class="page trust-media-section" aria-label="Conocé Perfushopping">
+  <h3 class="store-catalog-title" style="margin:0 0 10px;font-family:Georgia,'Times New Roman',serif;letter-spacing:.5px">Conocé Perfushopping</h3>
+  <div class="trust-media-grid">
+    <?php foreach ($trustMedia as $slot): ?>
+      <?php $foto = trim((string)($slot['foto'] ?? '')); $fotoTitulo = trim((string)($slot['foto_titulo'] ?? '')); ?>
+      <?php if ($foto !== ''): ?>
+      <div class="trust-media-card trust-photo-card">
+        <img src="<?= htmlspecialchars(Format::uploadUrl($foto)) ?>" alt="<?= htmlspecialchars($fotoTitulo !== '' ? $fotoTitulo : 'Perfushopping') ?>" loading="lazy" />
+        <?php if ($fotoTitulo !== ''): ?><div class="trust-media-caption"><?= htmlspecialchars($fotoTitulo) ?></div><?php endif; ?>
+      </div>
+      <?php endif; ?>
+      <?php
+        $videoUrl = trim((string)($slot['video_url'] ?? ''));
+        $youtubeHref = \Perfushopping\Web\Repo\Marketing\VideoRepo::youtubeWatchUrl($videoUrl);
+        $youtubeThumb = \Perfushopping\Web\Repo\Marketing\VideoRepo::youtubeThumb($videoUrl);
+        $videoTitle = trim((string)($slot['video_titulo'] ?? '')) ?: 'Ver video en YouTube';
+      ?>
+      <?php if ($youtubeHref !== '' && $youtubeThumb !== ''): ?>
+      <a class="trust-media-card trust-video-card" href="<?= htmlspecialchars($youtubeHref) ?>" target="_blank" rel="noopener noreferrer">
+        <img src="<?= htmlspecialchars($youtubeThumb) ?>" alt="" loading="lazy" />
+        <div class="trust-media-caption"><?= htmlspecialchars($videoTitle) ?></div>
+      </a>
+      <?php endif; ?>
+    <?php endforeach; ?>
+  </div>
+</section>
+<?php endif; ?>
+
 <div class="page store-catalog-section" style="margin-top:16px">
   <?php if ($isNovedades): ?>
     <div class="store-contact" style="margin-top:10px;line-height:1.55">

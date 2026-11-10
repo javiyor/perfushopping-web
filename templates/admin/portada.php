@@ -1,5 +1,6 @@
 <?php
 $config = $config ?? ['modo' => 'auto', 'codrub' => null, 'codsub' => null];
+$trustMedia = $trustMedia ?? [];
 $manual = $manual ?? [];
 $rubros = $rubros ?? [];
 $marcas = $marcas ?? [];
@@ -11,6 +12,8 @@ $coloresComponentes = $coloresComponentes ?? \Perfushopping\Web\Repo\PortadaRepo
 $modo = (string)($config['modo'] ?? 'auto');
 $codrub = (int)($config['codrub'] ?? 0);
 $codsub = (int)($config['codsub'] ?? 0);
+$trustBySlot = [];
+foreach ($trustMedia as $trustSlot) $trustBySlot[(int)($trustSlot['slot_id'] ?? 0)] = $trustSlot;
 $bannerText = trim((string)($config['banner_text'] ?? ''));
 $bannerBold = !empty($config['banner_bold']);
 $bannerItalic = !empty($config['banner_italic']);
@@ -264,6 +267,38 @@ $presetFondo = ['#1a1a1a' => 'Negro', '#C9A227' => 'Dorado', '#C0392B' => 'Rojo'
             <div class="mt-3">
                 <button class="btn btn-accent btn-sm" type="submit"><i class="bi bi-check-lg"></i> Guardar portada</button>
             </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4" id="confianza">
+    <div class="card-header bg-white fw-semibold"><i class="bi bi-shield-check"></i> Fotos y videos para generar confianza</div>
+    <div class="card-body">
+        <p class="text-muted small">Cargá hasta 3 fotos y 3 videos de YouTube. Se mostrarán en una sección destacada de la portada, junto al catálogo. Los videos se abren en YouTube.</p>
+        <form method="post" action="/admin/portada/confianza/guardar" enctype="multipart/form-data">
+            <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+            <div class="row g-3">
+                <?php for ($slotId = 1; $slotId <= 3; $slotId++): $slot = $trustBySlot[$slotId] ?? []; ?>
+                <div class="col-lg-4">
+                    <div class="border rounded p-3 h-100">
+                        <h6 class="fw-bold">Contenido <?= $slotId ?></h6>
+                        <?php if (!empty($slot['foto'])): ?>
+                        <img src="<?= htmlspecialchars(\Perfushopping\Web\Support\Format::uploadUrl((string)$slot['foto'])) ?>" alt="Foto de confianza <?= $slotId ?>" class="img-fluid rounded mb-2" style="height:140px;width:100%;object-fit:cover" />
+                        <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="eliminar_foto_<?= $slotId ?>" id="eliminarFoto<?= $slotId ?>" /><label class="form-check-label small" for="eliminarFoto<?= $slotId ?>">Quitar foto actual</label></div>
+                        <?php endif; ?>
+                        <label class="form-label small mb-1">Foto JPG, PNG o WEBP (máx. 5 MB)</label>
+                        <input class="form-control form-control-sm mb-2" type="file" name="foto_<?= $slotId ?>" accept="image/jpeg,image/png,image/webp" />
+                        <label class="form-label small mb-1">Texto de la foto (opcional)</label>
+                        <input class="form-control form-control-sm mb-3" name="foto_titulo_<?= $slotId ?>" maxlength="120" value="<?= htmlspecialchars((string)($slot['foto_titulo'] ?? '')) ?>" placeholder="Ej.: Nuestra tienda" />
+                        <label class="form-label small mb-1">Enlace de YouTube</label>
+                        <input class="form-control form-control-sm mb-2" type="url" name="video_url_<?= $slotId ?>" value="<?= htmlspecialchars((string)($slot['video_url'] ?? '')) ?>" placeholder="https://youtu.be/..." />
+                        <label class="form-label small mb-1">Título del video (opcional)</label>
+                        <input class="form-control form-control-sm" name="video_titulo_<?= $slotId ?>" maxlength="120" value="<?= htmlspecialchars((string)($slot['video_titulo'] ?? '')) ?>" placeholder="Conocé Perfushopping" />
+                    </div>
+                </div>
+                <?php endfor; ?>
+            </div>
+            <div class="text-end mt-3"><button class="btn btn-accent btn-sm" type="submit"><i class="bi bi-check-lg"></i> Guardar fotos y videos</button></div>
         </form>
     </div>
 </div>

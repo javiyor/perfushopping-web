@@ -22,6 +22,7 @@ final class HomeController
         $codrub = (int)($_GET['codrub'] ?? 0);
         $codsub = (int)($_GET['codsub'] ?? 0);
         $isFiltered = ($q !== '' || $codrub > 0 || $codsub > 0);
+        $trustMedia = [];
 
         if ($isFiltered) {
             $products = (new ProductRepo())->list(['q' => $q, 'codrub' => $codrub, 'codsub' => $codsub]);
@@ -29,6 +30,7 @@ final class HomeController
         } else {
             $portadaRepo = new \Perfushopping\Web\Repo\PortadaRepo();
             $cfg = $portadaRepo->getConfig();
+            $trustMedia = $portadaRepo->getTrustMedia();
             $products = (new ProductRepo())->portada($cfg);
             $portadaInfo = $cfg;
         }
@@ -50,6 +52,7 @@ final class HomeController
             'user' => $user,
             'isWholesale' => $auth->isWholesaleApproved($user),
             'portadaInfo' => $portadaInfo,
+            'trustMedia' => $trustMedia,
             'blocks' => $blocks,
             'homeNeeds' => (new NeedRepo())->findAll(true),
             'homeVideos' => (new VideoRepo())->findActive(),

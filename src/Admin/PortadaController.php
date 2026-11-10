@@ -9,6 +9,7 @@ use Perfushopping\Web\Repo\PortadaRepo;
 use Perfushopping\Web\Service\AdminAuthService;
 use Perfushopping\Web\Support\Csrf;
 use Perfushopping\Web\Support\Response;
+use Perfushopping\Web\Support\UploadValidator;
 use Perfushopping\Web\Support\View;
 
 final class PortadaController
@@ -20,6 +21,7 @@ final class PortadaController
 
         $repo = new PortadaRepo();
         $config = $repo->getConfig();
+        $trustMedia = $repo->getTrustMedia();
         $manual = $repo->getManualProducts();
         $meta = new MetaRepo();
         $rubros = $meta->rubros();
@@ -34,6 +36,7 @@ final class PortadaController
         echo View::adminPage('admin/portada.php', [
             'adminUser' => $adminUser,
             'config' => $config,
+            'trustMedia' => $trustMedia,
             'tema' => PortadaRepo::tema($config),
             'plantillas' => PortadaRepo::plantillas(),
             'coloresComponentes' => PortadaRepo::coloresComponentes(),
@@ -95,6 +98,68 @@ final class PortadaController
 
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Portada actualizada.'];
         Response::redirect('/admin/portada');
+    }
+
+    public function saveTrustMedia(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $auth->requirePermiso('productos');
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $repo = new PortadaRepo();
+        $current = [];
+        foreach ($repo->getTrustMedia() as $slot) $current[(int)$slot['slot_id']] = $slot;
+        $slots = [];
+        $uploads = [];
+        try {
+            for ($i = 1; $i <= 3; $i++) {
+                $old = $current[$i] ?? [];
+                $foto = (string)($old['foto'] ?? '');
+                if (isset($_POST['eliminar_foto_' . $i])) $foto = '';
+                $file = $_FILES['foto_' . $i] ?? null;
+                if (is_array($file) && (int)($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+                    UploadValidator::validate($file);
+                    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                    $mime = $finfo ? finfo_file($finfo, (string)$file['tmp_name']) : '';
+                    if ($finfo) finfo_close($finfo);
+                    if (!in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true)) {
+                        throw new \RuntimeException('Las fotos de confianza deben ser JPG, PNG o WEBP.');
+                    }
+                    $uploads[$i] = $file;
+                }
+                $videoUrl = trim((string)($_POST['video_url_' . $i] ?? ($old['video_url'] ?? '')));
+                if ($videoUrl !== '') {
+                    $youtubeUrl = \Perfushopping\Web\Repo\Marketing\VideoRepo::youtubeWatchUrl($videoUrl);
+                    if ($youtubeUrl === '') throw new \RuntimeException('Ingresá una URL válida de YouTube para el video ' . $i . '.');
+                    $videoUrl = $youtubeUrl;
+                }
+                $slots[$i] = [
+                    'foto' => $foto,
+                    'foto_titulo' => trim((string)($_POST['foto_titulo_' . $i] ?? ($old['foto_titulo'] ?? ''))),
+                    'video_url' => $videoUrl,
+                    'video_titulo' => trim((string)($_POST['video_titulo_' . $i] ?? ($old['video_titulo'] ?? ''))),
+                ];
+            }
+
+            if ($uploads) {
+                $root = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? (defined('APP_BASE_DIR') ? APP_BASE_DIR : dirname(__DIR__, 2))), '/\\');
+                $uploadDir = $root . '/upload/portada-confianza';
+                if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true) && !is_dir($uploadDir)) {
+                    throw new \RuntimeException('No se pudo preparar la carpeta para guardar las fotos.');
+                }
+                foreach ($uploads as $i => $file) {
+                    $filename = UploadValidator::store($file, $uploadDir);
+                    $slots[$i]['foto'] = '/upload/portada-confianza/' . $filename;
+                }
+            }
+
+            $repo->saveTrustMedia($slots);
+            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Fotos y videos de confianza guardados en la portada.'];
+        } catch (\Throwable $e) {
+            error_log('PortadaController::saveTrustMedia error: ' . $e->getMessage());
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => $e->getMessage()];
+        }
+        Response::redirect('/admin/portada#confianza');
     }
 
     public function addManual(array $params): void
