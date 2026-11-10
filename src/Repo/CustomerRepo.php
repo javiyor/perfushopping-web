@@ -7,6 +7,20 @@ use Perfushopping\Web\Infra\Db;
 
 final class CustomerRepo
 {
+    private static ?array $webUserColumns = null;
+
+    private static function webUsersColumnas(): array
+    {
+        if (self::$webUserColumns !== null) return self::$webUserColumns;
+        try {
+            $rows = Db::pdo()->query('SHOW COLUMNS FROM web_users')->fetchAll();
+            self::$webUserColumns = array_fill_keys(array_column($rows, 'Field'), true);
+        } catch (\Throwable $e) {
+            self::$webUserColumns = [];
+        }
+        return self::$webUserColumns;
+    }
+
     /** @return array<int, array<string,mixed>> */
     public function search(string $q = '', int $limit = 60, int $offset = 0, string $city = '', string $category = ''): array
     {
@@ -15,11 +29,16 @@ final class CustomerRepo
         $q = trim($q);
 
         $clientCols = self::clientesColumnas();
-        $clientCity = !empty($clientCols['localidad']) ? "COALESCE(NULLIF(TRIM(u.city), ''), NULLIF(TRIM(c.Localidad), ''))" : 'NULLIF(TRIM(u.city), \'\')';
+        $webCols = self::webUsersColumnas();
+        $webCity = !empty($webCols['city']) ? "NULLIF(TRIM(u.city), '')" : 'NULL';
+        $clientCity = !empty($clientCols['localidad']) ? "COALESCE({$webCity}, NULLIF(TRIM(c.Localidad), ''))" : $webCity;
         $clientCategory = !empty($clientCols['categoria']) ? 'c.categoria' : 'NULL';
+        $webCategory = !empty($webCols['customer_category']) ? 'u.customer_category' : 'NULL';
         $select = '
             SELECT u.id, u.email, u.name, u.phone, u.role, u.wholesale_status,
-                   u.disabled_at, u.created_at, u.last_login_at, u.city, u.customer_category,
+                   u.disabled_at, u.created_at, u.last_login_at,
+                   ' . $webCity . ' AS city,
+                   ' . $webCategory . ' AS customer_category,
                    u.cliente_id,
                    c.razon AS cliente_razon,
                    c.cuit AS cliente_cuit,
@@ -58,13 +77,16 @@ final class CustomerRepo
             $params[':city'] = trim($city);
         }
         if (trim($category) !== '') {
-            $categoryParts = ['u.customer_category = :web_category'];
-            $params[':web_category'] = trim($category);
+            $categoryParts = [];
+            if (!empty($webCols['customer_category'])) {
+                $categoryParts[] = 'u.customer_category = :web_category';
+                $params[':web_category'] = trim($category);
+            }
             if (!empty($clientCols['categoria'])) {
                 $categoryParts[] = 'c.categoria = :erp_category';
                 $params[':erp_category'] = trim($category);
             }
-            $where[] = '(' . implode(' OR ', $categoryParts) . ')';
+            if ($categoryParts) $where[] = '(' . implode(' OR ', $categoryParts) . ')';
         }
 
         $sql = $select . $from;
@@ -82,7 +104,9 @@ final class CustomerRepo
     {
         $q = trim($q);
         $clientCols = self::clientesColumnas();
-        $clientCity = !empty($clientCols['localidad']) ? "COALESCE(NULLIF(TRIM(u.city), ''), NULLIF(TRIM(c.Localidad), ''))" : 'NULLIF(TRIM(u.city), \'\')';
+        $webCols = self::webUsersColumnas();
+        $webCity = !empty($webCols['city']) ? "NULLIF(TRIM(u.city), '')" : 'NULL';
+        $clientCity = !empty($clientCols['localidad']) ? "COALESCE({$webCity}, NULLIF(TRIM(c.Localidad), ''))" : $webCity;
         $params = [];
         $where = [];
         if ($q !== '') {
@@ -98,13 +122,16 @@ final class CustomerRepo
             $params[':city'] = trim($city);
         }
         if (trim($category) !== '') {
-            $categoryParts = ['u.customer_category = :web_category'];
-            $params[':web_category'] = trim($category);
+            $categoryParts = [];
+            if (!empty($webCols['customer_category'])) {
+                $categoryParts[] = 'u.customer_category = :web_category';
+                $params[':web_category'] = trim($category);
+            }
             if (!empty($clientCols['categoria'])) {
                 $categoryParts[] = 'c.categoria = :erp_category';
                 $params[':erp_category'] = trim($category);
             }
-            $where[] = '(' . implode(' OR ', $categoryParts) . ')';
+            if ($categoryParts) $where[] = '(' . implode(' OR ', $categoryParts) . ')';
         }
         $sql = 'SELECT COUNT(*) FROM web_users u LEFT JOIN clientes c ON c.idclien = u.cliente_id';
         if ($where) {
@@ -214,10 +241,12 @@ final class CustomerRepo
         $values = [];
         try {
             $cols = self::clientesColumnas();
-            $erpCities = !empty($cols['localidad'])
-                ? " UNION SELECT Localidad AS nombre FROM clientes WHERE Localidad IS NOT NULL AND TRIM(Localidad) <> ''"
-                : '';
-            $st = Db::pdo()->query("SELECT city AS nombre FROM web_users WHERE city IS NOT NULL AND TRIM(city) <> ''{$erpCities} ORDER BY nombre ASC");
+            $webCols = self::webUsersColumnas();
+            $queries = [];
+            if (!empty($webCols['city'])) $queries[] = "SELECT city AS nombre FROM web_users WHERE city IS NOT NULL AND TRIM(city) <> ''";
+            if (!empty($cols['localidad'])) $queries[] = "SELECT Localidad AS nombre FROM clientes WHERE Localidad IS NOT NULL AND TRIM(Localidad) <> ''";
+            if (!$queries) return [];
+            $st = Db::pdo()->query(implode(' UNION ', $queries) . ' ORDER BY nombre ASC');
             foreach ($st->fetchAll() as $row) $values[] = trim((string)($row['nombre'] ?? ''));
         } catch (\Throwable $e) {
             error_log('CustomerRepo::ciudadesFiltro error: ' . $e->getMessage());
@@ -231,10 +260,12 @@ final class CustomerRepo
         $values = [];
         try {
             $cols = self::clientesColumnas();
-            $erpCategories = !empty($cols['categoria'])
-                ? " UNION SELECT categoria FROM clientes WHERE categoria IS NOT NULL AND TRIM(categoria) <> ''"
-                : '';
-            $st = Db::pdo()->query("SELECT customer_category AS categoria FROM web_users WHERE customer_category IS NOT NULL AND TRIM(customer_category) <> ''{$erpCategories} ORDER BY categoria ASC");
+            $webCols = self::webUsersColumnas();
+            $queries = [];
+            if (!empty($webCols['customer_category'])) $queries[] = "SELECT customer_category AS categoria FROM web_users WHERE customer_category IS NOT NULL AND TRIM(customer_category) <> ''";
+            if (!empty($cols['categoria'])) $queries[] = "SELECT categoria FROM clientes WHERE categoria IS NOT NULL AND TRIM(categoria) <> ''";
+            if (!$queries) return [];
+            $st = Db::pdo()->query(implode(' UNION ', $queries) . ' ORDER BY categoria ASC');
             foreach ($st->fetchAll() as $row) {
                 $value = trim((string)($row['categoria'] ?? ''));
                 if ($value !== '') $values[$value] = $value;
@@ -248,15 +279,18 @@ final class CustomerRepo
     private function marketingContactsFrom(): string
     {
         $cols = self::clientesColumnas();
+        $webCols = self::webUsersColumnas();
         $cityCol = !empty($cols['localidad']) ? "NULLIF(TRIM(c.Localidad), '')" : "''";
         $categoryCol = !empty($cols['categoria']) ? "NULLIF(TRIM(c.categoria), '')" : 'NULL';
+        $webCityCol = !empty($webCols['city']) ? "NULLIF(TRIM(u.city), '')" : 'NULL';
+        $webCategoryCol = !empty($webCols['customer_category']) ? "NULLIF(TRIM(u.customer_category), '')" : 'NULL';
         $erpCategory = !empty($cols['categoria']) ? "COALESCE({$categoryCol}, 'minorista')" : "'none'";
         return "(
             SELECT CONCAT('w:', u.id) AS contact_key, 'web' AS source, u.id AS source_id,
                    COALESCE(NULLIF(TRIM(c.razon), ''), NULLIF(TRIM(u.name), ''), 'Sin nombre') AS nombre,
                    TRIM(u.email) AS email,
-                   COALESCE(NULLIF(TRIM(u.city), ''), {$cityCol}, '') AS ciudad,
-                   COALESCE(NULLIF(TRIM(u.customer_category), ''), {$categoryCol}, 'none') AS categoria,
+                   COALESCE({$webCityCol}, {$cityCol}, '') AS ciudad,
+                   COALESCE({$webCategoryCol}, {$categoryCol}, 'none') AS categoria,
                    COALESCE({$categoryCol}, '') AS categoria_erp
             FROM web_users u
             LEFT JOIN clientes c ON c.idclien = u.cliente_id
