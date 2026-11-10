@@ -103,16 +103,29 @@ $pageUrl = static function (int $target) use ($q, $city, $category, $perPage): s
     <?php endif; ?>
 </div>
 
-<form id="advertisingForm" class="card shadow-sm">
+<form id="advertisingForm" class="card shadow-sm" enctype="multipart/form-data">
     <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
     <div class="card-header bg-white fw-semibold">Mensaje publicitario</div>
     <div class="card-body">
         <div class="mb-3"><label class="form-label">Asunto</label><input class="form-control" name="subject" maxlength="200" required /></div>
         <div class="mb-3"><label class="form-label">Mensaje</label><textarea class="form-control" name="body" rows="7" maxlength="30000" required></textarea></div>
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <label class="form-label">Imagen dentro del mensaje</label>
+                <input class="form-control" type="file" name="inline_images[]" accept="image/jpeg,image/png,image/webp" multiple />
+                <div class="form-text">Hasta 4 imágenes JPG, PNG o WEBP, 5 MB cada una y 10 MB en total. Se verán dentro del cuerpo.</div>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Adjuntar PDF</label>
+                <input class="form-control" type="file" name="attached_pdf" accept="application/pdf,.pdf" />
+                <div class="form-text">Un archivo PDF · máximo 5 MB.</div>
+            </div>
+        </div>
         <div class="form-check">
             <input class="form-check-input" type="checkbox" value="1" name="include_unsubscribe" id="includeUnsubscribe" checked />
             <label class="form-check-label" for="includeUnsubscribe">Agregar mensaje y enlace para dejar de recibir publicidad</label>
         </div>
+        <div class="form-text mt-2">Todos los correos incluyen el enlace a www.perfushopping.com.ar, WhatsApp 3482 765798 y un botón «Responder».</div>
     </div>
     <div class="card-footer bg-white d-flex flex-wrap gap-2 align-items-center">
         <button class="btn btn-accent" type="submit" id="sendAdvertising"><i class="bi bi-send"></i> Enviar a la selección</button>

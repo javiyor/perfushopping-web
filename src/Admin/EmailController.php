@@ -10,6 +10,7 @@ use Perfushopping\Web\Service\AdminAuthService;
 use Perfushopping\Web\Support\Csrf;
 use Perfushopping\Web\Support\Env;
 use Perfushopping\Web\Support\Response;
+use Perfushopping\Web\Support\UploadValidator;
 use Perfushopping\Web\Support\View;
 
 final class EmailController
@@ -420,11 +421,85 @@ final class EmailController
             return;
         }
 
+        $attachments = [];
+        $inlineImageHtml = '';
+        $inlineImagePlain = '';
+        $attachedPdfHtml = '';
+        $attachedPdfPlain = '';
+        try {
+            $imageUpload = $_FILES['inline_images'] ?? ($_FILES['inline_image'] ?? null);
+            $imageFiles = [];
+            if (is_array($imageUpload) && isset($imageUpload['name']) && is_array($imageUpload['name'])) {
+                foreach (array_keys($imageUpload['name']) as $index) {
+                    $imageFiles[] = [
+                        'name' => $imageUpload['name'][$index] ?? '',
+                        'type' => $imageUpload['type'][$index] ?? '',
+                        'tmp_name' => $imageUpload['tmp_name'][$index] ?? '',
+                        'error' => $imageUpload['error'][$index] ?? UPLOAD_ERR_NO_FILE,
+                        'size' => $imageUpload['size'][$index] ?? 0,
+                    ];
+                }
+            } elseif (is_array($imageUpload)) {
+                $imageFiles[] = $imageUpload;
+            }
+            $imageFiles = array_values(array_filter($imageFiles, static fn(array $file): bool => (int)($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE));
+            if (count($imageFiles) > 4) throw new \RuntimeException('Podés insertar hasta 4 imágenes en cada envío.');
+            $totalImageBytes = 0;
+            foreach ($imageFiles as $index => $image) {
+                UploadValidator::validate($image);
+                $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                $mime = $finfo ? finfo_file($finfo, (string)$image['tmp_name']) : '';
+                if ($finfo) finfo_close($finfo);
+                if (!in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true)) {
+                    throw new \RuntimeException('Las imágenes deben ser JPG, PNG o WEBP.');
+                }
+                $content = file_get_contents((string)$image['tmp_name']);
+                if (!is_string($content) || $content === '') throw new \RuntimeException('No se pudo leer una de las imágenes.');
+                $totalImageBytes += strlen($content);
+                if ($totalImageBytes > 10 * 1024 * 1024) throw new \RuntimeException('El peso total de las imágenes no puede superar 10 MB.');
+                $extension = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'][$mime];
+                $contentId = 'ad-image-' . bin2hex(random_bytes(12));
+                $attachments[] = [
+                    'name' => 'imagen-publicitaria-' . ($index + 1) . '.' . $extension,
+                    'content' => $content,
+                    'mime' => $mime,
+                    'inline' => true,
+                    'content_id' => $contentId,
+                ];
+                $inlineImageHtml .= '<div style="margin:20px 0;text-align:center"><img src="cid:' . $contentId . '" alt="Imagen de Perfushopping" style="display:inline-block;max-width:100%;height:auto;border:0"></div>';
+            }
+            if ($imageFiles) {
+                $inlineImagePlain = "\n\n[" . count($imageFiles) . " imagen(es) promocional(es) incluidas en el correo]";
+            }
+
+            $pdf = $_FILES['attached_pdf'] ?? null;
+            if (is_array($pdf) && (int)($pdf['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+                UploadValidator::validate($pdf);
+                $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                $mime = $finfo ? finfo_file($finfo, (string)$pdf['tmp_name']) : '';
+                if ($finfo) finfo_close($finfo);
+                if ($mime !== 'application/pdf') throw new \RuntimeException('El archivo adjunto debe ser un PDF.');
+                $content = file_get_contents((string)$pdf['tmp_name']);
+                if (!is_string($content) || $content === '') throw new \RuntimeException('No se pudo leer el PDF seleccionado.');
+                $attachments[] = ['name' => 'archivo-publicitario.pdf', 'content' => $content, 'mime' => 'application/pdf'];
+                $attachedPdfHtml = '<p style="font:13px Arial,sans-serif;color:#555">Adjuntamos un archivo PDF con más información.</p>';
+                $attachedPdfPlain = "\n\nSe adjunta un archivo PDF.";
+            }
+        } catch (\Throwable $e) {
+            Response::json(['ok' => false, 'error' => $e->getMessage()], 422);
+            return;
+        }
+
         $contacts = (new CustomerRepo())->marketingContactsByKeys($keys);
         $marketingRepo = new EmailMarketingRepo();
         $unsubscribed = $marketingRepo->unsubscribeMap(array_column($contacts, 'email'));
         $mailer = new \Perfushopping\Web\Infra\SmtpMailer();
         $baseUrl = $this->publicBaseUrl();
+        $siteUrl = 'https://www.perfushopping.com.ar';
+        $whatsAppUrl = 'https://wa.me/543482765798';
+        $replyAddress = trim((string)Env::get('MAIL_FROM', Env::get('SMTP_USER', 'clientes@perfushopping.com.ar')));
+        if (!filter_var($replyAddress, FILTER_VALIDATE_EMAIL)) $replyAddress = 'clientes@perfushopping.com.ar';
+        $replyUrl = 'mailto:' . rawurlencode($replyAddress) . '?subject=' . rawurlencode('Re: ' . $subject);
         $sent = 0;
         $skipped = 0;
         $errors = [];
@@ -437,8 +512,16 @@ final class EmailController
             }
             $seen[$to] = true;
             try {
-                $html = '<div style="font-family:Arial,sans-serif;line-height:1.6">' . nl2br(htmlspecialchars($body, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')) . '</div>';
-                $plain = $body;
+                $html = '<div style="font-family:Arial,sans-serif;line-height:1.6">' . nl2br(htmlspecialchars($body, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')) . '</div>'
+                    . $inlineImageHtml . $attachedPdfHtml;
+                $html .= '<hr style="border:0;border-top:1px solid #ddd;margin:24px 0 14px">'
+                    . '<p style="font:14px Arial,sans-serif;line-height:1.7">Visitá nuestra web: <a href="' . $siteUrl . '">www.perfushopping.com.ar</a><br>'
+                    . 'WhatsApp: <a href="' . $whatsAppUrl . '">3482 765798</a></p>'
+                    . '<p style="margin:18px 0"><a href="' . htmlspecialchars($replyUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" style="display:inline-block;padding:11px 22px;border-radius:6px;background:#b13d68;color:#fff;text-decoration:none;font-weight:bold">Responder</a></p>';
+                $plain = $body . $inlineImagePlain . $attachedPdfPlain
+                    . "\n\nVisitá nuestra web: www.perfushopping.com.ar"
+                    . "\nWhatsApp: 3482 765798 (" . $whatsAppUrl . ')'
+                    . "\nResponder: " . $replyUrl;
                 $headers = [];
                 if ($includeUnsubscribe) {
                     $token = $marketingRepo->tokenForEmail($to);
@@ -455,7 +538,7 @@ final class EmailController
                         'List-Unsubscribe-Post' => 'List-Unsubscribe=One-Click',
                     ];
                 }
-                $mailer->send($to, $subject, $html, $plain, [], $headers);
+                $mailer->send($to, $subject, $html, $plain, $attachments, $headers);
                 $sent++;
             } catch (\Throwable $e) {
                 $errors[] = ['email' => $to, 'error' => mb_substr($e->getMessage(), 0, 180)];

@@ -187,6 +187,33 @@ final class PortadaRepo
         ];
     }
 
+    private static function luminancia(string $hex): float
+    {
+        $hex = ltrim($hex, '#');
+        $channels = [hexdec(substr($hex, 0, 2)), hexdec(substr($hex, 2, 2)), hexdec(substr($hex, 4, 2))];
+        $linear = array_map(static function (int $value): float {
+            $channel = $value / 255;
+            return $channel <= 0.04045 ? $channel / 12.92 : (($channel + 0.055) / 1.055) ** 2.4;
+        }, $channels);
+        return 0.2126 * $linear[0] + 0.7152 * $linear[1] + 0.0722 * $linear[2];
+    }
+
+    private static function contraste(string $foreground, string $background): float
+    {
+        $a = self::luminancia($foreground);
+        $b = self::luminancia($background);
+        return (max($a, $b) + 0.05) / (min($a, $b) + 0.05);
+    }
+
+    private static function colorTextoLegible(string $foreground, string $background, string $fallback): string
+    {
+        if (self::contraste($foreground, $background) >= 4.5) return $foreground;
+        if (self::contraste($fallback, $background) >= 4.5) return $fallback;
+        $dark = '#17140F';
+        $light = '#FFFFFF';
+        return self::contraste($dark, $background) >= self::contraste($light, $background) ? $dark : $light;
+    }
+
     /** @return array{plantilla:string,mode:string,color_fondo:string,color_fondo_secundario:string,color_tarjeta:string,color_acento:string,color_texto:string} */
     public static function tema(array $config): array
     {
@@ -198,6 +225,7 @@ final class PortadaRepo
             $valor = (string)($config[$color] ?? '');
             if (preg_match('/^#[0-9a-fA-F]{6}$/', $valor)) $tema[$color] = strtoupper($valor);
         }
+        $tema['color_texto'] = self::colorTextoLegible($tema['color_texto'], $tema['color_fondo'], self::PLANTILLAS[$key]['color_texto']);
         $fuente = (string)($config['fuente_tarjeta'] ?? 'system');
         $tema['fuente_tarjeta'] = in_array($fuente, ['system', 'serif', 'rounded'], true) ? $fuente : 'system';
         foreach (['color_nombre_producto', 'color_precio_producto'] as $color) {
@@ -221,6 +249,33 @@ final class PortadaRepo
             $value = (string)($storedComponentColors[$key] ?? '');
             $componentColors[$key] = preg_match('/^#[0-9a-fA-F]{6}$/', $value) ? strtoupper($value) : $default;
         }
+        $textBackgrounds = [
+            'brand_text' => 'header_bg',
+            'brand_subtext' => 'header_bg',
+            'nav_text' => 'nav_bg',
+            'hero_text' => 'hero_bg',
+            'hero_accent' => 'hero_bg',
+            'contact_text' => 'section_bg',
+            'catalog_title' => 'section_bg',
+            'filter_text' => 'filter_bg',
+            'product_category' => 'product_bg',
+            'promo_title' => 'promo_bg',
+            'promo_old_price' => 'promo_bg',
+            'promo_price' => 'promo_bg',
+            'footer_text' => 'footer_bg',
+            'footer_link' => 'footer_bg',
+            'button_text' => 'button_bg',
+            'promo_discount_text' => 'promo_discount_bg',
+        ];
+        foreach ($textBackgrounds as $textKey => $backgroundKey) {
+            $componentColors[$textKey] = self::colorTextoLegible(
+                $componentColors[$textKey],
+                $componentColors[$backgroundKey],
+                $defaultComponentColors[$textKey] ?? $tema['color_texto']
+            );
+        }
+        $tema['color_nombre_producto'] = self::colorTextoLegible($tema['color_nombre_producto'], $componentColors['product_bg'], $tema['color_texto']);
+        $tema['color_precio_producto'] = self::colorTextoLegible($tema['color_precio_producto'], $componentColors['product_bg'], $tema['color_acento']);
         $tema['colores_componentes'] = $componentColors;
         return $tema;
     }

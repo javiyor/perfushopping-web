@@ -49,9 +49,24 @@ final class SmtpMailer
         $this->cmd($fp, 'DATA');
         $this->expect($fp, 354);
 
-        $hasAttachments = count($attachments) > 0;
+        $inlineAttachments = [];
+        $regularAttachments = [];
+        foreach ($attachments as $attachment) {
+            if (!empty($attachment['inline'])) {
+                $contentId = trim((string)($attachment['content_id'] ?? ''));
+                if (!preg_match('/^[A-Za-z0-9._-]{1,120}$/', $contentId)) {
+                    throw new \InvalidArgumentException('Inline attachment requires a valid content_id.');
+                }
+                $inlineAttachments[] = $attachment;
+            } else {
+                $regularAttachments[] = $attachment;
+            }
+        }
+        $hasAttachments = count($regularAttachments) > 0;
+        $hasInlineAttachments = count($inlineAttachments) > 0;
         $boundaryMixed = 'mixed_' . bin2hex(random_bytes(12));
         $boundaryAlt = 'alt_' . bin2hex(random_bytes(12));
+        $boundaryRelated = 'related_' . bin2hex(random_bytes(12));
 
         $headers = [];
         $headers[] = 'From: ' . $this->encodeHeaderName($fromName) . ' <' . $from . '>';
@@ -83,18 +98,37 @@ final class SmtpMailer
         $msg .= "Content-Transfer-Encoding: 8bit\r\n\r\n";
         $msg .= $this->dotStuff($text) . "\r\n";
         $msg .= '--' . $boundaryAlt . "\r\n";
+        if ($hasInlineAttachments) {
+            $msg .= 'Content-Type: multipart/related; boundary=' . $boundaryRelated . "\r\n\r\n";
+            $msg .= '--' . $boundaryRelated . "\r\n";
+        }
         $msg .= "Content-Type: text/html; charset=UTF-8\r\n";
         $msg .= "Content-Transfer-Encoding: 8bit\r\n\r\n";
         $msg .= $this->dotStuff($htmlBody) . "\r\n";
+        if ($hasInlineAttachments) {
+            foreach ($inlineAttachments as $att) {
+                $msg .= '--' . $boundaryRelated . "\r\n";
+                $mime = $this->safeMime((string)($att['mime'] ?? 'application/octet-stream'));
+                $name = $this->safeFilename((string)($att['name'] ?? 'image'));
+                $msg .= 'Content-Type: ' . $mime . '; name="' . $name . "\"\r\n";
+                $msg .= 'Content-ID: <' . trim((string)$att['content_id']) . ">\r\n";
+                $msg .= 'Content-Disposition: inline; filename="' . $name . "\"\r\n";
+                $msg .= "Content-Transfer-Encoding: base64\r\n\r\n";
+                $msg .= chunk_split(base64_encode((string)($att['content'] ?? '')), 76, "\r\n") . "\r\n";
+            }
+            $msg .= '--' . $boundaryRelated . "--\r\n";
+        }
         $msg .= '--' . $boundaryAlt . "--\r\n";
 
         if ($hasAttachments) {
-            foreach ($attachments as $att) {
+            foreach ($regularAttachments as $att) {
                 $msg .= '--' . $boundaryMixed . "\r\n";
-                $msg .= "Content-Type: " . ($att['mime'] ?? 'application/octet-stream') . "; name=\"" . $att['name'] . "\"\r\n";
-                $msg .= "Content-Disposition: attachment; filename=\"" . $att['name'] . "\"\r\n";
+                $mime = $this->safeMime((string)($att['mime'] ?? 'application/octet-stream'));
+                $name = $this->safeFilename((string)($att['name'] ?? 'attachment'));
+                $msg .= 'Content-Type: ' . $mime . '; name="' . $name . "\"\r\n";
+                $msg .= 'Content-Disposition: attachment; filename="' . $name . "\"\r\n";
                 $msg .= "Content-Transfer-Encoding: base64\r\n\r\n";
-                $msg .= chunk_split(base64_encode($att['content']), 76, "\r\n") . "\r\n";
+                $msg .= chunk_split(base64_encode((string)($att['content'] ?? '')), 76, "\r\n") . "\r\n";
             }
             $msg .= '--' . $boundaryMixed . "--\r\n";
         }
@@ -103,6 +137,18 @@ final class SmtpMailer
         $this->expect($fp, 250);
         $this->cmd($fp, 'QUIT');
         fclose($fp);
+    }
+
+    private function safeMime(string $mime): string
+    {
+        return preg_match('#^[A-Za-z0-9.+-]+/[A-Za-z0-9.+-]+$#', $mime) ? $mime : 'application/octet-stream';
+    }
+
+    private function safeFilename(string $name): string
+    {
+        $name = basename(str_replace('\\', '/', $name));
+        $name = preg_replace('/[^A-Za-z0-9._-]/', '_', $name) ?? '';
+        return $name !== '' ? $name : 'attachment';
     }
 
     private function cmd($fp, string $line): void
