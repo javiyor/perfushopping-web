@@ -90,8 +90,8 @@ $commercialCategories = \Perfushopping\Web\Repo\FacturaRepo::categoriaLabels();
                 <label class="form-label small mb-1">Ciudad</label>
                 <select class="form-select form-select-sm" name="city">
                     <option value="">Todas</option>
-                    <?php foreach ($cities as $cityOption): ?>
-                    <option value="<?= htmlspecialchars((string)$cityOption) ?>" <?= $city === (string)$cityOption ? 'selected' : '' ?>><?= htmlspecialchars((string)$cityOption) ?></option>
+                    <?php foreach ($cities as $cityOption): $cityValue = (string)($cityOption['value'] ?? ''); $cityLabel = (string)($cityOption['label'] ?? $cityValue); ?>
+                    <option value="<?= htmlspecialchars($cityValue) ?>" <?= $city === $cityValue ? 'selected' : '' ?>><?= htmlspecialchars($cityLabel) ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>

@@ -21,6 +21,35 @@ final class CustomerRepo
         return self::$webUserColumns;
     }
 
+    /** @return array<int,string> Valores históricos almacenados para la ciudad elegida. */
+    private function valoresFiltroCiudad(string $city): array
+    {
+        $values = [];
+        if (str_starts_with($city, 'cityset:')) {
+            $decoded = base64_decode(substr($city, 8), true);
+            $parsed = $decoded !== false ? json_decode($decoded, true) : null;
+            if (is_array($parsed)) {
+                foreach ($parsed as $value) {
+                    if (is_scalar($value) && trim((string)$value) !== '') $values[] = trim((string)$value);
+                }
+            }
+        }
+        if (!$values && trim($city) !== '') $values[] = trim($city);
+        return array_slice(array_values(array_unique($values)), 0, 100);
+    }
+
+    private function ciudadInCondition(string $expression, string $city, string $prefix, array &$params): string
+    {
+        $values = $this->valoresFiltroCiudad($city);
+        $holders = [];
+        foreach ($values as $i => $value) {
+            $key = ':' . $prefix . $i;
+            $holders[] = $key;
+            $params[$key] = $value;
+        }
+        return $holders ? $expression . ' IN (' . implode(',', $holders) . ')' : '1 = 0';
+    }
+
     /** @return array<int, array<string,mixed>> */
     public function search(string $q = '', int $limit = 60, int $offset = 0, string $city = '', string $category = ''): array
     {
@@ -73,8 +102,7 @@ final class CustomerRepo
             $params[':cuit_like'] = $digits !== '' ? '%' . $digits . '%' : '%' . $q . '%';
         }
         if (trim($city) !== '') {
-            $where[] = $clientCity . ' = :city';
-            $params[':city'] = trim($city);
+            $where[] = $this->ciudadInCondition($clientCity, $city, 'city', $params);
         }
         if (trim($category) !== '') {
             $categoryParts = [];
@@ -118,8 +146,7 @@ final class CustomerRepo
             $params[':cuit_like'] = $digits !== '' ? '%' . $digits . '%' : '%' . $q . '%';
         }
         if (trim($city) !== '') {
-            $where[] = $clientCity . ' = :city';
-            $params[':city'] = trim($city);
+            $where[] = $this->ciudadInCondition($clientCity, $city, 'city', $params);
         }
         if (trim($category) !== '') {
             $categoryParts = [];
@@ -162,8 +189,7 @@ final class CustomerRepo
             $params[':like4'] = '%' . $q . '%';
         }
         if (trim($city) !== '') {
-            $where .= ' AND c.Localidad = :city';
-            $params[':city'] = trim($city);
+            $where .= ' AND ' . $this->ciudadInCondition('c.Localidad', $city, 'city', $params);
         }
         $cols = self::clientesColumnas();
         if (trim($category) !== '' && !empty($cols['categoria'])) {
@@ -214,8 +240,7 @@ final class CustomerRepo
             $params[':like4'] = '%' . $q . '%';
         }
         if (trim($city) !== '') {
-            $where .= ' AND c.Localidad = :city';
-            $params[':city'] = trim($city);
+            $where .= ' AND ' . $this->ciudadInCondition('c.Localidad', $city, 'city', $params);
         }
         if (trim($category) !== '' && !empty(self::clientesColumnas()['categoria'])) {
             $where .= ' AND c.categoria = :category';
@@ -247,11 +272,61 @@ final class CustomerRepo
             if (!empty($cols['localidad'])) $queries[] = "SELECT Localidad AS nombre FROM clientes WHERE Localidad IS NOT NULL AND TRIM(Localidad) <> ''";
             if (!$queries) return [];
             $st = Db::pdo()->query(implode(' UNION ', $queries) . ' ORDER BY nombre ASC');
-            foreach ($st->fetchAll() as $row) $values[] = trim((string)($row['nombre'] ?? ''));
+            foreach ($st->fetchAll() as $row) {
+                $value = trim((string)($row['nombre'] ?? ''));
+                if ($value !== '') $values[$value] = $value;
+            }
         } catch (\Throwable $e) {
             error_log('CustomerRepo::ciudadesFiltro error: ' . $e->getMessage());
         }
-        return array_values(array_unique(array_filter($values, static fn(string $v): bool => $v !== '')));
+
+        $nameByCode = [];
+        $nameByNormalized = [];
+        $nameBySlug = [];
+        try {
+            foreach (Db::pdo()->query('SELECT cod_lugar, lug_lugar FROM lugares')->fetchAll() as $place) {
+                $name = trim((string)($place['lug_lugar'] ?? ''));
+                if ($name === '') continue;
+                $nameByCode[(string)(int)($place['cod_lugar'] ?? 0)] = $name;
+                $nameByNormalized[mb_strtolower($name)] = $name;
+                $ascii = function_exists('iconv') ? @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $name) : $name;
+                $slug = preg_replace('/[^a-z0-9]+/', '-', strtolower((string)($ascii ?: $name))) ?? '';
+                $slug = trim($slug, '-');
+                if ($slug !== '') $nameBySlug[$slug] = $name;
+            }
+        } catch (\Throwable $e) {
+            error_log('CustomerRepo::ciudadesFiltro places error: ' . $e->getMessage());
+        }
+        try {
+            foreach (Db::pdo()->query('SELECT locality_key, display_name FROM local_delivery_localities WHERE active = 1')->fetchAll() as $place) {
+                $key = trim((string)($place['locality_key'] ?? ''));
+                $name = trim((string)($place['display_name'] ?? ''));
+                if ($key !== '' && $name !== '') $nameBySlug[mb_strtolower($key)] = $name;
+            }
+        } catch (\Throwable $e) {
+            // La tabla de envíos locales puede no existir en sitios antiguos.
+        }
+
+        $optionsByLabel = [];
+        foreach ($values as $value) {
+            $normalized = mb_strtolower($value);
+            $label = $nameByNormalized[$normalized] ?? '';
+            if ($label === '' && ctype_digit($value)) $label = $nameByCode[(string)(int)$value] ?? '';
+            if ($label === '') {
+                $ascii = function_exists('iconv') ? @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value) : $value;
+                $slug = preg_replace('/[^a-z0-9]+/', '-', strtolower((string)($ascii ?: $value))) ?? '';
+                $label = $nameBySlug[trim($slug, '-')] ?? $value;
+            }
+            $labelKey = mb_strtolower($label);
+            if (!isset($optionsByLabel[$labelKey])) $optionsByLabel[$labelKey] = ['label' => $label, 'values' => []];
+            $optionsByLabel[$labelKey]['values'][$value] = $value;
+        }
+        $options = array_map(static function (array $item): array {
+            $encoded = base64_encode((string)json_encode(array_values($item['values']), JSON_UNESCAPED_UNICODE));
+            return ['value' => 'cityset:' . $encoded, 'label' => (string)$item['label']];
+        }, array_values($optionsByLabel));
+        usort($options, static fn(array $a, array $b): int => strnatcasecmp((string)$a['label'], (string)$b['label']));
+        return $options;
     }
 
     /** @return array<int,string> valor => etiqueta */
@@ -327,8 +402,7 @@ final class CustomerRepo
             $params[':mq3'] = '%' . $q . '%';
         }
         if (trim($city) !== '') {
-            $where[] = 'm.ciudad = :mcity';
-            $params[':mcity'] = trim($city);
+            $where[] = $this->ciudadInCondition('m.ciudad', $city, 'mcity', $params);
         }
         if (trim($category) !== '') {
             $where[] = '(m.categoria = :mcat OR (m.source = \'web\' AND m.categoria_erp = :merpcat))';
