@@ -4,6 +4,8 @@ declare(strict_types=1);
 namespace Perfushopping\Web\Admin;
 
 use Perfushopping\Web\Repo\EmailFolderRepo;
+use Perfushopping\Web\Repo\EmailMarketingRepo;
+use Perfushopping\Web\Repo\CustomerRepo;
 use Perfushopping\Web\Service\AdminAuthService;
 use Perfushopping\Web\Support\Csrf;
 use Perfushopping\Web\Support\Env;
@@ -361,6 +363,126 @@ final class EmailController
             'csrf' => Csrf::token(),
             'pageTitle' => 'Bandeja de entrada',
         ]);
+    }
+
+    private function publicBaseUrl(): string
+    {
+        $url = rtrim(trim((string)Env::get('APP_URL', 'https://perfushopping.ar')), '/');
+        return preg_match('#^https?://[A-Za-z0-9.-]+(?::\d+)?$#', $url) ? $url : 'https://perfushopping.ar';
+    }
+
+    public function publicidad(array $params): void
+    {
+        $adminUser = (new AdminAuthService())->requirePermiso('clientes');
+        $repo = new CustomerRepo();
+        $q = trim((string)($_GET['q'] ?? ''));
+        $city = trim((string)($_GET['city'] ?? ''));
+        $category = trim((string)($_GET['category'] ?? ''));
+        $page = max(1, (int)($_GET['page'] ?? 1));
+        $perPage = (int)($_GET['per_page'] ?? 200);
+        if (!in_array($perPage, [50, 100, 200], true)) $perPage = 200;
+        $total = $repo->countMarketingContacts($q, $city, $category);
+        $pages = max(1, (int)ceil($total / $perPage));
+        $page = min($page, $pages);
+        $contacts = $repo->marketingContacts($q, $city, $category, $perPage, ($page - 1) * $perPage);
+        $unsubscribed = (new EmailMarketingRepo())->unsubscribeMap(array_column($contacts, 'email'));
+        foreach ($contacts as &$contact) {
+            $contact['unsubscribed'] = isset($unsubscribed[mb_strtolower(trim((string)($contact['email'] ?? '')))]);
+        }
+        unset($contact);
+        echo View::adminPage('admin/email/publicidad.php', [
+            'adminUser' => $adminUser,
+            'contacts' => $contacts,
+            'total' => $total,
+            'q' => $q,
+            'city' => $city,
+            'category' => $category,
+            'cities' => $repo->ciudadesFiltro(),
+            'categories' => $repo->categoriasFiltro(),
+            'page' => $page,
+            'pages' => $pages,
+            'perPage' => $perPage,
+            'csrf' => Csrf::token(),
+            'pageTitle' => 'Envío publicitario',
+        ]);
+    }
+
+    public function enviarPublicidad(array $params): void
+    {
+        (new AdminAuthService())->requirePermiso('clientes');
+        Csrf::check($_POST['_csrf'] ?? null);
+        $keys = array_slice(array_values(array_unique(array_map('strval', (array)($_POST['contact_keys'] ?? [])))), 0, 25);
+        $subject = trim((string)($_POST['subject'] ?? ''));
+        $body = trim((string)($_POST['body'] ?? ''));
+        $includeUnsubscribe = in_array((string)($_POST['include_unsubscribe'] ?? ''), ['1', 'on', 'true'], true);
+        if (!$keys || $subject === '' || $body === '' || mb_strlen($subject) > 200 || mb_strlen($body) > 30000) {
+            Response::json(['ok' => false, 'error' => 'Seleccioná contactos e ingresá asunto y mensaje. Cada tanda admite hasta 25 contactos.'], 422);
+            return;
+        }
+
+        $contacts = (new CustomerRepo())->marketingContactsByKeys($keys);
+        $marketingRepo = new EmailMarketingRepo();
+        $unsubscribed = $marketingRepo->unsubscribeMap(array_column($contacts, 'email'));
+        $mailer = new \Perfushopping\Web\Infra\SmtpMailer();
+        $baseUrl = $this->publicBaseUrl();
+        $sent = 0;
+        $skipped = 0;
+        $errors = [];
+        $seen = [];
+        foreach ($contacts as $contact) {
+            $to = mb_strtolower(trim((string)($contact['email'] ?? '')));
+            if (!filter_var($to, FILTER_VALIDATE_EMAIL) || isset($seen[$to]) || isset($unsubscribed[$to])) {
+                $skipped++;
+                continue;
+            }
+            $seen[$to] = true;
+            try {
+                $html = '<div style="font-family:Arial,sans-serif;line-height:1.6">' . nl2br(htmlspecialchars($body, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')) . '</div>';
+                $plain = $body;
+                $headers = [];
+                if ($includeUnsubscribe) {
+                    $token = $marketingRepo->tokenForEmail($to);
+                    if ($token === null) {
+                        $skipped++;
+                        continue;
+                    }
+                    $url = $baseUrl . '/email/desuscribir?token=' . rawurlencode($token);
+                    $html .= '<hr><p style="font-size:12px;color:#666">Si no querés recibir más mensajes publicitarios, <a href="'
+                        . htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '">podés darte de baja de la lista aquí</a>.</p>';
+                    $plain .= "\n\nSi no querés recibir más mensajes publicitarios, podés darte de baja aquí: " . $url;
+                    $headers = [
+                        'List-Unsubscribe' => '<' . $url . '>',
+                        'List-Unsubscribe-Post' => 'List-Unsubscribe=One-Click',
+                    ];
+                }
+                $mailer->send($to, $subject, $html, $plain, [], $headers);
+                $sent++;
+            } catch (\Throwable $e) {
+                $errors[] = ['email' => $to, 'error' => mb_substr($e->getMessage(), 0, 180)];
+            }
+        }
+        Response::json(['ok' => true, 'sent' => $sent, 'skipped' => $skipped, 'errors' => $errors]);
+    }
+
+    public function desuscribir(array $params): void
+    {
+        $token = trim((string)($_GET['token'] ?? $_POST['token'] ?? ''));
+        $repo = new EmailMarketingRepo();
+        $email = $repo->emailByToken($token);
+        if ($email === null) {
+            Response::html('<!doctype html><html lang="es"><meta charset="utf-8"><title>Enlace inválido</title><body><h1>Enlace inválido</h1><p>No se encontró este enlace de baja.</p></body></html>', 404);
+            return;
+        }
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+            $repo->unsubscribe($token);
+            $message = '<h1>Listo, te dimos de baja.</h1><p>No enviaremos más mensajes publicitarios a ' . htmlspecialchars($email, ENT_QUOTES, 'UTF-8') . '.</p>';
+        } else {
+            $already = isset($repo->unsubscribeMap([$email])[mb_strtolower($email)]);
+            $message = $already
+                ? '<h1>Ya estabas fuera de la lista.</h1><p>No enviaremos más mensajes publicitarios a ' . htmlspecialchars($email, ENT_QUOTES, 'UTF-8') . '.</p>'
+                : '<h1>Dejar de recibir publicidad</h1><p>Confirmá la baja de ' . htmlspecialchars($email, ENT_QUOTES, 'UTF-8') . '.</p><form method="post"><input type="hidden" name="token" value="' . htmlspecialchars($token, ENT_QUOTES, 'UTF-8') . '"><button type="submit">Darme de baja</button></form>';
+        }
+        Response::html('<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Baja de publicidad</title><body style="font:16px Arial,sans-serif;max-width:640px;margin:12vh auto;padding:24px;color:#222">' . $message . '</body></html>');
     }
 
     public function view(array $params): void

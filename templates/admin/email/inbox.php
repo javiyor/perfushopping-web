@@ -20,7 +20,10 @@ $folderName = static function (int $id) use ($folders): string {
         <h4 class="fw-bold mb-1">Bandeja de entrada</h4>
         <p class="text-muted small"><?= htmlspecialchars(Env::get('SMTP_USER', '')) ?></p>
     </div>
-    <a class="btn btn-outline-secondary btn-sm" href="https://webmail.perfushopping.com.ar" target="_blank"><i class="bi bi-box-arrow-up-right"></i> Webmail</a>
+    <div class="d-flex gap-2">
+        <a class="btn btn-accent btn-sm" href="/admin/email/publicidad"><i class="bi bi-megaphone"></i> Enviar publicidad</a>
+        <a class="btn btn-outline-secondary btn-sm" href="https://webmail.perfushopping.com.ar" target="_blank"><i class="bi bi-box-arrow-up-right"></i> Webmail</a>
+    </div>
 </div>
 
 <?php if ($error): ?>

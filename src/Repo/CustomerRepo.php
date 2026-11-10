@@ -8,18 +8,23 @@ use Perfushopping\Web\Infra\Db;
 final class CustomerRepo
 {
     /** @return array<int, array<string,mixed>> */
-    public function search(string $q = '', int $limit = 60, int $offset = 0): array
+    public function search(string $q = '', int $limit = 60, int $offset = 0, string $city = '', string $category = ''): array
     {
-        $limit = max(1, min(200, $limit));
+        $limit = max(1, min(500, $limit));
         $offset = max(0, $offset);
         $q = trim($q);
 
+        $clientCols = self::clientesColumnas();
+        $clientCity = !empty($clientCols['localidad']) ? "COALESCE(NULLIF(TRIM(u.city), ''), NULLIF(TRIM(c.Localidad), ''))" : 'NULLIF(TRIM(u.city), \'\')';
+        $clientCategory = !empty($clientCols['categoria']) ? 'c.categoria' : 'NULL';
         $select = '
             SELECT u.id, u.email, u.name, u.phone, u.role, u.wholesale_status,
-                   u.disabled_at, u.created_at, u.last_login_at,
+                   u.disabled_at, u.created_at, u.last_login_at, u.city, u.customer_category,
                    u.cliente_id,
                    c.razon AS cliente_razon,
                    c.cuit AS cliente_cuit,
+                   ' . $clientCity . ' AS contact_city,
+                   ' . $clientCategory . ' AS erp_categoria,
                    COALESCE(o_sum.order_count, 0) AS order_count,
                    COALESCE(o_sum.total_spent, 0) AS total_spent_cents,
                    o_sum.last_order_at
@@ -48,6 +53,19 @@ final class CustomerRepo
             $params[':pk'] = $digits;
             $params[':cuit_like'] = $digits !== '' ? '%' . $digits . '%' : '%' . $q . '%';
         }
+        if (trim($city) !== '') {
+            $where[] = $clientCity . ' = :city';
+            $params[':city'] = trim($city);
+        }
+        if (trim($category) !== '') {
+            $categoryParts = ['u.customer_category = :web_category'];
+            $params[':web_category'] = trim($category);
+            if (!empty($clientCols['categoria'])) {
+                $categoryParts[] = 'c.categoria = :erp_category';
+                $params[':erp_category'] = trim($category);
+            }
+            $where[] = '(' . implode(' OR ', $categoryParts) . ')';
+        }
 
         $sql = $select . $from;
         if ($where) {
@@ -60,9 +78,11 @@ final class CustomerRepo
         return $st->fetchAll();
     }
 
-    public function countSearch(string $q = ''): int
+    public function countSearch(string $q = '', string $city = '', string $category = ''): int
     {
         $q = trim($q);
+        $clientCols = self::clientesColumnas();
+        $clientCity = !empty($clientCols['localidad']) ? "COALESCE(NULLIF(TRIM(u.city), ''), NULLIF(TRIM(c.Localidad), ''))" : 'NULLIF(TRIM(u.city), \'\')';
         $params = [];
         $where = [];
         if ($q !== '') {
@@ -72,6 +92,19 @@ final class CustomerRepo
             $params[':like'] = '%' . $q . '%';
             $params[':pk'] = $digits;
             $params[':cuit_like'] = $digits !== '' ? '%' . $digits . '%' : '%' . $q . '%';
+        }
+        if (trim($city) !== '') {
+            $where[] = $clientCity . ' = :city';
+            $params[':city'] = trim($city);
+        }
+        if (trim($category) !== '') {
+            $categoryParts = ['u.customer_category = :web_category'];
+            $params[':web_category'] = trim($category);
+            if (!empty($clientCols['categoria'])) {
+                $categoryParts[] = 'c.categoria = :erp_category';
+                $params[':erp_category'] = trim($category);
+            }
+            $where[] = '(' . implode(' OR ', $categoryParts) . ')';
         }
         $sql = 'SELECT COUNT(*) FROM web_users u LEFT JOIN clientes c ON c.idclien = u.cliente_id';
         if ($where) {
@@ -87,9 +120,9 @@ final class CustomerRepo
      * Se muestran con etiqueta "Presencial".
      * @return array<int, array<string,mixed>>
      */
-    public function searchPresenciales(string $q = '', int $limit = 60, int $offset = 0): array
+    public function searchPresenciales(string $q = '', int $limit = 60, int $offset = 0, string $city = '', string $category = ''): array
     {
-        $limit = max(1, min(200, $limit));
+        $limit = max(1, min(500, $limit));
         $offset = max(0, $offset);
         $q = trim($q);
         $params = [];
@@ -101,8 +134,16 @@ final class CustomerRepo
             $params[':like3'] = '%' . $q . '%';
             $params[':like4'] = '%' . $q . '%';
         }
+        if (trim($city) !== '') {
+            $where .= ' AND c.Localidad = :city';
+            $params[':city'] = trim($city);
+        }
+        $cols = self::clientesColumnas();
+        if (trim($category) !== '' && !empty($cols['categoria'])) {
+            $where .= ' AND c.categoria = :category';
+            $params[':category'] = trim($category);
+        }
         try {
-            $cols = self::clientesColumnas();
             $selCond = !empty($cols['condicion_iva']) ? 'c.condicion_iva,' : 'NULL AS condicion_iva,';
             $selCat = !empty($cols['categoria']) ? 'c.categoria,' : 'NULL AS categoria,';
             $selMayorista = !empty($cols['precio_mayorista']) ? 'c.precio_mayorista,' : 'NULL AS precio_mayorista,';
@@ -133,7 +174,7 @@ final class CustomerRepo
         }
     }
 
-    public function countPresenciales(string $q = ''): int
+    public function countPresenciales(string $q = '', string $city = '', string $category = ''): int
     {
         $q = trim($q);
         $params = [];
@@ -144,6 +185,14 @@ final class CustomerRepo
             $params[':like2'] = '%' . $q . '%';
             $params[':like3'] = '%' . $q . '%';
             $params[':like4'] = '%' . $q . '%';
+        }
+        if (trim($city) !== '') {
+            $where .= ' AND c.Localidad = :city';
+            $params[':city'] = trim($city);
+        }
+        if (trim($category) !== '' && !empty(self::clientesColumnas()['categoria'])) {
+            $where .= ' AND c.categoria = :category';
+            $params[':category'] = trim($category);
         }
         try {
             $st = Db::pdo()->prepare("
@@ -157,6 +206,139 @@ final class CustomerRepo
         } catch (\Throwable $e) {
             return 0;
         }
+    }
+
+    /** Filtros disponibles para listados y envíos publicitarios. */
+    public function ciudadesFiltro(): array
+    {
+        $values = [];
+        try {
+            $cols = self::clientesColumnas();
+            $erpCities = !empty($cols['localidad'])
+                ? " UNION SELECT Localidad AS nombre FROM clientes WHERE Localidad IS NOT NULL AND TRIM(Localidad) <> ''"
+                : '';
+            $st = Db::pdo()->query("SELECT city AS nombre FROM web_users WHERE city IS NOT NULL AND TRIM(city) <> ''{$erpCities} ORDER BY nombre ASC");
+            foreach ($st->fetchAll() as $row) $values[] = trim((string)($row['nombre'] ?? ''));
+        } catch (\Throwable $e) {
+            error_log('CustomerRepo::ciudadesFiltro error: ' . $e->getMessage());
+        }
+        return array_values(array_unique(array_filter($values, static fn(string $v): bool => $v !== '')));
+    }
+
+    /** @return array<int,string> valor => etiqueta */
+    public function categoriasFiltro(): array
+    {
+        $values = [];
+        try {
+            $cols = self::clientesColumnas();
+            $erpCategories = !empty($cols['categoria'])
+                ? " UNION SELECT categoria FROM clientes WHERE categoria IS NOT NULL AND TRIM(categoria) <> ''"
+                : '';
+            $st = Db::pdo()->query("SELECT customer_category AS categoria FROM web_users WHERE customer_category IS NOT NULL AND TRIM(customer_category) <> ''{$erpCategories} ORDER BY categoria ASC");
+            foreach ($st->fetchAll() as $row) {
+                $value = trim((string)($row['categoria'] ?? ''));
+                if ($value !== '') $values[$value] = $value;
+            }
+        } catch (\Throwable $e) {
+            error_log('CustomerRepo::categoriasFiltro error: ' . $e->getMessage());
+        }
+        return $values;
+    }
+
+    private function marketingContactsFrom(): string
+    {
+        $cols = self::clientesColumnas();
+        $cityCol = !empty($cols['localidad']) ? "NULLIF(TRIM(c.Localidad), '')" : "''";
+        $categoryCol = !empty($cols['categoria']) ? "NULLIF(TRIM(c.categoria), '')" : 'NULL';
+        $erpCategory = !empty($cols['categoria']) ? "COALESCE({$categoryCol}, 'minorista')" : "'none'";
+        return "(
+            SELECT CONCAT('w:', u.id) AS contact_key, 'web' AS source, u.id AS source_id,
+                   COALESCE(NULLIF(TRIM(c.razon), ''), NULLIF(TRIM(u.name), ''), 'Sin nombre') AS nombre,
+                   TRIM(u.email) AS email,
+                   COALESCE(NULLIF(TRIM(u.city), ''), {$cityCol}, '') AS ciudad,
+                   COALESCE(NULLIF(TRIM(u.customer_category), ''), {$categoryCol}, 'none') AS categoria,
+                   COALESCE({$categoryCol}, '') AS categoria_erp
+            FROM web_users u
+            LEFT JOIN clientes c ON c.idclien = u.cliente_id
+            WHERE u.disabled_at IS NULL AND u.email IS NOT NULL AND TRIM(u.email) <> ''
+            UNION ALL
+            SELECT CONCAT('e:', c.idclien) AS contact_key, 'erp' AS source, c.idclien AS source_id,
+                   COALESCE(NULLIF(TRIM(c.razon), ''), 'Sin nombre') AS nombre,
+                   TRIM(c.mail) AS email,
+                   COALESCE({$cityCol}, '') AS ciudad,
+                   {$erpCategory} AS categoria,
+                   COALESCE({$categoryCol}, '') AS categoria_erp
+            FROM clientes c
+            WHERE c.mail IS NOT NULL AND TRIM(c.mail) <> ''
+              AND NOT EXISTS (SELECT 1 FROM web_users wu WHERE wu.cliente_id = c.idclien)
+              AND NOT EXISTS (SELECT 1 FROM web_users we WHERE LOWER(TRIM(we.email)) = LOWER(TRIM(c.mail)))
+              AND c.idclien = (
+                  SELECT MIN(c2.idclien) FROM clientes c2
+                  WHERE LOWER(TRIM(c2.mail)) = LOWER(TRIM(c.mail))
+                    AND c2.mail IS NOT NULL AND TRIM(c2.mail) <> ''
+                    AND NOT EXISTS (SELECT 1 FROM web_users w2 WHERE w2.cliente_id = c2.idclien)
+                    AND NOT EXISTS (SELECT 1 FROM web_users w3 WHERE LOWER(TRIM(w3.email)) = LOWER(TRIM(c2.mail)))
+              )
+        )";
+    }
+
+    private function marketingContactFilters(string $q, string $city, string $category, array &$params): string
+    {
+        $where = [];
+        $q = trim($q);
+        if ($q !== '') {
+            $where[] = '(m.nombre LIKE :mq1 OR m.email LIKE :mq2 OR m.ciudad LIKE :mq3)';
+            $params[':mq1'] = '%' . $q . '%';
+            $params[':mq2'] = '%' . $q . '%';
+            $params[':mq3'] = '%' . $q . '%';
+        }
+        if (trim($city) !== '') {
+            $where[] = 'm.ciudad = :mcity';
+            $params[':mcity'] = trim($city);
+        }
+        if (trim($category) !== '') {
+            $where[] = '(m.categoria = :mcat OR (m.source = \'web\' AND m.categoria_erp = :merpcat))';
+            $params[':mcat'] = trim($category);
+            $params[':merpcat'] = trim($category);
+        }
+        return $where ? ' WHERE ' . implode(' AND ', $where) : '';
+    }
+
+    public function countMarketingContacts(string $q = '', string $city = '', string $category = ''): int
+    {
+        $params = [];
+        $filters = $this->marketingContactFilters($q, $city, $category, $params);
+        $st = Db::pdo()->prepare('SELECT COUNT(*) FROM ' . $this->marketingContactsFrom() . ' m' . $filters);
+        $st->execute($params);
+        return (int)$st->fetchColumn();
+    }
+
+    /** @return array<int,array<string,mixed>> */
+    public function marketingContacts(string $q = '', string $city = '', string $category = '', int $limit = 200, int $offset = 0): array
+    {
+        $limit = max(1, min(200, $limit));
+        $offset = max(0, $offset);
+        $params = [];
+        $filters = $this->marketingContactFilters($q, $city, $category, $params);
+        $st = Db::pdo()->prepare('SELECT m.* FROM ' . $this->marketingContactsFrom() . ' m' . $filters
+            . ' ORDER BY m.nombre ASC, m.email ASC LIMIT ' . $limit . ' OFFSET ' . $offset);
+        $st->execute($params);
+        return $st->fetchAll();
+    }
+
+    /** @param array<int,string> $contactKeys @return array<int,array<string,mixed>> */
+    public function marketingContactsByKeys(array $contactKeys): array
+    {
+        $keys = array_values(array_unique(array_filter(array_map(static function ($key): string {
+            $key = trim((string)$key);
+            return preg_match('/^(?:w|e):[1-9][0-9]*$/', $key) ? $key : '';
+        }, $contactKeys))));
+        if (!$keys) return [];
+        $keys = array_slice($keys, 0, 500);
+        $st = Db::pdo()->prepare('SELECT m.* FROM ' . $this->marketingContactsFrom() . ' m WHERE m.contact_key IN ('
+            . implode(',', array_fill(0, count($keys), '?')) . ') ORDER BY m.nombre ASC, m.email ASC');
+        $st->execute($keys);
+        return $st->fetchAll();
     }
 
     /** @return array<string,mixed>|null */

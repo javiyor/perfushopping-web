@@ -59,7 +59,7 @@ final class SmtpMailer
         $headers[] = 'Subject: ' . $this->encodeHeaderName($subject);
         $headers[] = 'MIME-Version: 1.0';
         $headers[] = 'Date: ' . date('r');
-        foreach (['In-Reply-To', 'References'] as $headerName) {
+        foreach (['In-Reply-To', 'References', 'List-Unsubscribe', 'List-Unsubscribe-Post'] as $headerName) {
             $headerValue = trim((string)($extraHeaders[$headerName] ?? ''));
             if ($headerValue !== '' && !preg_match('/[\r\n]/', $headerValue)) {
                 $headers[] = $headerName . ': ' . $headerValue;

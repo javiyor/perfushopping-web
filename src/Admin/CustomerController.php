@@ -15,27 +15,48 @@ use Perfushopping\Web\Support\View;
 
 final class CustomerController
 {
+    private function clientesBackUrl(): string
+    {
+        $query = [];
+        foreach (['q', 'city', 'category'] as $key) {
+            $value = trim((string)($_POST[$key] ?? ''));
+            if ($value !== '') $query[$key] = $value;
+        }
+        $perPage = (int)($_POST['per_page'] ?? 200);
+        if (in_array($perPage, [50, 100, 200, 500], true)) $query['per_page'] = $perPage;
+        $page = max(1, (int)($_POST['page'] ?? 1));
+        $pagePres = max(1, (int)($_POST['page_pres'] ?? 1));
+        if ($page > 1) $query['page'] = $page;
+        if ($pagePres > 1) $query['page_pres'] = $pagePres;
+        return '/admin/clientes' . ($query ? '?' . http_build_query($query) : '');
+    }
+
     public function index(array $params): void
     {
         $auth = new AdminAuthService();
         $adminUser = $auth->requirePermiso('clientes');
 
         $q = trim((string)($_GET['q'] ?? ''));
+        $city = trim((string)($_GET['city'] ?? ''));
+        $category = trim((string)($_GET['category'] ?? ''));
         $page = max(1, (int)($_GET['page'] ?? 1));
-        $perPage = 60;
+        $allowedPerPage = [50, 100, 200, 500];
+        $perPage = (int)($_GET['per_page'] ?? 200);
+        if (!in_array($perPage, $allowedPerPage, true)) $perPage = 200;
         $repo = new CustomerRepo();
 
-        $total = $repo->countSearch($q);
+        $total = $repo->countSearch($q, $city, $category);
         $pages = max(1, (int)ceil($total / $perPage));
         if ($page > $pages) {
             $page = $pages;
         }
-        $list = $repo->search($q, $perPage, ($page - 1) * $perPage);
+        $list = $repo->search($q, $perPage, ($page - 1) * $perPage, $city, $category);
 
-        $totalPres = $repo->countPresenciales($q);
+        $totalPres = $repo->countPresenciales($q, $city, $category);
         $pagesPres = max(1, (int)ceil($totalPres / $perPage));
-        $pagePres = min($page, $pagesPres);
-        $presenciales = $repo->searchPresenciales($q, $perPage, ($pagePres - 1) * $perPage);
+        $pagePres = max(1, (int)($_GET['page_pres'] ?? 1));
+        $pagePres = min($pagePres, $pagesPres);
+        $presenciales = $repo->searchPresenciales($q, $perPage, ($pagePres - 1) * $perPage, $city, $category);
         $erpIds = array_merge(
             array_column($list, 'cliente_id'),
             array_column($presenciales, 'idclien')
@@ -48,6 +69,11 @@ final class CustomerController
             'presenciales' => $presenciales,
             'ctaCteHabilitaciones' => $ctaCteHabilitaciones,
             'q' => $q,
+            'city' => $city,
+            'category' => $category,
+            'cities' => $repo->ciudadesFiltro(),
+            'categories' => $repo->categoriasFiltro(),
+            'perPage' => $perPage,
             'page' => $page,
             'pages' => $pages,
             'total' => $total,
@@ -138,8 +164,7 @@ final class CustomerController
 
         $idclien = (int)($_POST['idclien'] ?? 0);
         $habilitado = (int)($_POST['habilitado'] ?? 0) === 1;
-        $q = trim((string)($_POST['q'] ?? ''));
-        $back = '/admin/clientes' . ($q !== '' ? '?q=' . rawurlencode($q) : '');
+        $back = $this->clientesBackUrl();
         $motivo = trim((string)($_POST['motivo'] ?? ''));
         if ($idclien <= 0 || $motivo === '') {
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Seleccioná un cliente y registrá el motivo de la autorización.'];
@@ -180,8 +205,7 @@ final class CustomerController
 
         $userId = (int)($_POST['user_id'] ?? 0);
         $idclien = (int)($_POST['idclien'] ?? 0);
-        $q = trim((string)($_POST['q'] ?? ''));
-        $backList = '/admin/clientes' . ($q !== '' ? '?q=' . rawurlencode($q) : '');
+        $backList = $this->clientesBackUrl();
         $repo = new CustomerRepo();
 
         // Cliente presencial (solo tabla clientes, sin usuario web)
@@ -277,8 +301,7 @@ final class CustomerController
 
         $userId = (int)($_POST['user_id'] ?? 0);
         $idclien = (int)($_POST['idclien'] ?? 0);
-        $q = trim((string)($_POST['q'] ?? ''));
-        $backList = '/admin/clientes' . ($q !== '' ? '?q=' . rawurlencode($q) : '');
+        $backList = $this->clientesBackUrl();
         $repo = new CustomerRepo();
 
         // Cliente presencial (solo tabla clientes, sin usuario web)

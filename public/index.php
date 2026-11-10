@@ -588,7 +588,11 @@ $router->post('/admin/empresa/guardar', [AdminEmpresaController::class, 'save'])
 $router->post('/admin/empresa/logo/eliminar', [AdminEmpresaController::class, 'removeLogo']);
 
 // Admin - Email (IMAP)
+$router->get('/email/desuscribir', [AdminEmailController::class, 'desuscribir']);
+$router->post('/email/desuscribir', [AdminEmailController::class, 'desuscribir']);
 $router->get('/admin/email', [AdminEmailController::class, 'inbox']);
+$router->get('/admin/email/publicidad', [AdminEmailController::class, 'publicidad']);
+$router->post('/admin/email/publicidad/enviar', [AdminEmailController::class, 'enviarPublicidad']);
 $router->get('/admin/email/nuevos', [AdminEmailController::class, 'nuevos']);
 $router->get('/admin/email/(?P<uid>\d+)/adjunto', [AdminEmailController::class, 'adjunto']);
 $router->get('/admin/email/(?P<uid>\d+)', [AdminEmailController::class, 'view']);

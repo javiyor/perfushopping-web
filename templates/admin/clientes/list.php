@@ -5,6 +5,11 @@ $list = $list ?? [];
 $presenciales = $presenciales ?? [];
 $ctaCteHabilitaciones = $ctaCteHabilitaciones ?? [];
 $q = (string)($q ?? '');
+$city = (string)($city ?? '');
+$category = (string)($category ?? '');
+$cities = $cities ?? [];
+$categories = $categories ?? [];
+$perPage = (int)($perPage ?? 200);
 $erpCols = $erpCols ?? [];
 $page = max(1, (int)($page ?? 1));
 $pages = max(1, (int)($pages ?? 1));
@@ -12,8 +17,23 @@ $total = (int)($total ?? count($list));
 $pagePres = max(1, (int)($pagePres ?? 1));
 $pagesPres = max(1, (int)($pagesPres ?? 1));
 $totalPres = (int)($totalPres ?? count($presenciales));
-$pageUrl = function ($p) use ($q) {
-    return '/admin/clientes?page=' . $p . ($q !== '' ? '&q=' . rawurlencode($q) : '');
+$pageUrl = function ($p) use ($q, $city, $category, $perPage) {
+    return '/admin/clientes?' . http_build_query(array_filter([
+        'page' => $p,
+        'q' => $q,
+        'city' => $city,
+        'category' => $category,
+        'per_page' => $perPage,
+    ], static fn($value): bool => $value !== '' && $value !== null));
+};
+$pagePresUrl = function ($p) use ($q, $city, $category, $perPage) {
+    return '/admin/clientes?' . http_build_query(array_filter([
+        'page_pres' => $p,
+        'q' => $q,
+        'city' => $city,
+        'category' => $category,
+        'per_page' => $perPage,
+    ], static fn($value): bool => $value !== '' && $value !== null));
 };
 $paginador = function (int $pag, int $pags, callable $url): void {
     if ($pags <= 1) {
@@ -48,6 +68,7 @@ $customerCategories = [
     'barbero' => 'Barbero/a', 'maquillador' => 'Maquillador/a', 'spa' => 'Spa / centro estético',
     'revendedor' => 'Revendedor/a', 'otro' => 'Otro profesional',
 ];
+$commercialCategories = \Perfushopping\Web\Repo\FacturaRepo::categoriaLabels();
 ?>
 
 <div class="d-flex justify-content-between align-items-start mb-3">
@@ -61,15 +82,42 @@ $customerCategories = [
 
 <div class="card shadow-sm mb-3">
     <div class="card-body">
-        <form method="get" action="/admin/clientes" class="row g-2">
-            <div class="col-lg-8">
+        <form method="get" action="/admin/clientes" class="row g-2 align-items-end">
+            <div class="col-lg-4">
                 <input class="form-control form-control-sm" name="q" value="<?= htmlspecialchars($q) ?>" placeholder="Buscar por nombre, email, teléfono o DNI/CUIT" />
             </div>
-            <div class="col-lg-2">
+            <div class="col-sm-6 col-lg-2">
+                <label class="form-label small mb-1">Ciudad</label>
+                <select class="form-select form-select-sm" name="city">
+                    <option value="">Todas</option>
+                    <?php foreach ($cities as $cityOption): ?>
+                    <option value="<?= htmlspecialchars((string)$cityOption) ?>" <?= $city === (string)$cityOption ? 'selected' : '' ?>><?= htmlspecialchars((string)$cityOption) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-sm-6 col-lg-2">
+                <label class="form-label small mb-1">Categoría</label>
+                <select class="form-select form-select-sm" name="category">
+                    <option value="">Todas</option>
+                    <?php foreach ($categories as $categoryOption => $categoryValue): ?>
+                    <?php $categoryOption = (string)$categoryValue; $categoryLabel = $customerCategories[$categoryOption] ?? $commercialCategories[$categoryOption] ?? $categoryOption; ?>
+                    <option value="<?= htmlspecialchars($categoryOption) ?>" <?= $category === $categoryOption ? 'selected' : '' ?>><?= htmlspecialchars($categoryLabel) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-sm-6 col-lg-2">
+                <label class="form-label small mb-1">Por página</label>
+                <select class="form-select form-select-sm" name="per_page">
+                    <?php foreach ([50, 100, 200, 500] as $pageSize): ?>
+                    <option value="<?= $pageSize ?>" <?= $perPage === $pageSize ? 'selected' : '' ?>><?= $pageSize ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-sm-6 col-lg-1">
                 <button class="btn btn-accent btn-sm w-100" type="submit"><i class="bi bi-search"></i> Buscar</button>
             </div>
-            <div class="col-lg-2">
-                <?php if ($q !== ''): ?>
+            <div class="col-sm-6 col-lg-1">
+                <?php if ($q !== '' || $city !== '' || $category !== '' || $perPage !== 200): ?>
                     <a class="btn btn-outline-secondary btn-sm w-100" href="/admin/clientes"><i class="bi bi-x-lg"></i> Limpiar</a>
                 <?php endif; ?>
             </div>
@@ -251,7 +299,7 @@ $customerCategories = [
     <?php if ($pagesPres > 1): ?>
         <div class="card-footer bg-white d-flex justify-content-between align-items-center">
             <span class="small text-muted"><?= $totalPres ?> presenciales · Página <?= $pagePres ?> de <?= $pagesPres ?></span>
-            <?php $paginador($pagePres, $pagesPres, $pageUrl); ?>
+            <?php $paginador($pagePres, $pagesPres, $pagePresUrl); ?>
         </div>
     <?php endif; ?>
 </div>
@@ -261,6 +309,11 @@ $customerCategories = [
     <input type="hidden" name="user_id" value="0" />
     <input type="hidden" name="idclien" id="eliminarPresencialId" value="0" />
     <input type="hidden" name="q" value="<?= htmlspecialchars($q) ?>" />
+    <input type="hidden" name="city" value="<?= htmlspecialchars($city) ?>" />
+    <input type="hidden" name="category" value="<?= htmlspecialchars($category) ?>" />
+    <input type="hidden" name="per_page" value="<?= $perPage ?>" />
+    <input type="hidden" name="page" value="<?= $page ?>" />
+    <input type="hidden" name="page_pres" value="<?= $pagePres ?>" />
 </form>
 
 <!-- Modal editar cliente presencial -->
@@ -272,6 +325,11 @@ $customerCategories = [
                 <input type="hidden" name="user_id" value="0" />
                 <input type="hidden" name="idclien" id="presencialIdclien" value="0" />
                 <input type="hidden" name="q" value="<?= htmlspecialchars($q) ?>" />
+                <input type="hidden" name="city" value="<?= htmlspecialchars($city) ?>" />
+                <input type="hidden" name="category" value="<?= htmlspecialchars($category) ?>" />
+                <input type="hidden" name="per_page" value="<?= $perPage ?>" />
+                <input type="hidden" name="page" value="<?= $page ?>" />
+                <input type="hidden" name="page_pres" value="<?= $pagePres ?>" />
                 <div class="modal-header">
                     <h5 class="modal-title"><i class="bi bi-pencil"></i> Editar cliente presencial</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -391,6 +449,11 @@ $customerCategories = [
                 <input type="hidden" name="idclien" id="ctaCteIdclien" value="0" />
                 <input type="hidden" name="habilitado" id="ctaCteHabilitado" value="0" />
                 <input type="hidden" name="q" value="<?= htmlspecialchars($q) ?>" />
+                <input type="hidden" name="city" value="<?= htmlspecialchars($city) ?>" />
+                <input type="hidden" name="category" value="<?= htmlspecialchars($category) ?>" />
+                <input type="hidden" name="per_page" value="<?= $perPage ?>" />
+                <input type="hidden" name="page" value="<?= $page ?>" />
+                <input type="hidden" name="page_pres" value="<?= $pagePres ?>" />
                 <div class="modal-header">
                     <h5 class="modal-title">Autorizar cuenta corriente</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
