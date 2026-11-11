@@ -1104,9 +1104,8 @@ final class StockRepo
         $params = [];
         $where = $this->ajustesFiltrosWhere($desde, $hasta, $params);
         $having = $this->ajustesFiltrosHaving($depDesde, $depHasta, $params);
-        $grupoExpr = $this->ensureGrupoColumn()
-            ? 'COALESCE(sc.grupo_id, sc.idcabstock)'
-            : 'sc.idcabstock';
+        $hasGrupo = $this->ensureGrupoColumn();
+        $grupoExpr = $hasGrupo ? 'COALESCE(sc.grupo_id, sc.idcabstock)' : 'sc.idcabstock';
         $compraSelect = $this->ensureCompraIdColumn()
             ? 'MAX(sc.factura_compra_id)'
             : 'NULL';
@@ -1115,10 +1114,8 @@ final class StockRepo
                    GROUP_CONCAT(sc.idcabstock ORDER BY sc.idcabstock ASC) AS ids,
                    MAX(sc.fecha) AS fecha, MAX(sc.notas) AS motivo, MAX(sc.tipo_movimiento) AS tipo,
                    MAX(sc.iddepoh) AS iddepoh, MAX(sc.iddepod) AS iddepod, {$compraSelect} AS factura_compra_id,
-                   MAX(dh.nomdepo) AS depo_hasta, MAX(dd.nomdepo) AS depo_desde,
-                   COUNT(sd.idprodu) AS items, COALESCE(SUM(sd.canti), 0) AS unidades
+                   MAX(dh.nomdepo) AS depo_hasta, MAX(dd.nomdepo) AS depo_desde
             FROM stockcab sc
-            LEFT JOIN stockdet sd ON sd.idstockcab = sc.idcabstock
             LEFT JOIN deposito dh ON dh.iddepo = sc.iddepoh
             LEFT JOIN deposito dd ON dd.iddepo = sc.iddepod
             WHERE 1 = 1{$where}
@@ -1129,6 +1126,31 @@ final class StockRepo
         ");
         $st->execute($params);
         $rows = $st->fetchAll();
+        if ($rows) {
+            $groupIds = array_values(array_unique(array_map(static fn(array $row): int => (int)($row['id'] ?? 0), $rows)));
+            $groupIds = array_values(array_filter($groupIds, static fn(int $id): bool => $id > 0));
+            if ($groupIds) {
+                $in = implode(',', array_fill(0, count($groupIds), '?'));
+                $groupItemsWhere = $hasGrupo
+                    ? "(sc.grupo_id IN ({$in}) OR sc.idcabstock IN ({$in}))"
+                    : "sc.idcabstock IN ({$in})";
+                $stItems = Db::pdo()->prepare("SELECT {$grupoExpr} AS id, COUNT(sd.idprodu) AS items,
+                        COALESCE(SUM(sd.canti), 0) AS unidades
+                    FROM stockcab sc
+                    LEFT JOIN stockdet sd ON sd.idstockcab = sc.idcabstock
+                    WHERE {$groupItemsWhere}
+                    GROUP BY {$grupoExpr}");
+                $stItems->execute($hasGrupo ? array_merge($groupIds, $groupIds) : $groupIds);
+                $itemsByGroup = [];
+                foreach ($stItems->fetchAll() as $itemRow) $itemsByGroup[(int)$itemRow['id']] = $itemRow;
+                foreach ($rows as &$row) {
+                    $itemRow = $itemsByGroup[(int)($row['id'] ?? 0)] ?? [];
+                    $row['items'] = (int)($itemRow['items'] ?? 0);
+                    $row['unidades'] = (int)($itemRow['unidades'] ?? 0);
+                }
+                unset($row);
+            }
+        }
         foreach ($rows as &$r) {
             $r['tipo_label'] = self::etiquetaTipo((string)($r['tipo'] ?? ''));
             $r['depo_desde_label'] = self::etiquetaDeposito($r['depo_desde'] ?? null, (string)($r['tipo'] ?? ''), 'desde');
@@ -1140,10 +1162,17 @@ final class StockRepo
     /** Cantidad total de grupos de ajuste para paginar el historial. */
     public function ajustesGruposCount(string $desde = '', string $hasta = '', int $depDesde = 0, int $depHasta = 0): int
     {
+        $hasGrupo = $this->ensureGrupoColumn();
+        if ($desde === '' && $hasta === '' && $depDesde <= 0 && $depHasta <= 0) {
+            $sql = $hasGrupo
+                ? 'SELECT COUNT(DISTINCT grupo_id) + (SELECT COUNT(*) FROM stockcab WHERE grupo_id IS NULL) FROM stockcab WHERE grupo_id IS NOT NULL'
+                : 'SELECT COUNT(*) FROM stockcab';
+            return (int)Db::pdo()->query($sql)->fetchColumn();
+        }
         $params = [];
         $where = $this->ajustesFiltrosWhere($desde, $hasta, $params);
         $having = $this->ajustesFiltrosHaving($depDesde, $depHasta, $params);
-        $grupoExpr = $this->ensureGrupoColumn()
+        $grupoExpr = $hasGrupo
             ? 'COALESCE(sc.grupo_id, sc.idcabstock)'
             : 'sc.idcabstock';
         $st = Db::pdo()->prepare("

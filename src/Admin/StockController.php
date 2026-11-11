@@ -371,6 +371,10 @@ final class StockController
         };
         $histDesde = $fmtFecha($_GET['desde'] ?? '');
         $histHasta = $fmtFecha($_GET['hasta'] ?? '');
+        if ($histDesde === '' && $histHasta === '') {
+            $histDesde = date('Y-m-d', strtotime('-30 days'));
+            $histHasta = date('Y-m-d');
+        }
         $histDepDesde = (int)($_GET['dep_desde'] ?? 0);
         $histDepHasta = (int)($_GET['dep_hasta'] ?? 0);
         $histPerPage = 30;
@@ -401,6 +405,10 @@ final class StockController
             'historialAjustes' => $historialAjustes,
             'histDesde' => $histDesde,
             'histHasta' => $histHasta,
+            'histResetUrl' => '/admin/stock/ajuste' . ((int)($params['id'] ?? 0) > 0 ? '/' . (int)$params['id'] : '') . '?' . http_build_query([
+                'desde' => date('Y-m-d', strtotime('-30 days')),
+                'hasta' => date('Y-m-d'),
+            ]),
             'histDepDesde' => $histDepDesde,
             'histDepHasta' => $histDepHasta,
             'histPage' => $histPage,

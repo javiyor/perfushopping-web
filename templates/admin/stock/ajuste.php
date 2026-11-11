@@ -22,6 +22,7 @@ $histPages = max(1, (int)($histPages ?? 1));
 $histTotal = (int)($histTotal ?? count($historialAjustes));
 $histHayFiltros = $histDesde !== '' || $histHasta !== '' || $histDepDesde > 0 || $histDepHasta > 0;
 $histBase = '/admin/stock/ajuste' . ((int)($producto['idprodu'] ?? 0) > 0 ? '/' . (int)$producto['idprodu'] : '');
+$histResetUrl = (string)($histResetUrl ?? $histBase);
 $histQuery = http_build_query(array_filter([
     'desde' => $histDesde,
     'hasta' => $histHasta,
@@ -236,7 +237,7 @@ $histWinStart = max(1, $histWinEnd - 6);
 
 <div class="card shadow-sm mt-3" id="historialStock">
     <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
-        <span>Grupos de ajuste generados</span>
+        <div><span>Movimientos de stock</span><div class="small text-muted fw-normal">Por defecto se muestran los últimos 30 días.</div></div>
         <span class="badge bg-secondary"><?= $histTotal ?><?= $histPages > 1 ? ' · pág. ' . $histPage . '/' . $histPages : '' ?></span>
     </div>
     <div class="card-body pb-2">
@@ -270,7 +271,7 @@ $histWinStart = max(1, $histWinEnd - 6);
             <div class="col-auto">
                 <button class="btn btn-accent btn-sm" type="submit"><i class="bi bi-funnel"></i> Filtrar</button>
                 <?php if ($histHayFiltros): ?>
-                    <a class="btn btn-outline-secondary btn-sm" href="<?= htmlspecialchars($histBase) ?>"><i class="bi bi-x-lg"></i> Limpiar</a>
+                    <a class="btn btn-outline-secondary btn-sm" href="<?= htmlspecialchars($histResetUrl) ?>"><i class="bi bi-arrow-counterclockwise"></i> Últimos 30 días</a>
                 <?php endif; ?>
             </div>
         </form>
