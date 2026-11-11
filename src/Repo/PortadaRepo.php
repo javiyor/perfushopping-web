@@ -7,6 +7,8 @@ use Perfushopping\Web\Infra\Db;
 
 final class PortadaRepo
 {
+    private static bool $schemaAttempted = false;
+    private static ?array $configCache = null;
     private const MODOS = ['auto', 'rubro', 'marca', 'ultimos', 'manual'];
     private const PLANTILLAS = [
         'elegante' => ['label' => 'Elegante oscura', 'mode' => 'dark', 'color_fondo' => '#050505', 'color_fondo_secundario' => '#0C0B0A', 'color_tarjeta' => '#171411', 'color_acento' => '#D8B25A', 'color_texto' => '#F6F4EF'],
@@ -56,6 +58,8 @@ final class PortadaRepo
 
     private function ensureTables(): void
     {
+        if (self::$schemaAttempted) return;
+        self::$schemaAttempted = true;
         try {
             Db::pdo()->exec("
                 CREATE TABLE IF NOT EXISTS portada_config (
@@ -91,57 +95,66 @@ final class PortadaRepo
             if ((int)$st->fetchColumn() === 0) {
                 Db::pdo()->exec("INSERT IGNORE INTO portada_config (id, modo) VALUES (1, 'auto')");
             }
-            $this->ensureColumn('portada_config', 'banner_text', 'VARCHAR(120) DEFAULT NULL');
-            $this->ensureColumn('portada_config', 'banner_bold', 'TINYINT(1) NOT NULL DEFAULT 0');
-            $this->ensureColumn('portada_config', 'banner_italic', 'TINYINT(1) NOT NULL DEFAULT 0');
-            $this->ensureColumn('portada_config', 'banner_size', "VARCHAR(10) NOT NULL DEFAULT 'grande'");
-            $this->ensureColumn('portada_config', 'banner_color', "VARCHAR(7) NOT NULL DEFAULT '#C9A227'");
-            $this->ensureColumn('portada_config', 'banner_bg', 'VARCHAR(7) DEFAULT NULL');
-            $this->ensureColumn('portada_config', 'banner_sub', 'VARCHAR(160) DEFAULT NULL');
-            $this->ensureColumn('portada_config', 'banner_sub_bold', 'TINYINT(1) NOT NULL DEFAULT 0');
-            $this->ensureColumn('portada_config', 'banner_sub_italic', 'TINYINT(1) NOT NULL DEFAULT 0');
-            $this->ensureColumn('portada_config', 'banner_sub_size', "VARCHAR(10) NOT NULL DEFAULT 'normal'");
-            $this->ensureColumn('portada_config', 'banner_sub_color', "VARCHAR(7) NOT NULL DEFAULT '#FFFFFF'");
-            $this->ensureColumn('portada_config', 'plantilla', "VARCHAR(24) NOT NULL DEFAULT 'elegante'");
-            $this->ensureColumn('portada_config', 'color_fondo', "VARCHAR(7) NOT NULL DEFAULT '#050505'");
-            $this->ensureColumn('portada_config', 'color_fondo_secundario', "VARCHAR(7) NOT NULL DEFAULT '#0C0B0A'");
-            $this->ensureColumn('portada_config', 'color_tarjeta', "VARCHAR(7) NOT NULL DEFAULT '#171411'");
-            $this->ensureColumn('portada_config', 'color_acento', "VARCHAR(7) NOT NULL DEFAULT '#D8B25A'");
-            $this->ensureColumn('portada_config', 'color_texto', "VARCHAR(7) NOT NULL DEFAULT '#F6F4EF'");
-            $this->ensureColumn('portada_config', 'fuente_tarjeta', "VARCHAR(16) NOT NULL DEFAULT 'system'");
-            $this->ensureColumn('portada_config', 'color_nombre_producto', "VARCHAR(7) NOT NULL DEFAULT '#F6F4EF'");
-            $this->ensureColumn('portada_config', 'tamano_nombre_producto', 'TINYINT UNSIGNED NOT NULL DEFAULT 14');
-            $this->ensureColumn('portada_config', 'color_precio_producto', "VARCHAR(7) NOT NULL DEFAULT '#D8B25A'");
-            $this->ensureColumn('portada_config', 'tamano_precio_producto', 'TINYINT UNSIGNED NOT NULL DEFAULT 18');
-            $this->ensureColumn('portada_config', 'footer_text', 'TEXT DEFAULT NULL');
-            $this->ensureColumn('portada_config', 'colores_componentes', 'TEXT DEFAULT NULL');
+            $this->ensureColumns('portada_config', [
+                'banner_text' => 'VARCHAR(120) DEFAULT NULL',
+                'banner_bold' => 'TINYINT(1) NOT NULL DEFAULT 0',
+                'banner_italic' => 'TINYINT(1) NOT NULL DEFAULT 0',
+                'banner_size' => "VARCHAR(10) NOT NULL DEFAULT 'grande'",
+                'banner_color' => "VARCHAR(7) NOT NULL DEFAULT '#C9A227'",
+                'banner_bg' => 'VARCHAR(7) DEFAULT NULL',
+                'banner_sub' => 'VARCHAR(160) DEFAULT NULL',
+                'banner_sub_bold' => 'TINYINT(1) NOT NULL DEFAULT 0',
+                'banner_sub_italic' => 'TINYINT(1) NOT NULL DEFAULT 0',
+                'banner_sub_size' => "VARCHAR(10) NOT NULL DEFAULT 'normal'",
+                'banner_sub_color' => "VARCHAR(7) NOT NULL DEFAULT '#FFFFFF'",
+                'plantilla' => "VARCHAR(24) NOT NULL DEFAULT 'elegante'",
+                'color_fondo' => "VARCHAR(7) NOT NULL DEFAULT '#050505'",
+                'color_fondo_secundario' => "VARCHAR(7) NOT NULL DEFAULT '#0C0B0A'",
+                'color_tarjeta' => "VARCHAR(7) NOT NULL DEFAULT '#171411'",
+                'color_acento' => "VARCHAR(7) NOT NULL DEFAULT '#D8B25A'",
+                'color_texto' => "VARCHAR(7) NOT NULL DEFAULT '#F6F4EF'",
+                'fuente_tarjeta' => "VARCHAR(16) NOT NULL DEFAULT 'system'",
+                'color_nombre_producto' => "VARCHAR(7) NOT NULL DEFAULT '#F6F4EF'",
+                'tamano_nombre_producto' => 'TINYINT UNSIGNED NOT NULL DEFAULT 14',
+                'color_precio_producto' => "VARCHAR(7) NOT NULL DEFAULT '#D8B25A'",
+                'tamano_precio_producto' => 'TINYINT UNSIGNED NOT NULL DEFAULT 18',
+                'footer_text' => 'TEXT DEFAULT NULL',
+                'colores_componentes' => 'TEXT DEFAULT NULL',
+            ]);
         } catch (\Throwable $e) {
+            error_log('PortadaRepo::ensureTables error: ' . $e->getMessage());
         }
     }
 
-    private function ensureColumn(string $table, string $column, string $definition): void
+    private function ensureColumns(string $table, array $definitions): void
     {
-        $like = Db::pdo()->prepare('SHOW COLUMNS FROM `' . $table . '` LIKE :c');
-        $like->execute([':c' => $column]);
-        if ($like->fetch() !== false) {
-            return;
+        $columns = array_fill_keys(array_column(Db::pdo()->query('SHOW COLUMNS FROM `' . $table . '`')->fetchAll(), 'Field'), true);
+        foreach ($definitions as $column => $definition) {
+            if (isset($columns[$column])) continue;
+            Db::pdo()->exec('ALTER TABLE `' . $table . '` ADD COLUMN `' . $column . '` ' . $definition);
+            $columns[$column] = true;
         }
-        Db::pdo()->exec('ALTER TABLE `' . $table . '` ADD COLUMN `' . $column . '` ' . $definition);
+    }
+
+    /** Ensures homepage configuration tables during admin setup, never in public read paths. */
+    public function ensureSchema(): void
+    {
+        $this->ensureTables();
     }
 
     /** @return array<string,mixed> */
     public function getConfig(): array
     {
-        $this->ensureTables();
+        if (self::$configCache !== null) return self::$configCache;
         try {
             $st = Db::pdo()->query("SELECT * FROM portada_config WHERE id=1 LIMIT 1");
             $row = $st->fetch();
             if ($row) {
-                return $row;
+                return self::$configCache = $row;
             }
         } catch (\Throwable $e) {
         }
-        return ['id' => 1, 'modo' => 'auto', 'codrub' => null, 'codsub' => null,
+        return self::$configCache = ['id' => 1, 'modo' => 'auto', 'codrub' => null, 'codsub' => null,
             'banner_text' => null, 'banner_bold' => 0, 'banner_italic' => 0,
             'banner_size' => 'grande', 'banner_color' => '#C9A227', 'banner_bg' => null,
             'banner_sub' => null, 'banner_sub_bold' => 0, 'banner_sub_italic' => 0,
@@ -380,12 +393,12 @@ final class PortadaRepo
             ':footer_text' => $footerText !== '' ? $footerText : null,
             ':colores_componentes' => $componentColorsJson,
         ]);
+        self::$configCache = null;
     }
 
     /** @return array<int, array<string,mixed>> */
     public function getManualProducts(): array
     {
-        $this->ensureTables();
         try {
             $sql = "
                 SELECT p.idprodu, p.produ, p.precio, p.precio1, p.imagen, p.codrub, p.codsub, p.enweb,
@@ -470,7 +483,6 @@ final class PortadaRepo
     /** @return array<int,array{slot_id:int,foto:string,foto_titulo:string,video_url:string,video_titulo:string}> */
     public function getTrustMedia(): array
     {
-        $this->ensureTables();
         $slots = [];
         for ($i = 1; $i <= 3; $i++) {
             $slots[$i] = ['slot_id' => $i, 'foto' => '', 'foto_titulo' => '', 'video_url' => '', 'video_titulo' => ''];

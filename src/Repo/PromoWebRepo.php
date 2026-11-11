@@ -8,8 +8,13 @@ use Perfushopping\Web\Infra\Db;
 /** Productos en promoción para la web (precio neto promocionado por producto). */
 final class PromoWebRepo
 {
+    private static bool $promoSchemaAttempted = false;
+    private static bool $bannerSchemaAttempted = false;
+
     private function ensure(): void
     {
+        if (self::$promoSchemaAttempted) return;
+        self::$promoSchemaAttempted = true;
         try {
             Db::pdo()->exec("CREATE TABLE IF NOT EXISTS promo_web (
                 id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -109,7 +114,6 @@ final class PromoWebRepo
     /** Promo activa de un producto o null. */
     public function findActiveByProduct(int $idprodu): ?array
     {
-        $this->ensure();
         if ($idprodu <= 0) {
             return null;
         }
@@ -144,7 +148,6 @@ final class PromoWebRepo
     /** Promos activas para la portada (sólo con promo menor al precio minorista neto). */
     public function listActive(): array
     {
-        $this->ensure();
         try {
             $st = Db::pdo()->query("
                 SELECT w.idprodu, w.promo_precio, w.orden,
@@ -175,6 +178,8 @@ final class PromoWebRepo
 
     private function ensureBanners(): void
     {
+        if (self::$bannerSchemaAttempted) return;
+        self::$bannerSchemaAttempted = true;
         $this->ensure();
         try {
             Db::pdo()->exec("CREATE TABLE IF NOT EXISTS promo_banners (
@@ -215,7 +220,6 @@ final class PromoWebRepo
     /** Banners activos para la portada, con nombre de marca y link resuelto. */
     public function listActiveBanners(): array
     {
-        $this->ensureBanners();
         try {
             $st = Db::pdo()->query("
                 SELECT b.*, s.nomsub

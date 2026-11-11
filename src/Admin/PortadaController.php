@@ -20,6 +20,7 @@ final class PortadaController
         $adminUser = $auth->requirePermiso('productos');
 
         $repo = new PortadaRepo();
+        $repo->ensureSchema();
         $config = $repo->getConfig();
         $trustMedia = $repo->getTrustMedia();
         $manual = $repo->getManualProducts();
