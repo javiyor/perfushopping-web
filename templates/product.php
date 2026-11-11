@@ -64,7 +64,7 @@ if (!$isWholesale) {
         <?php endif; ?>
       </div>
       <?php if (!empty($p['nomrub']) || !empty($p['nomsub'])): ?>
-        <p style="color:rgba(246,244,239,0.65)">
+        <p style="color:var(--muted)">
           <?= htmlspecialchars((string)($p['nomrub'] ?? '')) ?>
           <?php if (!empty($p['nomsub'])): ?>
             &middot; <?= htmlspecialchars(trim((string)$p['nomsub'])) ?>
@@ -73,7 +73,7 @@ if (!$isWholesale) {
       <?php endif; ?>
 
       <?php if (!empty($p['observ'])): ?>
-        <div class="notice" style="white-space:pre-wrap"><?= htmlspecialchars((string)$p['observ']) ?></div>
+        <div class="notice product-description" style="white-space:pre-wrap;color:var(--text)!important"><?= htmlspecialchars((string)$p['observ']) ?></div>
       <?php endif; ?>
 
       <?php
@@ -88,13 +88,13 @@ if (!$isWholesale) {
         <div class="notice" style="white-space:pre-wrap"><strong>Beneficio:</strong> <?= htmlspecialchars((string)$commercial['benefit']) ?></div>
       <?php endif; ?>
       <?php if (!empty($commercial['ideal_for'])): ?>
-        <p style="color:rgba(246,244,239,0.7);margin:6px 0"><strong>Ideal para:</strong> <?= htmlspecialchars((string)$commercial['ideal_for']) ?></p>
+        <p style="color:var(--muted);margin:6px 0"><strong>Ideal para:</strong> <?= htmlspecialchars((string)$commercial['ideal_for']) ?></p>
       <?php endif; ?>
       <?php if (!empty($commercial['problem'])): ?>
-        <p style="color:rgba(246,244,239,0.7);margin:6px 0"><strong>Resuelve:</strong> <?= htmlspecialchars((string)$commercial['problem']) ?></p>
+        <p style="color:var(--muted);margin:6px 0"><strong>Resuelve:</strong> <?= htmlspecialchars((string)$commercial['problem']) ?></p>
       <?php endif; ?>
       <?php if (!empty($commercial['usage'])): ?>
-        <p style="color:rgba(246,244,239,0.7);margin:6px 0"><strong>Modo de uso:</strong> <?= htmlspecialchars((string)$commercial['usage']) ?></p>
+        <p style="color:var(--muted);margin:6px 0"><strong>Modo de uso:</strong> <?= htmlspecialchars((string)$commercial['usage']) ?></p>
       <?php endif; ?>
       <?php if (!empty($commercial['advice'])): ?>
         <div class="notice" style="white-space:pre-wrap"><strong>Consejo Perfushopping:</strong> <?= htmlspecialchars((string)$commercial['advice']) ?></div>
@@ -224,7 +224,7 @@ if (!$isWholesale) {
         <?php foreach ($productFaqs as $faq): ?>
         <details style="margin-bottom:8px">
           <summary style="cursor:pointer;font-weight:600"><?= htmlspecialchars((string)$faq['question']) ?></summary>
-          <div style="margin-top:6px;color:rgba(246,244,239,0.75)"><?= nl2br(htmlspecialchars((string)$faq['answer'])) ?></div>
+          <div style="margin-top:6px;color:var(--muted)"><?= nl2br(htmlspecialchars((string)$faq['answer'])) ?></div>
         </details>
         <?php endforeach; ?>
       </div>
