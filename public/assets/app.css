@@ -255,7 +255,7 @@ input::placeholder, textarea::placeholder { color: rgba(246,244,239,0.45); }
   border-radius: 16px;
   border: 1px solid rgba(216,178,90,0.25);
   background: rgba(216,178,90,0.08);
-  color: rgba(246,244,239,0.92);
+  color: var(--text);
 }
 .notice.danger { border-color: rgba(255,107,107,0.35); background: rgba(255,107,107,0.10); }
 .notice.ok { border-color: rgba(73,211,154,0.35); background: rgba(73,211,154,0.10); }
