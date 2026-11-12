@@ -460,6 +460,7 @@ $pedidoDescPct = $pedidoDescPct ?? 0;
 <script>
 // ── State ──
 let cart = [];
+let modoEdicionFactura = <?= (int)($editarId ?? 0) > 0 ? 'true' : 'false' ?>;
 let ctaCteHabilitada = false;
 let ctaCteCheckSequence = 0;
 // Mientras la factura está abierta (POS), el layout NO recarga la página
@@ -547,6 +548,78 @@ function precioActivo(item) {
     return item.net_price_cents || 0;
 }
 
+function promoPagoCalificado() {
+    if (modoEdicionFactura) return false;
+    const lines = Array.from(document.querySelectorAll('#pagosContainer .pago-line'));
+    let hayFormaElegible = false;
+    for (const line of lines) {
+        const forma = line.querySelector('.fp-forma')?.value || '';
+        const cents = Math.round((parseFloat(line.querySelector('.fp-monto')?.value) || 0) * 100);
+        const formaElegible = forma === 'efectivo' || forma === 'transferencia';
+        if (formaElegible) hayFormaElegible = true;
+        else if (cents > 0) return false;
+    }
+    return hayFormaElegible;
+}
+
+function promoNetCents(item) {
+    const gross = Math.max(0, parseInt(item.promo_pos_final_cents) || 0);
+    const iva = Math.max(0, Number(item.iva_rate) || 0);
+    if (!gross || iva <= 0) return gross;
+    const estimate = Math.max(0, Math.round(gross / (1 + iva / 100)));
+    let best = estimate, bestDiff = Infinity;
+    for (let net = Math.max(0, estimate - 3); net <= estimate + 3; net++) {
+        const final = net + Math.round(net * iva / 100);
+        const diff = Math.abs(final - gross);
+        if (diff < bestDiff) { best = net; bestDiff = diff; }
+        if (diff === 0) return net;
+    }
+    return best;
+}
+
+function promoUnitsFor(item, index) {
+    if (!promoPagoCalificado() || !item.promo_pos_version) return 0;
+    const regularNet = Math.max(0, precioActivo(item));
+    const regularFinal = regularNet + Math.round(regularNet * Math.max(0, Number(item.iva_rate) || 0) / 100);
+    if (Number(item.promo_pos_final_cents || 0) >= regularFinal) return 0;
+    const remainingRaw = item.promo_pos_remaining;
+    const totalRemaining = remainingRaw === null || remainingRaw === undefined ? Infinity : Math.max(0, parseInt(remainingRaw) || 0);
+    let alreadyUsed = 0;
+    for (let i = 0; i < index && alreadyUsed < totalRemaining; i++) {
+        const previous = cart[i];
+        if ((previous.idprodu || 0) !== (item.idprodu || 0) || previous.promo_pos_version !== item.promo_pos_version) continue;
+        alreadyUsed += Math.min(Math.max(0, parseInt(previous.qty) || 0), totalRemaining - alreadyUsed);
+    }
+    return Math.min(Math.max(0, parseInt(item.qty) || 0), Math.max(0, totalRemaining - alreadyUsed));
+}
+
+function lineAmounts(item, index) {
+    const qty = Math.max(1, parseInt(item.qty) || 1);
+    const promoQty = promoUnitsFor(item, index);
+    const regularQty = qty - promoQty;
+    const regularNet = Math.max(0, precioActivo(item));
+    const promoNet = promoQty > 0 ? promoNetCents(item) : 0;
+    const discount = 1 - lineDto(item.dto) / 100;
+    const promoLineNet = promoQty > 0 ? Math.round(promoQty * promoNet * discount) : 0;
+    const regularLineNet = regularQty > 0 ? Math.round(regularQty * regularNet * discount) : 0;
+    const promoLineIva = item.iva_rate > 0 && promoQty > 0 ? Math.round(promoLineNet * item.iva_rate / 100) : 0;
+    const regularLineIva = item.iva_rate > 0 && regularQty > 0 ? Math.round(regularLineNet * item.iva_rate / 100) : 0;
+    return {net: promoLineNet + regularLineNet, iva: promoLineIva + regularLineIva};
+}
+
+function precioCarritoLabel(item, index) {
+    const regular = getDisplayPrice(precioActivo(item), item.iva_rate);
+    const promoQty = promoUnitsFor(item, index);
+    if (promoQty <= 0) return '$' + fmtPrice(regular);
+    const promo = displayPriceIsGross() ? Number(item.promo_pos_final_cents) : getDisplayPrice(promoNetCents(item), item.iva_rate);
+    if (promoQty >= item.qty) return '$' + fmtPrice(promo) + ' promo';
+    return '$' + fmtPrice(promo) + ' promo (' + promoQty + ') · $' + fmtPrice(regular) + ' resto';
+}
+
+function actualizarPromoEnCarrito() {
+    if (cart.length) renderCart(); else recalcTotals();
+}
+
 function actualizarBadgeMayorista() {
     const badge = document.getElementById('clienteCatBadge');
     if (badge) badge.style.display = clienteMayorista ? '' : 'none';
@@ -624,9 +697,19 @@ function searchProd(q) {    fetch('/admin/facturas/buscar-productos?q=' + encode
                 const priceCents = precioVigenteCents(p);
                 const precio1Cents = p.precio1 ? Math.round(parseFloat(p.precio1) * 100) : 0;
                 const ivaRate = p.tiva || 21;
-                const displayPrice = getDisplayPrice(priceCents, ivaRate);
+                const promoFinalCents = Number(p.promo_pos_final_cents || 0);
+                const precioRegularFinal = priceCents + Math.round(priceCents * ivaRate / 100);
+                const hasPromo = promoFinalCents > 0 && Boolean(p.promo_pos_version) && promoFinalCents < precioRegularFinal;
+                const promoSelected = hasPromo && promoPagoCalificado();
+                const promoNet = promoSelected ? promoNetCents({promo_pos_final_cents: promoFinalCents, iva_rate: ivaRate}) : 0;
+                const displayPrice = promoSelected
+                    ? (displayPriceIsGross() ? promoFinalCents : getDisplayPrice(promoNet, ivaRate))
+                    : getDisplayPrice(priceCents, ivaRate);
                 const stockDep = p.stock_deposito ?? 0;
                 const stockTot = p.stock_total ?? 0;
+                const promoHint = hasPromo
+                    ? '<div class="small text-success fw-semibold">Oferta contado/transferencia: $' + fmtPrice(promoFinalCents) + (p.promo_pos_remaining !== null ? ' · quedan ' + Number(p.promo_pos_remaining) : '') + '</div>'
+                    : '';
 
                 // Barcode scan auto-add
                 if (p.matched_variant) {
@@ -639,6 +722,10 @@ function searchProd(q) {    fetch('/admin/facturas/buscar-productos?q=' + encode
                         qty: 1,
                         unit_price_cents: priceCents,
                         precio1_cents: precio1Cents,
+                        promo_pos_final_cents: p.promo_pos_final_cents || 0,
+                        promo_pos_remaining: p.promo_pos_remaining,
+                        promo_pos_version: p.promo_pos_version || '',
+                        promo_pos_until: p.promo_pos_until || '',
                         iva_rate: ivaRate,
                         fecompra: p.fecompra || '',
                     });
@@ -661,7 +748,7 @@ function searchProd(q) {    fetch('/admin/facturas/buscar-productos?q=' + encode
                             <span class="ms-2">${fecompraBadge(p.fecompra)}</span>
                         </div>
                     </div>
-                    <div class="prod-price">$${fmtPrice(displayPrice)}</div>
+                    <div class="prod-price">$${fmtPrice(displayPrice)}${promoHint}</div>
                 `;
                 div.addEventListener('mousedown', function(e) {
                     e.preventDefault();
@@ -676,6 +763,10 @@ function searchProd(q) {    fetch('/admin/facturas/buscar-productos?q=' + encode
                             qty: 1,
                             unit_price_cents: priceCents,
                             precio1_cents: precio1Cents,
+                            promo_pos_final_cents: p.promo_pos_final_cents || 0,
+                            promo_pos_remaining: p.promo_pos_remaining,
+                            promo_pos_version: p.promo_pos_version || '',
+                            promo_pos_until: p.promo_pos_until || '',
                             iva_rate: ivaRate,
                             fecompra: p.fecompra || '',
                         });
@@ -722,6 +813,10 @@ function showVariantPicker(p, priceCents, precio1Cents, ivaRate) {
                 qty: 1,
                 unit_price_cents: priceCents,
                 precio1_cents: precio1Cents,
+                promo_pos_final_cents: p.promo_pos_final_cents || 0,
+                promo_pos_remaining: p.promo_pos_remaining,
+                promo_pos_version: p.promo_pos_version || '',
+                promo_pos_until: p.promo_pos_until || '',
                 iva_rate: ivaRate,
                 fecompra: p.fecompra || '',
             });
@@ -756,6 +851,12 @@ function addToCart(item) {
     if (existing) {
         existing.qty += item.qty || 1;
         if (!existing.fecompra && item.fecompra) existing.fecompra = item.fecompra;
+        if (!existing.promo_pos_version && item.promo_pos_version) {
+            existing.promo_pos_final_cents = Number(item.promo_pos_final_cents || 0);
+            existing.promo_pos_remaining = item.promo_pos_remaining === null || item.promo_pos_remaining === undefined ? null : Number(item.promo_pos_remaining);
+            existing.promo_pos_version = item.promo_pos_version;
+            existing.promo_pos_until = item.promo_pos_until || '';
+        }
     } else {
         cart.push({
             idprodu: item.idprodu,
@@ -765,6 +866,10 @@ function addToCart(item) {
             qty: item.qty || 1,
             net_price_cents: netPrice,
             precio1_cents: item.precio1_cents || 0,
+            promo_pos_final_cents: Number(item.promo_pos_final_cents || 0),
+            promo_pos_remaining: item.promo_pos_remaining === null || item.promo_pos_remaining === undefined ? null : Number(item.promo_pos_remaining),
+            promo_pos_version: item.promo_pos_version || '',
+            promo_pos_until: item.promo_pos_until || '',
             dto: dto,
             iva_rate: item.iva_rate || 21,
             fecompra: item.fecompra || '',
@@ -788,18 +893,20 @@ function renderCart() {
     count.textContent = cart.length + ' item(s)';
     container.innerHTML = cart.map((item, idx) => {
         const dto = lineDto(item.dto);
-        const displayPrice = getDisplayPrice(precioActivo(item), item.iva_rate);
-        const total = item.qty * displayPrice * (1 - dto / 100);
+        const amounts = lineAmounts(item, idx);
+        const total = displayPriceIsGross() ? amounts.net + amounts.iva : amounts.net;
+        const promoQty = promoUnitsFor(item, idx);
         return `
             <div class="pos-cart-item" data-idx="${idx}">
                 <div class="ci-name">
                     <div class="ci-prod">${esc(item.producto)}</div>
                     <div class="ci-var">${item.variedad ? esc(item.variedad) : '—'}</div>
+                    ${promoQty > 0 ? '<div class="small text-success fw-semibold">Oferta efectivo/transferencia' + (item.promo_pos_until ? ' · hasta ' + esc(item.promo_pos_until) : '') + '</div>' : ''}
                     ${item.fecompra ? '<div style="font-size:10px">' + fecompraBadge(item.fecompra) + '</div>' : ''}
                 </div>
                 <div class="ci-qty"><input type="number" value="${item.qty}" min="1" onchange="updateQty(${idx}, this.value)" /></div>
                 <div class="ci-dto"><input type="number" value="${dto}" min="0" max="100" step="1" title="Descuento %" onchange="updateDto(${idx}, this.value)" /></div>
-                <div class="ci-price">$${fmtPrice(displayPrice)}</div>
+                <div class="ci-price">${precioCarritoLabel(item, idx)}</div>
                 <div class="ci-total">$${fmtPrice(total)}</div>
                 <div class="ci-del" onclick="removeItem(${idx})">&times;</div>
             </div>
@@ -825,12 +932,11 @@ function removeItem(idx) {
 
 function recalcTotals() {
     let subtotal = 0, iva = 0, total = 0;
-    cart.forEach(item => {
-        const netLine = Math.round(item.qty * precioActivo(item) * (1 - lineDto(item.dto) / 100));
-        const lineIva = item.iva_rate > 0 ? Math.round(netLine * item.iva_rate / 100) : 0;
-        subtotal += netLine;
-        iva += lineIva;
-        total += netLine + lineIva;
+    cart.forEach((item, index) => {
+        const amounts = lineAmounts(item, index);
+        subtotal += amounts.net;
+        iva += amounts.iva;
+        total += amounts.net + amounts.iva;
     });
     const descPct = parseFloat(document.getElementById('posDescuento').value) || 0;
     const descuento = descPct > 0 ? Math.round(total * descPct / 100) : 0;
@@ -1653,7 +1759,7 @@ function addPagoLine(forma) {
                 </select>
             </div>
             <div class="col-4">
-                <div class="input-group input-group-sm"><span class="input-group-text">$</span><input class="form-control fp-monto" type="number" min="0" step="0.01" value="0" oninput="recalcTotals()" /></div>
+                <div class="input-group input-group-sm"><span class="input-group-text">$</span><input class="form-control fp-monto" type="number" min="0" step="0.01" value="0" oninput="actualizarPromoEnCarrito()" /></div>
             </div>
             <div class="col-1 text-end">
                 <button class="btn btn-sm btn-outline-danger fp-del" type="button" onclick="removePagoLine(this)"><i class="bi bi-x-lg"></i></button>
@@ -1667,7 +1773,7 @@ function addPagoLine(forma) {
 
 function removePagoLine(btn) {
     btn.closest('.pago-line').remove();
-    recalcTotals();
+    actualizarPromoEnCarrito();
 }
 
 function onPagoFormaChange(sel) {
@@ -1729,7 +1835,7 @@ function onPagoFormaChange(sel) {
             if (montoInput) montoInput.value = amountCents > 0 ? (amountCents / 100).toFixed(2) : '0';
             status.textContent = amountCents > 0 ? 'Valor del voucher: $' + fmtPrice(amountCents) + '. Se canjeará una sola vez.' : 'Elegí un voucher disponible.';
             status.className = 'col-12 small fp-voucher-status ' + (amountCents > 0 ? 'text-success' : 'text-muted');
-            recalcTotals();
+            actualizarPromoEnCarrito();
         });
         voucherSelect.innerHTML = '<option value="">— Seleccionar voucher —</option>' + VOUCHERS_DISPONIBLES.map(v =>
             `<option value="${esc(v.codigo)}" data-cents="${Number(v.importe_cents || 0)}">${esc(v.destinatario_nombre)} — ${esc(v.codigo)} — $${fmtPrice(Number(v.importe_cents || 0))}</option>`
@@ -1762,13 +1868,13 @@ function onPagoFormaChange(sel) {
             const pesos = mm * cz;
             extra.querySelector('#fpConvShow').value = pesos ? pesos.toFixed(2) : '';
             if (montoInput) { montoInput.value = pesos ? pesos.toFixed(2) : 0; montoInput.readOnly = true; }
-            recalcTotals();
+            actualizarPromoEnCarrito();
         };
         extra.querySelectorAll('.fp-monto-moneda,.fp-cotizacion').forEach(i => i.addEventListener('input', updConv));
     } else {
         extra.innerHTML = '';
     }
-    recalcTotals();
+    actualizarPromoEnCarrito();
 }
 
     if (EDITAR_ID <= 0) addPagoLine('efectivo');
@@ -1846,10 +1952,9 @@ function submitFactura() {
     const notas = document.getElementById('facturaNotas').value;
 
     const descPct = parseFloat(document.getElementById('posDescuento').value) || 0;
-    const totalBruto = cart.reduce((sum, item) => {
-        const netLine = Math.round(item.qty * precioActivo(item) * (1 - lineDto(item.dto) / 100));
-        const lineIva = item.iva_rate > 0 ? Math.round(netLine * item.iva_rate / 100) : 0;
-        return sum + netLine + lineIva;
+    const totalBruto = cart.reduce((sum, item, index) => {
+        const amounts = lineAmounts(item, index);
+        return sum + amounts.net + amounts.iva;
     }, 0);
     const descuentoCents = descPct > 0 ? Math.round(totalBruto * descPct / 100) : 0;
 
@@ -1917,8 +2022,9 @@ function submitFactura() {
         if (formaTipo(pagos[i].forma_pago) !== 'efectivo') continue;
         excesoSinEfectivo -= Math.min(excesoSinEfectivo, pagos[i].monto_cents);
     }
-    if (totalVoucher > 0 && excesoSinEfectivo > 0) {
-        alert('El total de los medios de pago supera la compra. Ajustá los importes para que el voucher y los demás pagos coincidan con el total.');
+    const promoUnitsInCart = cart.reduce((sum, item, index) => sum + promoUnitsFor(item, index), 0);
+    if (promoUnitsInCart > 0 && excesoSinEfectivo > 0) {
+        alert('Los medios de pago no efectivo superan el total. Ajustá el importe de transferencia, tarjeta u otros pagos al total actualizado.');
         btn.disabled = false;
         btn.innerHTML = BTN_LABEL;
         return;
@@ -1973,13 +2079,15 @@ function submitFactura() {
             cuit: clienteCuit,
             condicion_iva: clienteCondIva,
         },
-        items: cart.map(item => ({
+        items: cart.map((item, index) => ({
             idprodu: item.idprodu,
             idcodgusto: item.idcodgusto,
             producto: item.producto,
             variedad: item.variedad,
             qty: item.qty,
             unit_price_cents: precioActivo(item),
+            promo_pos_version: item.promo_pos_version || '',
+            promo_pos_units: promoUnitsFor(item, index),
             iva_rate: item.iva_rate,
             descuento_pct: lineDto(item.dto),
         })),

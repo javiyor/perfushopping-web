@@ -517,10 +517,12 @@ final class EmailController
                 $html .= '<hr style="border:0;border-top:1px solid #ddd;margin:24px 0 14px">'
                     . '<p style="font:14px Arial,sans-serif;line-height:1.7">Visitá nuestra web: <a href="' . $siteUrl . '">www.perfushopping.com.ar</a><br>'
                     . 'WhatsApp: <a href="' . $whatsAppUrl . '">3482 765798</a></p>'
+                    . '<p style="font:14px Arial,sans-serif;line-height:1.6">Si te gusta, te lo podemos enviar donde estés… estamos para servirte.</p>'
                     . '<p style="margin:18px 0"><a href="' . htmlspecialchars($replyUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" style="display:inline-block;padding:11px 22px;border-radius:6px;background:#b13d68;color:#fff;text-decoration:none;font-weight:bold">Responder</a></p>';
                 $plain = $body . $inlineImagePlain . $attachedPdfPlain
                     . "\n\nVisitá nuestra web: www.perfushopping.com.ar"
                     . "\nWhatsApp: 3482 765798 (" . $whatsAppUrl . ')'
+                    . "\nSi te gusta, te lo podemos enviar donde estés… estamos para servirte."
                     . "\nResponder: " . $replyUrl;
                 $headers = [];
                 if ($includeUnsubscribe) {

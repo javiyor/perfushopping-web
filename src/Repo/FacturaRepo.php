@@ -372,7 +372,7 @@ final class FacturaRepo
         return $prefix . str_pad((string)($count + 1), 4, '0', STR_PAD_LEFT);
     }
 
-    public function create(array $data, array $items, array $pagos): int
+    public function create(array $data, array $items, array $pagos, array $promoUsos = []): int
     {
         $this->ensureEntregaColumns();
         $hasOrder = $this->ensureOrderColumn();
@@ -380,6 +380,7 @@ final class FacturaRepo
         $hasComprobanteAsociado = $this->ensureComprobanteAsociadoColumn();
         \Perfushopping\Web\Repo\VoucherRegaloRepo::ensureTable();
         $this->prepararColumnasItemsYPagos();
+        if ($promoUsos) (new \Perfushopping\Web\Repo\PosProductPromoRepo())->ensureTables();
         $orderCol = $hasOrder ? ', order_id' : '';
         $orderVal = $hasOrder ? ', :order_id' : '';
         $sucursalCol = $hasSucursal ? ', sucursal_id' : '';
@@ -453,6 +454,7 @@ $st = $pdo->prepare('
                     \Perfushopping\Web\Repo\VoucherRegaloRepo::canjearEnFactura($voucherCode, (int)$pago['monto_cents'], $id);
                 }
             }
+            if ($promoUsos) (new \Perfushopping\Web\Repo\PosProductPromoRepo())->reservarUnidades($id, $promoUsos);
 
             $pdo->commit();
             return $id;
@@ -964,6 +966,16 @@ $st = $pdo->prepare('
                     }
                 }
             }
+        }
+
+        $promoMap = (new \Perfushopping\Web\Repo\PosProductPromoRepo())->ofertasActivas(array_column($products, 'idprodu'));
+        foreach ($products as $idx => $product) {
+            $promo = $promoMap[(int)($product['idprodu'] ?? 0)] ?? null;
+            if (!$promo) continue;
+            $products[$idx]['promo_pos_final_cents'] = (int)$promo['precio_final_cents'];
+            $products[$idx]['promo_pos_remaining'] = $promo['unidades_disponibles'] === null ? null : (int)$promo['unidades_disponibles'];
+            $products[$idx]['promo_pos_version'] = (string)$promo['offer_version'];
+            $products[$idx]['promo_pos_until'] = (string)($promo['fecha_hasta'] ?? '');
         }
 
         return $products;

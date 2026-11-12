@@ -334,12 +334,13 @@ final class FacturaController
             (int)($cliente['idclien'] ?? 0) ?: null
         );
 
-        $itemsData = $this->normalizarItems($input['items']);
-        $items = $itemsData['items'];
-        $subtotal = $itemsData['subtotal'];
-        $ivaTotal = $itemsData['iva'];
-
         try {
+            $promoEligible = !in_array($tipo, ['NC', 'ND'], true)
+                && $this->pagosCalificanPromo((array)($input['pagos'] ?? []), (string)($input['forma_pago'] ?? 'efectivo'));
+            $itemsData = $this->normalizarItems($input['items'], $promoEligible);
+            $items = $itemsData['items'];
+            $subtotal = $itemsData['subtotal'];
+            $ivaTotal = $itemsData['iva'];
             $pagos = $this->normalizarPagos($input['pagos'] ?? [], $input, (int)$adminUser['id'], $clienteNombre, $subtotal + $ivaTotal);
         } catch (\InvalidArgumentException $e) {
             Response::json(['ok'=>false,'error'=>$e->getMessage()], 422);
@@ -449,6 +450,16 @@ final class FacturaController
             Response::json(['ok'=>false,'error'=>'El voucher se canjea por su valor completo. Completá o ajustá los demás medios para cubrir exactamente la compra.'], 422);
             return;
         }
+        $excesoSinEfectivo = max(0, $pagadoCents - $totalFacturado);
+        foreach (array_reverse($pagos) as $pago) {
+            if ($excesoSinEfectivo <= 0) break;
+            if (\Perfushopping\Web\Repo\FormaPagoRepo::tipoDe((string)($pago['forma_pago'] ?? '')) !== 'efectivo') continue;
+            $excesoSinEfectivo -= min($excesoSinEfectivo, (int)($pago['monto_cents'] ?? 0));
+        }
+        if (!empty($itemsData['promo_usos']) && $excesoSinEfectivo > 0) {
+            Response::json(['ok' => false, 'error' => 'Los pagos que no son en efectivo no pueden superar el total facturado. Ajustá los importes de pago.'], 422);
+            return;
+        }
         $formaPago = $pagos[0]['forma_pago'] ?? 'efectivo';
 
         if ($this->montoCuentaCorriente($pagos) > 0
@@ -510,7 +521,7 @@ final class FacturaController
         while (true) {
             try {
                 $facturaData['codigo'] = $codigo;
-                $id = $repo->create($facturaData, $items, $pagos);
+                $id = $repo->create($facturaData, $items, $pagos, $itemsData['promo_usos'] ?? []);
                 break;
             } catch (\PDOException $e) {
                 $esDuplicado = ((int)($e->errorInfo[1] ?? 0) === 1062) && stripos($e->getMessage(), 'codigo') !== false;
@@ -638,17 +649,59 @@ final class FacturaController
         return $nombre !== '' ? $nombre : 'Consumidor Final';
     }
 
-    /** @return array{items:array,subtotal:int,iva:int} */
-    private function normalizarItems(array $rawItems): array
+    private function pagosCalificanPromo(array $rawPayments, string $fallbackForma = ''): bool
     {
+        $formas = [];
+        foreach ($rawPayments as $payment) {
+            if (!is_array($payment) || (int)($payment['monto_cents'] ?? 0) <= 0) continue;
+            $formas[] = trim((string)($payment['forma_pago'] ?? ''));
+        }
+        if (!$formas) {
+            $fallbackForma = trim($fallbackForma);
+            if ($fallbackForma === '') return false;
+            $formas[] = $fallbackForma;
+        }
+        foreach ($formas as $forma) {
+            if (!in_array($forma, ['efectivo', 'transferencia'], true)) return false;
+        }
+        return true;
+    }
+
+    private function netoPromoCents(int $precioFinalCents, float $ivaRate): int
+    {
+        if ($ivaRate <= 0) return $precioFinalCents;
+        $estimate = max(0, (int)round($precioFinalCents / (1 + $ivaRate / 100)));
+        $best = $estimate;
+        $bestDiff = PHP_INT_MAX;
+        for ($net = max(0, $estimate - 3); $net <= $estimate + 3; $net++) {
+            $final = $net + (int)round($net * $ivaRate / 100);
+            $difference = abs($final - $precioFinalCents);
+            if ($difference < $bestDiff) {
+                $best = $net;
+                $bestDiff = $difference;
+            }
+            if ($difference === 0) return $net;
+        }
+        return $best;
+    }
+
+    /** @return array{items:array,subtotal:int,iva:int,promo_usos:array} */
+    private function normalizarItems(array $rawItems, bool $promoEligible = false): array
+    {
+        $promoMap = [];
+        if ($promoEligible) {
+            $promoMap = (new \Perfushopping\Web\Repo\PosProductPromoRepo())->ofertasActivas(
+                array_map(static fn(array $it): int => (int)($it['idprodu'] ?? 0), $rawItems)
+            );
+        }
         $items = [];
         $subtotal = 0;
         $ivaTotal = 0;
-        foreach ($rawItems as $it) {
-            $qty = max(1, (int)($it['qty'] ?? 1));
-            $unitPrice = max(0, (int)($it['unit_price_cents'] ?? 0));
-            $ivaRate = (float)($it['iva_rate'] ?? 21);
-            $dtoPct = min(100.0, max(0.0, (float)($it['descuento_pct'] ?? 0)));
+        $promoUsos = [];
+        $promoUnitsByProduct = [];
+
+        $append = static function (array $it, int $qty, int $unitPrice, float $ivaRate, float $dtoPct, int $promoQty = 0, string $promoVersion = '') use (&$items, &$subtotal, &$ivaTotal): void {
+            if ($qty <= 0) return;
             $lineNet = (int)round($qty * $unitPrice * (1 - $dtoPct / 100));
             $lineIva = $ivaRate > 0 ? (int)round($lineNet * $ivaRate / 100) : 0;
             $items[] = [
@@ -662,11 +715,51 @@ final class FacturaController
                 'descuento_pct' => $dtoPct,
                 'iva_cents' => $lineIva,
                 'total_cents' => $lineNet + $lineIva,
+                'promo_pos_aplicada' => $promoQty > 0,
+                'promo_pos_offer_version' => $promoQty > 0 ? $promoVersion : null,
             ];
             $subtotal += $lineNet;
             $ivaTotal += $lineIva;
+        };
+
+        foreach ($rawItems as $it) {
+            $qty = max(1, (int)($it['qty'] ?? 1));
+            $unitPrice = max(0, (int)($it['unit_price_cents'] ?? 0));
+            $ivaRate = (float)($it['iva_rate'] ?? 21);
+            $dtoPct = min(100.0, max(0.0, (float)($it['descuento_pct'] ?? 0)));
+            $productId = (int)($it['idprodu'] ?? 0);
+            $requestedVersion = trim((string)($it['promo_pos_version'] ?? ''));
+            $promoQty = 0;
+            $offer = null;
+            if ($promoEligible && $requestedVersion !== '' && $productId > 0) {
+                $offer = $promoMap[$productId] ?? null;
+                if (!$offer || !hash_equals((string)$offer['offer_version'], $requestedVersion)) {
+                    throw new \InvalidArgumentException('La oferta de ' . trim((string)($it['producto'] ?? 'este producto')) . ' cambió o ya venció. Volvé a buscarlo antes de facturar.');
+                }
+                $clientPromoQty = max(0, min($qty, (int)($it['promo_pos_units'] ?? 0)));
+                $regularFinalCents = $unitPrice + (int)round($unitPrice * $ivaRate / 100);
+                if ((int)$offer['precio_final_cents'] < $regularFinalCents) {
+                    $remaining = $offer['unidades_disponibles'] === null ? PHP_INT_MAX : max(0, (int)$offer['unidades_disponibles'] - (int)($promoUnitsByProduct[$productId] ?? 0));
+                    $promoQty = min($qty, $remaining);
+                }
+                if ($clientPromoQty !== $promoQty) {
+                    throw new \InvalidArgumentException('Cambió la cantidad disponible de la oferta de ' . trim((string)($it['producto'] ?? 'este producto')) . '. Revisá el carrito antes de facturar.');
+                }
+                $promoUnitsByProduct[$productId] = ($promoUnitsByProduct[$productId] ?? 0) + $promoQty;
+            }
+
+            if ($promoQty > 0 && $offer) {
+                $promoNet = $this->netoPromoCents((int)$offer['precio_final_cents'], $ivaRate);
+                $append($it, $promoQty, $promoNet, $ivaRate, $dtoPct, $promoQty, $requestedVersion);
+                $promoUsos[$productId] = [
+                    'unidades' => ($promoUsos[$productId]['unidades'] ?? 0) + $promoQty,
+                    'offer_version' => $requestedVersion,
+                ];
+            }
+            $regularQty = $qty - $promoQty;
+            if ($regularQty > 0) $append($it, $regularQty, $unitPrice, $ivaRate, $dtoPct);
         }
-        return ['items' => $items, 'subtotal' => $subtotal, 'iva' => $ivaTotal];
+        return ['items' => $items, 'subtotal' => $subtotal, 'iva' => $ivaTotal, 'promo_usos' => $promoUsos];
     }
 
     /**
@@ -1001,6 +1094,10 @@ final class FacturaController
             Response::redirect($factura ? '/admin/facturas/' . $id : '/admin/facturas');
             return;
         }
+        if ((new \Perfushopping\Web\Repo\PosProductPromoRepo())->tieneUsosFactura($id)) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Esta factura usó una oferta con cupo promocional y no se puede editar. Anulala y emití una nueva factura.'];
+            Response::redirect('/admin/facturas/' . $id);
+        }
 
         $edicionPendiente = null;
         try {
@@ -1145,6 +1242,16 @@ final class FacturaController
                 return;
             }
             Response::json(['ok' => false, 'error' => $motivo], 422);
+            return;
+        }
+        if ((new \Perfushopping\Web\Repo\PosProductPromoRepo())->tieneUsosFactura($editarId)) {
+            $message = 'Esta factura usó una oferta con cupo promocional y no se puede editar. Anulala y emití una nueva factura.';
+            if ($approvalRequestId > 0 && $approvalRepo) {
+                $approvalRepo->marcarObsoletaPendiente($approvalRequestId, (int)$adminUser['id'], (string)($adminUser['nombre'] ?? ''), $message);
+                Response::json(['ok' => false, 'error' => $message . ' La solicitud quedó obsoleta.'], 409);
+                return;
+            }
+            Response::json(['ok' => false, 'error' => $message], 422);
             return;
         }
         try {
@@ -1681,6 +1788,10 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
 
         $repo->updateEstado($id, $estado);
 
+        if ($estado === 'anulada' && $oldEstado !== 'anulada') {
+            (new \Perfushopping\Web\Repo\PosProductPromoRepo())->liberarFactura($id);
+        }
+
         // Restore stock if factura is anulated (un solo movimiento). Anular una
         // NC quita lo devuelto del depósito de origen. La ND no mueve stock.
         if ($estado === 'anulada' && $oldEstado !== 'anulada') {
@@ -1777,6 +1888,7 @@ $puntosRepo = new \Perfushopping\Web\Repo\PuntosRepo();
         }
 
         $repo->delete($id);
+        (new \Perfushopping\Web\Repo\PosProductPromoRepo())->liberarFactura($id);
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Factura eliminada.'];
         Response::redirect('/admin/facturas');
     }

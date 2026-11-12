@@ -19,6 +19,8 @@ $selectedId = (int)$product['idprodu'];
 $selectedIva = (float)($product['tiva'] ?? 0);
 $priceGross = number_format((float)($product['precio'] ?? 0) * (1 + ($selectedIva / 100)), 2, '.', '');
 $price1Gross = number_format((float)($product['precio1'] ?? 0) * (1 + ($selectedIva / 100)), 2, '.', '');
+$posPromoOferta = $posPromoOferta ?? null;
+$promoFinalGrossInput = !empty($posPromoOferta['activo']) && !empty($posPromoOferta['precio_final_cents']) ? number_format((int)$posPromoOferta['precio_final_cents'] / 100, 2, '.', '') : '';
 $mainImg = Format::uploadUrl((string)($product['imagen'] ?? ''));
 $formatDate = static fn(string $d): string => (trim($d) === '' || $d === '0000-00-00') ? '-' : $d;
 
@@ -191,12 +193,37 @@ foreach ($proveedores as $prov) {
                                 </div>
                             </div>
 
-                                <div class="mb-1">
-                                    <label class="form-label small">Neto calculado</label>
+                            <div class="mb-1">
+                                <label class="form-label small">Neto calculado</label>
                                     <div class="form-control form-control-sm bg-light text-muted" id="netoCalculado" style="cursor:default" readonly>
                                         Minorista $<?= number_format((float)($product['precio'] ?? 0), 2, ',', '.') ?> | Mayorista $<?= number_format((float)($product['precio1'] ?? 0), 2, ',', '.') ?>
+                                </div>
+                            </div>
+
+                            <div class="border rounded p-2 my-2 bg-light">
+                                <div class="fw-semibold small mb-2">Oferta POS · solo efectivo o transferencia</div>
+                                <div class="row g-2">
+                                    <div class="col-md-4">
+                                        <label class="form-label small mb-1">Precio final promo (IVA incluido)</label>
+                                        <input class="form-control form-control-sm" name="promo_final_gross" type="number" min="0" step="0.01" value="<?= htmlspecialchars($promoFinalGrossInput) ?>" placeholder="Vacío = sin oferta" />
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small mb-1">Válida hasta</label>
+                                        <input class="form-control form-control-sm" name="promo_fecha_hasta" type="date" value="<?= htmlspecialchars((string)($posPromoOferta['fecha_hasta'] ?? '')) ?>" />
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small mb-1">Unidades promo disponibles</label>
+                                        <input class="form-control form-control-sm" name="promo_unidades_limite" type="number" min="1" step="1" value="<?= !empty($posPromoOferta['unidades_limite']) ? (int)$posPromoOferta['unidades_limite'] : '' ?>" placeholder="Sin límite" />
                                     </div>
                                 </div>
+                                <?php if ($posPromoOferta && !empty($posPromoOferta['activo'])): ?>
+                                <div class="small text-muted mt-2">Vendidas con promo: <?= (int)($posPromoOferta['unidades_vendidas'] ?? 0) ?><?= !empty($posPromoOferta['unidades_limite']) ? ' de ' . (int)$posPromoOferta['unidades_limite'] : '' ?>. Indicá al menos fecha o cantidad; dejá vacío el precio para desactivar.</div>
+                                <?php elseif ($posPromoOferta): ?>
+                                <div class="small text-muted mt-2">Oferta desactivada. Ingresá un precio final y una fecha o cantidad para volver a activarla.</div>
+                                <?php else: ?>
+                                <div class="small text-muted mt-2">La oferta se aplica automáticamente si todos los pagos son en efectivo o transferencia. Configurá fecha, unidades o ambas; dejá el precio vacío para no ofrecer promoción.</div>
+                                <?php endif; ?>
+                            </div>
 
                             <div class="form-check mb-1">
                                 <input class="form-check-input" type="checkbox" name="enweb" id="enweb" <?= ((int)($product['enweb'] ?? 0) === 1) ? 'checked' : '' ?> />

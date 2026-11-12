@@ -180,6 +180,9 @@ final class ProductController
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Producto no encontrado.'];
             Response::redirect('/admin/productos');
         }
+        $promoRepo = new \Perfushopping\Web\Repo\PosProductPromoRepo();
+        $promoRepo->ensureTables();
+        $posPromoOferta = $promoRepo->getForProduct($id);
 
         $variants = $this->repo->variants($id);
         $imagesMap = $this->repo->variantImagesMap(array_map(static fn (array $v): int => (int)($v['idcodgusto'] ?? 0), $variants));
@@ -207,6 +210,7 @@ final class ProductController
         echo View::adminPage('admin/productos/edit.php', [
             'adminUser' => $adminUser,
             'product' => $product,
+            'posPromoOferta' => $posPromoOferta,
             'variants' => $variants,
             'rubros' => $rubros,
             'subrubros' => $subrubros,
@@ -310,8 +314,55 @@ final class ProductController
         $ganan2 = (float)str_replace(',', '.', trim((string)($_POST['ganan2'] ?? '0')));
         $precomp = $this->parseMoney((string)($_POST['precomp'] ?? '')) ?? 0;
 
+        $promoData = null;
+        if (array_key_exists('promo_final_gross', $_POST)) {
+            $promoGrossRaw = trim((string)($_POST['promo_final_gross'] ?? ''));
+            $promoGross = $this->parseMoney($promoGrossRaw);
+            if ($promoGrossRaw !== '' && $promoGross === null) {
+                $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Ingresá un precio final de oferta válido.'];
+                Response::redirect('/admin/productos/' . $idprodu);
+            }
+            $expiryRaw = trim((string)($_POST['promo_fecha_hasta'] ?? ''));
+            $unitsRaw = trim((string)($_POST['promo_unidades_limite'] ?? ''));
+            if ($promoGross !== null && $promoGross > 0) {
+                $expiry = null;
+                if ($expiryRaw !== '') {
+                    $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $expiryRaw);
+                    if (!$date || $date->format('Y-m-d') !== $expiryRaw) {
+                        $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'La fecha de vencimiento de la oferta no es válida.'];
+                        Response::redirect('/admin/productos/' . $idprodu);
+                    }
+                    $expiry = $expiryRaw;
+                }
+                $units = null;
+                if ($unitsRaw !== '') {
+                    if (!ctype_digit($unitsRaw) || (int)$unitsRaw <= 0) {
+                        $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'El límite de unidades debe ser un entero mayor a cero.'];
+                        Response::redirect('/admin/productos/' . $idprodu);
+                    }
+                    $units = (int)$unitsRaw;
+                }
+                if ($expiry === null && $units === null) {
+                    $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'La oferta debe tener una fecha de vencimiento, un límite de unidades o ambos.'];
+                    Response::redirect('/admin/productos/' . $idprodu);
+                }
+                $promoData = ['price_cents' => (int)round($promoGross * 100), 'expires_on' => $expiry, 'units_limit' => $units];
+            } else {
+                $promoData = ['price_cents' => null, 'expires_on' => null, 'units_limit' => null];
+            }
+        }
+
         $ivaRate = (float)($product['tiva'] ?? 0);
         $this->repo->updateProduct($idprodu, $observ, $this->grossToNet($precioBruto, $ivaRate), $this->grossToNet($precio1Bruto, $ivaRate), $enweb, $produ, $codrub, $codsub, $codepar, $codprove, $ganan1, $ganan2, $precomp);
+
+        if ($promoData !== null) {
+            (new \Perfushopping\Web\Repo\PosProductPromoRepo())->saveOffer(
+                $idprodu,
+                $promoData['price_cents'],
+                $promoData['expires_on'],
+                $promoData['units_limit']
+            );
+        }
 
         $this->saveCommercial((int)$idprodu, (array)($_POST['commercial'] ?? []));
 
