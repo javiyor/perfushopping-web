@@ -11,6 +11,8 @@ $pages = max(1, (int)($pages ?? 1));
 $total = (int)($total ?? count($list));
 $pv = (int)($pv ?? 0);
 $puntosVenta = $puntosVenta ?? [];
+$puedeAutorizarEdiciones = is_array($adminUser ?? null)
+    && \Perfushopping\Web\Service\AdminAuthService::adminPuedeAutorizar($adminUser);
 $estados = ['' => 'Todos', 'pendiente' => 'Pendiente', 'emitida' => 'Emitida', 'anulada' => 'Anulada'];
 $queryBase = http_build_query(array_filter(['q' => $q, 'estado' => $estado, 'desde' => $desde, 'hasta' => $hasta, 'pv' => $pv > 0 ? (string)$pv : ''], function($v) { return $v !== ''; }));
 $pageUrl = function($p) use ($queryBase) {
@@ -27,7 +29,10 @@ $tipoBadges = ['FACT-A' => 'primary', 'FACT-B' => 'success', 'FACT-C' => 'second
         <h4 class="fw-bold mb-1">Facturación</h4>
         <p class="text-muted small">Comprobantes emitidos</p>
     </div>
-    <a class="btn btn-accent btn-sm" href="/admin/facturas/nueva"><i class="bi bi-plus-lg"></i> Nueva factura</a>
+    <div class="d-flex gap-2">
+        <?php if ($puedeAutorizarEdiciones): ?><a class="btn btn-outline-primary btn-sm" href="/admin/facturas/ediciones-pendientes"><i class="bi bi-clipboard-check"></i> Ediciones pendientes</a><?php endif; ?>
+        <a class="btn btn-accent btn-sm" href="/admin/facturas/nueva"><i class="bi bi-plus-lg"></i> Nueva factura</a>
+    </div>
 </div>
 
 <div class="card shadow-sm mb-3">

@@ -169,6 +169,7 @@
     <?php
     $adminUser = $adminUser ?? null;
     $adminRol = $adminUser['rol'] ?? '';
+    $puedeAutorizarEdiciones = is_array($adminUser) && \Perfushopping\Web\Service\AdminAuthService::adminPuedeAutorizar($adminUser);
     $adminRolLabel = ['superadmin'=>'Super Admin','ventas'=>'Ventas','administracion'=>'Admin.','compras'=>'Compras','caja'=>'Caja'][$adminRol] ?? '';
     $adminRolBadge = 'badge-' . $adminRol;
 
@@ -211,6 +212,7 @@
             <?php if ($can('presupuestos')): ?><a href="/admin/presupuestos" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Presupuestos a clientes (antes de facturar)"><i class="bi bi-file-text"></i>Presupuestos</a><?php endif; ?>
             <?php if ($can('remitos')): ?><a href="/admin/remitos" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Remitos de entrega y movimiento de stock"><i class="bi bi-receipt"></i>Remitos</a><?php endif; ?>
             <?php if ($can('facturacion')): ?><a href="/admin/facturas" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Facturación POS: emitir facturas y tickets"><i class="bi bi-receipt-cutoff"></i>Facturación</a><?php endif; ?>
+            <?php if ($puedeAutorizarEdiciones): ?><a href="/admin/facturas/ediciones-pendientes" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Revisar y aprobar cambios solicitados en facturas"><i class="bi bi-clipboard-check"></i>Ediciones de facturas</a><?php endif; ?>
             <?php if ($can('pagos') || $can('facturacion')): ?><a href="/admin/facturas/pagos" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Pagos registrados en facturas"><i class="bi bi-cash-coin"></i>Cobros facturas</a><?php endif; ?>
             <?php if ($can('facturacion')): ?><a href="/admin/formas-pago" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Formas de pago disponibles al facturar"><i class="bi bi-credit-card"></i>Formas de pago</a><?php endif; ?>
             <?php if ($can('facturacion')): ?><a href="/admin/envios" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Envíos pendientes: entregas a domicilio y cobros"><i class="bi bi-truck"></i>Envíos<span class="badge-count red" id="badgeEnviosPendientes" style="display:none">0</span></a><?php endif; ?>

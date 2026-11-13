@@ -970,12 +970,23 @@ $st = $pdo->prepare('
 
         $promoMap = (new \Perfushopping\Web\Repo\PosProductPromoRepo())->ofertasActivas(array_column($products, 'idprodu'));
         foreach ($products as $idx => $product) {
-            $promo = $promoMap[(int)($product['idprodu'] ?? 0)] ?? null;
-            if (!$promo) continue;
-            $products[$idx]['promo_pos_final_cents'] = (int)$promo['precio_final_cents'];
-            $products[$idx]['promo_pos_remaining'] = $promo['unidades_disponibles'] === null ? null : (int)$promo['unidades_disponibles'];
-            $products[$idx]['promo_pos_version'] = (string)$promo['offer_version'];
-            $products[$idx]['promo_pos_until'] = (string)($promo['fecha_hasta'] ?? '');
+            $productOffers = $promoMap[(int)($product['idprodu'] ?? 0)] ?? [];
+            foreach ($products[$idx]['variants'] as $vi => $variant) {
+                $promo = $productOffers[(int)($variant['idcodgusto'] ?? 0)] ?? null;
+                if (!$promo) continue;
+                $products[$idx]['variants'][$vi]['promo_pos_final_cents'] = (int)$promo['precio_final_cents'];
+                $products[$idx]['variants'][$vi]['promo_pos_remaining'] = $promo['unidades_disponibles'] === null ? null : (int)$promo['unidades_disponibles'];
+                $products[$idx]['variants'][$vi]['promo_pos_version'] = (string)$promo['offer_version'];
+                $products[$idx]['variants'][$vi]['promo_pos_until'] = (string)($promo['fecha_hasta'] ?? '');
+            }
+            $selectedVariantId = (int)($product['matched_variant_id'] ?? 0);
+            $promo = $selectedVariantId > 0 ? ($productOffers[$selectedVariantId] ?? null) : null;
+            if ($promo) {
+                $products[$idx]['promo_pos_final_cents'] = (int)$promo['precio_final_cents'];
+                $products[$idx]['promo_pos_remaining'] = $promo['unidades_disponibles'] === null ? null : (int)$promo['unidades_disponibles'];
+                $products[$idx]['promo_pos_version'] = (string)$promo['offer_version'];
+                $products[$idx]['promo_pos_until'] = (string)($promo['fecha_hasta'] ?? '');
+            }
         }
 
         return $products;

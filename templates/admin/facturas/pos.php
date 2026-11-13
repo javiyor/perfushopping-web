@@ -587,7 +587,7 @@ function promoUnitsFor(item, index) {
     let alreadyUsed = 0;
     for (let i = 0; i < index && alreadyUsed < totalRemaining; i++) {
         const previous = cart[i];
-        if ((previous.idprodu || 0) !== (item.idprodu || 0) || previous.promo_pos_version !== item.promo_pos_version) continue;
+        if ((previous.idprodu || 0) !== (item.idprodu || 0) || (previous.idcodgusto || 0) !== (item.idcodgusto || 0) || previous.promo_pos_version !== item.promo_pos_version) continue;
         alreadyUsed += Math.min(Math.max(0, parseInt(previous.qty) || 0), totalRemaining - alreadyUsed);
     }
     return Math.min(Math.max(0, parseInt(item.qty) || 0), Math.max(0, totalRemaining - alreadyUsed));
@@ -790,10 +790,12 @@ function showVariantPicker(p, priceCents, precio1Cents, ivaRate) {
         const cs = v.codscan ? ' (' + v.codscan + ')' : '';
         const vStockDep = v.stock_deposito ?? 0;
         const vStockTot = v.stock_total ?? 0;
+        const vPromo = Number(v.promo_pos_final_cents || 0);
+        const vPromoHint = vPromo > 0 && v.promo_pos_version ? ' · <span class="text-success fw-semibold">Promo $' + fmtPrice(vPromo) + (v.promo_pos_remaining !== null ? ' (' + Number(v.promo_pos_remaining) + ' disponibles)' : '') + '</span>' : '';
         html += '<div class="suggestion-item variant-item" data-id="' + v.idcodgusto + '" data-nom="' + esc(v.nomgusto) + '" data-cod="' + esc(String(v.idcodgusto)) + '">'
             + esc(v.nomgusto) + cs + ' <span class="text-muted" style="font-size:10px">#'+v.idcodgusto+'</span>'
             + ' <span class="text-success" style="font-size:11px">Dep: ' + vStockDep + '</span>'
-            + ' <span class="text-muted" style="font-size:11px">Total: ' + vStockTot + '</span>'
+            + ' <span class="text-muted" style="font-size:11px">Total: ' + vStockTot + '</span>' + vPromoHint
             + '</div>';
     });
     html += '</div></div>';
@@ -813,10 +815,10 @@ function showVariantPicker(p, priceCents, precio1Cents, ivaRate) {
                 qty: 1,
                 unit_price_cents: priceCents,
                 precio1_cents: precio1Cents,
-                promo_pos_final_cents: p.promo_pos_final_cents || 0,
-                promo_pos_remaining: p.promo_pos_remaining,
-                promo_pos_version: p.promo_pos_version || '',
-                promo_pos_until: p.promo_pos_until || '',
+                promo_pos_final_cents: v.promo_pos_final_cents || 0,
+                promo_pos_remaining: v.promo_pos_remaining,
+                promo_pos_version: v.promo_pos_version || '',
+                promo_pos_until: v.promo_pos_until || '',
                 iva_rate: ivaRate,
                 fecompra: p.fecompra || '',
             });

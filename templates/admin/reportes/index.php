@@ -6,6 +6,14 @@ $hasta = (string)($hasta ?? date('Y-m-d'));
 $puntoVenta = (int)($puntoVenta ?? 0);
 $puntosVenta = $puntosVenta ?? [];
 ?>
+<style>
+.report-chart-half { position: relative; width: 100%; }
+.report-chart-half--55 { height: 55px; }
+.report-chart-half--70 { height: 70px; }
+.report-chart-half--75 { height: 75px; }
+.report-chart-half--90 { height: 90px; }
+.report-chart-half--110 { height: 110px; }
+</style>
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
         <h4 class="fw-bold mb-1">Reportes</h4>
@@ -131,7 +139,7 @@ $puntosVenta = $puntosVenta ?? [];
             <div class="card shadow-sm">
                 <div class="card-header bg-white fw-semibold">Comparativa del período</div>
                 <div class="card-body">
-                    <canvas id="comparativaPeriodoChart" height="110"></canvas>
+                    <div class="report-chart-half report-chart-half--55"><canvas id="comparativaPeriodoChart"></canvas></div>
                     <div class="small text-muted mt-2" id="comparativaPeriodoDetalle"></div>
                     <div class="mt-3" id="resumenGastosCuentas"></div>
                     <div class="small text-muted">Las ventas y la ganancia respetan el punto de venta seleccionado. Compras y gastos son globales y se filtran por fecha; Compras incluye comprobantes no anulados y gastos en Bienes de cambio, las notas de crédito restan y las monedas extranjeras usan su tipo de cambio.</div>
@@ -155,7 +163,7 @@ $puntosVenta = $puntosVenta ?? [];
             <div class="card shadow-sm h-100">
                 <div class="card-header bg-white fw-semibold">Comparativa mensual del valor de inventario</div>
                 <div class="card-body">
-                    <canvas id="inventarioChart" height="150"></canvas>
+                    <div class="report-chart-half report-chart-half--75"><canvas id="inventarioChart"></canvas></div>
                     <div class="small text-muted mt-2" id="inventarioSinHistorial" style="display:none">Todavía no hay capturas de meses anteriores. Se irán agregando en la primera consulta de cada mes.</div>
                 </div>
             </div>
@@ -182,7 +190,7 @@ $puntosVenta = $puntosVenta ?? [];
             <div class="card shadow-sm">
                 <div class="card-header bg-white fw-semibold">Ventas diarias</div>
                 <div class="card-body">
-                    <canvas id="ventasChart" height="220"></canvas>
+                    <div class="report-chart-half report-chart-half--110"><canvas id="ventasChart"></canvas></div>
                 </div>
             </div>
         </div>
@@ -191,7 +199,7 @@ $puntosVenta = $puntosVenta ?? [];
             <div class="card shadow-sm">
                 <div class="card-header bg-white fw-semibold">Formas de pago</div>
                 <div class="card-body">
-                    <canvas id="formasChart" height="180"></canvas>
+                    <div class="report-chart-half report-chart-half--90"><canvas id="formasChart"></canvas></div>
                 </div>
                 <div class="card-body p-0">
                     <table class="table table-admin mb-0">
@@ -216,7 +224,7 @@ $puntosVenta = $puntosVenta ?? [];
             <div class="card shadow-sm">
                 <div class="card-header bg-white fw-semibold">Ventas mensuales (24 meses)</div>
                 <div class="card-body">
-                    <canvas id="mensualChart" height="220"></canvas>
+                    <div class="report-chart-half report-chart-half--110"><canvas id="mensualChart"></canvas></div>
                 </div>
             </div>
         </div>
@@ -228,7 +236,7 @@ $puntosVenta = $puntosVenta ?? [];
             <div class="card shadow-sm">
                 <div class="card-header bg-white fw-semibold">Ventas por sucursal</div>
                 <div class="card-body">
-                    <canvas id="sucursalChart" height="140"></canvas>
+                    <div class="report-chart-half report-chart-half--70"><canvas id="sucursalChart"></canvas></div>
                 </div>
                 <div class="table-responsive">
                     <table class="table table-admin mb-0">
@@ -321,7 +329,7 @@ $puntosVenta = $puntosVenta ?? [];
             <div class="card shadow-sm">
                 <div class="card-header bg-white fw-semibold">Ventas por actividad/departamento (departa.codactiv)</div>
                 <div class="card-body">
-                    <canvas id="departamentoChart" height="150"></canvas>
+                    <div class="report-chart-half report-chart-half--75"><canvas id="departamentoChart"></canvas></div>
                 </div>
                 <div class="table-responsive">
                     <table class="table table-admin mb-0">
@@ -472,6 +480,7 @@ function cargarReportes() {
                 options: {
                     indexAxis: 'y',
                     responsive: true,
+                    maintainAspectRatio: false,
                     plugins: {legend: {display: true}, tooltip: {callbacks: {label: ctx => ctx.dataset.label + ': ' + fmtCents(Math.round(ctx.parsed.x * 100))}}},
                     scales: {x: {beginAtZero: true, stacked: true, ticks: {callback: value => '$' + Number(value).toLocaleString('es-AR')}}, y: {stacked: true}},
                 },
@@ -501,7 +510,7 @@ function cargarReportes() {
                         tension: 0.2,
                     }],
                 },
-                options: {responsive: true, plugins: {tooltip: {callbacks: {label: ctx => fmtCents(Math.round(ctx.parsed.y * 100))}}}, scales: {y: {beginAtZero: true}}},
+                options: {responsive: true, maintainAspectRatio: false, plugins: {tooltip: {callbacks: {label: ctx => fmtCents(Math.round(ctx.parsed.y * 100))}}}, scales: {y: {beginAtZero: true}}},
             });
 
             document.getElementById('kpiAutorizadas').textContent = fmtCents(parseInt(aut.total_cents ?? 0));
@@ -562,6 +571,7 @@ function cargarReportes() {
                 },
                 options: {
                     responsive: true,
+                    maintainAspectRatio: false,
                     plugins: { legend: { position: 'top' } },
                     scales: {
                         y: { beginAtZero: true, title: { display: true, text: '$' } },
@@ -591,7 +601,7 @@ function cargarReportes() {
                         labels: formas.map(f => fpLabels[f.forma_pago] || f.forma_pago),
                         datasets: [{ data: formas.map(f => parseInt(f.total_cents || 0) / 100), backgroundColor: chartColors(formas.length) }],
                     },
-                    options: { responsive: true, plugins: { legend: { position: 'bottom' } } },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } },
                 });
             }
 
@@ -615,7 +625,7 @@ function cargarReportes() {
                         labels: mens.map(x => x.mes),
                         datasets: [{ label: 'Ventas ($)', data: mens.map(x => parseInt(x.total_cents || 0) / 100), backgroundColor: 'rgba(216, 178, 90, 0.7)', borderColor: 'rgba(216, 178, 90, 1)', borderWidth: 1 }],
                     },
-                    options: { responsive: true, plugins: { legend: { position: 'top' } }, scales: { y: { beginAtZero: true } } },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } }, scales: { y: { beginAtZero: true } } },
                 });
             }
 
@@ -664,7 +674,7 @@ function cargarReportes() {
                             { label: 'Gastos ($)', data: sucs.map(s => parseInt(s.gastos_cents || 0) / 100), backgroundColor: 'rgba(220, 53, 69, 0.6)', borderColor: 'rgba(220, 53, 69, 1)', borderWidth: 1 },
                         ],
                     },
-                    options: { responsive: true, plugins: { legend: { display: true } }, scales: { y: { beginAtZero: true } } },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true } }, scales: { y: { beginAtZero: true } } },
                 });
             }
 
@@ -726,6 +736,7 @@ function cargarReportes() {
                 options: {
                     indexAxis: 'y',
                     responsive: true,
+                    maintainAspectRatio: false,
                     plugins: {legend: {display: false}, tooltip: {callbacks: {label: ctx => fmtCents(Math.round(ctx.parsed.x * 100))}}},
                     scales: {x: {beginAtZero: true, ticks: {callback: value => '$' + Number(value).toLocaleString('es-AR')}}},
                 },

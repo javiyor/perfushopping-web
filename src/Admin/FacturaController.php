@@ -698,7 +698,7 @@ final class FacturaController
         $subtotal = 0;
         $ivaTotal = 0;
         $promoUsos = [];
-        $promoUnitsByProduct = [];
+        $promoUnitsByVariant = [];
 
         $append = static function (array $it, int $qty, int $unitPrice, float $ivaRate, float $dtoPct, int $promoQty = 0, string $promoVersion = '') use (&$items, &$subtotal, &$ivaTotal): void {
             if ($qty <= 0) return;
@@ -728,38 +728,42 @@ final class FacturaController
             $ivaRate = (float)($it['iva_rate'] ?? 21);
             $dtoPct = min(100.0, max(0.0, (float)($it['descuento_pct'] ?? 0)));
             $productId = (int)($it['idprodu'] ?? 0);
+            $variantId = (int)($it['idcodgusto'] ?? 0);
+            $promoKey = $productId . ':' . $variantId;
             $requestedVersion = trim((string)($it['promo_pos_version'] ?? ''));
             $promoQty = 0;
             $offer = null;
-            if ($promoEligible && $requestedVersion !== '' && $productId > 0) {
-                $offer = $promoMap[$productId] ?? null;
+            if ($promoEligible && $requestedVersion !== '' && $productId > 0 && $variantId > 0) {
+                $offer = $promoMap[$productId][$variantId] ?? null;
                 if (!$offer || !hash_equals((string)$offer['offer_version'], $requestedVersion)) {
                     throw new \InvalidArgumentException('La oferta de ' . trim((string)($it['producto'] ?? 'este producto')) . ' cambió o ya venció. Volvé a buscarlo antes de facturar.');
                 }
                 $clientPromoQty = max(0, min($qty, (int)($it['promo_pos_units'] ?? 0)));
                 $regularFinalCents = $unitPrice + (int)round($unitPrice * $ivaRate / 100);
                 if ((int)$offer['precio_final_cents'] < $regularFinalCents) {
-                    $remaining = $offer['unidades_disponibles'] === null ? PHP_INT_MAX : max(0, (int)$offer['unidades_disponibles'] - (int)($promoUnitsByProduct[$productId] ?? 0));
+                    $remaining = $offer['unidades_disponibles'] === null ? PHP_INT_MAX : max(0, (int)$offer['unidades_disponibles'] - (int)($promoUnitsByVariant[$promoKey] ?? 0));
                     $promoQty = min($qty, $remaining);
                 }
                 if ($clientPromoQty !== $promoQty) {
                     throw new \InvalidArgumentException('Cambió la cantidad disponible de la oferta de ' . trim((string)($it['producto'] ?? 'este producto')) . '. Revisá el carrito antes de facturar.');
                 }
-                $promoUnitsByProduct[$productId] = ($promoUnitsByProduct[$productId] ?? 0) + $promoQty;
+                $promoUnitsByVariant[$promoKey] = ($promoUnitsByVariant[$promoKey] ?? 0) + $promoQty;
             }
 
             if ($promoQty > 0 && $offer) {
                 $promoNet = $this->netoPromoCents((int)$offer['precio_final_cents'], $ivaRate);
                 $append($it, $promoQty, $promoNet, $ivaRate, $dtoPct, $promoQty, $requestedVersion);
-                $promoUsos[$productId] = [
-                    'unidades' => ($promoUsos[$productId]['unidades'] ?? 0) + $promoQty,
+                $promoUsos[$promoKey] = [
+                    'idprodu' => $productId,
+                    'idcodgusto' => $variantId,
+                    'unidades' => ($promoUsos[$promoKey]['unidades'] ?? 0) + $promoQty,
                     'offer_version' => $requestedVersion,
                 ];
             }
             $regularQty = $qty - $promoQty;
             if ($regularQty > 0) $append($it, $regularQty, $unitPrice, $ivaRate, $dtoPct);
         }
-        return ['items' => $items, 'subtotal' => $subtotal, 'iva' => $ivaTotal, 'promo_usos' => $promoUsos];
+        return ['items' => $items, 'subtotal' => $subtotal, 'iva' => $ivaTotal, 'promo_usos' => array_values($promoUsos)];
     }
 
     /**
