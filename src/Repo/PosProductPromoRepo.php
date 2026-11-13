@@ -59,25 +59,23 @@ final class PosProductPromoRepo
         }
     }
 
-    public function getOfertasProducto(int $idprodu): array
+    public function getForProduct(int $idprodu): ?array
     {
-        if ($idprodu <= 0) return [];
+        if ($idprodu <= 0) return null;
         $this->ensureTables();
-        $st = Db::pdo()->prepare('SELECT * FROM producto_promos_pos WHERE idprodu = :id ORDER BY idcodgusto ASC');
+        $st = Db::pdo()->prepare('SELECT * FROM producto_promos_pos WHERE idprodu = :id AND idcodgusto = 0 LIMIT 1');
         $st->execute([':id' => $idprodu]);
-        $offers = [];
-        foreach ($st->fetchAll() as $row) $offers[(int)$row['idcodgusto']] = $row;
-        return $offers;
+        return $st->fetch() ?: null;
     }
 
-    public function saveOffer(int $idprodu, int $idcodgusto, ?int $priceCents, ?string $expiresOn, ?int $unitsLimit): void
+    public function saveOffer(int $idprodu, ?int $priceCents, ?string $expiresOn, ?int $unitsLimit): void
     {
         $this->ensureTables();
         if ($idprodu <= 0) throw new \InvalidArgumentException('Producto inválido para configurar la oferta.');
         $priceCents = max(0, (int)($priceCents ?? 0));
         if ($priceCents === 0) {
-            Db::pdo()->prepare('UPDATE producto_promos_pos SET activo = 0, updated_at = NOW() WHERE idprodu = :id AND idcodgusto = :gusto LIMIT 1')
-                ->execute([':id' => $idprodu, ':gusto' => max(0, $idcodgusto)]);
+            Db::pdo()->prepare('UPDATE producto_promos_pos SET activo = 0, updated_at = NOW() WHERE idprodu = :id AND idcodgusto = 0 LIMIT 1')
+                ->execute([':id' => $idprodu]);
             return;
         }
         if ($expiresOn === null && $unitsLimit === null) {
@@ -87,8 +85,8 @@ final class PosProductPromoRepo
         $pdo = Db::pdo();
         $pdo->beginTransaction();
         try {
-            $st = $pdo->prepare('SELECT * FROM producto_promos_pos WHERE idprodu = :id AND idcodgusto = :gusto LIMIT 1 FOR UPDATE');
-            $st->execute([':id' => $idprodu, ':gusto' => max(0, $idcodgusto)]);
+            $st = $pdo->prepare('SELECT * FROM producto_promos_pos WHERE idprodu = :id AND idcodgusto = 0 LIMIT 1 FOR UPDATE');
+            $st->execute([':id' => $idprodu]);
             $old = $st->fetch() ?: null;
             $sameOffer = $old
                 && (int)($old['activo'] ?? 0) === 1
@@ -99,13 +97,12 @@ final class PosProductPromoRepo
             $unitsSold = $sameOffer ? (int)($old['unidades_vendidas'] ?? 0) : 0;
             $upsert = $pdo->prepare('INSERT INTO producto_promos_pos
                 (idprodu, idcodgusto, precio_final_cents, fecha_hasta, unidades_limite, unidades_vendidas, offer_version, activo, updated_at)
-                VALUES (:id, :gusto, :price, :expires, :units, :sold, :version, 1, NOW())
+                VALUES (:id, 0, :price, :expires, :units, :sold, :version, 1, NOW())
                 ON DUPLICATE KEY UPDATE precio_final_cents = VALUES(precio_final_cents), fecha_hasta = VALUES(fecha_hasta),
                     unidades_limite = VALUES(unidades_limite), unidades_vendidas = VALUES(unidades_vendidas),
                     offer_version = VALUES(offer_version), activo = 1, updated_at = NOW()');
             $upsert->execute([
                 ':id' => $idprodu,
-                ':gusto' => max(0, $idcodgusto),
                 ':price' => $priceCents,
                 ':expires' => $expiresOn,
                 ':units' => $unitsLimit,
@@ -119,23 +116,24 @@ final class PosProductPromoRepo
         }
     }
 
-    /** @param array<int,int> $productIds @return array<int,array<int,array<string,mixed>>> keyed by product id then variety id */
+    /** @param array<int,int> $productIds @return array<int,array<string,mixed>> keyed by product id */
     public function ofertasActivas(array $productIds): array
     {
         $ids = array_values(array_unique(array_filter(array_map('intval', $productIds), static fn(int $id): bool => $id > 0)));
         if (!$ids) return [];
         try {
-            $st = Db::pdo()->prepare('SELECT idprodu, idcodgusto, precio_final_cents, fecha_hasta, unidades_limite,
+            $st = Db::pdo()->prepare('SELECT idprodu, precio_final_cents, fecha_hasta, unidades_limite,
                     unidades_vendidas, offer_version,
                     CASE WHEN unidades_limite IS NULL THEN NULL ELSE GREATEST(0, unidades_limite - unidades_vendidas) END AS unidades_disponibles
                 FROM producto_promos_pos
                 WHERE activo = 1
                   AND (fecha_hasta IS NULL OR fecha_hasta >= CURDATE())
                   AND (unidades_limite IS NULL OR unidades_vendidas < unidades_limite)
+                  AND idcodgusto = 0
                   AND idprodu IN (' . implode(',', array_fill(0, count($ids), '?')) . ')');
             $st->execute($ids);
             $out = [];
-            foreach ($st->fetchAll() as $row) $out[(int)$row['idprodu']][(int)$row['idcodgusto']] = $row;
+            foreach ($st->fetchAll() as $row) $out[(int)$row['idprodu']] = $row;
             return $out;
         } catch (\Throwable $e) {
             return [];
@@ -148,22 +146,21 @@ final class PosProductPromoRepo
         $pdo = Db::pdo();
         $update = $pdo->prepare("UPDATE producto_promos_pos
             SET unidades_vendidas = unidades_vendidas + :add_units, updated_at = NOW()
-            WHERE idprodu = :id AND idcodgusto = :gusto AND activo = 1 AND offer_version = :version
+            WHERE idprodu = :id AND idcodgusto = 0 AND activo = 1 AND offer_version = :version
               AND (fecha_hasta IS NULL OR fecha_hasta >= CURDATE())
               AND (unidades_limite IS NULL OR unidades_vendidas + :check_units <= unidades_limite)");
         $insert = $pdo->prepare('INSERT INTO producto_pos_promo_usos (factura_id, idprodu, idcodgusto, offer_version, unidades, created_at)
-            VALUES (:factura, :id, :gusto, :version, :units, NOW())');
-        foreach ($usos as $usage) {
-            $idprodu = (int)($usage['idprodu'] ?? 0);
-            $idcodgusto = (int)($usage['idcodgusto'] ?? 0);
+            VALUES (:factura, :id, 0, :version, :units, NOW())');
+        foreach ($usos as $idprodu => $usage) {
+            $idprodu = (int)$idprodu;
             $units = max(0, (int)($usage['unidades'] ?? 0));
             $version = trim((string)($usage['offer_version'] ?? ''));
             if ($idprodu <= 0 || $units <= 0 || $version === '') continue;
-            $update->execute([':add_units' => $units, ':check_units' => $units, ':id' => $idprodu, ':gusto' => $idcodgusto, ':version' => $version]);
+            $update->execute([':add_units' => $units, ':check_units' => $units, ':id' => $idprodu, ':version' => $version]);
             if ($update->rowCount() !== 1) {
                 throw new \RuntimeException('La oferta de un producto venció o se agotó mientras se facturaba. Volvé a consultar el producto.');
             }
-            $insert->execute([':factura' => $facturaId, ':id' => $idprodu, ':gusto' => $idcodgusto, ':version' => $version, ':units' => $units]);
+            $insert->execute([':factura' => $facturaId, ':id' => $idprodu, ':version' => $version, ':units' => $units]);
         }
     }
 

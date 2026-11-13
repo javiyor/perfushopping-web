@@ -182,9 +182,8 @@ final class ProductController
         }
         $promoRepo = new \Perfushopping\Web\Repo\PosProductPromoRepo();
         $promoRepo->ensureTables();
+        $posPromoOferta = $promoRepo->getForProduct($id);
         $variants = $this->repo->variants($id);
-        $posPromoOfertas = $promoRepo->getOfertasProducto($id);
-        $posPromoOferta = $posPromoOfertas;
         $imagesMap = $this->repo->variantImagesMap(array_map(static fn (array $v): int => (int)($v['idcodgusto'] ?? 0), $variants));
         foreach ($variants as $idx => $variant) {
             $variants[$idx]['images'] = $imagesMap[(int)($variant['idcodgusto'] ?? 0)] ?? [];
@@ -314,21 +313,16 @@ final class ProductController
         $ganan2 = (float)str_replace(',', '.', trim((string)($_POST['ganan2'] ?? '0')));
         $precomp = $this->parseMoney((string)($_POST['precomp'] ?? '')) ?? 0;
 
-        $promoData = [];
+        $promoData = null;
         if (array_key_exists('promo_final_gross', $_POST)) {
-            $variantIds = array_map(static fn(array $v): int => (int)($v['idcodgusto'] ?? 0), $this->repo->variants($idprodu));
-            $promoPrices = (array)$_POST['promo_final_gross'];
-            $promoExpiries = (array)($_POST['promo_fecha_hasta'] ?? []);
-            $promoLimits = (array)($_POST['promo_unidades_limite'] ?? []);
-            foreach ($variantIds as $variantId) {
-            $promoGrossRaw = trim((string)($promoPrices[$variantId] ?? ''));
+            $promoGrossRaw = trim((string)($_POST['promo_final_gross'] ?? ''));
             $promoGross = $this->parseMoney($promoGrossRaw);
             if ($promoGrossRaw !== '' && $promoGross === null) {
                 $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Ingresá un precio final de oferta válido.'];
                 Response::redirect('/admin/productos/' . $idprodu);
             }
-            $expiryRaw = trim((string)($promoExpiries[$variantId] ?? ''));
-            $unitsRaw = trim((string)($promoLimits[$variantId] ?? ''));
+            $expiryRaw = trim((string)($_POST['promo_fecha_hasta'] ?? ''));
+            $unitsRaw = trim((string)($_POST['promo_unidades_limite'] ?? ''));
             if ($promoGross !== null && $promoGross > 0) {
                 $expiry = null;
                 if ($expiryRaw !== '') {
@@ -351,23 +345,21 @@ final class ProductController
                     $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'La oferta debe tener una fecha de vencimiento, un límite de unidades o ambos.'];
                     Response::redirect('/admin/productos/' . $idprodu);
                 }
-                $promoData[$variantId] = ['price_cents' => (int)round($promoGross * 100), 'expires_on' => $expiry, 'units_limit' => $units];
+                $promoData = ['price_cents' => (int)round($promoGross * 100), 'expires_on' => $expiry, 'units_limit' => $units];
             } else {
-                $promoData[$variantId] = ['price_cents' => null, 'expires_on' => null, 'units_limit' => null];
-            }
+                $promoData = ['price_cents' => null, 'expires_on' => null, 'units_limit' => null];
             }
         }
 
         $ivaRate = (float)($product['tiva'] ?? 0);
         $this->repo->updateProduct($idprodu, $observ, $this->grossToNet($precioBruto, $ivaRate), $this->grossToNet($precio1Bruto, $ivaRate), $enweb, $produ, $codrub, $codsub, $codepar, $codprove, $ganan1, $ganan2, $precomp);
 
-        foreach ($promoData as $variantId => $offerData) {
+        if ($promoData !== null) {
             (new \Perfushopping\Web\Repo\PosProductPromoRepo())->saveOffer(
                 $idprodu,
-                (int)$variantId,
-                $offerData['price_cents'],
-                $offerData['expires_on'],
-                $offerData['units_limit']
+                $promoData['price_cents'],
+                $promoData['expires_on'],
+                $promoData['units_limit']
             );
         }
 
