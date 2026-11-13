@@ -467,8 +467,13 @@ let ctaCteCheckSequence = 0;
 // al actualizar el service worker: espera la acción del usuario.
 window.__facturaEnProceso = function() { return true; };
 let productSearchTimer;
+let productSearchSequence = 0;
+let productInputRevision = 0;
+let productSearchAbort = null;
+let explicitProductSearchQueue = Promise.resolve();
 let html5Scanner = null;
 let isScanning = false;
+let cameraScanPending = false;
 
 // ── Barcode scanner via camera ──
 document.getElementById('btnScanCam').addEventListener('click', function() {
@@ -477,9 +482,11 @@ document.getElementById('btnScanCam').addEventListener('click', function() {
         if (html5Scanner) { html5Scanner.stop().catch(()=>{}); html5Scanner.clear(); }
         reader.style.display = 'none';
         isScanning = false;
+        cameraScanPending = false;
         return;
     }
     reader.style.display = 'block';
+    cameraScanPending = false;
     if (!html5Scanner) {
         html5Scanner = new Html5Qrcode('scanReader');
     }
@@ -487,16 +494,20 @@ document.getElementById('btnScanCam').addEventListener('click', function() {
         { facingMode: 'environment' },
         { fps: 15, qrbox: { width: 250, height: 100 } },
         function(decodedText) {
+            if (cameraScanPending) return;
+            cameraScanPending = true;
             html5Scanner.stop().catch(()=>{});
             reader.style.display = 'none';
             isScanning = false;
-            document.getElementById('productSearch').value = decodedText;
-            searchProd(decodedText);
+            const input = document.getElementById('productSearch');
+            input.value = String(decodedText);
+            queueCompletedProductSearch(input.value.trim());
         },
         function() {}
     ).then(() => {
         isScanning = true;
     }).catch(err => {
+        cameraScanPending = false;
         alert('Error al acceder a la cámara: ' + err);
         reader.style.display = 'none';
     });
@@ -659,18 +670,58 @@ const prodInput = document.getElementById('productSearch');
 const prodResults = document.getElementById('productResults');
 
 prodInput.addEventListener('input', function() {
+    const revision = ++productInputRevision;
+    const sequence = ++productSearchSequence;
     clearTimeout(productSearchTimer);
+    if (productSearchAbort) productSearchAbort.abort();
+    prodResults.style.display = 'none';
+    prodResults.innerHTML = '';
     const val = this.value.trim();
     if (val.length < 2) { prodResults.style.display = 'none'; return; }
-    productSearchTimer = setTimeout(() => searchProd(val), 200);
+    productSearchTimer = setTimeout(() => searchProd(val, false, sequence, revision), 250);
 });
 
 prodInput.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') { prodResults.style.display = 'none'; this.blur(); }
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+        const val = this.value.trim();
+        if (val !== '') queueCompletedProductSearch(val);
+    }
 });
 
+function cancelProductSearch() {
+    clearTimeout(productSearchTimer);
+    productSearchSequence++;
+    if (productSearchAbort) {
+        productSearchAbort.abort();
+        productSearchAbort = null;
+    }
+}
+
+function clearProductSearchInput() {
+    prodInput.value = '';
+    productInputRevision++;
+    prodInput.focus();
+}
+
+function queueCompletedProductSearch(q) {
+    if (!q) return;
+    cancelProductSearch();
+    clearProductSearchInput();
+    const revision = productInputRevision;
+    prodResults.style.display = 'none';
+    explicitProductSearchQueue = explicitProductSearchQueue
+        .then(() => searchProd(q, true, null, revision))
+        .catch(error => console.error('POS barcode search failed:', error));
+}
+
 document.addEventListener('click', function(e) {
-    if (!e.target.closest('.pos-search-box')) prodResults.style.display = 'none';
+    if (!e.target.closest('.pos-search-box')) {
+        prodResults.style.display = 'none';
+        cancelProductSearch();
+    }
 });
 
 // Semáforo de fecha de compra: >90 días rojo, >60 amarillo, dentro verde.
@@ -684,15 +735,115 @@ function fecompraBadge(fecha) {
     return '<span class="' + cls + '">F.Comp: ' + esc(txt) + '</span>';
 }
 
-function searchProd(q) {    fetch('/admin/facturas/buscar-productos?q=' + encodeURIComponent(q))
-        .then(r => r.json())
-        .then(data => {
+function searchProd(q, explicit = false, sequence = null, revision = productInputRevision) {
+    const controller = explicit ? null : new AbortController();
+    if (!explicit) productSearchAbort = controller;
+    const url = '/admin/facturas/buscar-productos?q=' + encodeURIComponent(q);
+    return fetch(url, controller ? {signal: controller.signal} : {})
+        .then(r => {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+        })
+        .then(response => {
+            if (!explicit && (sequence !== productSearchSequence || revision !== productInputRevision || prodInput.value.trim() !== q)) return;
+            const data = Array.isArray(response) ? response : (response.items || []);
+            const barcode = response && !Array.isArray(response) ? (response.barcode || {}) : {};
+
+            if (barcode.can_auto_add && barcode.match && (explicit || !barcode.has_longer_prefix)) {
+                const p = data.find(item => Number(item.idprodu) === Number(barcode.match.idprodu));
+                if (!p) {
+                    if (explicit && revision !== productInputRevision) return;
+                    prodResults.innerHTML = '';
+                    prodResults.innerHTML = '<div class="pos-result-item text-danger" style="justify-content:center">No se pudo resolver el producto del código.</div>';
+                    prodResults.style.display = 'block';
+                    return;
+                }
+                const priceCents = precioVigenteCents(p);
+                const precio1Cents = p.precio1 ? Math.round(parseFloat(p.precio1) * 100) : 0;
+                const ivaRate = p.tiva || 21;
+                if (barcode.match.idcodgusto > 0) {
+                    const matchedVariant = (p.variants || []).find(v => Number(v.idcodgusto) === Number(barcode.match.idcodgusto));
+                    if (!matchedVariant) {
+                        if (explicit && revision !== productInputRevision) return;
+                        prodResults.innerHTML = '';
+                        prodResults.innerHTML = '<div class="pos-result-item text-danger" style="justify-content:center">La variedad del código no está disponible para la venta.</div>';
+                        prodResults.style.display = 'block';
+                        return;
+                    }
+                    addToCart({
+                        idprodu: Number(p.idprodu),
+                        idcodgusto: Number(matchedVariant.idcodgusto),
+                        producto: p.produ,
+                        variedad: matchedVariant.nomgusto || barcode.match.variedad || '',
+                        qty: 1,
+                        unit_price_cents: priceCents,
+                        precio1_cents: precio1Cents,
+                        promo_pos_final_cents: p.promo_pos_final_cents || 0,
+                        promo_pos_remaining: p.promo_pos_remaining,
+                        promo_pos_version: p.promo_pos_version || '',
+                        promo_pos_until: p.promo_pos_until || '',
+                        iva_rate: ivaRate,
+                        fecompra: p.fecompra || '',
+                    });
+                    if (revision === productInputRevision) {
+                        prodResults.innerHTML = '';
+                        prodResults.style.display = 'none';
+                    }
+                    if (!explicit && prodInput.value.trim() === q) clearProductSearchInput();
+                    return;
+                }
+                addToCart({
+                    idprodu: Number(p.idprodu),
+                    idcodgusto: 0,
+                    producto: p.produ,
+                    variedad: '',
+                    qty: 1,
+                    unit_price_cents: priceCents,
+                    precio1_cents: precio1Cents,
+                    promo_pos_final_cents: p.promo_pos_final_cents || 0,
+                    promo_pos_remaining: p.promo_pos_remaining,
+                    promo_pos_version: p.promo_pos_version || '',
+                    promo_pos_until: p.promo_pos_until || '',
+                    iva_rate: ivaRate,
+                    fecompra: p.fecompra || '',
+                });
+                if (revision === productInputRevision) {
+                    prodResults.innerHTML = '';
+                    prodResults.style.display = 'none';
+                }
+                if (!explicit && prodInput.value.trim() === q) clearProductSearchInput();
+                return;
+            }
+
+            if (explicit && revision !== productInputRevision) return;
             prodResults.innerHTML = '';
-            if (!data || data.length === 0) {
-                prodResults.innerHTML = '<div class="pos-result-item text-muted" style="justify-content:center">Sin resultados</div>';
+
+            if (barcode.requires_selection && !barcode.ambiguous && barcode.match && (explicit || !barcode.has_longer_prefix)) {
+                const p = data.find(item => Number(item.idprodu) === Number(barcode.match.idprodu));
+                if (p) {
+                    const priceCents = precioVigenteCents(p);
+                    const precio1Cents = p.precio1 ? Math.round(parseFloat(p.precio1) * 100) : 0;
+                    showVariantPicker(p, priceCents, precio1Cents, p.tiva || 21);
+                    return;
+                }
+            }
+
+            if (!data.length) {
+                prodResults.innerHTML = '<div class="pos-result-item text-muted" style="justify-content:center">Sin resultados para “' + esc(q) + '”</div>';
                 prodResults.style.display = 'block';
                 return;
             }
+
+            if (barcode.ambiguous) {
+                prodResults.innerHTML = '<div class="alert alert-warning py-2 px-3 mb-0 small">Código duplicado o ambiguo. Elegí el producto y la variedad; no se agregó automáticamente.</div>';
+            } else if (barcode.requires_selection) {
+                prodResults.innerHTML = '<div class="alert alert-info py-2 px-3 mb-0 small">Este código identifica el producto, pero tiene varias variedades. Seleccioná una.</div>';
+            } else if (barcode.exact && barcode.has_longer_prefix && !explicit) {
+                prodResults.innerHTML = '<div class="alert alert-info py-2 px-3 mb-0 small">El código coincide con un prefijo de otro código más largo. Terminá el escaneo o presioná Enter para confirmar.</div>';
+            } else if (barcode.exact && !barcode.can_auto_add) {
+                prodResults.innerHTML = '<div class="alert alert-warning py-2 px-3 mb-0 small">El código coincide con una variedad no disponible o no seleccionable.</div>';
+            }
+
             data.forEach(p => {
                 const priceCents = precioVigenteCents(p);
                 const precio1Cents = p.precio1 ? Math.round(parseFloat(p.precio1) * 100) : 0;
@@ -711,30 +862,6 @@ function searchProd(q) {    fetch('/admin/facturas/buscar-productos?q=' + encode
                     ? '<div class="small text-success fw-semibold">Oferta contado/transferencia: $' + fmtPrice(promoFinalCents) + (p.promo_pos_remaining !== null ? ' · quedan ' + Number(p.promo_pos_remaining) : '') + '</div>'
                     : '';
 
-                // Barcode scan auto-add
-                if (p.matched_variant) {
-                    const mv = p.matched_variant;
-                    addToCart({
-                        idprodu: p.idprodu,
-                        idcodgusto: mv.idcodgusto,
-                        producto: p.produ,
-                        variedad: mv.nomgusto,
-                        qty: 1,
-                        unit_price_cents: priceCents,
-                        precio1_cents: precio1Cents,
-                        promo_pos_final_cents: p.promo_pos_final_cents || 0,
-                        promo_pos_remaining: p.promo_pos_remaining,
-                        promo_pos_version: p.promo_pos_version || '',
-                        promo_pos_until: p.promo_pos_until || '',
-                        iva_rate: ivaRate,
-                        fecompra: p.fecompra || '',
-                    });
-                    prodResults.style.display = 'none';
-                    prodInput.value = '';
-                    prodInput.focus();
-                    return;
-                }
-
                 const div = document.createElement('div');
                 div.className = 'pos-result-item';
                 div.style.flexWrap = 'wrap';
@@ -752,6 +879,7 @@ function searchProd(q) {    fetch('/admin/facturas/buscar-productos?q=' + encode
                 `;
                 div.addEventListener('mousedown', function(e) {
                     e.preventDefault();
+                    cancelProductSearch();
                     if (p.variants && p.variants.length > 0) {
                         showVariantPicker(p, priceCents, precio1Cents, ivaRate);
                     } else {
@@ -778,6 +906,14 @@ function searchProd(q) {    fetch('/admin/facturas/buscar-productos?q=' + encode
                 prodResults.appendChild(div);
             });
             prodResults.style.display = 'block';
+        })
+        .catch(error => {
+            if (error.name === 'AbortError') return;
+            if (!explicit && (sequence !== productSearchSequence || revision !== productInputRevision || prodInput.value.trim() !== q)) return;
+            if (explicit && revision !== productInputRevision) return;
+            console.error('POS product search failed:', error);
+            prodResults.innerHTML = '<div class="pos-result-item text-danger" style="justify-content:center">No se pudo buscar el producto.</div>';
+            prodResults.style.display = 'block';
         });
 }
 
@@ -803,6 +939,7 @@ function showVariantPicker(p, priceCents, precio1Cents, ivaRate) {
     prodResults.querySelectorAll('.suggestion-item').forEach(el => {
         el.addEventListener('mousedown', function(e) {
             e.preventDefault();
+            cancelProductSearch();
             const nom = this.dataset.nom || '';
             const gustoId = this.dataset.id || 0;
             addToCart({

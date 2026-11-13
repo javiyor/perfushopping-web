@@ -881,38 +881,94 @@ $st = $pdo->prepare('
         $st->execute($params);
         $products = $st->fetchAll();
 
-        $matchedVariant = null;
-        if (ctype_digit($q) || preg_match('/^\d{8,13}$/', $q)) {
-            $st2 = $pdo->prepare('
+        // Resolve barcode candidates independently from the fuzzy search. Keep the input
+        // as text so leading zeroes survive, and never choose an arbitrary duplicate.
+        $barcodeCandidates = [];
+        $barcodeProducts = [];
+        $barcodeCode = $q;
+        $stExactVariants = $pdo->prepare('
+            SELECT g.idcodgusto, g.idprodu, g.nomgusto, g.codscan, g.discont,
+                   p.idprodu AS product_id, p.codprodu, p.produ, p.precio, p.precio1,
+                   p.precomp, p.codprodup, p.enweb, p.stocact, p.fecompra,
+                   i.codivaprodu, i.tiva
+            FROM gustos g
+            INNER JOIN producto p ON p.idprodu = g.idprodu
+            LEFT JOIN ivaprodu i ON i.codivaprodu = p.iva
+            WHERE CAST(TRIM(g.codscan) AS CHAR) = :barcode
+        ');
+        $stExactVariants->execute([':barcode' => $barcodeCode]);
+        foreach ($stExactVariants->fetchAll() as $row) {
+            $variantId = (int)$row['idcodgusto'];
+            $productId = (int)$row['product_id'];
+            $barcodeCandidates['variant:' . $variantId] = [
+                'kind' => 'variant',
+                'idprodu' => $productId,
+                'idcodgusto' => $variantId,
+                'variedad' => (string)($row['nomgusto'] ?? ''),
+                'codscan' => (string)($row['codscan'] ?? ''),
+                'discont' => (int)($row['discont'] ?? 0),
+            ];
+            $row['idprodu'] = $productId;
+            unset($row['product_id'], $row['idcodgusto'], $row['nomgusto'], $row['codscan'], $row['discont']);
+            $barcodeProducts[$productId] = $row;
+        }
+
+        if (in_array('codbarra', self::productoColumns(), true)) {
+            $stExactProducts = $pdo->prepare('
                 SELECT p.idprodu, p.codprodu, p.produ, p.precio, p.precio1, p.precomp, p.codprodup, p.enweb, p.stocact, p.fecompra,
-                       i.codivaprodu, i.tiva,
-                       g.idcodgusto, g.nomgusto AS matched_nomgusto
-                FROM gustos g
-                INNER JOIN producto p ON p.idprodu = g.idprodu
+                       i.codivaprodu, i.tiva
+                FROM producto p
                 LEFT JOIN ivaprodu i ON i.codivaprodu = p.iva
-                WHERE g.codscan = :c
-                GROUP BY p.idprodu
-                LIMIT 1
+                WHERE CAST(p.codbarra AS CHAR) = :barcode
             ');
-            $st2->execute([':c' => $q]);
-            $byCode = $st2->fetch();
-            if ($byCode) {
-                $matchedVariant = [
-                    'idcodgusto' => (int)$byCode['idcodgusto'],
-                    'nomgusto' => $byCode['matched_nomgusto'],
-                    'codscan' => $q,
+            $stExactProducts->execute([':barcode' => $barcodeCode]);
+            foreach ($stExactProducts->fetchAll() as $row) {
+                $productId = (int)$row['idprodu'];
+                $barcodeCandidates['product:' . $productId] = [
+                    'kind' => 'product',
+                    'idprodu' => $productId,
+                    'idcodgusto' => 0,
+                    'variedad' => '',
+                    'codscan' => $barcodeCode,
+                    'discont' => 0,
                 ];
-                unset($byCode['idcodgusto'], $byCode['matched_nomgusto']);
-                $exists = false;
-                foreach ($products as $pr) {
-                    if ((int)$pr['idprodu'] === (int)$byCode['idprodu']) { $exists = true; break;
-                    }
-                }
-                if (!$exists) array_unshift($products, $byCode);
+                $barcodeProducts[$productId] = $row;
             }
         }
 
-        $matchedV = $matchedVariant;
+        foreach ($barcodeProducts as $barcodeProduct) {
+            $exists = false;
+            foreach ($products as $pr) {
+                if ((int)$pr['idprodu'] === (int)$barcodeProduct['idprodu']) {
+                    $exists = true;
+                    break;
+                }
+            }
+            if (!$exists) array_unshift($products, $barcodeProduct);
+        }
+
+        $hasLongerBarcodePrefix = false;
+        if ($barcodeCandidates) {
+            $prefixSt = $pdo->prepare('SELECT 1 FROM gustos WHERE CHAR_LENGTH(TRIM(CAST(codscan AS CHAR))) > CHAR_LENGTH(:prefix_len) AND LEFT(TRIM(CAST(codscan AS CHAR)), CHAR_LENGTH(:prefix_left)) = :prefix_value LIMIT 1');
+            $prefixSt->execute([':prefix_len' => $barcodeCode, ':prefix_left' => $barcodeCode, ':prefix_value' => $barcodeCode]);
+            $hasLongerBarcodePrefix = (bool)$prefixSt->fetchColumn();
+            if (!$hasLongerBarcodePrefix && in_array('codbarra', self::productoColumns(), true)) {
+                $productPrefixSt = $pdo->prepare('SELECT 1 FROM producto WHERE CHAR_LENGTH(CAST(codbarra AS CHAR)) > CHAR_LENGTH(:prefix_len) AND LEFT(CAST(codbarra AS CHAR), CHAR_LENGTH(:prefix_left)) = :prefix_value LIMIT 1');
+                $productPrefixSt->execute([':prefix_len' => $barcodeCode, ':prefix_left' => $barcodeCode, ':prefix_value' => $barcodeCode]);
+                $hasLongerBarcodePrefix = (bool)$productPrefixSt->fetchColumn();
+            }
+        }
+
+        $barcodeResolution = [
+            'exact' => (bool)$barcodeCandidates,
+            'ambiguous' => count($barcodeCandidates) > 1,
+            'has_longer_prefix' => $hasLongerBarcodePrefix,
+            'can_auto_add' => false,
+            'requires_selection' => false,
+            'match' => null,
+        ];
+        $singleBarcodeCandidate = count($barcodeCandidates) === 1 ? reset($barcodeCandidates) : null;
+
         foreach ($products as $idx => $pr) {
             $idprodu = (int)$pr['idprodu'];
 
@@ -955,16 +1011,38 @@ $st = $pdo->prepare('
             }
         }
 
-        if ($matchedV) {
-            foreach ($products as $idx => $pr) {
-                if ((int)$pr['idprodu'] === 0) continue;
-                foreach (($pr['variants'] ?? []) as $v) {
-                    if ((int)$v['idcodgusto'] === $matchedV['idcodgusto']) {
-                        $products[$idx]['matched_variant_id'] = $matchedV['idcodgusto'];
-                        $products[$idx]['matched_variant'] = $matchedV;
-                        break;
+        if ($singleBarcodeCandidate !== null) {
+            foreach ($products as $product) {
+                if ((int)$product['idprodu'] !== (int)$singleBarcodeCandidate['idprodu']) continue;
+                if ($singleBarcodeCandidate['kind'] === 'variant') {
+                    $sellableVariant = null;
+                    foreach (($product['variants'] ?? []) as $variant) {
+                        if ((int)$variant['idcodgusto'] === (int)$singleBarcodeCandidate['idcodgusto']) {
+                            $sellableVariant = $variant;
+                            break;
+                        }
+                    }
+                    if ($sellableVariant !== null) {
+                        $barcodeResolution['can_auto_add'] = true;
+                        $barcodeResolution['match'] = $singleBarcodeCandidate;
+                        $barcodeResolution['match']['variedad'] = (string)($sellableVariant['nomgusto'] ?? '');
+                    }
+                } else {
+                    $activeVariants = $product['variants'] ?? [];
+                    if (count($activeVariants) > 1) {
+                        $barcodeResolution['requires_selection'] = true;
+                        $barcodeResolution['match'] = $singleBarcodeCandidate;
+                    } else {
+                        $match = $singleBarcodeCandidate;
+                        if (count($activeVariants) === 1) {
+                            $match['idcodgusto'] = (int)$activeVariants[0]['idcodgusto'];
+                            $match['variedad'] = (string)$activeVariants[0]['nomgusto'];
+                        }
+                        $barcodeResolution['can_auto_add'] = true;
+                        $barcodeResolution['match'] = $match;
                     }
                 }
+                break;
             }
         }
 
@@ -979,7 +1057,7 @@ $st = $pdo->prepare('
             }
         }
 
-        return $products;
+        return ['items' => $products, 'barcode' => $barcodeResolution];
     }
 
     public function findClienteWeb(string $q, int $limit = 10): array
