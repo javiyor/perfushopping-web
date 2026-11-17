@@ -160,18 +160,29 @@ final class CompraRepo
 
     public function existsComprobante(string $cuit, string $tipo, string $puntoVenta, string $numero): bool
     {
-        $st = Db::pdo()->prepare('
+        return $this->findComprobanteId($cuit, $tipo, $puntoVenta, $numero) !== null;
+    }
+
+    public function findComprobanteId(string $cuit, string $tipo, string $puntoVenta, string $numero, int $excludeId = 0): ?int
+    {
+        $sql = '
             SELECT id FROM factura_compra
-            WHERE cuit_proveedor = :c AND tipo = :t AND punto_venta = :pv AND numero_desde = :n
-            LIMIT 1
-        ');
-        $st->execute([
+            WHERE cuit_proveedor = :c AND tipo = :t AND punto_venta = :pv AND numero_desde = :n';
+        $params = [
             ':c' => $cuit,
             ':t' => $tipo,
             ':pv' => $puntoVenta,
             ':n' => $numero,
-        ]);
-        return $st->fetchColumn() !== false;
+        ];
+        if ($excludeId > 0) {
+            $sql .= ' AND id <> :exclude_id';
+            $params[':exclude_id'] = $excludeId;
+        }
+        $sql .= ' ORDER BY id ASC LIMIT 1';
+        $st = Db::pdo()->prepare($sql);
+        $st->execute($params);
+        $id = $st->fetchColumn();
+        return $id !== false ? (int)$id : null;
     }
 
     /** @param array<string,mixed> $d */

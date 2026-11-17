@@ -296,6 +296,19 @@ final class CompraController
 
         $cuit = preg_replace('/\D/', '', (string)($_POST['cuit_proveedor'] ?? ''));
         $razon = trim((string)($_POST['razon_proveedor'] ?? ''));
+        $tipoComprobante = trim((string)($_POST['tipo'] ?? ''));
+        $puntoVenta = trim((string)($_POST['punto_venta'] ?? ''));
+        $numeroComprobante = trim((string)($_POST['numero_desde'] ?? ''));
+        if ($cuit !== '' && $tipoComprobante !== '' && $puntoVenta !== '' && $numeroComprobante !== '') {
+            $duplicadoId = $repo->findComprobanteId($cuit, $tipoComprobante, $puntoVenta, $numeroComprobante, $id);
+            if ($duplicadoId !== null) {
+                $_SESSION['admin_flash'] = [
+                    'type' => 'danger',
+                    'text' => 'Ese comprobante ya está registrado como factura de compra #' . $duplicadoId . '. Abrí el existente para consultarlo o editarlo.',
+                ];
+                Response::redirect('/admin/compras/' . $duplicadoId);
+            }
+        }
         $idprovee = $cuit !== '' ? $repo->proveedorEnsure($cuit, $razon) : null;
         if (CompraRepo::esCondicionIva($razon)) {
             // Autocorrige con la razón real del proveedor; si no hay, rechaza el guardado.
@@ -327,10 +340,10 @@ final class CompraController
             'flete_pct' => ($fleteCents > 0 && $netoGravado > 0) ? round(($fleteCents / 100) / $netoGravado * 100, 2) : null,
             'flete_transporte_id' => (int)($_POST['flete_transporte_id'] ?? 0) ?: null,
             'flete_transporte' => trim((string)($_POST['flete_transporte'] ?? '')),
-            'tipo' => trim((string)($_POST['tipo'] ?? '')),
-            'punto_venta' => trim((string)($_POST['punto_venta'] ?? '')),
-            'numero_desde' => trim((string)($_POST['numero_desde'] ?? '')),
-            'numero_hasta' => trim((string)($_POST['numero_hasta'] ?? '')) ?: trim((string)($_POST['numero_desde'] ?? '')),
+            'tipo' => $tipoComprobante,
+            'punto_venta' => $puntoVenta,
+            'numero_desde' => $numeroComprobante,
+            'numero_hasta' => trim((string)($_POST['numero_hasta'] ?? '')) ?: $numeroComprobante,
             'cod_autorizacion' => trim((string)($_POST['cod_autorizacion'] ?? '')),
             'cuit_proveedor' => $cuit,
             'razon_proveedor' => $repo->resolverRazon($idprovee, $cuit, $razon),
@@ -356,20 +369,34 @@ final class CompraController
 
         $oldItems = [];
         $oldDepo = 0;
-        if ($id > 0) {
-            $prev = $repo->findById($id);
-            $wasCompleta = ((string)($prev['estado'] ?? '') === 'completa');
-            if ($wasCompleta) {
-                $oldItems = $repo->itemsActuales($id);
-                $oldDepo = (int)($prev['iddepo'] ?? 0);
+        try {
+            if ($id > 0) {
+                $prev = $repo->findById($id);
+                $wasCompleta = ((string)($prev['estado'] ?? '') === 'completa');
+                if ($wasCompleta) {
+                    $oldItems = $repo->itemsActuales($id);
+                    $oldDepo = (int)($prev['iddepo'] ?? 0);
+                }
+                $data['estado'] = $items ? 'completa' : ($wasCompleta ? 'completa' : 'pendiente');
+                $repo->update($id, $data);
+                $compraId = $id;
+            } else {
+                $data['estado'] = $items ? 'completa' : 'pendiente';
+                $data['created_by'] = (int)$adminUser['id'];
+                $compraId = $repo->insert($data);
             }
-            $data['estado'] = $items ? 'completa' : ($wasCompleta ? 'completa' : 'pendiente');
-            $repo->update($id, $data);
-            $compraId = $id;
-        } else {
-            $data['estado'] = $items ? 'completa' : 'pendiente';
-            $data['created_by'] = (int)$adminUser['id'];
-            $compraId = $repo->insert($data);
+        } catch (\PDOException $e) {
+            if ((int)($e->errorInfo[1] ?? 0) === 1062) {
+                $duplicadoId = $repo->findComprobanteId($cuit, $tipoComprobante, $puntoVenta, $numeroComprobante, $id);
+                if ($duplicadoId !== null) {
+                    $_SESSION['admin_flash'] = [
+                        'type' => 'danger',
+                        'text' => 'Ese comprobante ya está registrado como factura de compra #' . $duplicadoId . '. Abrí el existente para consultarlo o editarlo.',
+                    ];
+                    Response::redirect('/admin/compras/' . $duplicadoId);
+                }
+            }
+            throw $e;
         }
 
         if ($items) {
