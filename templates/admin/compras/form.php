@@ -232,6 +232,14 @@ $idcta1Sel = (int)($compra['idcta1'] ?? 0);
                             <label class="form-label small">% sobre gravado</label>
                             <input class="form-control form-control-sm" id="fletePct" readonly tabindex="-1" value="<?= (isset($compra['flete_pct']) && $compra['flete_pct'] !== null && $compra['flete_pct'] !== '') ? htmlspecialchars((string)$compra['flete_pct']) : '' ?>" />
                         </div>
+                        <div class="col-6">
+                            <label class="form-label small">Bultos recibidos</label>
+                            <input class="form-control form-control-sm" name="bultos_recibidos" type="number" min="0" step="1" value="<?= ($compra['bultos_recibidos'] ?? null) !== null ? (int)$compra['bultos_recibidos'] : '' ?>" placeholder="Cantidad de paquetes" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small">Observación de recepción <span class="text-muted">(opcional)</span></label>
+                            <input class="form-control form-control-sm" name="bultos_observacion" maxlength="500" value="<?= htmlspecialchars((string)($compra['bultos_observacion'] ?? '')) ?>" placeholder="Ej.: embalaje roto, bultos mojados…" />
+                        </div>
                     </div>
                 </div>
             </div>

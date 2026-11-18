@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Perfushopping\Web\Admin;
 
 use Perfushopping\Web\Repo\OrdenCompraRepo;
+use Perfushopping\Web\Repo\CompraRepo;
 use Perfushopping\Web\Repo\CtaCteProveedorRepo;
 use Perfushopping\Web\Service\AdminAuthService;
 use Perfushopping\Web\Support\Csrf;
@@ -296,23 +297,33 @@ final class OrdenCompraController
         $auth = new AdminAuthService();
         $adminUser = $auth->requirePermiso('compras');
 
-        $q = trim((string)($_GET['q'] ?? ''));
-        $proveedor = trim((string)($_GET['proveedor'] ?? ''));
-        $list = (new OrdenCompraRepo())->searchFletes($q, $proveedor);
+        $mes = trim((string)($_GET['mes'] ?? date('Y-m')));
+        $mesDate = preg_match('/^\d{4}-\d{2}$/', $mes)
+            ? \DateTimeImmutable::createFromFormat('!Y-m-d', $mes . '-01')
+            : false;
+        if (!$mesDate || $mesDate->format('Y-m') !== $mes) {
+            $mes = date('Y-m');
+        }
+        $list = (new CompraRepo())->fletesPagadosPorMes($mes);
 
         $totalFletes = 0;
+        $totalNeto = 0.0;
+        $totalBultos = 0;
         foreach ($list as $o) {
-            $totalFletes += (int)$o['flete_cents'];
+            $totalFletes += (int)($o['flete_pagado_cents'] ?? 0);
+            $totalNeto += (float)($o['neto_gravado'] ?? 0);
+            $totalBultos += (int)($o['bultos_recibidos'] ?? 0);
         }
 
-        echo View::adminPage('admin/ordenes-compra/fletes.php', [
+        echo View::adminPage('admin/compras/fletes.php', [
             'adminUser' => $adminUser,
             'list' => $list,
-            'q' => $q,
-            'proveedor' => $proveedor,
+            'mes' => $mes,
             'totalFletes' => $totalFletes,
+            'totalNeto' => $totalNeto,
+            'totalBultos' => $totalBultos,
             'csrf' => Csrf::token(),
-            'pageTitle' => 'Fletes — Costos comparativos',
+            'pageTitle' => 'Fletes pagados',
         ]);
     }
 

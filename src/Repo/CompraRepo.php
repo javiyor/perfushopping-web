@@ -17,12 +17,79 @@ final class CompraRepo
             return self::$facturaColumns;
         }
         try {
-            $rows = Db::pdo()->query('SHOW COLUMNS FROM factura_compra')->fetchAll();
-            self::$facturaColumns = array_column($rows, 'Field');
+            $pdo = Db::pdo();
+            $definitions = [
+                'fecha_recepcion' => 'DATE DEFAULT NULL',
+                'flete_cents' => 'INT NOT NULL DEFAULT 0',
+                'bultos_recibidos' => 'INT UNSIGNED DEFAULT NULL',
+                'bultos_observacion' => 'VARCHAR(500) DEFAULT NULL',
+            ];
+            $rows = $pdo->query('SHOW COLUMNS FROM factura_compra')->fetchAll();
+            $fields = array_column($rows, 'Field');
+            foreach ($definitions as $column => $definition) {
+                if (in_array($column, $fields, true)) continue;
+                try {
+                    $pdo->exec('ALTER TABLE factura_compra ADD COLUMN `' . $column . '` ' . $definition);
+                } catch (\Throwable $e) {
+                    // Una petición concurrente pudo crear la columna primero.
+                    error_log('CompraRepo::facturaColumns ' . $column . ': ' . $e->getMessage());
+                }
+                $rows = $pdo->query('SHOW COLUMNS FROM factura_compra')->fetchAll();
+                $fields = array_column($rows, 'Field');
+            }
+            self::$facturaColumns = $fields;
         } catch (\Throwable $e) {
+            error_log('CompraRepo::facturaColumns: ' . $e->getMessage());
             self::$facturaColumns = [];
         }
         return self::$facturaColumns;
+    }
+
+    /** Totales mensuales de fletes registrados y pagados al recibir las compras, por proveedor/fecha. */
+    public function fletesPagadosPorMes(string $mes): array
+    {
+        $this->facturaColumns();
+        if (!preg_match('/^\d{4}-\d{2}$/', $mes)) {
+            throw new \InvalidArgumentException('El mes debe tener formato AAAA-MM.');
+        }
+        $primerDia = \DateTimeImmutable::createFromFormat('!Y-m-d', $mes . '-01');
+        if (!$primerDia || $primerDia->format('Y-m') !== $mes) {
+            throw new \InvalidArgumentException('El mes seleccionado no es válido.');
+        }
+        $desde = $primerDia->format('Y-m-d');
+        $hasta = $primerDia->modify('last day of this month')->format('Y-m-d');
+        $proveedorKey = "CASE
+            WHEN NULLIF(TRIM(cuit_proveedor), '') IS NOT NULL THEN CONCAT('cuit:', TRIM(cuit_proveedor))
+            WHEN idprovee IS NOT NULL THEN CONCAT('id:', idprovee)
+            ELSE CONCAT('razon:', LOWER(TRIM(COALESCE(razon_proveedor, ''))))
+        END";
+        $st = Db::pdo()->prepare("
+            SELECT fecha_recepcion,
+                   {$proveedorKey} AS proveedor_key,
+                   COALESCE(NULLIF(MAX(NULLIF(TRIM(razon_proveedor), '')), ''),
+                       MAX(NULLIF(TRIM(cuit_proveedor), '')), 'Proveedor sin identificar') AS proveedor,
+                   MAX(NULLIF(TRIM(cuit_proveedor), '')) AS cuit_proveedor,
+                   COALESCE(SUM(imp_neto_gravado), 0) AS neto_gravado,
+                   COALESCE(SUM(COALESCE(bultos_recibidos, 0)), 0) AS bultos_recibidos,
+                   COALESCE(SUM(CASE WHEN flete_cents > 0 THEN flete_cents ELSE 0 END), 0) AS flete_pagado_cents,
+                   GROUP_CONCAT(DISTINCT NULLIF(TRIM(bultos_observacion), '') SEPARATOR ' · ') AS bultos_observacion,
+                   COUNT(*) AS comprobantes,
+                   SUM(CASE WHEN flete_cents > 0 THEN 1 ELSE 0 END) AS fletes_pagados,
+                   GROUP_CONCAT(CASE WHEN flete_cents > 0 THEN id END ORDER BY id ASC SEPARATOR ',') AS compra_ids
+            FROM factura_compra
+            WHERE fecha_recepcion BETWEEN :desde AND :hasta
+              AND COALESCE(estado, '') <> 'anulada'
+            GROUP BY fecha_recepcion, {$proveedorKey}
+            HAVING SUM(CASE WHEN flete_cents > 0 THEN 1 ELSE 0 END) > 0
+            ORDER BY fecha_recepcion DESC, proveedor ASC
+        ");
+        $st->execute([':desde' => $desde, ':hasta' => $hasta]);
+        return $st->fetchAll();
+    }
+
+    public function asegurarCamposFleteRecepcion(): void
+    {
+        $this->facturaColumns();
     }
 
     private static ?array $itemsColumns = null;
@@ -124,6 +191,7 @@ final class CompraRepo
     /** @return array<string,mixed>|null */
     public function findById(int $id): ?array
     {
+        $this->facturaColumns();
         $st = Db::pdo()->prepare('
             SELECT fc.*,
                    pv.razon AS proveedor_razon,
@@ -227,6 +295,14 @@ final class CompraRepo
             $extraCols[] = 'flete_transporte';
             $extraVals[] = ':flete_tnom';
         }
+        if (in_array('bultos_recibidos', $cols, true)) {
+            $extraCols[] = 'bultos_recibidos';
+            $extraVals[] = ':bultos_recibidos';
+        }
+        if (in_array('bultos_observacion', $cols, true)) {
+            $extraCols[] = 'bultos_observacion';
+            $extraVals[] = ':bultos_observacion';
+        }
         $extraColsSql = $extraCols ? ', ' . implode(', ', $extraCols) : '';
         $extraValsSql = $extraVals ? ', ' . implode(', ', $extraVals) : '';
         $st = Db::pdo()->prepare('
@@ -241,7 +317,7 @@ final class CompraRepo
                :obs, :cb)
         ');
         $p = $this->params($d);
-        foreach (['ret_ing_brutos' => ':ret_ib', 'ret_iva' => ':ret_iva', 'plazo_cuotas' => ':plazo_cuotas', 'plazo_dias' => ':plazo_dias', 'fecha_recepcion' => ':frecep', 'flete_cents' => ':flete_cents', 'flete_pct' => ':flete_pct', 'flete_transporte_id' => ':flete_tid', 'flete_transporte' => ':flete_tnom'] as $col => $ph) {
+        foreach (['ret_ing_brutos' => ':ret_ib', 'ret_iva' => ':ret_iva', 'plazo_cuotas' => ':plazo_cuotas', 'plazo_dias' => ':plazo_dias', 'fecha_recepcion' => ':frecep', 'flete_cents' => ':flete_cents', 'flete_pct' => ':flete_pct', 'flete_transporte_id' => ':flete_tid', 'flete_transporte' => ':flete_tnom', 'bultos_recibidos' => ':bultos_recibidos', 'bultos_observacion' => ':bultos_observacion'] as $col => $ph) {
             if (!in_array($col, $cols, true)) {
                 unset($p[$ph]);
             }
@@ -282,6 +358,12 @@ final class CompraRepo
         if (in_array('flete_transporte', $cols, true)) {
             $extraSet .= ', flete_transporte = :flete_tnom';
         }
+        if (in_array('bultos_recibidos', $cols, true)) {
+            $extraSet .= ', bultos_recibidos = :bultos_recibidos';
+        }
+        if (in_array('bultos_observacion', $cols, true)) {
+            $extraSet .= ', bultos_observacion = :bultos_observacion';
+        }
         $st = Db::pdo()->prepare('
             UPDATE factura_compra SET
               estado = :estado, fecha = :fecha, tipo = :tipo, punto_venta = :pv,
@@ -296,7 +378,7 @@ final class CompraRepo
         $p = $this->params($d);
         // El UPDATE no toca origen ni created_by: deben salir del binding.
         unset($p[':origen'], $p[':cb']);
-        foreach (['ret_ing_brutos' => ':ret_ib', 'ret_iva' => ':ret_iva', 'plazo_cuotas' => ':plazo_cuotas', 'plazo_dias' => ':plazo_dias', 'fecha_recepcion' => ':frecep', 'flete_cents' => ':flete_cents', 'flete_pct' => ':flete_pct', 'flete_transporte_id' => ':flete_tid', 'flete_transporte' => ':flete_tnom'] as $col => $ph) {
+        foreach (['ret_ing_brutos' => ':ret_ib', 'ret_iva' => ':ret_iva', 'plazo_cuotas' => ':plazo_cuotas', 'plazo_dias' => ':plazo_dias', 'fecha_recepcion' => ':frecep', 'flete_cents' => ':flete_cents', 'flete_pct' => ':flete_pct', 'flete_transporte_id' => ':flete_tid', 'flete_transporte' => ':flete_tnom', 'bultos_recibidos' => ':bultos_recibidos', 'bultos_observacion' => ':bultos_observacion'] as $col => $ph) {
             if (!in_array($col, $cols, true)) {
                 unset($p[$ph]);
             }
@@ -333,6 +415,8 @@ final class CompraRepo
             ':flete_pct' => isset($d['flete_pct']) && $d['flete_pct'] !== '' && $d['flete_pct'] !== null ? round((float)$d['flete_pct'], 2) : null,
             ':flete_tid' => ((int)($d['flete_transporte_id'] ?? 0)) > 0 ? (int)$d['flete_transporte_id'] : null,
             ':flete_tnom' => trim((string)($d['flete_transporte'] ?? '')) !== '' ? trim((string)$d['flete_transporte']) : null,
+            ':bultos_recibidos' => ($d['bultos_recibidos'] ?? null) !== null && $d['bultos_recibidos'] !== '' ? max(0, (int)$d['bultos_recibidos']) : null,
+            ':bultos_observacion' => trim((string)($d['bultos_observacion'] ?? '')) !== '' ? mb_substr(trim((string)$d['bultos_observacion']), 0, 500) : null,
             ':tipo' => (string)($d['tipo'] ?? ''),
             ':pv' => (string)($d['punto_venta'] ?? ''),
             ':nd' => (string)($d['numero_desde'] ?? ''),

@@ -4,3 +4,7 @@ ALTER TABLE factura_compra
   ADD COLUMN IF NOT EXISTS flete_pct DECIMAL(5,2) DEFAULT NULL AFTER flete_cents,
   ADD COLUMN IF NOT EXISTS flete_transporte_id INT UNSIGNED DEFAULT NULL AFTER flete_pct,
   ADD COLUMN IF NOT EXISTS flete_transporte VARCHAR(200) DEFAULT NULL AFTER flete_transporte_id;
+
+ALTER TABLE factura_compra
+  ADD COLUMN IF NOT EXISTS bultos_recibidos INT UNSIGNED DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS bultos_observacion VARCHAR(500) DEFAULT NULL;

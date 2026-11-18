@@ -309,6 +309,13 @@ final class CompraController
                 Response::redirect('/admin/compras/' . $duplicadoId);
             }
         }
+        $bultosRaw = trim((string)($_POST['bultos_recibidos'] ?? ''));
+        if ($bultosRaw !== '' && (!ctype_digit($bultosRaw) || (float)$bultosRaw > 4294967295)) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'La cantidad de bultos debe ser un entero igual o mayor a cero.'];
+            Response::redirect($id > 0 ? '/admin/compras/' . $id . '/editar' : '/admin/compras/nueva');
+        }
+        $bultosRecibidos = $bultosRaw !== '' ? (int)$bultosRaw : null;
+        $bultosObservacion = mb_substr(trim((string)($_POST['bultos_observacion'] ?? '')), 0, 500);
         $idprovee = $cuit !== '' ? $repo->proveedorEnsure($cuit, $razon) : null;
         if (CompraRepo::esCondicionIva($razon)) {
             // Autocorrige con la razón real del proveedor; si no hay, rechaza el guardado.
@@ -336,6 +343,8 @@ final class CompraController
             'origen' => (string)($_POST['origen'] ?? 'manual'),
             'fecha' => $fecha !== '' ? $fecha : date('Y-m-d'),
             'fecha_recepcion' => preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaRecepcion) ? $fechaRecepcion : null,
+            'bultos_recibidos' => $bultosRecibidos,
+            'bultos_observacion' => $bultosObservacion,
             'flete_cents' => $fleteCents,
             'flete_pct' => ($fleteCents > 0 && $netoGravado > 0) ? round(($fleteCents / 100) / $netoGravado * 100, 2) : null,
             'flete_transporte_id' => (int)($_POST['flete_transporte_id'] ?? 0) ?: null,
@@ -582,6 +591,7 @@ final class CompraController
     private function formData(array $adminUser, array $compra, array $items): array
     {
         $repo = new CompraRepo();
+        $repo->asegurarCamposFleteRecepcion();
         $stockRepo = new StockRepo();
         foreach ($items as $i => $item) {
             $idprodu = (int)($item['idprodu'] ?? 0);

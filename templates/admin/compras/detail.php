@@ -37,6 +37,10 @@ $estado = (string)($compra['estado'] ?? 'pendiente');
                     <dt class="col-sm-3">Fecha recepción</dt>
                     <dd class="col-sm-9"><?= htmlspecialchars((string)$compra['fecha_recepcion']) ?></dd>
                     <?php endif; ?>
+                    <?php if (($compra['bultos_recibidos'] ?? null) !== null || trim((string)($compra['bultos_observacion'] ?? '')) !== ''): ?>
+                    <dt class="col-sm-3">Bultos recibidos</dt>
+                    <dd class="col-sm-9"><?= ($compra['bultos_recibidos'] ?? null) !== null ? (int)$compra['bultos_recibidos'] : '—' ?><?= trim((string)($compra['bultos_observacion'] ?? '')) !== '' ? ' · ' . htmlspecialchars((string)$compra['bultos_observacion']) : '' ?></dd>
+                    <?php endif; ?>
                     <dt class="col-sm-3">Proveedor</dt>
                     <dd class="col-sm-9 fw-bold">
                         <?php
