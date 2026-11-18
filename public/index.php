@@ -478,6 +478,7 @@ $router->post('/admin/sesion/guardar', [AdminSesionController::class, 'guardar']
 $router->post('/admin/sesion/cerrar', [AdminSesionController::class, 'cerrar']);
 $router->get('/admin/badges', [AdminBadgeController::class, 'badges']);
 $router->get('/admin/stock', [AdminStockController::class, 'index']);
+$router->get('/admin/stock/reposicion', [AdminStockController::class, 'reposicion']);
 $router->get('/admin/stock/exportar-excel', [AdminStockController::class, 'exportarExcel']);
 $router->get('/admin/stock/imprimir', [AdminStockController::class, 'imprimir']);
 $router->post('/admin/stock/recalcular', [AdminStockController::class, 'recalcular']);

@@ -75,6 +75,38 @@ final class StockController
         ]);
     }
 
+    public function reposicion(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requirePermiso('productos');
+        $repo = new StockRepo();
+        $depositos = $repo->grillaDepositos();
+        $depoARaw = trim((string)($_GET['depo_a'] ?? ''));
+        $depoBRaw = trim((string)($_GET['depo_b'] ?? ''));
+        $depoA = $depoARaw !== '' && ctype_digit($depoARaw) ? (int)$depoARaw : null;
+        $depoB = $depoBRaw !== '' && ctype_digit($depoBRaw) ? (int)$depoBRaw : null;
+        $recomendacion = null;
+        $error = '';
+
+        if ($depoA !== null && $depoB !== null) {
+            try {
+                $recomendacion = $repo->recomendacionReposicionPareja($depoA, $depoB);
+            } catch (\InvalidArgumentException $e) {
+                $error = $e->getMessage();
+            }
+        }
+
+        echo View::adminPage('admin/stock/reposicion.php', [
+            'adminUser' => $adminUser,
+            'depositos' => $depositos,
+            'depoA' => $depoA,
+            'depoB' => $depoB,
+            'recomendacion' => $recomendacion,
+            'error' => $error,
+            'pageTitle' => 'Reposición entre depósitos',
+        ]);
+    }
+
     private const STOCK_COLS = [
         'produ' => 'Producto',
         'nomgusto' => 'Variedad',

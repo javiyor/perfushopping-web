@@ -481,6 +481,93 @@ final class StockRepo
         return $st->fetchAll();
     }
 
+    /**
+     * Sugiere transferencias para repartir por mitades las existencias entre dos
+     * depósitos operativos cuando una variedad no tiene stock en uno de ellos.
+     * No registra movimientos: solo prepara las listas para reposición.
+     *
+     * @return array{deposito_a:array,deposito_b:array,enviar_a:array,enviar_b:array}
+     */
+    public function recomendacionReposicionPareja(int $depoAId, int $depoBId): array
+    {
+        if ($depoAId === $depoBId) {
+            throw new \InvalidArgumentException('Seleccioná dos depósitos diferentes.');
+        }
+
+        $pdo = Db::pdo();
+        $depoStmt = $pdo->prepare('SELECT iddepo, nomdepo, marca FROM deposito WHERE iddepo IN (:depo_a, :depo_b)');
+        $depoStmt->execute([':depo_a' => $depoAId, ':depo_b' => $depoBId]);
+        $depositosById = [];
+        foreach ($depoStmt->fetchAll() as $depo) {
+            if ((int)($depo['marca'] ?? 0) === 2) {
+                $depositosById[(int)$depo['iddepo']] = $depo;
+            }
+        }
+        if (count($depositosById) !== 2) {
+            throw new \InvalidArgumentException('Los dos depósitos deben existir y estar marcados como operativos (marca 2).');
+        }
+
+        $st = $pdo->prepare('
+            SELECT p.idprodu, p.produ, g.idcodgusto, g.nomgusto, g.codscan,
+                   COALESCE(sa.stock, 0) AS stock_a,
+                   COALESCE(sb.stock, 0) AS stock_b
+            FROM gustos g
+            INNER JOIN producto p ON p.idprodu = g.idprodu
+            LEFT JOIN (
+                SELECT s.idcodgusto, SUM(s.stock) AS stock
+                FROM stock s
+                INNER JOIN deposito d ON d.iddepo = s.iddepo AND d.marca = 2
+                WHERE s.iddepo = :stock_depo_a
+                GROUP BY s.idcodgusto
+            ) sa ON sa.idcodgusto = g.idcodgusto
+            LEFT JOIN (
+                SELECT s.idcodgusto, SUM(s.stock) AS stock
+                FROM stock s
+                INNER JOIN deposito d ON d.iddepo = s.iddepo AND d.marca = 2
+                WHERE s.iddepo = :stock_depo_b
+                GROUP BY s.idcodgusto
+            ) sb ON sb.idcodgusto = g.idcodgusto
+            WHERE g.idcodgusto > 0
+            ORDER BY p.produ ASC, g.nomgusto ASC
+        ');
+        $st->execute([':stock_depo_a' => $depoAId, ':stock_depo_b' => $depoBId]);
+
+        $enviarA = [];
+        $enviarB = [];
+        foreach ($st->fetchAll() as $row) {
+            $stockA = max(0, (int)($row['stock_a'] ?? 0));
+            $stockB = max(0, (int)($row['stock_b'] ?? 0));
+            $cantidad = 0;
+            $destino = null;
+            if ($stockA === 0 && $stockB > 2) {
+                $cantidad = intdiv($stockB, 2);
+                $destino = 'a';
+            } elseif ($stockB === 0 && $stockA > 2) {
+                $cantidad = intdiv($stockA, 2);
+                $destino = 'b';
+            }
+            if ($cantidad <= 0 || $destino === null) continue;
+
+            $item = [
+                'idprodu' => (int)$row['idprodu'],
+                'idcodgusto' => (int)$row['idcodgusto'],
+                'produ' => (string)($row['produ'] ?? ''),
+                'nomgusto' => (string)($row['nomgusto'] ?? ''),
+                'codscan' => (string)($row['codscan'] ?? ''),
+                'cantidad' => $cantidad,
+            ];
+            if ($destino === 'a') $enviarA[] = $item;
+            else $enviarB[] = $item;
+        }
+
+        return [
+            'deposito_a' => $depositosById[$depoAId],
+            'deposito_b' => $depositosById[$depoBId],
+            'enviar_a' => $enviarA,
+            'enviar_b' => $enviarB,
+        ];
+    }
+
     public function departamentos(): array
     {
         $st = Db::pdo()->query('SELECT codepar, nomdepar FROM departa ORDER BY nomdepar ASC');

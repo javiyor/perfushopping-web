@@ -333,7 +333,7 @@ $puntosVenta = $puntosVenta ?? [];
                 </div>
                 <div class="table-responsive">
                     <table class="table table-admin mb-0">
-                        <thead><tr><th>Departamento</th><th>Actividad</th><th class="text-end">Cant.</th><th class="text-end">Total</th><th style="width:35%"></th></tr></thead>
+                        <thead><tr><th>Departamento</th><th>Actividad</th><th class="text-end">Cant.</th><th class="text-end">Neto gravado</th><th class="text-end">Exento</th><th class="text-end">IVA</th><th class="text-end">Total</th><th style="width:15%"></th></tr></thead>
                         <tbody id="deptoBody"></tbody>
                     </table>
                 </div>
@@ -742,12 +742,12 @@ function cargarReportes() {
                 },
             });
             if (!deptos.length) {
-                deptoBody.innerHTML = '<tr><td colspan="5" class="text-muted text-center">Sin datos</td></tr>';
+                deptoBody.innerHTML = '<tr><td colspan="8" class="text-muted text-center">Sin datos</td></tr>';
             } else {
                 const maxTotal = Math.max(...deptos.map(x => parseInt(x.total_cents || 0)), 1);
                 deptos.forEach(dp => {
                     const pct = (parseInt(dp.total_cents || 0) / maxTotal * 100).toFixed(0);
-                    deptoBody.innerHTML += '<tr><td>' + escHtml(dp.departamento) + '</td><td>' + escHtml(dp.codactiv || '-') + '</td><td class="text-end">' + parseInt(dp.qty_total || 0) + '</td><td class="text-end">' + fmtCents(parseInt(dp.total_cents || 0)) + '</td><td><div class="progress" style="height:6px"><div class="progress-bar bg-accent" style="width:' + pct + '%"></div></div></td></tr>';
+                    deptoBody.innerHTML += '<tr><td>' + escHtml(dp.departamento) + '</td><td>' + escHtml(dp.codactiv || '-') + '</td><td class="text-end">' + parseInt(dp.qty_total || 0) + '</td><td class="text-end">' + fmtCents(parseInt(dp.neto_gravado_cents || 0)) + '</td><td class="text-end">' + fmtCents(parseInt(dp.exento_cents || 0)) + '</td><td class="text-end">' + fmtCents(parseInt(dp.iva_cents || 0)) + '</td><td class="text-end">' + fmtCents(parseInt(dp.total_cents || 0)) + '</td><td><div class="progress" style="height:6px"><div class="progress-bar bg-accent" style="width:' + pct + '%"></div></div></td></tr>';
                 });
             }
 

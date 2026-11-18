@@ -124,10 +124,16 @@ final class ReporteRepo
         $aut = $this->soloAutorizadasWhere();
         $qty = $this->montoSignado('fi.qty');
         $total = $this->montoSignado('fi.total_cents');
+        $netoGravado = $this->montoSignado('CASE WHEN fi.iva_rate > 0 THEN fi.total_cents - fi.iva_cents ELSE 0 END');
+        $exento = $this->montoSignado('CASE WHEN fi.iva_rate <= 0 THEN fi.total_cents - fi.iva_cents ELSE 0 END');
+        $iva = $this->montoSignado('fi.iva_cents');
         $st = Db::pdo()->prepare("
             SELECT
                 COALESCE(NULLIF(TRIM(CAST(d.codactiv AS CHAR)), ''), '0') AS codactiv,
                 SUM({$qty}) AS qty_total,
+                SUM({$netoGravado}) AS neto_gravado_cents,
+                SUM({$exento}) AS exento_cents,
+                SUM({$iva}) AS iva_cents,
                 SUM({$total}) AS total_cents
             FROM factura_items fi
             INNER JOIN facturas f ON f.id = fi.factura_id
