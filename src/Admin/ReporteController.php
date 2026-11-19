@@ -120,7 +120,7 @@ final class ReporteController
         $comparativas = [];
         foreach ($periodos as $key => [$d, $h]) {
             $step = 'comparativas:' . $key;
-            $r = $repo->resumenVentas($d, $h, $puntoVenta);
+            $r = $repo->resumenVentasTotal($d, $h, $puntoVenta);
             $comparativas[$key] = [
                 'desde' => $d,
                 'hasta' => $h,

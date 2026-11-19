@@ -58,6 +58,33 @@ final class ReporteRepo
         return $st->fetch() ?: ['cantidad' => 0, 'total_cents' => 0, 'iva_cents' => 0, 'subtotal_cents' => 0];
     }
 
+    /** Resumen comparativo de todas las facturas emitidas, tengan o no CAE. */
+    public function resumenVentasTotal(string $desde, string $hasta, int $puntoVenta = 0): array
+    {
+        $params = [':desde' => $desde, ':hasta' => $hasta];
+        $pvWhere = '';
+        if ($puntoVenta > 0) {
+            $pvWhere = ' AND f.punto_venta = :pv';
+            $params[':pv'] = $puntoVenta;
+        }
+        $total = $this->montoSignado('f.total_cents');
+        $iva = $this->montoSignado('f.iva_cents');
+        $subtotal = $this->montoSignado('f.subtotal_cents');
+        $st = Db::pdo()->prepare("
+            SELECT
+                COUNT(*) AS cantidad,
+                COALESCE(SUM({$total}), 0) AS total_cents,
+                COALESCE(SUM({$iva}), 0) AS iva_cents,
+                COALESCE(SUM({$subtotal}), 0) AS subtotal_cents
+            FROM facturas f
+            WHERE f.estado = 'emitida'
+              AND f.fecha BETWEEN :desde AND :hasta
+              $pvWhere
+        ");
+        $st->execute($params);
+        return $st->fetch() ?: ['cantidad' => 0, 'total_cents' => 0, 'iva_cents' => 0, 'subtotal_cents' => 0];
+    }
+
     public function ventasDiarias(string $desde, string $hasta, int $puntoVenta = 0): array
     {
         $params = [':desde' => $desde, ':hasta' => $hasta];
