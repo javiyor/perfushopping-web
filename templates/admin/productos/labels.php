@@ -24,9 +24,9 @@ $impresoraEtiquetas = $impresoraEtiquetas ?? null;
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family:Arial,Helvetica,sans-serif; width:80mm; }
 .config-bar { display:none; }
-.label-grid { display:flex; flex-wrap:wrap; padding:2mm 0 0 2mm; }
+.label-grid { display:grid; grid-template-columns:repeat(2, 38mm); gap:2mm 1mm; justify-content:center; padding:2mm 1mm; }
 .label {
-    width:35mm; min-height:16mm; margin:0 0 2mm 2mm;
+    width:38mm; min-height:16mm; margin:0;
     display:flex; flex-direction:column; align-items:center;
     border:1px dashed #ccc; overflow:hidden; padding:0.8mm;
 }
@@ -41,11 +41,11 @@ body { font-family:Arial,Helvetica,sans-serif; width:80mm; }
     .selection-form { display:none !important; }
 }
 @media screen {
-    body { padding:10px; background:#f5f5f5; }
+    body { width:auto; min-width:80mm; padding:10px; background:#f5f5f5; }
     .config-bar { display:block; background:#fff; border-radius:8px; padding:10px; margin-bottom:10px; max-width:180mm; font-family:Arial,sans-serif; font-size:13px; }
     .config-bar label { margin-right:15px; cursor:pointer; }
     .config-bar .btn-print { margin-left:10px; }
-    .label-grid { background:#fff; border-radius:8px; padding:4mm; max-width:180mm; }
+    .label-grid { background:#fff; border-radius:8px; padding:4mm; max-width:180mm; width:auto; }
     .label { border:1px solid #ddd; border-radius:2px; }
     .selection-form { max-width: 180mm; margin-bottom: 20px; padding: 15px; background: #fff; border-radius: 8px; border: 1px solid #ddd; }
     .selection-form h4 { margin: 0 0 15px; font-size: 14px; }
@@ -104,7 +104,7 @@ body { font-family:Arial,Helvetica,sans-serif; width:80mm; }
             <label style="font-size:13px">Rotación:
                 <select name="rot" style="width:90px">
                     <option value="0">0°</option>
-                    <option value="1">90°</option>
+                    <option value="1" selected>90°</option>
                     <option value="2">180°</option>
                     <option value="3">270°</option>
                 </select>
