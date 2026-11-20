@@ -36,6 +36,19 @@ body { font-family:Arial,Helvetica,sans-serif; width:80mm; }
 .label .row-price-ws { font-size:6px; color:#666; }
 .label .barcode-wrap { margin-top:1px; line-height:0; }
 @media print {
+    html, body { width:80mm !important; min-width:80mm !important; max-width:80mm !important; margin:0 !important; padding:0 !important; }
+    .label-grid {
+        display:grid !important;
+        grid-template-columns:38mm 38mm !important;
+        grid-auto-flow:row;
+        column-gap:1mm !important;
+        row-gap:2mm !important;
+        justify-content:center !important;
+        width:80mm !important;
+        max-width:80mm !important;
+        padding:2mm 1mm !important;
+    }
+    .label { width:38mm !important; margin:0 !important; break-inside:avoid; page-break-inside:avoid; transform:none !important; }
     .label { border:none; }
     .config-bar { display:none !important; }
     .selection-form { display:none !important; }
