@@ -188,10 +188,13 @@ if (!$producto):
         <?php endif; ?>
 
         <div class="card shadow-sm mb-3">
-            <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
-                <span>Movimientos de Compras</span>
-                <span class="badge bg-secondary"><?= count($movCompras) ?></span>
+            <div class="card-header bg-white p-0">
+                <button class="btn btn-link text-decoration-none text-body fw-semibold w-100 d-flex justify-content-between align-items-center px-3 py-2" type="button" data-bs-toggle="collapse" data-bs-target="#stockComprasCollapse" aria-expanded="false" aria-controls="stockComprasCollapse">
+                    <span>Movimientos de Compras</span>
+                    <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                </button>
             </div>
+            <div class="collapse" id="stockComprasCollapse">
             <?php if ($movCompras): ?>
             <div class="table-responsive" style="max-height:300px;overflow-y:auto">
                 <table class="table table-sm mb-0">
@@ -231,13 +234,17 @@ if (!$producto):
             <?php else: ?>
             <div class="card-body text-muted text-center small">Sin movimientos de compras</div>
             <?php endif; ?>
+            </div>
         </div>
 
         <div class="card shadow-sm mb-3">
-            <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
-                <span>Movimientos de Ventas</span>
-                <span class="badge bg-secondary"><?= count($movVentas) ?></span>
+            <div class="card-header bg-white p-0">
+                <button class="btn btn-link text-decoration-none text-body fw-semibold w-100 d-flex justify-content-between align-items-center px-3 py-2" type="button" data-bs-toggle="collapse" data-bs-target="#stockVentasCollapse" aria-expanded="false" aria-controls="stockVentasCollapse">
+                    <span>Movimientos de Ventas</span>
+                    <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                </button>
             </div>
+            <div class="collapse" id="stockVentasCollapse">
             <?php if ($movVentas): ?>
             <div class="table-responsive" style="max-height:300px;overflow-y:auto">
                 <table class="table table-sm mb-0">
@@ -277,6 +284,7 @@ if (!$producto):
             <?php else: ?>
             <div class="card-body text-muted text-center small">Sin movimientos de ventas</div>
             <?php endif; ?>
+            </div>
         </div>
 
         <div class="card shadow-sm">

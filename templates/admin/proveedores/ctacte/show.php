@@ -182,10 +182,13 @@ $filtroQs = $q !== '' ? '&q=' . urlencode($q) : '';
 <?php endif; ?>
 
 <div class="card shadow-sm">
-    <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
-        <span>Movimientos</span>
-        <span class="badge bg-secondary"><?= count($movimientos) ?> registros</span>
+    <div class="card-header bg-white p-0">
+        <button class="btn btn-link text-decoration-none text-body fw-semibold w-100 d-flex justify-content-between align-items-center px-3 py-2" type="button" data-bs-toggle="collapse" data-bs-target="#proveedorMovimientosCollapse" aria-expanded="false" aria-controls="proveedorMovimientosCollapse">
+            <span>Movimientos</span>
+            <i class="bi bi-chevron-down" aria-hidden="true"></i>
+        </button>
     </div>
+    <div class="collapse" id="proveedorMovimientosCollapse">
     <div class="table-responsive">
         <table class="table table-sm table-hover mb-0 ctacte-data-table">
             <thead>
@@ -227,6 +230,7 @@ $filtroQs = $q !== '' ? '&q=' . urlencode($q) : '';
                 <?php endif; ?>
             </tbody>
         </table>
+    </div>
     </div>
 </div>
 <script>
