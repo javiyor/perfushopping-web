@@ -758,7 +758,6 @@ public function saveVariantLogistics(array $params): void
         $labelH = (int)round(25 * $dpm);
         $gap = (int)round(1 * $dpm);
         $pageW = (int)round(80 * $dpm);
-        $pitch = $labelH + $gap;
         $marginX = (int)round(1.5 * $dpm);
         $marginY = (int)round(1 * $dpm);
 
@@ -792,7 +791,7 @@ public function saveVariantLogistics(array $params): void
             return "N\n";
         }
 
-        $out = "N\nq{$pageW}\nQ{$pitch},0008\n";
+        $out = "N\nq{$pageW}\nQ{$labelH},{$gap}\n";
         foreach (array_chunk($labels, 2) as $row) {
             $out .= "N\n";
             foreach ($row as $col => $lb) {
@@ -808,14 +807,13 @@ public function saveVariantLogistics(array $params): void
                 $out .= 'A' . $x . ',' . $y . ',' . $rot . ',' . $fontSmall . ',1,1,N,"' . $lb['sub'] . "\"\n";
                 $y += $lhSmall + 3;
                 $out .= 'A' . $x . ',' . $y . ',' . $rot . ',' . $fontBig . ',1,1,N,"' . $price . "\"\n";
+                $y += $lhBig + 2;
                 $out .= 'A' . $x . ',' . $y . ',' . $rot . ',' . $fontSmall . ',1,1,N,"' . $priceWs . "\"\n";
-                $y += $lhBig + 4;
-                $barH = max((int)round(8 * $dpm), $labelH - $y - $lhSmall - 4);
-                if (strlen($lb['ean']) === 13 && ctype_digit($lb['ean'])) {
-                    $out .= 'B' . $x . ',' . $y . ',' . $rot . ',' . $barH . ',7,' . $narrow . ',5,N,"' . substr($lb['ean'], 0, 12) . "\"\n";
-                } else {
-                    $out .= 'B' . $x . ',' . $y . ',' . $rot . ',' . $barH . ',5,' . $narrow . ',3,N,"' . $lb['ean'] . "\"\n";
-                }
+                $y += $lhSmall + 3;
+                $barH = max((int)round(8 * $dpm), $labelH - $y - 4);
+                // EPL barcode syntax: B x,y,rotation,type,narrow,wide,height,HRI,data.
+                // Type 3 is EAN-13; pass the first 12 digits so the printer adds its check digit.
+                $out .= 'B' . $x . ',' . $y . ',' . $rot . ',3,' . $narrow . ',7,' . $barH . ',B,"' . substr($lb['ean'], 0, 12) . "\"\n";
             }
             $out .= "P1\n";
         }
