@@ -730,9 +730,9 @@ public function saveVariantLogistics(array $params): void
         $selectedVariants = array_map('intval', (array)($_POST['variants'] ?? []));
         $quantities = (array)($_POST['qty'] ?? []);
         $dpi = ((int)($_POST['dpi'] ?? 203)) === 300 ? 300 : 203;
-        $rot = (int)($_POST['rot'] ?? 1);
+        $rot = (int)($_POST['rot'] ?? 0);
         if (!in_array($rot, [0, 1, 2, 3], true)) {
-            $rot = 1;
+            $rot = 0;
         }
 
         $variants = array_values(array_filter($this->repo->variants($id), function ($v) use ($selectedVariants) {
@@ -751,7 +751,7 @@ public function saveVariantLogistics(array $params): void
         exit;
     }
 
-    private function buildEpl(array $product, array $variants, array $quantities, int $dpi, int $rot = 1): string
+    private function buildEpl(array $product, array $variants, array $quantities, int $dpi, int $rot = 0): string
     {
         $dpm = $dpi / 25.4;
         $labelW = (int)round(38 * $dpm);

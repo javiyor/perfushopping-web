@@ -103,8 +103,8 @@ body { font-family:Arial,Helvetica,sans-serif; width:80mm; }
             </label>
             <label style="font-size:13px">Rotación:
                 <select name="rot" style="width:90px">
-                    <option value="0">0°</option>
-                    <option value="1" selected>90°</option>
+                    <option value="0" selected>0°</option>
+                    <option value="1">90°</option>
                     <option value="2">180°</option>
                     <option value="3">270°</option>
                 </select>
