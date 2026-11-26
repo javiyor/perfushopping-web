@@ -748,6 +748,7 @@ $sucursalId = $auth->getSucursalId();
         echo View::adminPage('admin/caja/ajuste.php', [
             'adminUser' => $adminUser,
             'apertura' => $apertura,
+            'turnoActual' => (string)($apertura['turno'] ?? ''),
             'csrf' => Csrf::token(),
             'pageTitle' => 'Solicitar corrección de apertura',
         ]);
@@ -789,6 +790,42 @@ $sucursalId = $auth->getSucursalId();
 
         $repo->solicitarAjusteApertura((int)$apertura['id'], $nuevoCents, $motivo, (int)$adminUser['id']);
         $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Corrección enviada. Queda pendiente hasta que un administrador la apruebe.'];
+        Response::redirect('/admin/caja');
+    }
+
+    public function solicitarAjusteTurnoAperturaStore(array $params): void
+    {
+        $auth = new AdminAuthService();
+        $adminUser = $auth->requirePermiso('caja_movimientos');
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $repo = new CajaRepo();
+        $apertura = $repo->aperturaActiva($auth->getSucursalId(), $auth->getTurno(), date('Y-m-d'));
+        if (!$apertura || ($apertura['estado'] ?? '') !== 'abierta') {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No hay una caja abierta para corregir.'];
+            Response::redirect('/admin/caja');
+        }
+        if ($repo->ajustePendienteDeCaja((int)$apertura['id'])) {
+            $_SESSION['admin_flash'] = ['type' => 'info', 'text' => 'Ya hay una corrección pendiente de aprobación para esta apertura.'];
+            Response::redirect('/admin/caja');
+        }
+
+        $nuevoTurno = trim((string)($_POST['turno_nuevo'] ?? ''));
+        $motivo = trim((string)($_POST['motivo_turno'] ?? ''));
+        if (!in_array($nuevoTurno, ['manana', 'tarde'], true)
+            || $nuevoTurno === (string)($apertura['turno'] ?? '')
+            || mb_strlen($motivo) < 10
+        ) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Seleccioná un turno distinto y describí el motivo (mínimo 10 caracteres).'];
+            Response::redirect('/admin/caja/apertura/ajuste');
+        }
+
+        try {
+            $repo->solicitarAjusteTurno((int)$apertura['id'], $nuevoTurno, $motivo, (int)$adminUser['id']);
+            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Cambio de turno enviado. Queda pendiente hasta que un administrador lo apruebe.'];
+        } catch (\Throwable $e) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => $e->getMessage()];
+        }
         Response::redirect('/admin/caja');
     }
 

@@ -20,6 +20,14 @@ final class BadgeController
         $userRepo = new UserRepo();
         $stockRepo = new StockRepo();
         $facturaRepo = new \Perfushopping\Web\Repo\FacturaRepo();
+        $cajaAjustesPendientes = 0;
+        if (($adminUser['rol'] ?? '') === 'superadmin') {
+            try {
+                $cajaAjustesPendientes = (new \Perfushopping\Web\Repo\CajaRepo())->countAjustesPendientes();
+            } catch (\Throwable $e) {
+                error_log('BadgeController cash adjustment count: ' . $e->getMessage());
+            }
+        }
         $puedeAutorizarFacturas = \Perfushopping\Web\Service\AdminAuthService::adminPuedeAutorizar($adminUser);
         $edicionesFacturaPendientes = 0;
         if ($puedeAutorizarFacturas) {
@@ -35,6 +43,7 @@ final class BadgeController
             'pedidos_abandonados' => $orderRepo->countAbandoned(),
             'usuarios_nuevos' => $userRepo->countNewToday(),
             'stock_ajustes_pendientes' => (($adminUser['rol'] ?? '') === 'superadmin') ? $stockRepo->countSolicitudesAjustePendientes() : 0,
+            'caja_ajustes_pendientes' => $cajaAjustesPendientes,
             'envios_pendientes' => $facturaRepo->countEnviosPendientes(),
             'ediciones_factura_pendientes' => $edicionesFacturaPendientes,
         ]);

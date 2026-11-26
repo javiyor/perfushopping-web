@@ -1445,17 +1445,17 @@ final class CajaRepo
     }
 
     /** ¿Hay otra apertura (distinta de $cajaId) para sucursal+fecha+turno? */
-    private function existeOtraAperturaTurno(int $cajaId, string $turno): ?array
+    private function existeOtraAperturaTurno(int $cajaId, string $turno, bool $soloAbiertas = false): ?array
     {
         $ap = $this->findById($cajaId);
         if (!$ap) {
             return null;
         }
-        $st = Db::pdo()->prepare('
+        $sql = '
             SELECT id, estado, turno, fecha FROM caja_aperturas
-            WHERE sucursal_id = :suc AND fecha = :fec AND turno = :tur AND id <> :id
-            LIMIT 1
-        ');
+            WHERE sucursal_id = :suc AND fecha = :fec AND turno = :tur AND id <> :id';
+        if ($soloAbiertas) $sql .= " AND estado = 'abierta'";
+        $st = Db::pdo()->prepare($sql . ' ORDER BY id DESC LIMIT 1');
         $st->execute([
             ':suc' => (int)($ap['sucursal_id'] ?? 0),
             ':fec' => (string)($ap['fecha'] ?? ''),
@@ -1466,13 +1466,16 @@ final class CajaRepo
         return $row ?: null;
     }
 
-    private function errorTurnoOcupado(int $cajaId, string $turno): \RuntimeException
+    private function errorTurnoOcupado(int $cajaId, string $turno, bool $soloAbiertas = false): \RuntimeException
     {
-        $otra = $this->existeOtraAperturaTurno($cajaId, $turno);
+        $otra = $this->existeOtraAperturaTurno($cajaId, $turno, $soloAbiertas);
         if (!$otra) {
             return new \RuntimeException('Turno ocupado.');
         }
         $nombre = $turno === 'manana' ? 'mañana' : 'tarde';
+        if ($soloAbiertas) {
+            return new \RuntimeException('Ya hay una caja abierta para el turno ' . $nombre . ' en esta sucursal y fecha (caja #' . (int)$otra['id'] . ').');
+        }
         return new \RuntimeException(
             'Ya existe la caja #' . (int)$otra['id'] . ' (' . ($otra['estado'] ?? '?') . ') del ' . $nombre
             . ' el ' . (string)($otra['fecha'] ?? '') . '. Corregí o anulá esa caja primero.'
@@ -1493,7 +1496,7 @@ final class CajaRepo
         return $st->fetch() ?: null;
     }
 
-    /** Solicita cambiar el turno de una caja cerrada (manana/tarde). */
+    /** Solicita cambiar el turno de una caja; los cambios se aplican solo al aprobarse. */
     public function solicitarAjusteTurno(int $cajaId, string $nuevoTurno, string $motivo, int $solicitadoPor): int
     {
         $this->ensureAjustesTable();
@@ -1504,15 +1507,17 @@ final class CajaRepo
         if (!$apertura) {
             throw new \RuntimeException('Cierre no encontrado.');
         }
-        if (($apertura['estado'] ?? '') !== 'cerrada') {
-            throw new \RuntimeException('Solo se puede corregir un cierre ya realizado.');
+        $estado = (string)($apertura['estado'] ?? '');
+        if (!in_array($estado, ['abierta', 'cerrada'], true)) {
+            throw new \RuntimeException('La caja no se encuentra en un estado que permita corregir el turno.');
         }
         $actual = (string)($apertura['turno'] ?? '');
         if ($actual === $nuevoTurno) {
             throw new \RuntimeException('El turno ya es ese.');
         }
-        if ($this->existeOtraAperturaTurno($cajaId, $nuevoTurno)) {
-            throw $this->errorTurnoOcupado($cajaId, $nuevoTurno);
+        $soloAbiertas = $estado === 'abierta';
+        if ($this->existeOtraAperturaTurno($cajaId, $nuevoTurno, $soloAbiertas)) {
+            throw $this->errorTurnoOcupado($cajaId, $nuevoTurno, $soloAbiertas);
         }
         $st = Db::pdo()->prepare('
             INSERT INTO caja_apertura_ajustes (caja_id, campo, valor_anterior_cents, valor_nuevo_cents, valor_anterior_text, valor_nuevo_text, motivo, estado, solicitado_por, created_at)
@@ -1592,6 +1597,11 @@ final class CajaRepo
         return $st->fetchAll();
     }
 
+    public function countAjustesPendientes(): int
+    {
+        return (int)Db::pdo()->query("SELECT COUNT(*) FROM caja_apertura_ajustes WHERE estado = 'pendiente'")->fetchColumn();
+    }
+
     public function ajustesHistorial(int $limit = 20): array
     {
         $this->ensureAjustesTable();
@@ -1646,8 +1656,9 @@ final class CajaRepo
                     if (($caja['turno'] ?? '') === $nuevoTurno) {
                         throw new \RuntimeException('El turno ya es ese.');
                     }
-                    if ($this->existeOtraAperturaTurno($cajaId, $nuevoTurno)) {
-                        throw $this->errorTurnoOcupado($cajaId, $nuevoTurno);
+                    $soloAbiertas = (string)($caja['estado'] ?? '') === 'abierta';
+                    if ($this->existeOtraAperturaTurno($cajaId, $nuevoTurno, $soloAbiertas)) {
+                        throw $this->errorTurnoOcupado($cajaId, $nuevoTurno, $soloAbiertas);
                     }
                     $pdo->prepare("UPDATE caja_aperturas SET turno = :tur, updated_at = NOW() WHERE id = :caja LIMIT 1")
                         ->execute([':tur' => $nuevoTurno, ':caja' => $cajaId]);

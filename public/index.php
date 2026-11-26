@@ -545,6 +545,7 @@ $router->post('/admin/caja/general/controlar', [AdminCajaController::class, 'con
 $router->post('/admin/caja/cierre/controlar', [AdminCajaController::class, 'controlarCierre']);
 $router->get('/admin/caja/apertura/ajuste', [AdminCajaController::class, 'solicitarAjusteForm']);
 $router->post('/admin/caja/apertura/ajuste/guardar', [AdminCajaController::class, 'solicitarAjusteStore']);
+$router->post('/admin/caja/apertura/turno/guardar', [AdminCajaController::class, 'solicitarAjusteTurnoAperturaStore']);
 $router->get('/admin/caja/cierre/(?P<id>\d+)/ajuste', [AdminCajaController::class, 'solicitarAjusteCierreForm']);
 $router->post('/admin/caja/cierre/ajuste/guardar', [AdminCajaController::class, 'solicitarAjusteCierreStore']);
 $router->get('/admin/caja/ajustes', [AdminCajaController::class, 'ajustes']);

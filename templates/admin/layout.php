@@ -219,7 +219,7 @@
             <?php if ($can('recibos')): ?><a href="/admin/recibos/comprobantes" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Listado de cobranzas y emisión de recibos"><i class="bi bi-wallet2"></i>Cobranzas</a><?php endif; ?>
             <?php if ($can('facturacion')): ?><a href="/admin/vouchers" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Generar y consultar vouchers de regalo"><i class="bi bi-gift"></i>Vouchers regalo</a><?php endif; ?>
             <?php if ($can('cta_cte')): ?><a href="/admin/ctacte" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Cuentas corrientes de clientes"><i class="bi bi-currency-dollar"></i>Ctas. ctes.</a><?php endif; ?>
-            <?php if ($can('caja_movimientos')): ?><a href="/admin/caja" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Caja del turno: apertura, movimientos y cierre"><i class="bi bi-cash-stack"></i>Caja</a><?php endif; ?>
+            <?php if ($can('caja_movimientos')): ?><a href="/admin/caja" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Caja del turno: apertura, movimientos y cierre"><i class="bi bi-cash-stack"></i>Caja<?php if ($adminRol === 'superadmin'): ?><span class="badge-dot red" id="badgeCajaAjustes" style="display:none" title="Correcciones de caja pendientes"></span><?php endif; ?></a><?php endif; ?>
             <?php if ($adminRol === 'superadmin'): ?><a href="/admin/caja/general" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Caja general: ingresos/egresos centralizados"><i class="bi bi-piggy-bank"></i>Caja General</a><?php endif; ?>
             <a href="/admin/empleados/comisiones" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Comisiones ganadas por marca"><i class="bi bi-award"></i>Comisiones</a>
             <?php if ($can('caja_movimientos')): ?><a href="/admin/impresion/config" data-bs-toggle="<?= $isDemo ? 'tooltip' : '' ?>" data-bs-placement="right" title="Configuración de impresión de tickets"><i class="bi bi-printer"></i>Impresión</a><?php endif; ?>
@@ -399,6 +399,9 @@
             var sa = document.getElementById('badgeStockAjustes');
             if (d.stock_ajustes_pendientes > 0) { sa.textContent = d.stock_ajustes_pendientes; sa.style.display = ''; }
             else { sa.style.display = 'none'; }
+
+            var ca = document.getElementById('badgeCajaAjustes');
+            if (ca) ca.style.display = Number(d.caja_ajustes_pendientes || 0) > 0 ? 'inline-block' : 'none';
 
             var ev = document.getElementById('badgeEnviosPendientes');
             if (ev) {

@@ -3,6 +3,8 @@ use Perfushopping\Web\Support\Format;
 
 $apertura = $apertura ?? [];
 $actualCents = (int)($apertura['monto_inicial_cents'] ?? 0);
+$turnoActual = (string)($turnoActual ?? ($apertura['turno'] ?? ''));
+$turnoActualLabel = $turnoActual === 'tarde' ? 'Tarde' : 'Mañana';
 ?>
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
@@ -39,6 +41,28 @@ $actualCents = (int)($apertura['monto_inicial_cents'] ?? 0);
 
                     <button class="btn btn-accent" type="submit"><i class="bi bi-send"></i> Enviar para aprobación</button>
                     <a class="btn btn-outline-secondary" href="/admin/caja">Cancelar</a>
+                </form>
+            </div>
+        </div>
+        <div class="card shadow-sm mt-3">
+            <div class="card-header bg-white fw-semibold">Corrección del turno</div>
+            <div class="card-body">
+                <div class="alert alert-info small">Turno actual: <strong><?= htmlspecialchars($turnoActualLabel) ?></strong>. El cambio no se aplicará hasta que un administrador lo apruebe.</div>
+                <form method="post" action="/admin/caja/apertura/turno/guardar">
+                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>" />
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Turno correcto</label>
+                        <select class="form-select" name="turno_nuevo" required>
+                            <option value="">Seleccionar…</option>
+                            <option value="manana">Mañana</option>
+                            <option value="tarde">Tarde</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Descripción del error</label>
+                        <textarea class="form-control" name="motivo_turno" rows="3" required minlength="10" placeholder="Explicá por qué hay que cambiar el turno registrado."></textarea>
+                    </div>
+                    <button class="btn btn-outline-primary" type="submit"><i class="bi bi-send"></i> Solicitar cambio de turno</button>
                 </form>
             </div>
         </div>
