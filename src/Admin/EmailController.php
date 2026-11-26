@@ -6,6 +6,7 @@ namespace Perfushopping\Web\Admin;
 use Perfushopping\Web\Repo\EmailFolderRepo;
 use Perfushopping\Web\Repo\EmailMarketingRepo;
 use Perfushopping\Web\Repo\CustomerRepo;
+use Perfushopping\Web\Repo\EmpresaRepo;
 use Perfushopping\Web\Service\AdminAuthService;
 use Perfushopping\Web\Support\Csrf;
 use Perfushopping\Web\Support\Env;
@@ -278,6 +279,99 @@ final class EmailController
     private static function normalizeMessageId(string $raw): string
     {
         return mb_substr(trim($raw, " \t<>"), 0, 255);
+    }
+
+    /** Logo configurado en empre, preferentemente adjuntado como imagen CID. */
+    private function logoCorreo(): array
+    {
+        $empresa = (new EmpresaRepo())->getDefault() ?? [];
+        $logo = trim((string)($empresa['logo'] ?? ''));
+        if ($logo === '') return ['url' => '', 'html' => '', 'attachments' => []];
+
+        $url = \Perfushopping\Web\Support\Format::absoluteUploadUrl($logo);
+        $uploadUrl = \Perfushopping\Web\Support\Format::uploadUrl($logo);
+        $path = parse_url($uploadUrl, PHP_URL_PATH);
+        $webroot = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? APP_BASE_DIR), '/\\');
+        $realRoot = realpath($webroot);
+        $realFile = is_string($path) && str_starts_with($path, '/') ? realpath($webroot . $path) : false;
+        if ($realRoot && $realFile && str_starts_with($realFile, $realRoot . DIRECTORY_SEPARATOR) && is_file($realFile)) {
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $mime = $finfo ? finfo_file($finfo, $realFile) : '';
+            if ($finfo) finfo_close($finfo);
+            if (in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true) && filesize($realFile) <= 3 * 1024 * 1024) {
+                $content = file_get_contents($realFile);
+                if (is_string($content) && $content !== '') {
+                    $contentId = 'empresa-logo-' . bin2hex(random_bytes(10));
+                    $extension = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp'][$mime];
+                    return [
+                        'url' => $url,
+                        'html' => '<div style="margin:20px 0 0"><img src="cid:' . $contentId . '" alt="' . htmlspecialchars((string)($empresa['nomemp'] ?? 'Empresa'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" style="display:block;max-width:220px;max-height:100px;width:auto;height:auto;border:0"></div>',
+                        'attachments' => [[
+                            'name' => 'logo-empresa.' . $extension,
+                            'content' => $content,
+                            'mime' => $mime,
+                            'inline' => true,
+                            'content_id' => $contentId,
+                        ]],
+                    ];
+                }
+            }
+        }
+        return [
+            'url' => $url,
+            'html' => '<div style="margin:20px 0 0"><img src="' . htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" alt="' . htmlspecialchars((string)($empresa['nomemp'] ?? 'Empresa'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" style="display:block;max-width:220px;max-height:100px;width:auto;height:auto;border:0"></div>',
+            'attachments' => [],
+        ];
+    }
+
+    private function correoHtmlConLogo(string $bodyHtml, array $branding): string
+    {
+        return '<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#212529">'
+            . $bodyHtml . (string)($branding['html'] ?? '') . '</div>';
+    }
+
+    public function redactar(array $params): void
+    {
+        $adminUser = (new AdminAuthService())->requirePermiso('clientes');
+        $branding = $this->logoCorreo();
+        echo View::adminPage('admin/email/compose.php', [
+            'adminUser' => $adminUser,
+            'csrf' => Csrf::token(),
+            'logoUrl' => (string)($branding['url'] ?? ''),
+            'pageTitle' => 'Redactar email',
+        ]);
+    }
+
+    public function enviarMensaje(array $params): void
+    {
+        (new AdminAuthService())->requirePermiso('clientes');
+        Csrf::check($_POST['_csrf'] ?? null);
+        $to = trim((string)($_POST['to'] ?? ''));
+        $subject = trim((string)($_POST['subject'] ?? ''));
+        $bodyHtml = trim((string)($_POST['body_html'] ?? ''));
+        if (!filter_var($to, FILTER_VALIDATE_EMAIL) || $subject === '' || mb_strlen($subject) > 200
+            || mb_strlen($bodyHtml) > 100000 || trim(strip_tags($bodyHtml)) === '') {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Completá un destinatario válido, el asunto y el mensaje.'];
+            Response::redirect('/admin/email/redactar');
+        }
+        try {
+            $safeHtml = self::sanitizeReplyHtml($bodyHtml);
+            if (trim(strip_tags($safeHtml)) === '') throw new \RuntimeException('El mensaje quedó vacío luego de quitar contenido no permitido.');
+            $plain = trim(html_entity_decode(strip_tags(str_replace(['<br>', '<br/>', '<br />', '</p>', '</div>', '</li>'], "\n", $safeHtml)), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            $branding = $this->logoCorreo();
+            (new \Perfushopping\Web\Infra\SmtpMailer())->send(
+                $to,
+                $subject,
+                $this->correoHtmlConLogo($safeHtml, $branding),
+                $plain,
+                $branding['attachments'] ?? []
+            );
+            $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Email enviado a ' . $to . '.'];
+            Response::redirect('/admin/email');
+        } catch (\Throwable $e) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'No se pudo enviar el email: ' . $e->getMessage()];
+            Response::redirect('/admin/email/redactar');
+        }
     }
 
     public function inbox(array $params): void
@@ -766,7 +860,8 @@ final class EmailController
                 $threadHeaders['In-Reply-To'] = '<' . $messageId . '>';
                 $threadHeaders['References'] = trim($references . ' <' . $messageId . '>');
             }
-            (new \Perfushopping\Web\Infra\SmtpMailer())->send($to, $subject, $safeHtml, $plain, [], $threadHeaders);
+            $branding = $this->logoCorreo();
+            (new \Perfushopping\Web\Infra\SmtpMailer())->send($to, $subject, $this->correoHtmlConLogo($safeHtml, $branding), $plain, $branding['attachments'] ?? [], $threadHeaders);
             $_SESSION['admin_flash'] = ['type' => 'ok', 'text' => 'Respuesta enviada a ' . $to . '.'];
         } catch (\Throwable $e) {
             if (isset($mbox) && $mbox instanceof \IMAP\Connection) @imap_close($mbox);

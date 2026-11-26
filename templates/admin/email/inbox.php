@@ -21,6 +21,7 @@ $folderName = static function (int $id) use ($folders): string {
         <p class="text-muted small"><?= htmlspecialchars(Env::get('SMTP_USER', '')) ?></p>
     </div>
     <div class="d-flex gap-2">
+        <a class="btn btn-primary btn-sm" href="/admin/email/redactar"><i class="bi bi-pencil-square"></i> Redactar email</a>
         <a class="btn btn-accent btn-sm" href="/admin/email/publicidad"><i class="bi bi-megaphone"></i> Enviar publicidad</a>
         <a class="btn btn-outline-secondary btn-sm" href="https://webmail.perfushopping.com.ar" target="_blank"><i class="bi bi-box-arrow-up-right"></i> Webmail</a>
     </div>
