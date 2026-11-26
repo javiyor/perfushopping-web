@@ -15,11 +15,22 @@ final class SucursalRepo
         if (self::$arcaColumnChecked) {
             return;
         }
-        self::$arcaColumnChecked = true;
-        $pdo = Db::pdo();
-        $st = $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'admin_sucursales' AND COLUMN_NAME = 'punto_venta_arca'");
-        if ((int)$st->fetchColumn() === 0) {
-            $pdo->exec('ALTER TABLE admin_sucursales ADD COLUMN punto_venta_arca INT UNSIGNED DEFAULT NULL AFTER punto_venta');
+        for ($attempt = 0; $attempt < 2; $attempt++) {
+            try {
+                $pdo = Db::pdo();
+                $st = $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'admin_sucursales' AND COLUMN_NAME = 'punto_venta_arca'");
+                if ((int)$st->fetchColumn() === 0) {
+                    $pdo->exec('ALTER TABLE admin_sucursales ADD COLUMN punto_venta_arca INT UNSIGNED DEFAULT NULL AFTER punto_venta');
+                }
+                self::$arcaColumnChecked = true;
+                return;
+            } catch (\PDOException $e) {
+                if ($attempt !== 0 || !Db::isConnectionLost($e)) {
+                    throw $e;
+                }
+                error_log('SucursalRepo::ensureArcaColumn: conexión MySQL perdida; se reconecta y reintenta.');
+                Db::reconnect();
+            }
         }
     }
 

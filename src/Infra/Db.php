@@ -4,11 +4,26 @@ declare(strict_types=1);
 namespace Perfushopping\Web\Infra;
 
 use PDO;
+use PDOException;
 use Perfushopping\Web\Support\Env;
 
 final class Db
 {
     private static ?PDO $pdo = null;
+
+    public static function reconnect(): PDO
+    {
+        self::$pdo = null;
+        return self::pdo();
+    }
+
+    public static function isConnectionLost(PDOException $e): bool
+    {
+        $driverCode = (int)($e->errorInfo[1] ?? 0);
+        $sqlState = (string)$e->getCode();
+        return in_array($driverCode, [2006, 2013, 2055], true)
+            || str_starts_with($sqlState, '08');
+    }
 
     public static function pdo(): PDO
     {
