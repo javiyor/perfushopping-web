@@ -42,6 +42,13 @@ $qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $
 ?>
 <style>
 .stock-located-row { outline:3px solid #0d6efd; outline-offset:-3px; background-color:#cfe2ff !important; }
+.stock-table tbody td:nth-child(11), .stock-table tbody td:nth-child(12) { font-size:1.1rem; font-weight:600; }
+.stock-table tbody td:nth-child(11) .badge { min-width:2.3rem; padding:.4em .55em; font-size:.95rem; }
+.stock-table tfoot td:nth-child(11), .stock-table tfoot td:nth-child(12) { font-size:1rem; }
+@media (max-width: 768px) {
+    .stock-table tbody td:nth-child(11), .stock-table tbody td:nth-child(12) { font-size:1rem; }
+    .stock-table tbody td:nth-child(11) .badge { font-size:.9rem; }
+}
 </style>
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
@@ -168,7 +175,7 @@ $qs = static function (array $overrides = []) use ($q, $codepar, $stockFilter, $
 
 <div class="card shadow-sm">
     <div class="table-responsive">
-        <table class="table table-admin table-hover mb-0" style="font-size:13px">
+        <table class="table table-admin table-hover mb-0 stock-table" style="font-size:13px">
             <thead>
                 <tr>
                     <th style="width:40px"></th>
