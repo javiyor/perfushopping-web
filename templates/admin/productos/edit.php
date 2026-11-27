@@ -163,15 +163,29 @@ foreach ($proveedores as $prov) {
                         <div class="card-header bg-white fw-semibold">Costos y márgenes</div>
                         <div class="card-body">
                             <div class="row g-1 mb-2">
-                                <div class="col-md-4">
-                                    <label class="form-label small">Costo <span class="text-muted">(sin IVA)</span></label>
-                                    <input class="form-control form-control-sm calc-trigger" name="precomp" value="<?= htmlspecialchars((string)($product['precomp'] ?? '0')) ?>" inputmode="decimal" />
+                                <div class="col-md-5">
+                                    <label class="form-label small">Costo ingresado</label>
+                                    <input class="form-control form-control-sm calc-trigger" name="costo_base" value="<?= htmlspecialchars((string)($product['precomp'] ?? '0')) ?>" inputmode="decimal" />
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-3">
+                                    <label class="form-label small">Bonif. (%)</label>
+                                    <input class="form-control form-control-sm calc-trigger" name="bonificacion_pct" type="number" min="0" max="100" step="0.01" value="0" inputmode="decimal" />
+                                </div>
+                                <div class="col-md-4 d-flex align-items-end pb-1">
+                                    <div class="form-check">
+                                        <input class="form-check-input calc-trigger" type="checkbox" name="costo_iva_incluido" id="costoIvaIncluido" value="1" />
+                                        <label class="form-check-label small" for="costoIvaIncluido">IVA incluido</label>
+                                    </div>
+                                </div>
+                                <input type="hidden" name="precomp" value="<?= htmlspecialchars((string)($product['precomp'] ?? '0')) ?>" />
+                            </div>
+                            <div class="small text-muted mb-2">La bonificación se descuenta del costo ingresado; si marcás IVA incluido, se calcula el costo neto sin IVA.</div>
+                            <div class="row g-1">
+                                <div class="col-md-6">
                                     <label class="form-label small">Margen minorista <span class="text-muted">(%)</span></label>
                                     <input class="form-control form-control-sm calc-trigger" name="ganan1" value="<?= htmlspecialchars((string)($product['ganan1'] ?? '0')) ?>" inputmode="decimal" />
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-6">
                                     <label class="form-label small">Margen mayorista <span class="text-muted">(%)</span></label>
                                     <input class="form-control form-control-sm calc-trigger" name="ganan2" value="<?= htmlspecialchars((string)($product['ganan2'] ?? '0')) ?>" inputmode="decimal" />
                                 </div>
@@ -605,16 +619,26 @@ document.querySelectorAll('.calc-trigger').forEach(function(el) {
 function parseImporte(v) {
     return parseFloat((v || '0').replace(',', '.')) || 0;
 }
+function calcularCostoNeto() {
+    var base = parseImporte(document.querySelector('[name="costo_base"]').value);
+    var bonif = Math.min(100, Math.max(0, parseImporte(document.querySelector('[name="bonificacion_pct"]').value)));
+    var ivaPct = <?= json_encode($selectedIva) ?>;
+    var neto = base * (1 - bonif / 100);
+    if (document.getElementById('costoIvaIncluido').checked && ivaPct > 0) neto /= (1 + ivaPct / 100);
+    neto = Math.round(neto * 100) / 100;
+    document.querySelector('[name="precomp"]').value = neto.toFixed(2);
+    return neto;
+}
 function actualizarNeto() {
     var netoEl = document.getElementById('netoCalculado');
     if (!netoEl) return;
     var ivaPct = <?= json_encode($selectedIva) ?>;
     var n1 = parseImporte(document.querySelector('[name="precio_gross"]').value) / (1 + ivaPct / 100);
     var n2 = parseImporte(document.querySelector('[name="precio1_gross"]').value) / (1 + ivaPct / 100);
-    netoEl.textContent = 'Minorista $' + fmtNeto(n1) + ' | Mayorista $' + fmtNeto(n2);
+    netoEl.textContent = 'Costo neto $' + fmtNeto(calcularCostoNeto()) + ' | Minorista $' + fmtNeto(n1) + ' | Mayorista $' + fmtNeto(n2);
 }
 function autoCalcPrices() {
-    var costo = parseImporte(document.querySelector('[name="precomp"]').value);
+    var costo = calcularCostoNeto();
     var g1 = parseImporte(document.querySelector('[name="ganan1"]').value);
     var g2 = parseImporte(document.querySelector('[name="ganan2"]').value);
     var ivaPct = <?= json_encode($selectedIva) ?>;
@@ -629,7 +653,7 @@ function autoCalcPrices() {
     actualizarNeto();
 }
 function autoCalcMargins() {
-    var costo = parseImporte(document.querySelector('[name="precomp"]').value);
+    var costo = calcularCostoNeto();
     if (costo <= 0) { actualizarNeto(); return; }
     var ivaPct = <?= json_encode($selectedIva) ?>;
     var p1 = parseImporte(document.querySelector('[name="precio_gross"]').value);

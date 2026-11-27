@@ -146,6 +146,17 @@ final class ProductController
             $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Error al buscar productos: ' . $e->getMessage()];
         }
 
+        $posPromos = [];
+        if ($view === 'table' && !empty($result['items'])) {
+            try {
+                $posPromos = (new \Perfushopping\Web\Repo\PosProductPromoRepo())->getForProducts(
+                    array_map(static fn(array $item): int => (int)($item['idprodu'] ?? 0), $result['items'])
+                );
+            } catch (\Throwable $e) {
+                error_log('ProductController::index POS offers: ' . $e->getMessage());
+            }
+        }
+
         $brands = $this->repo->brandOptions();
         $categories = $this->repo->categoryOptions();
 
@@ -163,6 +174,7 @@ final class ProductController
             'brands' => $brands,
             'categories' => $categories,
             'products' => $result['items'],
+            'posPromos' => $posPromos,
             'csrf' => Csrf::token(),
             'flash' => $_SESSION['admin_flash'] ?? null,
             'pageTitle' => 'Productos',
@@ -311,7 +323,24 @@ final class ProductController
         $codprove = trim((string)($_POST['codprove'] ?? ''));
         $ganan1 = (float)str_replace(',', '.', trim((string)($_POST['ganan1'] ?? '0')));
         $ganan2 = (float)str_replace(',', '.', trim((string)($_POST['ganan2'] ?? '0')));
-        $precomp = $this->parseMoney((string)($_POST['precomp'] ?? '')) ?? 0;
+        $ivaRate = (float)($product['tiva'] ?? 0);
+        $costoRaw = (string)($_POST['costo_base'] ?? $_POST['precomp'] ?? '');
+        $costoBase = $this->parseMoney($costoRaw);
+        if (trim($costoRaw) !== '' && $costoBase === null) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'Ingresá un costo válido.'];
+            Response::redirect('/admin/productos/' . $idprodu);
+        }
+        $costoBase ??= 0;
+        $bonifRaw = trim((string)($_POST['bonificacion_pct'] ?? ''));
+        $bonifPct = $bonifRaw === '' ? 0 : $this->parseMoney($bonifRaw);
+        if ($bonifPct === null || $bonifPct > 100) {
+            $_SESSION['admin_flash'] = ['type' => 'danger', 'text' => 'La bonificación debe ser un porcentaje entre 0 y 100.'];
+            Response::redirect('/admin/productos/' . $idprodu);
+        }
+        $precomp = round($costoBase * (1 - $bonifPct / 100), 2);
+        if (isset($_POST['costo_iva_incluido'])) {
+            $precomp = $this->grossToNet($precomp, $ivaRate);
+        }
 
         $promoData = null;
         if (array_key_exists('promo_final_gross', $_POST)) {
@@ -351,7 +380,6 @@ final class ProductController
             }
         }
 
-        $ivaRate = (float)($product['tiva'] ?? 0);
         $this->repo->updateProduct($idprodu, $observ, $this->grossToNet($precioBruto, $ivaRate), $this->grossToNet($precio1Bruto, $ivaRate), $enweb, $produ, $codrub, $codsub, $codepar, $codprove, $ganan1, $ganan2, $precomp);
 
         if ($promoData !== null) {
@@ -428,6 +456,70 @@ final class ProductController
             'precio1_gross' => $precio1Bruto,
             'fecompra' => $cambioPrecio ? date('Y-m-d') : (string)($product['fecompra'] ?? ''),
         ]);
+    }
+
+    public function savePosOffer(array $params): void
+    {
+        $this->auth->requirePermiso('productos');
+        Csrf::check($_POST['_csrf'] ?? null);
+
+        $idprodu = (int)($_POST['idprodu'] ?? 0);
+        $product = $idprodu > 0 ? $this->repo->find($idprodu) : null;
+        if (!$product) {
+            Response::json(['ok' => false, 'error' => 'Producto no encontrado.'], 404);
+            return;
+        }
+
+        $priceRaw = trim((string)($_POST['promo_final_gross'] ?? ''));
+        $price = $this->parseMoney($priceRaw);
+        if ($priceRaw !== '' && ($price === null || $price <= 0)) {
+            Response::json(['ok' => false, 'error' => 'Ingresá un precio promocional válido mayor a cero.'], 422);
+            return;
+        }
+        if ($priceRaw === '') {
+            try {
+                (new \Perfushopping\Web\Repo\PosProductPromoRepo())->saveOffer($idprodu, null, null, null);
+                Response::json(['ok' => true, 'message' => 'Oferta desactivada.']);
+            } catch (\Throwable $e) {
+                Response::json(['ok' => false, 'error' => $e->getMessage()], 500);
+            }
+            return;
+        }
+        $expiryRaw = trim((string)($_POST['promo_fecha_hasta'] ?? ''));
+        $unitsRaw = trim((string)($_POST['promo_unidades_limite'] ?? ''));
+        $expiry = null;
+        if ($expiryRaw !== '') {
+            $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $expiryRaw);
+            if (!$date || $date->format('Y-m-d') !== $expiryRaw) {
+                Response::json(['ok' => false, 'error' => 'La fecha de vencimiento no es válida.'], 422);
+                return;
+            }
+            $expiry = $expiryRaw;
+        }
+        $units = null;
+        if ($unitsRaw !== '') {
+            if (!ctype_digit($unitsRaw) || (int)$unitsRaw <= 0) {
+                Response::json(['ok' => false, 'error' => 'Las unidades promo deben ser un entero mayor a cero.'], 422);
+                return;
+            }
+            $units = (int)$unitsRaw;
+        }
+        if ($expiry === null && $units === null) {
+            Response::json(['ok' => false, 'error' => 'Configurá una fecha de vencimiento, un límite de unidades o ambos.'], 422);
+            return;
+        }
+
+        try {
+            (new \Perfushopping\Web\Repo\PosProductPromoRepo())->saveOffer(
+                $idprodu,
+                (int)round((float)$price * 100),
+                $expiry,
+                $units
+            );
+            Response::json(['ok' => true, 'message' => 'Oferta guardada.']);
+        } catch (\Throwable $e) {
+            Response::json(['ok' => false, 'error' => $e->getMessage()], 500);
+        }
     }
 
     public function uploadMainImage(array $params): void

@@ -10,6 +10,7 @@ $view = (string)($view ?? 'cards');
 $brands = $brands ?? [];
 $categories = $categories ?? [];
 $products = $products ?? [];
+$posPromos = $posPromos ?? [];
 $page = (int)($page ?? 1);
 $perPage = (int)($perPage ?? 60);
 $total = (int)($total ?? 0);
@@ -163,7 +164,7 @@ $fecompraClass = static function (string $fcompra): string {
                         <?php foreach ($sortable as $col => $label):
                             $active = $sort === $col;
                         ?>
-                            <th class="<?= $active ? 'sort-active' : '' ?>">
+                            <th rowspan="2" class="<?= $active ? 'sort-active' : '' ?>">
                                 <a href="<?= htmlspecialchars($sortLink($col)) ?>" class="text-decoration-none d-flex align-items-center gap-1">
                                     <?= htmlspecialchars($label) ?>
                                     <?php if ($active): ?>
@@ -172,9 +173,15 @@ $fecompraClass = static function (string $fcompra): string {
                                 </a>
                             </th>
                         <?php endforeach; ?>
-                        <th>Var.</th>
-                        <th>Web</th>
-                        <th></th>
+                        <th rowspan="2">Var.</th>
+                        <th rowspan="2">Web</th>
+                        <th colspan="3" class="text-center">Oferta POS · solo efectivo o transferencia</th>
+                        <th rowspan="2"></th>
+                    </tr>
+                    <tr>
+                        <th>Precio final promo (IVA incluido)</th>
+                        <th>Válida hasta</th>
+                        <th>Unidades promo disponibles</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -182,6 +189,10 @@ $fecompraClass = static function (string $fcompra): string {
                         $itemId = (int)($item['idprodu'] ?? 0);
                         $itemIva = (float)($item['tiva'] ?? 0);
                         $itemGross = (float)($item['precio'] ?? 0) * (1 + ($itemIva / 100));
+                        $posPromo = $posPromos[$itemId] ?? [];
+                        $promoIsActive = !empty($posPromo['activo']);
+                        $promoPrice = $promoIsActive && (int)($posPromo['precio_final_cents'] ?? 0) > 0
+                            ? number_format((int)$posPromo['precio_final_cents'] / 100, 2, '.', '') : '';
                         $query = [];
                         if ($q !== '') $query['q'] = $q;
                         if ($codsub > 0) $query['codsub'] = (string)$codsub;
@@ -206,14 +217,19 @@ $fecompraClass = static function (string $fcompra): string {
                             <td class="text-center">
                                 <span class="badge <?= ((int)($item['enweb'] ?? 0) === 1) ? 'bg-success' : 'bg-secondary' ?>" style="font-size:10px"><?= ((int)($item['enweb'] ?? 0) === 1) ? 'ON' : 'OFF' ?></span>
                             </td>
+                            <td><input class="form-control form-control-sm js-pos-offer-price" type="number" min="0.01" step="0.01" value="<?= htmlspecialchars($promoPrice) ?>" placeholder="Vacío = sin oferta" title="Precio final promocional con IVA incluido" style="min-width:150px" /></td>
+                            <td><input class="form-control form-control-sm js-pos-offer-date" type="date" value="<?= htmlspecialchars((string)($posPromo['fecha_hasta'] ?? '')) ?>" title="Válida hasta" style="min-width:140px" /></td>
+                            <td><input class="form-control form-control-sm js-pos-offer-units" type="number" min="1" step="1" value="<?= !empty($posPromo['unidades_limite']) ? (int)$posPromo['unidades_limite'] : '' ?>" placeholder="Sin límite" title="Unidades promo disponibles" style="min-width:125px" /></td>
                             <td class="text-nowrap">
                                 <button type="button" class="btn btn-sm btn-outline-success py-0 px-1 js-quick-precio" title="Precios rápidos" style="font-size:11px"><i class="bi bi-calculator"></i></button>
+                                <button type="button" class="btn btn-sm btn-outline-primary py-0 px-1 js-save-pos-offer" data-idprodu="<?= $itemId ?>" data-csrf="<?= htmlspecialchars($csrf ?? '') ?>" title="Guardar oferta POS" style="font-size:11px"><i class="bi bi-tag"></i></button>
                                 <a class="btn btn-sm btn-outline-secondary py-0 px-1" href="<?= htmlspecialchars($href) ?>" style="font-size:11px"><i class="bi bi-pencil"></i></a>
+                                <span class="small js-pos-offer-status ms-1" aria-live="polite"></span>
                             </td>
                         </tr>
                     <?php endforeach; ?>
                     <tr id="quickPrecioRow" data-csrf="<?= htmlspecialchars($csrf ?? '') ?>" style="display:none">
-                        <td colspan="10">
+                        <td colspan="13">
                             <div class="d-flex align-items-center gap-2 flex-nowrap py-1">
                                 <span class="small fw-semibold text-nowrap">Costo</span>
                                 <input class="form-control form-control-sm q-costo" style="width:100px" inputmode="decimal" title="Costo (si tiene IVA incluido, marcar IVA inc.)" />
@@ -321,6 +337,51 @@ $fecompraClass = static function (string $fcompra): string {
         </nav>
     </div>
 <?php endif; ?>
+
+<script>
+(function () {
+    document.querySelectorAll('.js-save-pos-offer').forEach(function (button) {
+        button.addEventListener('click', function () {
+            var row = button.closest('tr');
+            var status = row ? row.querySelector('.js-pos-offer-status') : null;
+            if (!row || !status) return;
+            var price = row.querySelector('.js-pos-offer-price');
+            var date = row.querySelector('.js-pos-offer-date');
+            var units = row.querySelector('.js-pos-offer-units');
+            var priceValue = price.value.trim();
+            var body = new URLSearchParams({
+                _csrf: button.dataset.csrf || '',
+                idprodu: button.dataset.idprodu || '0',
+                promo_final_gross: priceValue,
+                promo_fecha_hasta: date.value,
+                promo_unidades_limite: units.value.trim()
+            });
+            button.disabled = true;
+            status.className = 'small js-pos-offer-status ms-1 text-muted';
+            status.textContent = 'Guardando…';
+            fetch('/admin/productos/save-pos-offer', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: body
+            }).then(function (response) {
+                return response.json().then(function (result) {
+                    if (!response.ok || !result.ok) throw new Error(result.error || 'No se pudo guardar la oferta.');
+                    return result;
+                });
+            }).then(function (result) {
+                status.className = 'small js-pos-offer-status ms-1 text-success';
+                status.textContent = result.message || 'Guardado';
+                window.setTimeout(function () { status.textContent = ''; }, 2500);
+            }).catch(function (error) {
+                status.className = 'small js-pos-offer-status ms-1 text-danger';
+                status.textContent = error.message || 'Error al guardar';
+            }).finally(function () {
+                button.disabled = false;
+            });
+        });
+    });
+})();
+</script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {

@@ -68,6 +68,19 @@ final class PosProductPromoRepo
         return $st->fetch() ?: null;
     }
 
+    /** @param int[] $productIds @return array<int,array<string,mixed>> keyed by product id */
+    public function getForProducts(array $productIds): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $productIds), static fn(int $id): bool => $id > 0)));
+        if (!$ids) return [];
+        $this->ensureTables();
+        $st = Db::pdo()->prepare('SELECT * FROM producto_promos_pos WHERE idcodgusto = 0 AND idprodu IN (' . implode(',', array_fill(0, count($ids), '?')) . ')');
+        $st->execute($ids);
+        $out = [];
+        foreach ($st->fetchAll() as $row) $out[(int)$row['idprodu']] = $row;
+        return $out;
+    }
+
     public function saveOffer(int $idprodu, ?int $priceCents, ?string $expiresOn, ?int $unitsLimit): void
     {
         $this->ensureTables();
